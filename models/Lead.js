@@ -144,17 +144,32 @@ class Lead {
    * @returns {Object} Leads with pagination info
    */
   static async findByOrganization(organizationId, options = {}) {
-    const {
-      limit = 50,
-      offset = 0,
-      status,
-      priority,
-      assigned_to,
-      source,
-      search,
-      sort = 'created_at',
-      order = 'desc'
-    } = options;
+    try {
+      console.log('Finding leads for organization:', organizationId, 'with options:', options);
+      
+      // First check if leads table exists
+      const tableCheck = await query(`
+        SELECT table_name 
+        FROM information_schema.tables 
+        WHERE table_schema = 'public' AND table_name = 'leads'
+      `, []);
+      
+      if (tableCheck.rows.length === 0) {
+        console.error('Leads table does not exist!');
+        throw new Error('Leads table not found in database. Please run migrations.');
+      }
+
+      const {
+        limit = 50,
+        offset = 0,
+        status,
+        priority,
+        assigned_to,
+        source,
+        search,
+        sort = 'created_at',
+        order = 'desc'
+      } = options;
 
     let query_text = `
       SELECT l.*, 
@@ -263,15 +278,19 @@ class Lead {
     const countResult = await query(countQuery, countParams, organizationId);
     const total = parseInt(countResult.rows[0].total);
 
-    return {
-      leads,
-      pagination: {
-        total,
-        page: Math.floor(offset / limit) + 1,
-        limit,
-        pages: Math.ceil(total / limit)
-      }
-    };
+      return {
+        leads,
+        pagination: {
+          total,
+          page: Math.floor(offset / limit) + 1,
+          limit,
+          pages: Math.ceil(total / limit)
+        }
+      };
+    } catch (error) {
+      console.error('Error in findByOrganization:', error);
+      throw error;
+    }
   }
 
   /**
@@ -336,25 +355,47 @@ class Lead {
    * @returns {Object} Lead statistics
    */
   static async getStats(organizationId) {
-    const result = await query(`
-      SELECT 
-        COUNT(*) as total_leads,
-        COUNT(CASE WHEN status = 'new' THEN 1 END) as new_leads,
-        COUNT(CASE WHEN status = 'contacted' THEN 1 END) as contacted_leads,
-        COUNT(CASE WHEN status = 'qualified' THEN 1 END) as qualified_leads,
-        COUNT(CASE WHEN status = 'converted' THEN 1 END) as converted_leads,
-        COUNT(CASE WHEN status = 'lost' THEN 1 END) as lost_leads,
-        COUNT(CASE WHEN priority = 'high' THEN 1 END) as high_priority,
-        COUNT(CASE WHEN assigned_to IS NOT NULL THEN 1 END) as assigned_leads,
-        COUNT(CASE WHEN created_at >= NOW() - INTERVAL '7 days' THEN 1 END) as new_this_week,
-        COUNT(CASE WHEN created_at >= NOW() - INTERVAL '30 days' THEN 1 END) as new_this_month,
-        COALESCE(SUM(value), 0) as total_value,
-        COALESCE(AVG(value), 0) as average_value
-      FROM leads 
-      WHERE organization_id = $1
-    `, [organizationId], organizationId);
+    try {
+      console.log('Getting stats for organization:', organizationId);
+      
+      // First check if leads table exists
+      const tableCheck = await query(`
+        SELECT table_name 
+        FROM information_schema.tables 
+        WHERE table_schema = 'public' AND table_name = 'leads'
+      `, []);
+      
+      console.log('Table check result:', tableCheck.rows);
+      
+      if (tableCheck.rows.length === 0) {
+        console.error('Leads table does not exist!');
+        throw new Error('Leads table not found in database. Please run migrations.');
+      }
 
-    return result.rows[0];
+      const result = await query(`
+        SELECT 
+          COUNT(*) as total_leads,
+          COUNT(CASE WHEN status = 'new' THEN 1 END) as new_leads,
+          COUNT(CASE WHEN status = 'contacted' THEN 1 END) as contacted_leads,
+          COUNT(CASE WHEN status = 'qualified' THEN 1 END) as qualified_leads,
+          COUNT(CASE WHEN status = 'converted' THEN 1 END) as converted_leads,
+          COUNT(CASE WHEN status = 'lost' THEN 1 END) as lost_leads,
+          COUNT(CASE WHEN priority = 'high' THEN 1 END) as high_priority,
+          COUNT(CASE WHEN assigned_to IS NOT NULL THEN 1 END) as assigned_leads,
+          COUNT(CASE WHEN created_at >= NOW() - INTERVAL '7 days' THEN 1 END) as new_this_week,
+          COUNT(CASE WHEN created_at >= NOW() - INTERVAL '30 days' THEN 1 END) as new_this_month,
+          COALESCE(SUM(value), 0) as total_value,
+          COALESCE(AVG(value), 0) as average_value
+        FROM leads 
+        WHERE organization_id = $1
+      `, [organizationId], organizationId);
+
+      console.log('Stats query result:', result.rows[0]);
+      return result.rows[0];
+    } catch (error) {
+      console.error('Error in getStats:', error);
+      throw error;
+    }
   }
 
   /**

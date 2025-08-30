@@ -17,6 +17,51 @@ const router = express.Router();
 router.use(authenticateToken);
 router.use(validateOrganizationContext);
 
+/**
+ * GET /leads/debug/tables
+ * Debug endpoint to check database tables (development only)
+ */
+router.get('/debug/tables', async (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(404).json({ error: 'Not found' });
+  }
+  
+  try {
+    const { query } = require('../database/connection');
+    
+    // Check all tables
+    const tables = await query(`
+      SELECT table_name, table_schema 
+      FROM information_schema.tables 
+      WHERE table_schema = 'public'
+      ORDER BY table_name
+    `);
+    
+    // Check if leads table specifically exists with its columns
+    const leadsColumns = await query(`
+      SELECT column_name, data_type, is_nullable, column_default
+      FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'leads'
+      ORDER BY ordinal_position
+    `);
+    
+    res.json({
+      message: 'Database debug info',
+      organizationId: req.organizationId,
+      userId: req.user?.id,
+      tables: tables.rows,
+      leadsTableColumns: leadsColumns.rows,
+      leadsTableExists: leadsColumns.rows.length > 0
+    });
+  } catch (error) {
+    console.error('Debug error:', error);
+    res.status(500).json({
+      error: 'Debug failed',
+      message: error.message
+    });
+  }
+});
+
 // Lead validation schemas
 const leadSchemas = {
   createLead: {
@@ -82,6 +127,18 @@ router.get('/',
   validate(leadSchemas.listLeads),
   async (req, res) => {
     try {
+      console.log('Getting leads for organization:', req.organizationId);
+      console.log('Query params:', req.query);
+      
+      // Check if organization ID exists
+      if (!req.organizationId) {
+        console.error('Missing organization ID in request');
+        return res.status(400).json({
+          error: 'Missing organization context',
+          message: 'Organization ID is required'
+        });
+      }
+
       const { 
         page = 1, 
         limit = 20,
@@ -108,15 +165,23 @@ router.get('/',
         order
       });
 
+      console.log(`Found ${result.leads.length} leads out of ${result.pagination.total} total`);
+
       res.json({
         leads: result.leads.map(lead => lead.toJSON()),
         pagination: result.pagination
       });
     } catch (error) {
       console.error('Get leads error:', error);
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        organizationId: req.organizationId
+      });
       res.status(500).json({
         error: 'Failed to retrieve leads',
-        message: 'Unable to get leads list'
+        message: 'Unable to get leads list',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }
   }
@@ -129,7 +194,20 @@ router.get('/',
 router.get('/stats',
   async (req, res) => {
     try {
+      console.log('Getting lead stats for organization:', req.organizationId);
+      console.log('User:', req.user?.id);
+      
+      // Check if organization ID exists
+      if (!req.organizationId) {
+        console.error('Missing organization ID in request');
+        return res.status(400).json({
+          error: 'Missing organization context',
+          message: 'Organization ID is required'
+        });
+      }
+
       const stats = await Lead.getStats(req.organizationId);
+      console.log('Raw stats from database:', stats);
       
       res.json({
         stats: {
@@ -143,9 +221,15 @@ router.get('/stats',
       });
     } catch (error) {
       console.error('Get lead stats error:', error);
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        organizationId: req.organizationId
+      });
       res.status(500).json({
         error: 'Failed to retrieve statistics',
-        message: 'Unable to get lead statistics'
+        message: 'Unable to get lead statistics',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }
   }
