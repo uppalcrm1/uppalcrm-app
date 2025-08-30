@@ -4,9 +4,15 @@ const Organization = require('../models/Organization');
 const { validateLogin, validateRegister } = require('../middleware/validation');
 const { resolveOrganization, authenticateToken } = require('../middleware/auth');
 const { createRateLimiters, preventTimingAttacks } = require('../middleware/security');
+const emailService = require('../services/emailService');
 
 const router = express.Router();
 const rateLimiters = createRateLimiters();
+
+// Initialize email service
+emailService.initialize().catch(err => {
+  console.warn('Email service initialization failed:', err.message);
+});
 
 /**
  * POST /auth/register
@@ -25,6 +31,35 @@ router.post('/register',
       // Generate token for the admin user
       const user = await User.findById(result.admin_user_id, result.organization.id);
       const tokenData = await user.generateToken(req.ip, req.get('User-Agent'));
+
+      // Send welcome email with login credentials (non-blocking)
+      const sendWelcomeEmail = async () => {
+        try {
+          const loginUrl = `${process.env.FRONTEND_URL || 'https://uppalcrm-frontend.onrender.com'}/login?org=${result.organization.slug}`;
+          
+          await emailService.sendWelcomeEmail({
+            organizationName: result.organization.name,
+            adminEmail: admin.email,
+            adminName: `${admin.first_name} ${admin.last_name}`,
+            loginUrl: loginUrl,
+            temporaryPassword: admin.password, // Original password before hashing
+            organizationSlug: result.organization.slug
+          });
+          
+          console.log(`✅ Welcome email sent to ${admin.email} for organization ${result.organization.name}`);
+        } catch (emailError) {
+          console.error('Failed to send welcome email:', {
+            error: emailError.message,
+            organizationId: result.organization.id,
+            adminEmail: admin.email,
+            organizationName: result.organization.name
+          });
+          // Don't throw error - email failure shouldn't prevent registration success
+        }
+      };
+
+      // Send email asynchronously (don't wait for it)
+      sendWelcomeEmail();
 
       res.status(201).json({
         message: 'Organization created successfully',
