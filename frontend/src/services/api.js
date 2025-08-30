@@ -1,0 +1,197 @@
+import axios from 'axios'
+import toast from 'react-hot-toast'
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
+
+// Create axios instance
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 10000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+})
+
+// Auth token management
+let authToken = localStorage.getItem('authToken')
+let organizationSlug = localStorage.getItem('organizationSlug')
+
+export const setAuthToken = (token) => {
+  authToken = token
+  localStorage.setItem('authToken', token)
+  api.defaults.headers.common['Authorization'] = `Bearer ${token}`
+}
+
+export const setOrganizationSlug = (slug) => {
+  organizationSlug = slug
+  localStorage.setItem('organizationSlug', slug)
+  api.defaults.headers.common['X-Organization-Slug'] = slug
+}
+
+export const clearAuth = () => {
+  authToken = null
+  organizationSlug = null
+  localStorage.removeItem('authToken')
+  localStorage.removeItem('organizationSlug')
+  delete api.defaults.headers.common['Authorization']
+  delete api.defaults.headers.common['X-Organization-Slug']
+}
+
+// Set initial headers if tokens exist
+if (authToken) {
+  api.defaults.headers.common['Authorization'] = `Bearer ${authToken}`
+}
+if (organizationSlug) {
+  api.defaults.headers.common['X-Organization-Slug'] = organizationSlug
+}
+
+// Response interceptor for error handling
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const message = error.response?.data?.message || error.message || 'An error occurred'
+    
+    if (error.response?.status === 401) {
+      clearAuth()
+      window.location.href = '/login'
+      toast.error('Session expired. Please log in again.')
+    } else if (error.response?.status >= 500) {
+      toast.error('Server error. Please try again later.')
+    } else if (error.response?.status === 429) {
+      toast.error('Too many requests. Please wait a moment.')
+    } else if (!error.response) {
+      toast.error('Network error. Please check your connection.')
+    }
+    
+    return Promise.reject(error)
+  }
+)
+
+// Auth API
+export const authAPI = {
+  login: async (email, password, orgSlug) => {
+    const response = await api.post('/auth/login', { email, password }, {
+      headers: { 'X-Organization-Slug': orgSlug }
+    })
+    return response.data
+  },
+  
+  register: async (organizationData, adminData) => {
+    const response = await api.post('/auth/register', {
+      organization: organizationData,
+      admin: adminData
+    })
+    return response.data
+  },
+  
+  me: async () => {
+    const response = await api.get('/auth/me')
+    return response.data
+  },
+  
+  logout: async () => {
+    await api.post('/auth/logout')
+    clearAuth()
+  },
+  
+  refresh: async () => {
+    const response = await api.post('/auth/refresh')
+    return response.data
+  }
+}
+
+// Users API
+export const usersAPI = {
+  getUsers: async (params = {}) => {
+    const response = await api.get('/users', { params })
+    return response.data
+  },
+  
+  getUser: async (id) => {
+    const response = await api.get(`/users/${id}`)
+    return response.data
+  },
+  
+  createUser: async (userData) => {
+    const response = await api.post('/users', userData)
+    return response.data
+  },
+  
+  updateUser: async (id, userData) => {
+    const response = await api.put(`/users/${id}`, userData)
+    return response.data
+  },
+  
+  deleteUser: async (id) => {
+    const response = await api.delete(`/users/${id}`)
+    return response.data
+  },
+  
+  getStats: async () => {
+    const response = await api.get('/users/stats')
+    return response.data
+  }
+}
+
+// Organizations API
+export const organizationsAPI = {
+  getCurrent: async () => {
+    const response = await api.get('/organizations/current')
+    return response.data
+  },
+  
+  updateCurrent: async (orgData) => {
+    const response = await api.put('/organizations/current', orgData)
+    return response.data
+  },
+  
+  getStats: async () => {
+    const response = await api.get('/organizations/current/stats')
+    return response.data
+  },
+  
+  getUsage: async () => {
+    const response = await api.get('/organizations/current/usage')
+    return response.data
+  }
+}
+
+// Leads API (we'll extend the backend for this)
+export const leadsAPI = {
+  getLeads: async (params = {}) => {
+    const response = await api.get('/leads', { params })
+    return response.data
+  },
+  
+  getLead: async (id) => {
+    const response = await api.get(`/leads/${id}`)
+    return response.data
+  },
+  
+  createLead: async (leadData) => {
+    const response = await api.post('/leads', leadData)
+    return response.data
+  },
+  
+  updateLead: async (id, leadData) => {
+    const response = await api.put(`/leads/${id}`, leadData)
+    return response.data
+  },
+  
+  deleteLead: async (id) => {
+    const response = await api.delete(`/leads/${id}`)
+    return response.data
+  },
+  
+  assignLead: async (leadId, userId) => {
+    const response = await api.put(`/leads/${leadId}/assign`, { assignedTo: userId })
+    return response.data
+  },
+  
+  getStats: async () => {
+    const response = await api.get('/leads/stats')
+    return response.data
+  }
+}
+
+export default api
