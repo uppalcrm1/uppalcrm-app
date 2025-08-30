@@ -29,12 +29,19 @@ async function migrate() {
   try {
     console.log('🔄 Starting database migration...');
     
-    // Read schema file
+    // Read and execute base schema file
     const schemaPath = path.join(__dirname, '../database/schema.sql');
     const schema = fs.readFileSync(schemaPath, 'utf8');
     
-    // Execute schema
+    console.log('🔧 Creating base schema (organizations, users, sessions)...');
     await client.query(schema);
+    
+    // Read and execute comprehensive leads migration
+    const leadsSchemaPath = path.join(__dirname, '../database/comprehensive-leads-migration.sql');
+    const leadsSchema = fs.readFileSync(leadsSchemaPath, 'utf8');
+    
+    console.log('🔧 Creating comprehensive lead management tables...');
+    await client.query(leadsSchema);
     
     console.log('✅ Database schema created successfully');
     
@@ -84,11 +91,25 @@ async function reset() {
   try {
     console.log('🔄 Resetting database...');
     
-    // Drop all tables
+    // Drop all tables in correct order
     await client.query(`
+      -- Drop lead-related tables first (due to foreign keys)
+      DROP TABLE IF EXISTS lead_documents CASCADE;
+      DROP TABLE IF EXISTS lead_tag_assignments CASCADE;
+      DROP TABLE IF EXISTS lead_tags CASCADE;
+      DROP TABLE IF EXISTS lead_scoring_rules CASCADE;
+      DROP TABLE IF EXISTS lead_interactions CASCADE;
+      DROP TABLE IF EXISTS lead_assignments CASCADE;
+      DROP TABLE IF EXISTS leads CASCADE;
+      DROP TABLE IF EXISTS lead_statuses CASCADE;
+      DROP TABLE IF EXISTS lead_sources CASCADE;
+      
+      -- Drop auth tables
       DROP TABLE IF EXISTS user_sessions CASCADE;
       DROP TABLE IF EXISTS users CASCADE;
       DROP TABLE IF EXISTS organizations CASCADE;
+      
+      -- Drop functions
       DROP FUNCTION IF EXISTS update_updated_at_column() CASCADE;
       DROP FUNCTION IF EXISTS check_user_limit() CASCADE;
       DROP FUNCTION IF EXISTS create_organization_with_admin() CASCADE;
@@ -141,18 +162,38 @@ async function status() {
     
     // Check for data
     if (tablesResult.rows.length > 0) {
-      const dataResult = await client.query(`
+      let dataQuery = `
         SELECT 
           (SELECT COUNT(*) FROM organizations) as organizations,
           (SELECT COUNT(*) FROM users) as users,
-          (SELECT COUNT(*) FROM user_sessions) as sessions;
-      `);
+          (SELECT COUNT(*) FROM user_sessions) as sessions`;
       
+      // Add leads data if leads table exists
+      const hasLeadsTable = tablesResult.rows.some(row => row.table_name === 'leads');
+      if (hasLeadsTable) {
+        dataQuery += `,
+          (SELECT COUNT(*) FROM leads) as leads,
+          (SELECT COUNT(*) FROM lead_sources) as lead_sources,
+          (SELECT COUNT(*) FROM lead_statuses) as lead_statuses,
+          (SELECT COUNT(*) FROM lead_interactions) as lead_interactions`;
+      }
+      
+      dataQuery += ';';
+      
+      const dataResult = await client.query(dataQuery);
       const data = dataResult.rows[0];
+      
       console.log('📈 Data counts:');
       console.log(`  - Organizations: ${data.organizations}`);
       console.log(`  - Users: ${data.users}`);
       console.log(`  - Active Sessions: ${data.sessions}`);
+      
+      if (hasLeadsTable) {
+        console.log(`  - Leads: ${data.leads}`);
+        console.log(`  - Lead Sources: ${data.lead_sources}`);
+        console.log(`  - Lead Statuses: ${data.lead_statuses}`);
+        console.log(`  - Lead Interactions: ${data.lead_interactions}`);
+      }
     }
     
   } catch (error) {
