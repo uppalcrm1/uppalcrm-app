@@ -18,9 +18,17 @@ const runMigration = async () => {
 
   console.log('🚀 Starting production database migration...');
 
+  // Render-optimized connection configuration
   const pool = new Pool({
     connectionString: databaseUrl,
-    ssl: databaseUrl.includes('render.com') ? { rejectUnauthorized: false } : false
+    ssl: databaseUrl.includes('render.com') || databaseUrl.includes('onrender.com') ? { 
+      rejectUnauthorized: false,
+      sslmode: 'require'
+    } : false,
+    // Optimized settings for Render PostgreSQL
+    max: 5, // Smaller pool for migrations
+    idleTimeoutMillis: 10000,
+    connectionTimeoutMillis: 15000
   });
 
   try {

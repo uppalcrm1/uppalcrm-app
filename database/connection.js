@@ -7,9 +7,9 @@ const dbConfig = process.env.DATABASE_URL ? {
   max: 20, // Maximum number of connections in pool
   idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
   connectionTimeoutMillis: 15000, // Increase timeout for cloud connections
-  ssl: { rejectUnauthorized: false }, // Required for Supabase and other cloud providers
-  // Force IPv4 for better compatibility
-  options: '-c default_transaction_isolation=read_committed'
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  // Remove transaction isolation setting for better Render compatibility
+  // Render PostgreSQL manages this automatically
 } : {
   host: process.env.DB_HOST || 'localhost',
   port: process.env.DB_PORT || 5432,
