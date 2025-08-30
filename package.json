@@ -9,7 +9,8 @@
     "migrate": "node scripts/migrate.js",
     "migrate:production": "node scripts/production-migrate.js",
     "seed": "node scripts/seed.js",
-    "generate:secrets": "node scripts/generate-secrets.js"
+    "generate:secrets": "node scripts/generate-secrets.js",
+    "check:database": "node scripts/check-database.js"
   },
   "dependencies": {
     "axios": "^1.11.0",

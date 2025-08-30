@@ -275,8 +275,8 @@ class Lead {
       countParams.push(searchPattern, searchPattern, searchPattern, searchPattern);
     }
 
-    const countResult = await query(countQuery, countParams, organizationId);
-    const total = parseInt(countResult.rows[0].total);
+      const countResult = await query(countQuery, countParams, organizationId);
+      const total = parseInt(countResult.rows[0].total);
 
       return {
         leads,
