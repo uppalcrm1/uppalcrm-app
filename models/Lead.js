@@ -171,21 +171,57 @@ class Lead {
         order = 'desc'
       } = options;
 
-    let query_text = `
-      SELECT l.*, 
-             u.first_name as assigned_first_name, 
-             u.last_name as assigned_last_name
-      FROM leads l
-      LEFT JOIN users u ON l.assigned_to = u.id AND u.organization_id = l.organization_id
-      WHERE l.organization_id = $1
-    `;
+    // Check schema to determine query structure
+    const hasStatusRelation = await query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'leads' AND column_name = 'lead_status_id'
+    `, []);
+
+    const hasSourceRelation = await query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'leads' AND column_name = 'lead_source_id'
+    `, []);
+
+    let query_text;
+    
+    if (hasStatusRelation.rows.length > 0) {
+      // New comprehensive schema
+      query_text = `
+        SELECT l.*, 
+               u.first_name as assigned_first_name, 
+               u.last_name as assigned_last_name,
+               ls.name as status,
+               lsr.name as source
+        FROM leads l
+        LEFT JOIN users u ON l.assigned_to = u.id AND u.organization_id = l.organization_id
+        LEFT JOIN lead_statuses ls ON l.lead_status_id = ls.id
+        LEFT JOIN lead_sources lsr ON l.lead_source_id = lsr.id
+        WHERE l.organization_id = $1
+      `;
+    } else {
+      // Old simple schema
+      query_text = `
+        SELECT l.*, 
+               u.first_name as assigned_first_name, 
+               u.last_name as assigned_last_name
+        FROM leads l
+        LEFT JOIN users u ON l.assigned_to = u.id AND u.organization_id = l.organization_id
+        WHERE l.organization_id = $1
+      `;
+    }
     
     const params = [organizationId];
     let paramCount = 1;
 
     // Add filters
     if (status) {
-      query_text += ` AND l.status = $${++paramCount}`;
+      if (hasStatusRelation.rows.length > 0) {
+        query_text += ` AND ls.name ILIKE $${++paramCount}`;
+      } else {
+        query_text += ` AND l.status = $${++paramCount}`;
+      }
       params.push(status);
     }
 
@@ -200,7 +236,11 @@ class Lead {
     }
 
     if (source) {
-      query_text += ` AND l.source = $${++paramCount}`;
+      if (hasSourceRelation.rows.length > 0) {
+        query_text += ` AND lsr.name ILIKE $${++paramCount}`;
+      } else {
+        query_text += ` AND l.source = $${++paramCount}`;
+      }
       params.push(source);
     }
 
@@ -372,23 +412,82 @@ class Lead {
         throw new Error('Leads table not found in database. Please run migrations.');
       }
 
-      const result = await query(`
-        SELECT 
-          COUNT(*) as total_leads,
-          COUNT(CASE WHEN status = 'new' THEN 1 END) as new_leads,
-          COUNT(CASE WHEN status = 'contacted' THEN 1 END) as contacted_leads,
-          COUNT(CASE WHEN status = 'qualified' THEN 1 END) as qualified_leads,
-          COUNT(CASE WHEN status = 'converted' THEN 1 END) as converted_leads,
-          COUNT(CASE WHEN status = 'lost' THEN 1 END) as lost_leads,
-          COUNT(CASE WHEN priority = 'high' THEN 1 END) as high_priority,
-          COUNT(CASE WHEN assigned_to IS NOT NULL THEN 1 END) as assigned_leads,
-          COUNT(CASE WHEN created_at >= NOW() - INTERVAL '7 days' THEN 1 END) as new_this_week,
-          COUNT(CASE WHEN created_at >= NOW() - INTERVAL '30 days' THEN 1 END) as new_this_month,
-          COALESCE(SUM(value), 0) as total_value,
-          COALESCE(AVG(value), 0) as average_value
-        FROM leads 
-        WHERE organization_id = $1
-      `, [organizationId], organizationId);
+      // First, let's check if we have the old simple leads table or new comprehensive one
+      const hasStatusColumn = await query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'leads' AND column_name = 'status'
+      `, []);
+
+      const hasStatusRelation = await query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'leads' AND column_name = 'lead_status_id'
+      `, []);
+
+      let statsQuery;
+      
+      if (hasStatusRelation.rows.length > 0) {
+        // New comprehensive schema with lead_statuses table
+        statsQuery = `
+          SELECT 
+            COUNT(*) as total_leads,
+            COUNT(CASE WHEN ls.name ILIKE 'new' THEN 1 END) as new_leads,
+            COUNT(CASE WHEN ls.name ILIKE 'contacted' THEN 1 END) as contacted_leads,
+            COUNT(CASE WHEN ls.name ILIKE 'qualified' THEN 1 END) as qualified_leads,
+            COUNT(CASE WHEN ls.name ILIKE 'converted' THEN 1 END) as converted_leads,
+            COUNT(CASE WHEN ls.name ILIKE 'lost' THEN 1 END) as lost_leads,
+            COUNT(CASE WHEN l.priority = 'high' THEN 1 END) as high_priority,
+            COUNT(CASE WHEN l.assigned_to IS NOT NULL THEN 1 END) as assigned_leads,
+            COUNT(CASE WHEN l.created_at >= NOW() - INTERVAL '7 days' THEN 1 END) as new_this_week,
+            COUNT(CASE WHEN l.created_at >= NOW() - INTERVAL '30 days' THEN 1 END) as new_this_month,
+            COALESCE(SUM(l.value), 0) as total_value,
+            COALESCE(AVG(l.value), 0) as average_value
+          FROM leads l
+          LEFT JOIN lead_statuses ls ON l.lead_status_id = ls.id
+          WHERE l.organization_id = $1
+        `;
+      } else if (hasStatusColumn.rows.length > 0) {
+        // Old simple schema with status column
+        statsQuery = `
+          SELECT 
+            COUNT(*) as total_leads,
+            COUNT(CASE WHEN status = 'new' THEN 1 END) as new_leads,
+            COUNT(CASE WHEN status = 'contacted' THEN 1 END) as contacted_leads,
+            COUNT(CASE WHEN status = 'qualified' THEN 1 END) as qualified_leads,
+            COUNT(CASE WHEN status = 'converted' THEN 1 END) as converted_leads,
+            COUNT(CASE WHEN status = 'lost' THEN 1 END) as lost_leads,
+            COUNT(CASE WHEN priority = 'high' THEN 1 END) as high_priority,
+            COUNT(CASE WHEN assigned_to IS NOT NULL THEN 1 END) as assigned_leads,
+            COUNT(CASE WHEN created_at >= NOW() - INTERVAL '7 days' THEN 1 END) as new_this_week,
+            COUNT(CASE WHEN created_at >= NOW() - INTERVAL '30 days' THEN 1 END) as new_this_month,
+            COALESCE(SUM(value), 0) as total_value,
+            COALESCE(AVG(value), 0) as average_value
+          FROM leads 
+          WHERE organization_id = $1
+        `;
+      } else {
+        // Fallback - just count leads
+        statsQuery = `
+          SELECT 
+            COUNT(*) as total_leads,
+            0 as new_leads,
+            0 as contacted_leads,
+            0 as qualified_leads,
+            0 as converted_leads,
+            0 as lost_leads,
+            0 as high_priority,
+            COUNT(CASE WHEN assigned_to IS NOT NULL THEN 1 END) as assigned_leads,
+            COUNT(CASE WHEN created_at >= NOW() - INTERVAL '7 days' THEN 1 END) as new_this_week,
+            COUNT(CASE WHEN created_at >= NOW() - INTERVAL '30 days' THEN 1 END) as new_this_month,
+            COALESCE(SUM(value), 0) as total_value,
+            COALESCE(AVG(value), 0) as average_value
+          FROM leads 
+          WHERE organization_id = $1
+        `;
+      }
+
+      const result = await query(statsQuery, [organizationId], organizationId);
 
       console.log('Stats query result:', result.rows[0]);
       return result.rows[0];
