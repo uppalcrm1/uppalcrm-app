@@ -288,15 +288,14 @@ function generateSecurePassword() {
     return password.split('').sort(() => Math.random() - 0.5).join('');
 }
 
-// Generate slug from company name
+// Generate slug from company name (alphanumeric only)
 function generateSlug(companyName) {
     return companyName
         .toLowerCase()
         .trim()
-        .replace(/[^\w\s-]/g, '') // Remove special characters
-        .replace(/\s+/g, '-') // Replace spaces with hyphens
-        .replace(/-+/g, '-') // Replace multiple hyphens with single
-        .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
+        .replace(/[^\w\s]/g, '') // Remove all special characters
+        .replace(/\s+/g, '') // Remove all spaces
+        .replace(/[^a-z0-9]/g, ''); // Keep only alphanumeric characters
 }
 
 // Real API call for trial signup
