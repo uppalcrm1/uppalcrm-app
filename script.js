@@ -307,12 +307,24 @@ async function simulateTrialSignup(data) {
         // Generate organization slug from company name
         const organizationSlug = generateSlug(data.company);
         
+        // Extract domain from website URL if provided
+        let domainOnly = null;
+        if (data.website && data.website.trim() !== '') {
+            try {
+                const url = new URL(data.website.startsWith('http') ? data.website : 'https://' + data.website);
+                domainOnly = url.hostname;
+            } catch (e) {
+                // If URL parsing fails, assume it's already a domain
+                domainOnly = data.website.replace(/^https?:\/\//, '').split('/')[0];
+            }
+        }
+
         // Format data according to API requirements
         const requestData = {
             organization: {
                 name: data.company,
                 slug: organizationSlug,
-                domain: data.website || null
+                domain: domainOnly
             },
             admin: {
                 email: data.email.toLowerCase().trim(),
