@@ -15,7 +15,7 @@ export default defineConfig({
         }
         
         // Copy _redirects file to dist root for Render SPA routing
-        const redirectsSrc = resolve('public/_redirects')
+        const redirectsSrc = resolve('../_redirects')
         const redirectsDest = resolve('dist/_redirects')
         
         if (existsSync(redirectsSrc)) {
