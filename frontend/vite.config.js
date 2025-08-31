@@ -17,4 +17,7 @@ export default defineConfig({
     outDir: 'dist',
     assetsDir: 'assets',
   },
+  publicDir: 'public',
+  // Copy _redirects file to build output for Render SPA routing
+  assetsInclude: ['**/_redirects']
 })
