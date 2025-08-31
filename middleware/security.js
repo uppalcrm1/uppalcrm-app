@@ -282,6 +282,16 @@ const configureCORS = () => {
         return callback(null, true);
       }
       
+      // Allow Netlify domains for marketing site
+      if (origin.includes('.netlify.app')) {
+        return callback(null, true);
+      }
+      
+      // Allow specific Netlify domain
+      if (origin === 'https://uppalcrmapp.netlify.app') {
+        return callback(null, true);
+      }
+      
       callback(new Error('Not allowed by CORS'));
     },
     credentials: true,
