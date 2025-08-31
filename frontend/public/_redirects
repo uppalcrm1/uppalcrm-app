@@ -1,9 +1,1 @@
-# SPA routing for React Router on Render
-# API routes proxy to backend
-/api/* https://uppalcrm-api.onrender.com/api/:splat 200
-
-# Health check endpoint
-/health https://uppalcrm-api.onrender.com/health 200
-
-# All other routes serve index.html for client-side routing
-/* /index.html 200!
+/*    /index.html   200
