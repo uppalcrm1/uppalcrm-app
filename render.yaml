@@ -42,23 +42,13 @@ services:
       - key: FRONTEND_URL
         value: https://uppalcrm-frontend.onrender.com
 
-  # Frontend Static Site
+  # Frontend Web Service with Express
   - type: web
     name: uppalcrm-frontend
-    runtime: static
+    runtime: node
     buildCommand: npm install && npm run build
-    staticPublishPath: ./dist
+    startCommand: npm start
     rootDir: frontend
-    routes:
-      - type: rewrite
-        source: /api/*
-        destination: https://uppalcrm-api.onrender.com/api/:splat
-      - type: rewrite
-        source: /health
-        destination: https://uppalcrm-api.onrender.com/health
-      - type: rewrite
-        source: /*
-        destination: /index.html
     envVars:
       - key: VITE_API_URL
         value: https://uppalcrm-api.onrender.com/api
