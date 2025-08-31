@@ -34,19 +34,25 @@ class EmailService {
       this.transporter = nodemailer.createTransport({
         host: process.env.SMTP_HOST || 'smtp-relay.brevo.com',
         port: parseInt(process.env.SMTP_PORT) || 587,
-        secure: false, // Use STARTTLS
+        secure: false, // Use STARTTLS (TLS on port 587)
         auth: {
           user: process.env.SMTP_USER, // Your Brevo login email
-          pass: process.env.SMTP_PASS  // Your Brevo SMTP key
+          pass: process.env.SMTP_PASS  // Your Brevo SMTP key (not login password!)
         },
-        // Brevo-specific options for better deliverability
+        // Brevo-specific TLS configuration
         tls: {
-          rejectUnauthorized: false
+          rejectUnauthorized: false,
+          ciphers: 'SSLv3'
         },
-        pool: true, // Use connection pooling
-        maxConnections: 5,
-        maxMessages: 100,
-        rateLimit: 14 // Max 14 emails per second (Brevo limit)
+        // Connection settings optimized for Brevo
+        pool: true,
+        maxConnections: 3, // Conservative for Brevo
+        maxMessages: 50,   // Conservative batch size
+        rateLimit: 10,     // Conservative rate limit (Brevo allows 14/sec)
+        // Add connection timeout settings
+        connectionTimeout: 60000, // 60 seconds
+        greetingTimeout: 30000,   // 30 seconds
+        socketTimeout: 60000      // 60 seconds
       });
 
       // Verify SMTP connection
