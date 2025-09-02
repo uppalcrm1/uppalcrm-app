@@ -53,17 +53,21 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const initAuth = async () => {
       const token = localStorage.getItem('authToken')
-      const orgSlug = localStorage.getItem('organizationSlug')
       
-      if (!token || !orgSlug) {
+      if (!token) {
         dispatch({ type: 'AUTH_ERROR' })
         return
       }
 
       try {
         setAuthToken(token)
-        setOrganizationSlug(orgSlug)
         const data = await authAPI.me()
+        
+        // Set organization slug from the response if not already set
+        if (data.organization?.slug) {
+          setOrganizationSlug(data.organization.slug)
+        }
+        
         dispatch({
           type: 'AUTH_SUCCESS',
           payload: {
@@ -81,14 +85,14 @@ export const AuthProvider = ({ children }) => {
     initAuth()
   }, [])
 
-  const login = async (email, password, organizationSlug) => {
+  const login = async (email, password) => {
     dispatch({ type: 'AUTH_START' })
     
     try {
-      const data = await authAPI.login(email, password, organizationSlug)
+      const data = await authAPI.login(email, password)
       
       setAuthToken(data.token)
-      setOrganizationSlug(organizationSlug)
+      setOrganizationSlug(data.organization.slug)
       
       dispatch({
         type: 'AUTH_SUCCESS',
@@ -115,7 +119,7 @@ export const AuthProvider = ({ children }) => {
       const data = await authAPI.register(organizationData, adminData)
       
       setAuthToken(data.token)
-      setOrganizationSlug(organizationData.slug)
+      setOrganizationSlug(data.organization.slug)
       
       dispatch({
         type: 'AUTH_SUCCESS',
