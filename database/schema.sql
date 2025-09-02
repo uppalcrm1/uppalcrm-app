@@ -41,8 +41,8 @@ CREATE TABLE users (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     created_by UUID REFERENCES users(id),
     
-    -- Ensure unique email per organization
-    UNIQUE(organization_id, email)
+    -- Ensure globally unique email
+    UNIQUE(email)
 );
 
 -- User sessions for JWT token management
@@ -60,7 +60,7 @@ CREATE TABLE user_sessions (
 -- Create indexes for performance
 CREATE INDEX idx_users_organization_id ON users(organization_id);
 CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_users_organization_email ON users(organization_id, email);
+CREATE INDEX idx_users_email_lookup ON users(email) WHERE is_active = true;
 CREATE INDEX idx_user_sessions_user_id ON user_sessions(user_id);
 CREATE INDEX idx_user_sessions_token_hash ON user_sessions(token_hash);
 CREATE INDEX idx_user_sessions_expires_at ON user_sessions(expires_at);

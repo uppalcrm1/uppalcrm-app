@@ -19,8 +19,9 @@ import {
   Clock,
   X
 } from 'lucide-react'
-import { leadsAPI, usersAPI } from '../services/api'
+import { leadsAPI, usersAPI, contactsAPI } from '../services/api'
 import LoadingSpinner from '../components/LoadingSpinner'
+import ConvertLeadModal from '../components/ConvertLeadModal'
 import toast from 'react-hot-toast'
 import { useForm } from 'react-hook-form'
 import { format } from 'date-fns'
@@ -53,6 +54,7 @@ const LeadsPage = () => {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showAssignModal, setShowAssignModal] = useState(false)
+  const [showConvertModal, setShowConvertModal] = useState(false)
   const [selectedLead, setSelectedLead] = useState(null)
   const [showFilters, setShowFilters] = useState(false)
 
@@ -135,6 +137,20 @@ const LeadsPage = () => {
     },
     onError: (error) => {
       toast.error(error.response?.data?.message || 'Failed to assign lead')
+    }
+  })
+
+  const convertMutation = useMutation({
+    mutationFn: (data) => contactsAPI.convertFromLead(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['leads'])
+      queryClient.invalidateQueries(['contacts'])
+      toast.success('Lead converted to contact successfully')
+      setShowConvertModal(false)
+      setSelectedLead(null)
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.message || 'Failed to convert lead')
     }
   })
 
@@ -406,9 +422,22 @@ const LeadsPage = () => {
                               setShowEditModal(true)
                             }}
                             className="p-1 text-gray-600 hover:text-primary-600"
+                            title="Edit lead"
                           >
                             <Edit size={16} />
                           </button>
+                          {(lead.status === 'qualified' || lead.status === 'converted') && (
+                            <button
+                              onClick={() => {
+                                setSelectedLead(lead)
+                                setShowConvertModal(true)
+                              }}
+                              className="p-1 text-gray-600 hover:text-green-600"
+                              title="Convert to contact"
+                            >
+                              <UserPlus size={16} />
+                            </button>
+                          )}
                           <button
                             onClick={() => {
                               if (window.confirm('Are you sure you want to delete this lead?')) {
@@ -416,6 +445,7 @@ const LeadsPage = () => {
                               }
                             }}
                             className="p-1 text-gray-600 hover:text-red-600"
+                            title="Delete lead"
                           >
                             <Trash2 size={16} />
                           </button>
@@ -493,6 +523,19 @@ const LeadsPage = () => {
           onSubmit={(userId) => assignMutation.mutate({ leadId: selectedLead.id, userId })}
           users={usersData?.users || []}
           isLoading={assignMutation.isPending}
+        />
+      )}
+
+      {/* Convert Lead Modal */}
+      {showConvertModal && selectedLead && (
+        <ConvertLeadModal
+          lead={selectedLead}
+          onClose={() => {
+            setShowConvertModal(false)
+            setSelectedLead(null)
+          }}
+          onSubmit={(data) => convertMutation.mutate(data)}
+          isLoading={convertMutation.isPending}
         />
       )}
     </div>

@@ -69,10 +69,8 @@ api.interceptors.response.use(
 
 // Auth API
 export const authAPI = {
-  login: async (email, password, orgSlug) => {
-    const response = await api.post('/auth/login', { email, password }, {
-      headers: { 'X-Organization-Slug': orgSlug }
-    })
+  login: async (email, password) => {
+    const response = await api.post('/auth/login', { email, password })
     return response.data
   },
   
@@ -190,6 +188,115 @@ export const leadsAPI = {
   
   getStats: async () => {
     const response = await api.get('/leads/stats')
+    return response.data
+  }
+}
+
+// Contacts API
+export const contactsAPI = {
+  getContacts: async (params = {}) => {
+    const response = await api.get('/contacts', { params })
+    return response.data
+  },
+  
+  getContact: async (id) => {
+    const response = await api.get(`/contacts/${id}`)
+    return response.data
+  },
+  
+  createContact: async (contactData) => {
+    const response = await api.post('/contacts', contactData)
+    return response.data
+  },
+  
+  updateContact: async (id, contactData) => {
+    const response = await api.put(`/contacts/${id}`, contactData)
+    return response.data
+  },
+  
+  deleteContact: async (id) => {
+    const response = await api.delete(`/contacts/${id}`)
+    return response.data
+  },
+  
+  getStats: async () => {
+    const response = await api.get('/contacts/stats')
+    return response.data
+  },
+  
+  convertFromLead: async (leadId, additionalData = {}) => {
+    const response = await api.post(`/contacts/convert-from-lead/${leadId}`, additionalData)
+    return response.data
+  },
+  
+  // Software editions
+  getEditions: async () => {
+    const response = await api.get('/contacts/software-editions')
+    return response.data
+  },
+  
+  createEdition: async (editionData) => {
+    const response = await api.post('/contacts/software-editions', editionData)
+    return response.data
+  },
+  
+  // Accounts management
+  getAccounts: async (contactId) => {
+    const response = await api.get(`/contacts/${contactId}/accounts`)
+    return response.data
+  },
+  
+  createAccount: async (contactId, accountData) => {
+    const response = await api.post(`/contacts/${contactId}/accounts`, accountData)
+    return response.data
+  },
+  
+  // Device management
+  getDevices: async (contactId) => {
+    const response = await api.get(`/contacts/${contactId}/devices`)
+    return response.data
+  },
+  
+  registerDevice: async (contactId, deviceData) => {
+    const response = await api.post(`/contacts/${contactId}/devices`, deviceData)
+    return response.data
+  },
+  
+  // License management
+  getLicenses: async (contactId, params = {}) => {
+    const response = await api.get(`/contacts/${contactId}/licenses`, { params })
+    return response.data
+  },
+  
+  generateLicense: async (contactId, licenseData) => {
+    const response = await api.post(`/contacts/${contactId}/licenses`, licenseData)
+    return response.data
+  },
+  
+  transferLicense: async (licenseId, transferData) => {
+    const response = await api.post(`/contacts/licenses/${licenseId}/transfer`, transferData)
+    return response.data
+  },
+  
+  // Trial management
+  getTrials: async (contactId, params = {}) => {
+    const response = await api.get(`/contacts/${contactId}/trials`, { params })
+    return response.data
+  },
+  
+  createTrial: async (contactId, trialData) => {
+    const response = await api.post(`/contacts/${contactId}/trials`, trialData)
+    return response.data
+  },
+  
+  // Activity tracking
+  recordDownload: async (downloadData) => {
+    const response = await api.post('/contacts/downloads/record', downloadData)
+    return response.data
+  },
+  
+  recordActivation: async (activationData) => {
+    const response = await api.post('/contacts/activations/record', activationData)
     return response.data
   }
 }

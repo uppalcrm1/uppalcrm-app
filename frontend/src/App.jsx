@@ -7,6 +7,7 @@ import RegisterPage from './pages/RegisterPage'
 import DashboardLayout from './components/DashboardLayout'
 import Dashboard from './pages/Dashboard'
 import LeadsPage from './pages/LeadsPage'
+import Contacts from './pages/Contacts'
 import TeamPage from './pages/TeamPage'
 import SettingsPage from './pages/SettingsPage'
 
@@ -63,6 +64,7 @@ function App() {
         <Route index element={<Navigate to="/dashboard" />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="leads" element={<LeadsPage />} />
+        <Route path="contacts" element={<Contacts />} />
         <Route path="team" element={<TeamPage />} />
         <Route path="settings" element={<SettingsPage />} />
       </Route>

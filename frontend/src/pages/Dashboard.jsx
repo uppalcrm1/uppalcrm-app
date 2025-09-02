@@ -11,7 +11,7 @@ import {
   ArrowRight,
   Activity
 } from 'lucide-react'
-import { leadsAPI, organizationsAPI } from '../services/api'
+import { leadsAPI, contactsAPI, organizationsAPI } from '../services/api'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 
@@ -20,6 +20,11 @@ const Dashboard = () => {
   const { data: leadStats, isLoading: leadsLoading } = useQuery({
     queryKey: ['leadStats'],
     queryFn: leadsAPI.getStats
+  })
+
+  const { data: contactStats, isLoading: contactsLoading } = useQuery({
+    queryKey: ['contactStats'],
+    queryFn: contactsAPI.getStats
   })
 
   const { data: orgStats, isLoading: orgLoading } = useQuery({
@@ -32,7 +37,12 @@ const Dashboard = () => {
     queryFn: () => leadsAPI.getLeads({ limit: 5, sort: 'created_at', order: 'desc' })
   })
 
-  const isLoading = leadsLoading || orgLoading || recentLeadsLoading
+  const { data: recentContacts, isLoading: recentContactsLoading } = useQuery({
+    queryKey: ['recentContacts'],
+    queryFn: () => contactsAPI.getContacts({ limit: 5, sort: 'created_at', order: 'desc' })
+  })
+
+  const isLoading = leadsLoading || contactsLoading || orgLoading || recentLeadsLoading || recentContactsLoading
 
   if (isLoading) {
     return <LoadingSpinner className="mt-8" />
@@ -62,11 +72,11 @@ const Dashboard = () => {
       {/* Page Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-600">Welcome back! Here's what's happening with your leads.</p>
+        <p className="text-gray-600">Welcome back! Here's what's happening with your leads and contacts.</p>
       </div>
 
       {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-6">
         <div className="card">
           <div className="flex items-center">
             <div className="p-2 bg-blue-100 rounded-lg">
@@ -118,6 +128,34 @@ const Dashboard = () => {
               <p className="text-sm font-medium text-gray-600">New This Week</p>
               <p className="text-2xl font-bold text-gray-900">
                 {leadStats?.stats.new_this_week || 0}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="flex items-center">
+            <div className="p-2 bg-indigo-100 rounded-lg">
+              <Users className="h-6 w-6 text-indigo-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Total Contacts</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {contactStats?.stats.total_contacts || 0}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="flex items-center">
+            <div className="p-2 bg-emerald-100 rounded-lg">
+              <Activity className="h-6 w-6 text-emerald-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Active Licenses</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {contactStats?.stats.active_licenses || 0}
               </p>
             </div>
           </div>
@@ -181,7 +219,7 @@ const Dashboard = () => {
       </div>
 
       {/* Recent Activity & Quick Actions */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Recent Leads */}
         <div className="card">
           <div className="flex items-center justify-between mb-4">
@@ -233,6 +271,52 @@ const Dashboard = () => {
           )}
         </div>
 
+        {/* Recent Contacts */}
+        <div className="card">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">Recent Contacts</h3>
+            <Link to="/contacts" className="text-primary-600 hover:text-primary-700 text-sm font-medium">
+              View all
+            </Link>
+          </div>
+          
+          {recentContacts?.contacts?.length > 0 ? (
+            <div className="space-y-3">
+              {recentContacts.contacts.map((contact) => (
+                <div key={contact.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
+                  <div>
+                    <p className="font-medium text-gray-900">{contact.full_name}</p>
+                    <p className="text-sm text-gray-600">{contact.company || 'No company'}</p>
+                    <div className="flex items-center mt-1">
+                      <span className="badge badge-green">
+                        Active
+                      </span>
+                      {contact.licenses_count > 0 && (
+                        <span className="text-xs text-gray-500 ml-2">
+                          {contact.licenses_count} license{contact.licenses_count !== 1 ? 's' : ''}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-gray-500">
+                      {new Date(contact.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-600 mb-4">No contacts yet</p>
+              <Link to="/contacts" className="btn btn-primary btn-sm">
+                Add Your First Contact
+              </Link>
+            </div>
+          )}
+        </div>
+
         {/* Quick Actions */}
         <div className="card">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
@@ -268,6 +352,17 @@ const Dashboard = () => {
                 <p className="text-sm text-gray-600">
                   {(parseInt(leadStats?.stats.total_leads || 0) - parseInt(leadStats?.stats.assigned_leads || 0))} unassigned
                 </p>
+              </div>
+              <ArrowRight className="h-5 w-5 text-gray-400" />
+            </Link>
+
+            <Link to="/contacts" className="flex items-center p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+              <div className="p-2 bg-indigo-100 rounded-lg">
+                <Users className="h-5 w-5 text-indigo-600" />
+              </div>
+              <div className="ml-3 flex-1">
+                <p className="font-medium text-gray-900">Manage contacts</p>
+                <p className="text-sm text-gray-600">{contactStats?.stats.total_contacts || 0} total contacts</p>
               </div>
               <ArrowRight className="h-5 w-5 text-gray-400" />
             </Link>

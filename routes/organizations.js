@@ -1,5 +1,7 @@
 const express = require('express');
 const Organization = require('../models/Organization');
+const Lead = require('../models/Lead');
+const Contact = require('../models/Contact');
 const { 
   validateUpdateOrganization, 
   validateUuidParam 
@@ -129,10 +131,79 @@ router.get('/current/stats',
         WHERE organization_id = $1 AND expires_at > NOW()
       `, [req.organizationId], req.organizationId);
 
+      // Get lead and contact statistics for dashboard
+      let leadStats = null;
+      let contactStats = null;
+      
+      try {
+        leadStats = await Lead.getStats(req.organizationId);
+      } catch (error) {
+        console.log('Lead stats not available:', error.message);
+        leadStats = {
+          total_leads: 0,
+          new_leads: 0,
+          contacted_leads: 0,
+          qualified_leads: 0,
+          converted_leads: 0,
+          lost_leads: 0,
+          high_priority: 0,
+          assigned_leads: 0,
+          new_this_week: 0,
+          new_this_month: 0,
+          total_value: 0,
+          average_value: 0
+        };
+      }
+
+      try {
+        contactStats = await Contact.getStats(req.organizationId);
+      } catch (error) {
+        console.log('Contact stats not available:', error.message);
+        contactStats = {
+          total_contacts: 0,
+          active_contacts: 0,
+          customers: 0,
+          prospects: 0,
+          converted_from_leads: 0,
+          new_this_week: 0,
+          new_this_month: 0,
+          total_value: 0,
+          average_value: 0
+        };
+      }
+
+      // Calculate conversion rates and combined metrics
+      const totalProspects = parseInt(leadStats.total_leads) + parseInt(contactStats.prospects);
+      const totalCustomers = parseInt(contactStats.customers);
+      const overallConversionRate = totalProspects > 0 ? 
+        ((parseInt(contactStats.converted_from_leads) / parseInt(leadStats.total_leads)) * 100).toFixed(2) : 0;
+
       res.json({
         basic_stats: stats,
         detailed_stats: detailedStats.rows[0],
         session_stats: sessionStats.rows[0],
+        lead_stats: {
+          ...leadStats,
+          total_value: parseFloat(leadStats.total_value) || 0,
+          average_value: parseFloat(leadStats.average_value) || 0,
+          conversion_rate: leadStats.total_leads > 0 ? 
+            ((parseInt(leadStats.converted_leads) / parseInt(leadStats.total_leads)) * 100).toFixed(2) : 0
+        },
+        contact_stats: {
+          ...contactStats,
+          total_value: parseFloat(contactStats.total_value) || 0,
+          average_value: parseFloat(contactStats.average_value) || 0,
+          conversion_rate: contactStats.total_contacts > 0 ? 
+            ((parseInt(contactStats.converted_from_leads) / parseInt(contactStats.total_contacts)) * 100).toFixed(2) : 0
+        },
+        combined_metrics: {
+          total_prospects: totalProspects,
+          total_customers: totalCustomers,
+          overall_conversion_rate: overallConversionRate,
+          total_pipeline_value: (parseFloat(leadStats.total_value) || 0) + (parseFloat(contactStats.total_value) || 0),
+          new_prospects_this_week: (parseInt(leadStats.new_this_week) || 0) + (parseInt(contactStats.new_this_week) || 0),
+          new_prospects_this_month: (parseInt(leadStats.new_this_month) || 0) + (parseInt(contactStats.new_this_month) || 0)
+        },
         limits: {
           max_users: parseInt(stats.max_users),
           current_users: parseInt(stats.active_users),
@@ -144,6 +215,182 @@ router.get('/current/stats',
       res.status(500).json({
         error: 'Failed to retrieve statistics',
         message: 'Unable to get organization statistics'
+      });
+    }
+  }
+);
+
+/**
+ * GET /organizations/current/dashboard
+ * Get comprehensive dashboard metrics including contacts, leads, and licenses
+ */
+router.get('/current/dashboard',
+  async (req, res) => {
+    try {
+      // Get basic organization info
+      const organization = await Organization.findById(req.organizationId);
+      
+      if (!organization) {
+        return res.status(404).json({
+          error: 'Organization not found',
+          message: 'Current organization does not exist'
+        });
+      }
+
+      // Get lead and contact statistics
+      let leadStats = {};
+      let contactStats = {};
+      
+      try {
+        leadStats = await Lead.getStats(req.organizationId);
+      } catch (error) {
+        console.log('Lead stats not available:', error.message);
+        leadStats = { total_leads: 0, new_this_week: 0, new_this_month: 0, total_value: 0 };
+      }
+
+      try {
+        contactStats = await Contact.getStats(req.organizationId);
+      } catch (error) {
+        console.log('Contact stats not available:', error.message);
+        contactStats = { total_contacts: 0, customers: 0, new_this_week: 0, new_this_month: 0, total_value: 0 };
+      }
+
+      // Get licensing metrics if tables exist
+      const { query } = require('../database/connection');
+      let licensingMetrics = {
+        active_licenses: 0,
+        active_trials: 0,
+        registered_devices: 0,
+        recent_downloads: 0,
+        recent_activations: 0,
+        expiring_soon: 0
+      };
+
+      try {
+        // Check if licensing tables exist before querying
+        const tablesExist = await query(`
+          SELECT table_name 
+          FROM information_schema.tables 
+          WHERE table_schema = 'public' 
+            AND table_name IN ('licenses', 'trials', 'devices', 'downloads', 'activations')
+        `, []);
+
+        const existingTables = tablesExist.rows.map(row => row.table_name);
+
+        if (existingTables.includes('licenses')) {
+          const licenseStats = await query(`
+            SELECT 
+              COUNT(CASE WHEN status = 'active' AND expires_at > NOW() THEN 1 END) as active_licenses,
+              COUNT(CASE WHEN status = 'active' AND expires_at BETWEEN NOW() AND NOW() + INTERVAL '30 days' THEN 1 END) as expiring_soon
+            FROM licenses 
+            WHERE organization_id = $1
+          `, [req.organizationId], req.organizationId);
+          
+          if (licenseStats.rows.length > 0) {
+            licensingMetrics.active_licenses = parseInt(licenseStats.rows[0].active_licenses) || 0;
+            licensingMetrics.expiring_soon = parseInt(licenseStats.rows[0].expiring_soon) || 0;
+          }
+        }
+
+        if (existingTables.includes('trials')) {
+          const trialStats = await query(`
+            SELECT COUNT(*) as active_trials
+            FROM trials 
+            WHERE organization_id = $1 AND status = 'active' AND expires_at > NOW()
+          `, [req.organizationId], req.organizationId);
+          
+          if (trialStats.rows.length > 0) {
+            licensingMetrics.active_trials = parseInt(trialStats.rows[0].active_trials) || 0;
+          }
+        }
+
+        if (existingTables.includes('devices')) {
+          const deviceStats = await query(`
+            SELECT COUNT(*) as registered_devices
+            FROM devices 
+            WHERE organization_id = $1
+          `, [req.organizationId], req.organizationId);
+          
+          if (deviceStats.rows.length > 0) {
+            licensingMetrics.registered_devices = parseInt(deviceStats.rows[0].registered_devices) || 0;
+          }
+        }
+
+        if (existingTables.includes('downloads')) {
+          const downloadStats = await query(`
+            SELECT COUNT(*) as recent_downloads
+            FROM downloads 
+            WHERE organization_id = $1 AND downloaded_at >= NOW() - INTERVAL '30 days'
+          `, [req.organizationId], req.organizationId);
+          
+          if (downloadStats.rows.length > 0) {
+            licensingMetrics.recent_downloads = parseInt(downloadStats.rows[0].recent_downloads) || 0;
+          }
+        }
+
+        if (existingTables.includes('activations')) {
+          const activationStats = await query(`
+            SELECT COUNT(*) as recent_activations
+            FROM activations 
+            WHERE organization_id = $1 AND activated_at >= NOW() - INTERVAL '30 days'
+          `, [req.organizationId], req.organizationId);
+          
+          if (activationStats.rows.length > 0) {
+            licensingMetrics.recent_activations = parseInt(activationStats.rows[0].recent_activations) || 0;
+          }
+        }
+
+      } catch (error) {
+        console.log('Licensing metrics not available:', error.message);
+      }
+
+      // Calculate key performance indicators
+      const totalPipeline = (parseFloat(leadStats.total_value) || 0) + (parseFloat(contactStats.total_value) || 0);
+      const totalGrowth = (parseInt(leadStats.new_this_month) || 0) + (parseInt(contactStats.new_this_month) || 0);
+      const conversionRate = (parseInt(leadStats.total_leads) || 0) > 0 ? 
+        (((parseInt(contactStats.converted_from_leads) || 0) / (parseInt(leadStats.total_leads) || 0)) * 100).toFixed(2) : 0;
+
+      res.json({
+        organization: {
+          name: organization.name,
+          subscription_plan: organization.subscription_plan,
+          created_at: organization.created_at
+        },
+        summary: {
+          total_leads: parseInt(leadStats.total_leads) || 0,
+          total_contacts: parseInt(contactStats.total_contacts) || 0,
+          total_customers: parseInt(contactStats.customers) || 0,
+          total_pipeline_value: totalPipeline,
+          conversion_rate: parseFloat(conversionRate),
+          growth_this_month: totalGrowth
+        },
+        leads: {
+          total: parseInt(leadStats.total_leads) || 0,
+          new_this_week: parseInt(leadStats.new_this_week) || 0,
+          new_this_month: parseInt(leadStats.new_this_month) || 0,
+          value: parseFloat(leadStats.total_value) || 0
+        },
+        contacts: {
+          total: parseInt(contactStats.total_contacts) || 0,
+          customers: parseInt(contactStats.customers) || 0,
+          prospects: parseInt(contactStats.prospects) || 0,
+          new_this_week: parseInt(contactStats.new_this_week) || 0,
+          new_this_month: parseInt(contactStats.new_this_month) || 0,
+          value: parseFloat(contactStats.total_value) || 0
+        },
+        licensing: licensingMetrics,
+        alerts: {
+          licenses_expiring_soon: licensingMetrics.expiring_soon,
+          high_priority_leads: parseInt(leadStats.high_priority) || 0,
+          unassigned_leads: (parseInt(leadStats.total_leads) || 0) - (parseInt(leadStats.assigned_leads) || 0)
+        }
+      });
+    } catch (error) {
+      console.error('Get dashboard metrics error:', error);
+      res.status(500).json({
+        error: 'Failed to retrieve dashboard data',
+        message: 'Unable to get dashboard metrics',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }
   }

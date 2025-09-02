@@ -16,6 +16,7 @@ const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const organizationRoutes = require('./routes/organizations');
 const leadRoutes = require('./routes/leads');
+const contactRoutes = require('./routes/contacts');
 
 // Load environment variables
 require('dotenv').config();
@@ -61,6 +62,7 @@ app.use('/api/auth', rateLimiters.general, authRoutes);
 app.use('/api/users', rateLimiters.general, userRoutes);
 app.use('/api/organizations', rateLimiters.general, organizationRoutes);
 app.use('/api/leads', rateLimiters.general, leadRoutes);
+app.use('/api/contacts', rateLimiters.general, contactRoutes);
 
 // API documentation endpoint
 app.get('/api', (req, res) => {
@@ -90,7 +92,8 @@ app.get('/api', (req, res) => {
       organizations: {
         'GET /api/organizations/current': 'Get current organization info',
         'PUT /api/organizations/current': 'Update organization (admin only)',
-        'GET /api/organizations/current/stats': 'Get organization statistics',
+        'GET /api/organizations/current/stats': 'Get detailed organization statistics with leads and contacts',
+        'GET /api/organizations/current/dashboard': 'Get comprehensive dashboard metrics including licensing',
         'GET /api/organizations/current/usage': 'Get usage metrics',
         'PUT /api/organizations/current/settings': 'Update organization settings',
         'DELETE /api/organizations/current': 'Deactivate organization (admin only)'
@@ -103,6 +106,28 @@ app.get('/api', (req, res) => {
         'PUT /api/leads/:id': 'Update lead information',
         'PUT /api/leads/:id/assign': 'Assign lead to team member',
         'DELETE /api/leads/:id': 'Delete lead'
+      },
+      contacts: {
+        'GET /api/contacts': 'List contacts with filtering and pagination',
+        'GET /api/contacts/stats': 'Get contact statistics',
+        'GET /api/contacts/software-editions': 'Get software editions catalog',
+        'POST /api/contacts/software-editions': 'Create new software edition',
+        'POST /api/contacts/convert-from-lead/:leadId': 'Convert lead to contact',
+        'GET /api/contacts/:id': 'Get specific contact',
+        'POST /api/contacts': 'Create new contact',
+        'PUT /api/contacts/:id': 'Update contact information',
+        'DELETE /api/contacts/:id': 'Delete contact',
+        'GET /api/contacts/:id/accounts': 'Get contact accounts',
+        'POST /api/contacts/:id/accounts': 'Create account for contact',
+        'GET /api/contacts/:id/devices': 'Get contact devices',
+        'POST /api/contacts/:id/devices': 'Register device for contact',
+        'GET /api/contacts/:id/licenses': 'Get contact licenses',
+        'POST /api/contacts/:id/licenses': 'Generate license for contact',
+        'GET /api/contacts/:id/trials': 'Get contact trials',
+        'POST /api/contacts/:id/trials': 'Create trial for contact',
+        'POST /api/contacts/licenses/:licenseId/transfer': 'Transfer license between contacts',
+        'POST /api/contacts/downloads/record': 'Record software download',
+        'POST /api/contacts/activations/record': 'Record software activation'
       }
     },
     authentication: 'Bearer token required for authenticated endpoints',

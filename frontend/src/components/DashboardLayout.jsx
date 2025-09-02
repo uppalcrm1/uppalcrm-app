@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   Users,
   UserCheck,
+  UserPlus,
   Settings,
   LogOut,
   Menu,
@@ -19,6 +20,7 @@ import LoadingSpinner from './LoadingSpinner'
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Leads', href: '/leads', icon: Users },
+  { name: 'Contacts', href: '/contacts', icon: UserPlus },
   { name: 'Team', href: '/team', icon: UserCheck },
   { name: 'Settings', href: '/settings', icon: Settings },
 ]
