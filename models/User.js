@@ -95,7 +95,7 @@ class User {
   }
 
   /**
-   * Find user by email within organization
+   * Find user by email within organization (legacy method)
    * @param {string} email - User email
    * @param {string} organizationId - Organization ID
    * @returns {User|null} User instance or null
@@ -114,13 +114,92 @@ class User {
   }
 
   /**
+   * Find user by email globally (no organization context needed)
+   * @param {string} email - User email
+   * @returns {User|null} User instance or null
+   */
+  static async findByEmailGlobal(email) {
+    const { pool } = require('../database/connection');
+    const client = await pool.connect();
+    
+    try {
+      // Temporarily disable RLS for global lookup
+      await client.query('SET LOCAL row_security = off');
+      
+      const result = await client.query(`
+        SELECT * FROM users 
+        WHERE email = $1 AND is_active = true
+      `, [email.toLowerCase()]);
+
+      if (result.rows.length === 0) {
+        return null;
+      }
+
+      return new User(result.rows[0]);
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
    * Authenticate user with email and password
+   * @param {string} email - User email
+   * @param {string} password - User password
+   * @param {string} organizationId - Organization ID (optional, for legacy compatibility)
+   * @returns {User|null} User instance if authenticated, null otherwise
+   */
+  static async authenticate(email, password, organizationId = null) {
+    // Use global email lookup for simplified login - bypass RLS for authentication
+    const { pool } = require('../database/connection');
+    const client = await pool.connect();
+    
+    try {
+      // Temporarily disable RLS for authentication lookup
+      await client.query('SET LOCAL row_security = off');
+      
+      const result = await client.query(`
+        SELECT * FROM users 
+        WHERE email = $1 AND is_active = true
+      `, [email.toLowerCase()]);
+
+      if (result.rows.length === 0) {
+        return null;
+      }
+
+      const user = new User(result.rows[0]);
+      const isValid = await bcrypt.compare(password, result.rows[0].password_hash);
+
+      if (!isValid) {
+        return null;
+      }
+
+      // Re-enable RLS and set organization context for the update
+      await client.query('SET LOCAL row_security = on');
+      await client.query('SELECT set_config($1, $2, true)', [
+        'app.current_organization_id',
+        user.organization_id
+      ]);
+
+      // Update last login
+      await client.query(`
+        UPDATE users SET last_login = NOW() WHERE id = $1
+      `, [user.id]);
+
+      user.last_login = new Date();
+      return user;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Legacy authenticate method with organization requirement
    * @param {string} email - User email
    * @param {string} password - User password
    * @param {string} organizationId - Organization ID
    * @returns {User|null} User instance if authenticated, null otherwise
    */
-  static async authenticate(email, password, organizationId) {
+  static async authenticateWithOrg(email, password, organizationId) {
     const result = await query(`
       SELECT * FROM users 
       WHERE email = $1 AND organization_id = $2 AND is_active = true

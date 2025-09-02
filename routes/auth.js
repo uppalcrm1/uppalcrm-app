@@ -88,25 +88,34 @@ router.post('/register',
 
 /**
  * POST /auth/login
- * Authenticate user within organization context
+ * Authenticate user with email and password only
  */
 router.post('/login',
-  resolveOrganization,
   rateLimiters.auth,
   validateLogin,
   preventTimingAttacks,
   async (req, res) => {
     try {
       const { email, password } = req.body;
-      const organizationId = req.organizationId;
 
-      // Authenticate user
-      const user = await User.authenticate(email, password, organizationId);
+      // Authenticate user globally (no organization context needed)
+      const user = await User.authenticate(email, password);
       
       if (!user) {
         return res.status(401).json({
           error: 'Authentication failed',
           message: 'Invalid email or password'
+        });
+      }
+
+      // Get user's organization
+      const Organization = require('../models/Organization');
+      const organization = await Organization.findById(user.organization_id);
+      
+      if (!organization) {
+        return res.status(500).json({
+          error: 'Organization not found',
+          message: 'User organization no longer exists'
         });
       }
 
@@ -118,7 +127,7 @@ router.post('/login',
         user: tokenData.user,
         token: tokenData.token,
         expires_at: tokenData.expiresAt,
-        organization: req.organization.toJSON()
+        organization: organization.toJSON()
       });
     } catch (error) {
       console.error('Login error:', error);
