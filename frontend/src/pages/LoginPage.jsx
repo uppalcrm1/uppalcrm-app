@@ -16,16 +16,11 @@ const LoginPage = () => {
   } = useForm()
 
   const onSubmit = async (data) => {
-    const result = await login(data.email, data.password, data.organizationSlug)
+    const result = await login(data.email, data.password)
     
     if (!result.success) {
       // Set form errors based on the error message
-      if (result.error.toLowerCase().includes('organization')) {
-        setError('organizationSlug', { 
-          type: 'manual', 
-          message: 'Organization not found' 
-        })
-      } else if (result.error.toLowerCase().includes('password')) {
+      if (result.error.toLowerCase().includes('password') || result.error.toLowerCase().includes('email')) {
         setError('password', { 
           type: 'manual', 
           message: 'Invalid email or password' 
@@ -54,31 +49,6 @@ const LoginPage = () => {
         {/* Login Form */}
         <div className="card">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-            {/* Organization Slug */}
-            <div>
-              <label htmlFor="organizationSlug" className="block text-sm font-medium text-gray-700 mb-2">
-                Organization
-              </label>
-              <div className="relative">
-                <Building2 className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <input
-                  {...register('organizationSlug', {
-                    required: 'Organization is required',
-                    pattern: {
-                      value: /^[a-z0-9-]+$/,
-                      message: 'Only lowercase letters, numbers, and hyphens allowed'
-                    }
-                  })}
-                  type="text"
-                  placeholder="your-organization"
-                  className={`input pl-10 ${errors.organizationSlug ? 'border-red-500' : ''}`}
-                />
-              </div>
-              {errors.organizationSlug && (
-                <p className="mt-1 text-sm text-red-600">{errors.organizationSlug.message}</p>
-              )}
-            </div>
-
             {/* Email */}
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
@@ -168,7 +138,6 @@ const LoginPage = () => {
         <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
           <h3 className="text-sm font-medium text-blue-900 mb-2">Demo Credentials</h3>
           <div className="text-xs text-blue-800 space-y-1">
-            <p><strong>Organization:</strong> testcompany</p>
             <p><strong>Email:</strong> admin@testcompany.com</p>
             <p><strong>Password:</strong> SecurePassword123!</p>
           </div>
