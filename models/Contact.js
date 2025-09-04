@@ -60,11 +60,11 @@ class Contact {
       const result = await query(`
         INSERT INTO contacts (
           organization_id, title, company, first_name, last_name, email, phone,
-          status, type, source, priority, value, notes, assigned_to, created_by,
-          next_follow_up, converted_from_lead_id
+          contact_status, contact_source, priority, lifetime_value, notes, assigned_to, created_by,
+          next_follow_up
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-        RETURNING *
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+        RETURNING id, name, tenant_id, status, source, email, first_name, last_name, company, phone, notes, created_at, updated_at
       `, [
         organizationId,
         title,
@@ -73,16 +73,14 @@ class Contact {
         last_name,
         email,
         phone,
-        status,
-        type,
-        source,
+        status, // maps to contact_status
+        source, // maps to contact_source
         priority,
-        parseFloat(value),
+        parseFloat(value), // maps to lifetime_value
         notes,
         assigned_to,
         createdBy,
-        next_follow_up,
-        converted_from_lead_id
+        next_follow_up
       ], organizationId);
 
       return new Contact(result.rows[0]);
