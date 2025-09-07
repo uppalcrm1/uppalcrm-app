@@ -56,8 +56,11 @@ app.use((req, res, next) => {
   next();
 });
 
-// Serve static files (React frontend)
-app.use(express.static(path.join(__dirname, 'frontend/dist')));
+// Serve static files only if frontend dist exists (for local dev)
+const frontendDistPath = path.join(__dirname, 'frontend/dist');
+if (require('fs').existsSync(frontendDistPath)) {
+  app.use(express.static(frontendDistPath));
+}
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -148,9 +151,19 @@ app.get('/api', (req, res) => {
   });
 });
 
-// Serve React app for root requests
+// Serve React app for root requests (if frontend exists)
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'frontend/dist/index.html'));
+  const indexPath = path.join(__dirname, 'frontend/dist/index.html');
+  if (require('fs').existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
+    res.json({
+      name: 'UppalCRM API',
+      version: '1.0.0',
+      status: 'API service running',
+      super_admin: '/api/super-admin/login'
+    });
+  }
 });
 
 // Handle 404 for API routes
@@ -162,9 +175,18 @@ app.use('/api/*', (req, res) => {
   });
 });
 
-// Serve React app for all other routes (SPA fallback)
+// Serve React app for all other routes (SPA fallback) - only if frontend exists
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'frontend/dist/index.html'));
+  const indexPath = path.join(__dirname, 'frontend/dist/index.html');
+  if (require('fs').existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
+    res.status(404).json({
+      error: 'Frontend not available',
+      message: 'This is an API-only service. Use /api endpoints.',
+      super_admin_api: '/api/super-admin/login'
+    });
+  }
 });
 
 // Global error handler
