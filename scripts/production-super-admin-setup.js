@@ -41,6 +41,24 @@ async function setupSuperAdmin() {
       return;
     }
     
+    // Apply trial management migration first (dependency)
+    console.log('🔧 Checking trial management migration...');
+    const trialTableCheck = await client.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'organization_subscriptions'
+      );
+    `);
+    
+    if (!trialTableCheck.rows[0].exists) {
+      console.log('🔧 Applying trial management migration first...');
+      const trialMigrationPath = path.join(__dirname, '../database/migrations/003_trial_management.sql');
+      const trialMigrationSQL = fs.readFileSync(trialMigrationPath, 'utf8');
+      await client.query(trialMigrationSQL);
+      console.log('✅ Trial management migration applied');
+    }
+    
     // Read and execute super admin migration
     const migrationPath = path.join(__dirname, '../database/migrations/004_super_admin.sql');
     const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
