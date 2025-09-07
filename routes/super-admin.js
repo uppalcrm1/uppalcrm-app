@@ -8,8 +8,29 @@ const router = express.Router();
 router.get('/test', (req, res) => {
   res.json({
     message: 'Super Admin routes are working!',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    jwt_secret_exists: !!process.env.JWT_SECRET,
+    environment: process.env.NODE_ENV || 'development'
   });
+});
+
+// Debug login endpoint
+router.post('/debug-login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    console.log('🔐 DEBUG login attempt for:', email);
+    
+    res.json({
+      message: 'Debug endpoint working',
+      received_email: email,
+      received_password: password ? 'provided' : 'missing',
+      jwt_secret_exists: !!process.env.JWT_SECRET,
+      environment: process.env.NODE_ENV || 'development'
+    });
+  } catch (error) {
+    console.error('Debug login error:', error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // Super Admin Authentication Middleware
