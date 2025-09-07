@@ -129,43 +129,74 @@ router.post('/login', async (req, res) => {
 // DASHBOARD
 router.get('/dashboard', authenticateSuperAdmin, async (req, res) => {
   try {
-    await query('SELECT calculate_daily_metrics()');
+    console.log('🔍 Super Admin dashboard request');
 
+    // Simple overview using actual database structure
     const overview = await query(`
       SELECT 
         (SELECT COUNT(*) FROM organizations WHERE trial_status = 'active') as active_trials,
         (SELECT COUNT(*) FROM organizations WHERE trial_status = 'expired') as expired_trials,
-        (SELECT COUNT(*) FROM organizations WHERE payment_status = 'active') as paid_customers,
+        (SELECT COUNT(*) FROM organizations WHERE payment_status = 'paid') as paid_customers,
         (SELECT COUNT(*) FROM organizations WHERE DATE(created_at) = CURRENT_DATE) as new_signups_today,
-        (SELECT COUNT(*) FROM organizations WHERE DATE(trial_started_at) = CURRENT_DATE) as new_trials_today,
-        (SELECT COUNT(*) FROM get_expiring_trials(7)) as expiring_next_7_days,
-        (SELECT COUNT(*) FROM get_expiring_trials(1)) as expiring_tomorrow,
-        (SELECT AVG(engagement_score) FROM trial_overview WHERE trial_status = 'active') as avg_engagement_score
+        (SELECT COUNT(*) FROM organizations WHERE trial_started_at IS NOT NULL AND DATE(trial_started_at) = CURRENT_DATE) as new_trials_today,
+        (SELECT COUNT(*) FROM organizations WHERE trial_ends_at BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days') as expiring_next_7_days,
+        (SELECT COUNT(*) FROM organizations WHERE trial_ends_at BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '1 day') as expiring_tomorrow,
+        (SELECT COUNT(*) FROM organizations) as total_organizations
     `);
 
+    console.log('📊 Dashboard overview query result:', overview.rows[0]);
+
+    // Recent metrics - just return empty for now since the table might be empty
     const recentMetrics = await query(`
-      SELECT date, new_business_leads, new_trials_started, trials_converted, trials_expired
+      SELECT metric_date as date, new_signups, trial_conversions, churn_count 
       FROM platform_metrics 
-      WHERE date >= CURRENT_DATE - INTERVAL '7 days'
-      ORDER BY date DESC
+      WHERE metric_date >= CURRENT_DATE - INTERVAL '7 days'
+      ORDER BY metric_date DESC
+      LIMIT 7
     `);
 
-    const topTrials = await query(`
-      SELECT organization_name, admin_name, admin_email, days_remaining, engagement_score, recent_logins
-      FROM trial_overview 
-      WHERE trial_status = 'active'
-      ORDER BY engagement_score DESC LIMIT 10
+    const topOrganizations = await query(`
+      SELECT 
+        o.id,
+        o.name as organization_name, 
+        u.first_name || ' ' || u.last_name as admin_name,
+        u.email as admin_email,
+        CASE 
+          WHEN o.trial_ends_at IS NOT NULL THEN 
+            EXTRACT(days FROM o.trial_ends_at - CURRENT_DATE)
+          ELSE NULL 
+        END as days_remaining,
+        o.trial_status,
+        o.payment_status,
+        o.created_at
+      FROM organizations o
+      LEFT JOIN users u ON u.organization_id = o.id AND u.is_primary = true
+      WHERE o.is_active = true
+      ORDER BY o.created_at DESC 
+      LIMIT 10
     `);
 
     const atRiskTrials = await query(`
-      SELECT * FROM get_expiring_trials(7) 
-      WHERE risk_level IN ('Critical', 'High') LIMIT 10
+      SELECT 
+        o.id,
+        o.name as organization_name,
+        u.first_name || ' ' || u.last_name as admin_name,
+        u.email as admin_email,
+        o.trial_ends_at,
+        EXTRACT(days FROM o.trial_ends_at - CURRENT_DATE) as days_remaining
+      FROM organizations o
+      LEFT JOIN users u ON u.organization_id = o.id AND u.is_primary = true
+      WHERE o.trial_status = 'active' 
+        AND o.trial_ends_at IS NOT NULL
+        AND o.trial_ends_at BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days'
+      ORDER BY o.trial_ends_at ASC
+      LIMIT 10
     `);
 
     res.json({
       overview: overview.rows[0],
       recent_metrics: recentMetrics.rows,
-      top_trials: topTrials.rows,
+      top_organizations: topOrganizations.rows,
       at_risk_trials: atRiskTrials.rows,
       last_updated: new Date()
     });
@@ -186,22 +217,42 @@ router.get('/organizations', authenticateSuperAdmin, async (req, res) => {
     const params = [];
 
     if (status !== 'all') {
-      whereClause += ` AND trial_status = $${params.length + 1}`;
+      whereClause += ` AND o.trial_status = $${params.length + 1}`;
       params.push(status);
     }
 
     if (search) {
-      whereClause += ` AND (organization_name ILIKE $${params.length + 1} OR admin_email ILIKE $${params.length + 1})`;
+      whereClause += ` AND (o.name ILIKE $${params.length + 1} OR u.email ILIKE $${params.length + 1})`;
       params.push(`%${search}%`);
     }
 
     const organizations = await query(`
-      SELECT * FROM trial_overview ${whereClause}
-      ORDER BY trial_created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+      SELECT 
+        o.id,
+        o.name as organization_name,
+        u.first_name || ' ' || u.last_name as admin_name,
+        u.email as admin_email,
+        o.trial_status,
+        o.payment_status,
+        o.trial_started_at as trial_created_at,
+        o.trial_ends_at,
+        o.created_at,
+        CASE 
+          WHEN o.trial_ends_at IS NOT NULL THEN 
+            EXTRACT(days FROM o.trial_ends_at - CURRENT_DATE)
+          ELSE NULL 
+        END as days_remaining
+      FROM organizations o
+      LEFT JOIN users u ON u.organization_id = o.id AND u.is_primary = true
+      ${whereClause.replace('WHERE 1=1', 'WHERE o.is_active = true')}
+      ORDER BY o.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}
     `, [...params, limit, offset]);
 
     const totalResult = await query(`
-      SELECT COUNT(*) as total FROM trial_overview ${whereClause}
+      SELECT COUNT(*) as total 
+      FROM organizations o
+      LEFT JOIN users u ON u.organization_id = o.id AND u.is_primary = true
+      ${whereClause.replace('WHERE 1=1', 'WHERE o.is_active = true')}
     `, params);
 
     const total = parseInt(totalResult.rows[0].total);
@@ -294,9 +345,27 @@ router.get('/expiring-trials', authenticateSuperAdmin, async (req, res) => {
     const { days = 7 } = req.query;
 
     const expiringTrials = await query(`
-      SELECT * FROM get_expiring_trials($1)
-      ORDER BY days_remaining ASC, engagement_score ASC
-    `, [days]);
+      SELECT 
+        o.id,
+        o.name as organization_name,
+        u.first_name || ' ' || u.last_name as admin_name,
+        u.email as admin_email,
+        o.trial_ends_at,
+        EXTRACT(days FROM o.trial_ends_at - CURRENT_DATE) as days_remaining,
+        o.trial_status,
+        o.payment_status,
+        CASE 
+          WHEN EXTRACT(days FROM o.trial_ends_at - CURRENT_DATE) <= 1 THEN 'High'
+          WHEN EXTRACT(days FROM o.trial_ends_at - CURRENT_DATE) <= 3 THEN 'Medium' 
+          ELSE 'Low'
+        END as risk_level
+      FROM organizations o
+      LEFT JOIN users u ON u.organization_id = o.id AND u.is_primary = true
+      WHERE o.trial_status = 'active' 
+        AND o.trial_ends_at IS NOT NULL
+        AND o.trial_ends_at BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '${days} days'
+      ORDER BY o.trial_ends_at ASC
+    `);
 
     const grouped = expiringTrials.rows.reduce((acc, trial) => {
       if (!acc[trial.risk_level]) acc[trial.risk_level] = [];
