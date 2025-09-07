@@ -10,7 +10,8 @@ router.get('/test', (req, res) => {
     message: 'Super Admin routes are working!',
     timestamp: new Date().toISOString(),
     jwt_secret_exists: !!process.env.JWT_SECRET,
-    environment: process.env.NODE_ENV || 'development'
+    environment: process.env.NODE_ENV || 'development',
+    version: '2.0 - Updated dashboard queries'
   });
 });
 
@@ -123,6 +124,36 @@ router.post('/login', async (req, res) => {
   } catch (error) {
     console.error('Super admin login error:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Simple dashboard test endpoint
+router.get('/dashboard-test', authenticateSuperAdmin, async (req, res) => {
+  try {
+    console.log('🔍 Testing dashboard queries step by step...');
+
+    // Just test the overview query
+    const overview = await query(`
+      SELECT 
+        (SELECT COUNT(*) FROM organizations WHERE trial_status = 'active') as active_trials,
+        (SELECT COUNT(*) FROM organizations) as total_organizations
+    `);
+
+    console.log('📊 Simple overview result:', overview.rows[0]);
+
+    res.json({
+      test: 'Dashboard queries working!',
+      overview: overview.rows[0],
+      timestamp: new Date()
+    });
+
+  } catch (error) {
+    console.error('Dashboard test error:', error);
+    res.status(500).json({ 
+      error: 'Dashboard test failed', 
+      message: error.message,
+      stack: error.stack 
+    });
   }
 });
 
