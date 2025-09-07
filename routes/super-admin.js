@@ -170,7 +170,7 @@ router.get('/dashboard', authenticateSuperAdmin, async (req, res) => {
         o.payment_status,
         o.created_at
       FROM organizations o
-      LEFT JOIN users u ON u.organization_id = o.id AND u.is_primary = true
+      LEFT JOIN users u ON u.organization_id = o.id
       WHERE o.is_active = true
       ORDER BY o.created_at DESC 
       LIMIT 10
@@ -185,7 +185,7 @@ router.get('/dashboard', authenticateSuperAdmin, async (req, res) => {
         o.trial_ends_at,
         EXTRACT(days FROM o.trial_ends_at - CURRENT_DATE) as days_remaining
       FROM organizations o
-      LEFT JOIN users u ON u.organization_id = o.id AND u.is_primary = true
+      LEFT JOIN users u ON u.organization_id = o.id
       WHERE o.trial_status = 'active' 
         AND o.trial_ends_at IS NOT NULL
         AND o.trial_ends_at BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days'
@@ -243,7 +243,7 @@ router.get('/organizations', authenticateSuperAdmin, async (req, res) => {
           ELSE NULL 
         END as days_remaining
       FROM organizations o
-      LEFT JOIN users u ON u.organization_id = o.id AND u.is_primary = true
+      LEFT JOIN users u ON u.organization_id = o.id
       ${whereClause.replace('WHERE 1=1', 'WHERE o.is_active = true')}
       ORDER BY o.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}
     `, [...params, limit, offset]);
@@ -251,7 +251,7 @@ router.get('/organizations', authenticateSuperAdmin, async (req, res) => {
     const totalResult = await query(`
       SELECT COUNT(*) as total 
       FROM organizations o
-      LEFT JOIN users u ON u.organization_id = o.id AND u.is_primary = true
+      LEFT JOIN users u ON u.organization_id = o.id
       ${whereClause.replace('WHERE 1=1', 'WHERE o.is_active = true')}
     `, params);
 
@@ -360,7 +360,7 @@ router.get('/expiring-trials', authenticateSuperAdmin, async (req, res) => {
           ELSE 'Low'
         END as risk_level
       FROM organizations o
-      LEFT JOIN users u ON u.organization_id = o.id AND u.is_primary = true
+      LEFT JOIN users u ON u.organization_id = o.id
       WHERE o.trial_status = 'active' 
         AND o.trial_ends_at IS NOT NULL
         AND o.trial_ends_at BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '${days} days'
