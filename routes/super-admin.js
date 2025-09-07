@@ -127,32 +127,29 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// Simple dashboard test endpoint
-router.get('/dashboard-test', authenticateSuperAdmin, async (req, res) => {
+// Check production database schema
+router.get('/schema-check', authenticateSuperAdmin, async (req, res) => {
   try {
-    console.log('🔍 Testing dashboard queries step by step...');
-
-    // Just test the overview query
-    const overview = await query(`
-      SELECT 
-        (SELECT COUNT(*) FROM organizations WHERE trial_status = 'active') as active_trials,
-        (SELECT COUNT(*) FROM organizations) as total_organizations
+    const orgColumns = await query(`
+      SELECT column_name, data_type 
+      FROM information_schema.columns 
+      WHERE table_name = 'organizations' 
+      ORDER BY ordinal_position
     `);
 
-    console.log('📊 Simple overview result:', overview.rows[0]);
-
+    const orgCount = await query('SELECT COUNT(*) FROM organizations');
+    
     res.json({
-      test: 'Dashboard queries working!',
-      overview: overview.rows[0],
+      organizations_columns: orgColumns.rows,
+      organizations_count: orgCount.rows[0].count,
       timestamp: new Date()
     });
 
   } catch (error) {
-    console.error('Dashboard test error:', error);
+    console.error('Schema check error:', error);
     res.status(500).json({ 
-      error: 'Dashboard test failed', 
-      message: error.message,
-      stack: error.stack 
+      error: 'Schema check failed', 
+      message: error.message 
     });
   }
 });
