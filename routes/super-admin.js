@@ -11,7 +11,7 @@ router.get('/test', (req, res) => {
     timestamp: new Date().toISOString(),
     jwt_secret_exists: !!process.env.JWT_SECRET,
     environment: process.env.NODE_ENV || 'development',
-    version: '2.0 - Updated dashboard queries'
+    version: '3.0 - Enhanced with comprehensive data'
   });
 });
 
@@ -124,6 +124,56 @@ router.post('/login', async (req, res) => {
   } catch (error) {
     console.error('Super admin login error:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Test enhanced query
+router.get('/test-enhanced', authenticateSuperAdmin, async (req, res) => {
+  try {
+    const sampleOrg = await query(`
+      SELECT 
+        o.id,
+        o.name as organization_name,
+        o.domain,
+        o.subscription_plan,
+        o.created_at,
+        
+        -- Admin contact info
+        u.email as admin_email,
+        u.first_name || ' ' || u.last_name as admin_name,
+        u.role as admin_role,
+        
+        -- User count
+        (SELECT COUNT(*) FROM users WHERE organization_id = o.id AND is_active = true) as active_user_count,
+        
+        -- Trial data if available  
+        COALESCE(tv.trial_status, 'no_trial') as trial_status,
+        tv.days_remaining,
+        
+        -- Trial history
+        (SELECT COUNT(*) FROM organization_trial_history WHERE organization_id = o.id) as total_trials
+        
+      FROM organizations o
+      LEFT JOIN users u ON u.organization_id = o.id AND u.role = 'admin'
+      LEFT JOIN trial_overview tv ON tv.organization_id = o.id
+      WHERE o.is_active = true
+      ORDER BY o.created_at DESC 
+      LIMIT 2
+    `);
+
+    res.json({
+      message: 'Enhanced query test',
+      sample_organizations: sampleOrg.rows,
+      timestamp: new Date()
+    });
+
+  } catch (error) {
+    console.error('Enhanced query test error:', error);
+    res.status(500).json({ 
+      error: 'Enhanced query failed', 
+      message: error.message,
+      stack: error.stack 
+    });
   }
 });
 
