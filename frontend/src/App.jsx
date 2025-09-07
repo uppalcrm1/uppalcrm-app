@@ -10,6 +10,7 @@ import LeadsPage from './pages/LeadsPage'
 import Contacts from './pages/Contacts'
 import TeamPage from './pages/TeamPage'
 import SettingsPage from './pages/SettingsPage'
+import SuperAdminApp from './components/SuperAdminApp'
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuth()
@@ -51,6 +52,9 @@ function App() {
           </PublicRoute>
         }
       />
+
+      {/* Super Admin Route */}
+      <Route path="/super-admin" element={<SuperAdminApp />} />
 
       {/* Protected Routes */}
       <Route

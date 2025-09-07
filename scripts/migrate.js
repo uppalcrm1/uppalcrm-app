@@ -43,6 +43,13 @@ async function migrate() {
     console.log('🔧 Creating comprehensive lead management tables...');
     await client.query(leadsSchema);
     
+    // Read and execute trial management migration
+    const trialSchemaPath = path.join(__dirname, '../database/migrations/003_trial_management.sql');
+    const trialSchema = fs.readFileSync(trialSchemaPath, 'utf8');
+    
+    console.log('🔧 Creating trial management system...');
+    await client.query(trialSchema);
+    
     console.log('✅ Database schema created successfully');
     
     // Verify tables were created
@@ -93,7 +100,11 @@ async function reset() {
     
     // Drop all tables in correct order
     await client.query(`
-      -- Drop lead-related tables first (due to foreign keys)
+      -- Drop trial management tables first (due to foreign keys)
+      DROP TABLE IF EXISTS organization_trial_history CASCADE;
+      DROP TABLE IF EXISTS organization_subscriptions CASCADE;
+      
+      -- Drop lead-related tables (due to foreign keys)
       DROP TABLE IF EXISTS lead_documents CASCADE;
       DROP TABLE IF EXISTS lead_tag_assignments CASCADE;
       DROP TABLE IF EXISTS lead_tags CASCADE;
@@ -104,6 +115,17 @@ async function reset() {
       DROP TABLE IF EXISTS lead_statuses CASCADE;
       DROP TABLE IF EXISTS lead_sources CASCADE;
       
+      -- Drop contact management tables
+      DROP TABLE IF EXISTS license_transfers CASCADE;
+      DROP TABLE IF EXISTS software_licenses CASCADE;
+      DROP TABLE IF EXISTS trials CASCADE;
+      DROP TABLE IF EXISTS downloads_activations CASCADE;
+      DROP TABLE IF EXISTS device_registrations CASCADE;
+      DROP TABLE IF EXISTS accounts CASCADE;
+      DROP TABLE IF EXISTS contacts CASCADE;
+      DROP TABLE IF EXISTS contacts_backup CASCADE;
+      DROP TABLE IF EXISTS software_editions CASCADE;
+      
       -- Drop auth tables
       DROP TABLE IF EXISTS user_sessions CASCADE;
       DROP TABLE IF EXISTS users CASCADE;
@@ -113,6 +135,9 @@ async function reset() {
       DROP FUNCTION IF EXISTS update_updated_at_column() CASCADE;
       DROP FUNCTION IF EXISTS check_user_limit() CASCADE;
       DROP FUNCTION IF EXISTS create_organization_with_admin() CASCADE;
+      DROP FUNCTION IF EXISTS start_organization_trial() CASCADE;
+      DROP FUNCTION IF EXISTS can_start_new_trial() CASCADE;
+      DROP FUNCTION IF EXISTS expire_trials() CASCADE;
     `);
     
     console.log('🗑️  Dropped existing tables and functions');

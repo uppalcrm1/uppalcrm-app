@@ -301,4 +301,70 @@ export const contactsAPI = {
   }
 }
 
+// Organization Trial Management API
+export const trialAPI = {
+  // Get current trial status
+  getTrialStatus: async () => {
+    const response = await api.get('/trials/status')
+    return response.data
+  },
+
+  // Start a new trial
+  startTrial: async (trialDays = 30) => {
+    const response = await api.post('/trials/start', { trial_days: trialDays })
+    return response.data
+  },
+
+  // Extend current trial
+  extendTrial: async (additionalDays) => {
+    const response = await api.post('/trials/extend', { additional_days: additionalDays })
+    return response.data
+  },
+
+  // Convert trial to paid subscription
+  convertTrial: async (paymentData) => {
+    const response = await api.post('/trials/convert', paymentData)
+    return response.data
+  },
+
+  // Cancel trial
+  cancelTrial: async (reason) => {
+    const response = await api.post('/trials/cancel', { reason })
+    return response.data
+  },
+
+  // Get trial history
+  getTrialHistory: async () => {
+    const response = await api.get('/trials/history')
+    return response.data
+  },
+
+  // Get subscription details
+  getSubscription: async () => {
+    const response = await api.get('/trials/subscription')
+    return response.data
+  },
+
+  // Check trial eligibility
+  checkEligibility: async () => {
+    const response = await api.get('/trials/check-eligibility')
+    return response.data
+  },
+
+  // Admin functions
+  admin: {
+    // Expire trials manually
+    expireTrials: async () => {
+      const response = await api.post('/trials/admin/expire')
+      return response.data
+    },
+
+    // Get trial statistics
+    getStatistics: async () => {
+      const response = await api.get('/trials/admin/statistics')
+      return response.data
+    }
+  }
+}
+
 export default api

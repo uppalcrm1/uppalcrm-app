@@ -218,11 +218,25 @@ const optionalAuth = async (req, res, next) => {
   }
 };
 
+/**
+ * Middleware to require organization context
+ */
+const requireOrganization = (req, res, next) => {
+  if (!req.user || !req.user.organization_id) {
+    return res.status(403).json({
+      error: 'Organization required',
+      message: 'This endpoint requires organization context'
+    });
+  }
+  next();
+};
+
 module.exports = {
   authenticateToken,
   requireRole,
   requirePermission,
   requireAdmin,
+  requireOrganization,
   resolveOrganization,
   canManageUsers,
   validateOrganizationContext,

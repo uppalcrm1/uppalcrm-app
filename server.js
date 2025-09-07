@@ -17,9 +17,14 @@ const userRoutes = require('./routes/users');
 const organizationRoutes = require('./routes/organizations');
 const leadRoutes = require('./routes/leads');
 const contactRoutes = require('./routes/contacts');
+const trialRoutes = require('./routes/trials');
+const superAdminRoutes = require('./routes/super-admin');
 
 // Load environment variables
 require('dotenv').config();
+
+// Import background jobs
+const EngagementTracker = require('./jobs/engagementTracking');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -45,8 +50,14 @@ app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 // Input sanitization
 app.use(sanitizeInput);
 
-// Serve static files (marketing website)
-app.use(express.static(path.join(__dirname, '.')));
+// Debug: Log all incoming requests
+app.use((req, res, next) => {
+  console.log(`📝 ${req.method} ${req.url} (path: ${req.path})`);
+  next();
+});
+
+// Serve static files (React frontend)
+app.use(express.static(path.join(__dirname, 'frontend/dist')));
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -63,6 +74,8 @@ app.use('/api/users', rateLimiters.general, userRoutes);
 app.use('/api/organizations', rateLimiters.general, organizationRoutes);
 app.use('/api/leads', rateLimiters.general, leadRoutes);
 app.use('/api/contacts', rateLimiters.general, contactRoutes);
+app.use('/api/trials', rateLimiters.general, trialRoutes);
+app.use('/api/super-admin', rateLimiters.general, superAdminRoutes);
 
 // API documentation endpoint
 app.get('/api', (req, res) => {
@@ -135,9 +148,9 @@ app.get('/api', (req, res) => {
   });
 });
 
-// Serve marketing website for root requests
+// Serve React app for root requests
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
+  res.sendFile(path.join(__dirname, 'frontend/dist/index.html'));
 });
 
 // Handle 404 for API routes
@@ -149,9 +162,9 @@ app.use('/api/*', (req, res) => {
   });
 });
 
-// Serve marketing website for all other routes (SPA fallback)
+// Serve React app for all other routes (SPA fallback)
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
+  res.sendFile(path.join(__dirname, 'frontend/dist/index.html'));
 });
 
 // Global error handler
@@ -185,12 +198,17 @@ const startServer = async () => {
     // Test database connection
     await testConnection();
     
+    // Initialize background jobs
+    EngagementTracker.init();
+    console.log('📊 Background jobs initialized');
+    
     app.listen(PORT, () => {
       console.log(`🚀 UppalCRM Server running on port ${PORT}`);
       console.log(`📊 API Documentation: http://localhost:${PORT}/api`);
       console.log(`🏥 Health Check: http://localhost:${PORT}/health`);
       console.log(`🌐 Marketing Site: http://localhost:${PORT}`);
       console.log(`🔒 Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`👑 Super Admin: http://localhost:${PORT}/super-admin`);
     });
   } catch (error) {
     console.error('Failed to start server:', error);
