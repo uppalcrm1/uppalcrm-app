@@ -127,7 +127,7 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// Check production database schema
+// Check production database schema and trial data
 router.get('/schema-check', authenticateSuperAdmin, async (req, res) => {
   try {
     const orgColumns = await query(`
@@ -138,10 +138,43 @@ router.get('/schema-check', authenticateSuperAdmin, async (req, res) => {
     `);
 
     const orgCount = await query('SELECT COUNT(*) FROM organizations');
+
+    // Check trial history data
+    let trialHistoryData = [];
+    try {
+      const trialHistory = await query('SELECT * FROM organization_trial_history LIMIT 5');
+      trialHistoryData = trialHistory.rows;
+    } catch (trialError) {
+      console.log('Trial history not available:', trialError.message);
+    }
+
+    // Check trial overview
+    let trialOverviewData = [];
+    try {
+      const trialOverview = await query('SELECT * FROM trial_overview LIMIT 3');
+      trialOverviewData = trialOverview.rows;
+    } catch (overviewError) {
+      console.log('Trial overview not available:', overviewError.message);
+    }
+
+    // Sample organization with users
+    const sampleOrg = await query(`
+      SELECT 
+        o.*,
+        (SELECT COUNT(*) FROM users WHERE organization_id = o.id) as user_count,
+        (SELECT json_agg(json_build_object('email', email, 'first_name', first_name, 'last_name', last_name, 'role', role)) 
+         FROM users WHERE organization_id = o.id LIMIT 3) as users
+      FROM organizations o 
+      ORDER BY o.created_at DESC
+      LIMIT 1
+    `);
     
     res.json({
       organizations_columns: orgColumns.rows,
       organizations_count: orgCount.rows[0].count,
+      trial_history_sample: trialHistoryData,
+      trial_overview_sample: trialOverviewData,
+      sample_organization: sampleOrg.rows[0] || null,
       timestamp: new Date()
     });
 
