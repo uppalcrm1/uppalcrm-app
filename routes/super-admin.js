@@ -172,14 +172,19 @@ router.get('/dashboard', authenticateSuperAdmin, async (req, res) => {
 
     console.log('📊 Dashboard overview query result:', overview.rows[0]);
 
-    // Recent metrics using correct column names
-    const recentMetrics = await query(`
-      SELECT date, new_organizations as new_signups, trials_converted as trial_conversions, churned_organizations as churn_count 
-      FROM platform_metrics 
-      WHERE date >= CURRENT_DATE - INTERVAL '7 days'
-      ORDER BY date DESC
-      LIMIT 7
-    `);
+    // Check if platform_metrics table exists, if not return empty array
+    let recentMetrics = { rows: [] };
+    try {
+      recentMetrics = await query(`
+        SELECT date, new_organizations as new_signups, trials_converted as trial_conversions, churned_organizations as churn_count 
+        FROM platform_metrics 
+        WHERE date >= CURRENT_DATE - INTERVAL '7 days'
+        ORDER BY date DESC
+        LIMIT 7
+      `);
+    } catch (metricsError) {
+      console.log('Platform metrics table not available, skipping metrics query');
+    }
 
     const topOrganizations = await query(`
       SELECT 
