@@ -374,36 +374,66 @@ router.get('/organizations', authenticateSuperAdmin, async (req, res) => {
         o.max_users,
         o.is_active,
         o.created_at,
-        o.updated_at,
-        
-        -- User information (admin contact)
-        u.email as admin_email,
-        u.first_name as admin_first_name,
-        u.last_name as admin_last_name,
-        u.role as admin_role,
-        u.last_login as admin_last_login,
-        
-        -- User count for organization
-        (SELECT COUNT(*) FROM users WHERE organization_id = o.id AND is_active = true) as active_user_count,
-        
-        -- Trial information from trial_overview if available
-        COALESCE(tv.trial_status, 'no_trial') as trial_status,
-        tv.trial_created_at,
-        tv.trial_ends_at,
-        tv.days_remaining,
-        tv.engagement_score,
-        tv.recent_logins,
-        
-        -- Trial history summary
-        (SELECT COUNT(*) FROM organization_trial_history WHERE organization_id = o.id) as total_trials,
-        (SELECT MAX(trial_end_date) FROM organization_trial_history WHERE organization_id = o.id) as last_trial_end
-        
+        o.updated_at
       FROM organizations o
-      LEFT JOIN users u ON u.organization_id = o.id AND u.role = 'admin'
-      LEFT JOIN trial_overview tv ON tv.organization_id = o.id
       ${whereClause}
       ORDER BY o.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}
     `, [...params, limit, offset]);
+
+    // Enhance each organization with contact and trial info
+    for (let org of organizations.rows) {
+      try {
+        // Get admin user info
+        const adminUser = await query(`
+          SELECT email, first_name, last_name, role, last_login 
+          FROM users 
+          WHERE organization_id = $1 AND role = 'admin' 
+          LIMIT 1
+        `, [org.id]);
+        
+        if (adminUser.rows.length > 0) {
+          const admin = adminUser.rows[0];
+          org.admin_email = admin.email;
+          org.admin_name = `${admin.first_name} ${admin.last_name}`;
+          org.admin_last_login = admin.last_login;
+        }
+
+        // Get user count
+        const userCount = await query(`
+          SELECT COUNT(*) as count FROM users WHERE organization_id = $1 AND is_active = true
+        `, [org.id]);
+        org.active_user_count = userCount.rows[0].count;
+
+        // Get trial info from trial_overview if it exists
+        try {
+          const trialInfo = await query(`
+            SELECT trial_status, days_remaining, engagement_score, trial_ends_at
+            FROM trial_overview WHERE organization_id = $1
+          `, [org.id]);
+          
+          if (trialInfo.rows.length > 0) {
+            const trial = trialInfo.rows[0];
+            org.trial_status = trial.trial_status;
+            org.days_remaining = trial.days_remaining;
+            org.engagement_score = trial.engagement_score;
+            org.trial_ends_at = trial.trial_ends_at;
+          } else {
+            org.trial_status = 'no_trial';
+          }
+        } catch (trialError) {
+          org.trial_status = 'no_trial';
+        }
+
+        // Get trial history count
+        const trialHistory = await query(`
+          SELECT COUNT(*) as count FROM organization_trial_history WHERE organization_id = $1
+        `, [org.id]);
+        org.total_trials = trialHistory.rows[0].count;
+
+      } catch (enhanceError) {
+        console.log(`Failed to enhance org ${org.id}:`, enhanceError.message);
+      }
+    }
 
     const totalResult = await query(`
       SELECT COUNT(*) as total 
