@@ -49,24 +49,37 @@ const authenticateSuperAdmin = async (req, res, next) => {
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
+    console.log('🔐 Super Admin login attempt for:', email);
+
+    if (!process.env.JWT_SECRET) {
+      console.error('❌ JWT_SECRET not found in environment');
+      return res.status(500).json({ error: 'Server configuration error' });
+    }
 
     const result = await query(
       'SELECT * FROM super_admin_users WHERE email = $1 AND is_active = true',
       [email.toLowerCase()]
     );
+    console.log('📊 Database query result:', result.rows.length, 'users found');
 
     if (result.rows.length === 0) {
+      console.log('❌ No active super admin found for email:', email);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
     const admin = result.rows[0];
+    console.log('👤 Found admin:', admin.email, 'ID:', admin.id);
+    
     const validPassword = await bcrypt.compare(password, admin.password_hash);
+    console.log('🔒 Password validation result:', validPassword);
     
     if (!validPassword) {
+      console.log('❌ Invalid password for:', email);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
     await query('UPDATE super_admin_users SET last_login = NOW() WHERE id = $1', [admin.id]);
+    console.log('✅ Updated last_login for admin:', admin.id);
 
     const token = jwt.sign(
       { user_id: admin.id, email: admin.email, is_super_admin: true },
