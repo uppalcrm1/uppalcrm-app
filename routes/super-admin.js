@@ -4,6 +4,14 @@ const jwt = require('jsonwebtoken');
 const { query, transaction } = require('../database/connection');
 const router = express.Router();
 
+// Debug endpoint to test if routes are loading
+router.get('/test', (req, res) => {
+  res.json({
+    message: 'Super Admin routes are working!',
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Super Admin Authentication Middleware
 const authenticateSuperAdmin = async (req, res, next) => {
   try {
