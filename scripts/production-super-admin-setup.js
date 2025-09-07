@@ -41,30 +41,64 @@ async function setupSuperAdmin() {
       return;
     }
     
-    // Apply trial management migration first (dependency)
-    console.log('🔧 Checking trial management migration...');
-    const trialTableCheck = await client.query(`
-      SELECT EXISTS (
-        SELECT FROM information_schema.tables 
-        WHERE table_schema = 'public' 
-        AND table_name = 'organization_subscriptions'
+    // Create minimal super admin tables without complex dependencies
+    console.log('🔧 Creating super admin tables...');
+    
+    // Create super admin users table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS super_admin_users (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password_hash VARCHAR(255) NOT NULL,
+        first_name VARCHAR(100) NOT NULL,
+        last_name VARCHAR(100) NOT NULL,
+        role VARCHAR(50) DEFAULT 'super_admin',
+        permissions JSONB DEFAULT '["all"]',
+        is_active BOOLEAN DEFAULT true,
+        last_login TIMESTAMP WITH TIME ZONE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
     `);
     
-    if (!trialTableCheck.rows[0].exists) {
-      console.log('🔧 Applying trial management migration first...');
-      const trialMigrationPath = path.join(__dirname, '../database/migrations/003_trial_management.sql');
-      const trialMigrationSQL = fs.readFileSync(trialMigrationPath, 'utf8');
-      await client.query(trialMigrationSQL);
-      console.log('✅ Trial management migration applied');
-    }
+    // Create other essential super admin tables
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS super_admin_sessions (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        admin_id UUID NOT NULL REFERENCES super_admin_users(id) ON DELETE CASCADE,
+        token_hash VARCHAR(255) NOT NULL,
+        expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+      
+      CREATE TABLE IF NOT EXISTS platform_metrics (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        metric_date DATE NOT NULL UNIQUE,
+        total_organizations INTEGER DEFAULT 0,
+        active_organizations INTEGER DEFAULT 0,
+        trial_organizations INTEGER DEFAULT 0,
+        paid_organizations INTEGER DEFAULT 0,
+        new_signups INTEGER DEFAULT 0,
+        trial_conversions INTEGER DEFAULT 0,
+        churn_count INTEGER DEFAULT 0,
+        total_revenue DECIMAL(12,2) DEFAULT 0,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+      
+      CREATE TABLE IF NOT EXISTS organization_notes (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        organization_id UUID NOT NULL,
+        admin_id UUID NOT NULL REFERENCES super_admin_users(id) ON DELETE SET NULL,
+        note_text TEXT NOT NULL,
+        note_type VARCHAR(50) DEFAULT 'general',
+        is_internal BOOLEAN DEFAULT true,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+    `);
     
-    // Read and execute super admin migration
-    const migrationPath = path.join(__dirname, '../database/migrations/004_super_admin.sql');
-    const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
-    
-    console.log('🔧 Executing super admin migration...');
-    await client.query(migrationSQL);
+    console.log('✅ Super admin tables created');
     
     console.log('✅ Super admin migration applied successfully');
     
