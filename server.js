@@ -19,13 +19,21 @@ const leadRoutes = require('./routes/leads');
 const contactRoutes = require('./routes/contacts');
 const trialRoutes = require('./routes/trials');
 const superAdminRoutes = require('./routes/super-admin');
-// Public leads routes (with error handling for production)
+// Public leads routes (simplified for production deployment)
 let publicLeadRoutes;
 try {
+  // Try the full version first
   publicLeadRoutes = require('./routes/public-leads');
+  console.log('✅ Full public leads routes loaded');
 } catch (error) {
-  console.warn('⚠️ Public leads routes failed to load:', error.message);
-  publicLeadRoutes = null;
+  console.warn('⚠️ Full public leads routes failed, trying simple version:', error.message);
+  try {
+    publicLeadRoutes = require('./routes/public-leads-simple');
+    console.log('✅ Simple public leads routes loaded');
+  } catch (simpleError) {
+    console.error('❌ All public leads routes failed:', simpleError.message);
+    publicLeadRoutes = null;
+  }
 }
 
 // Load environment variables
