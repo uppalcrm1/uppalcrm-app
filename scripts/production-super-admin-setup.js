@@ -122,6 +122,72 @@ async function setupSuperAdmin() {
       console.log('✅ Super admin user already exists');
     }
     
+    // Add trial columns to organizations table if they don't exist
+    console.log('🔧 Ensuring trial columns exist...');
+    
+    const columnCheck = await client.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'organizations' 
+      AND column_name IN ('trial_status', 'trial_started_at', 'trial_ends_at', 'payment_status')
+    `);
+    
+    const existingColumns = columnCheck.rows.map(row => row.column_name);
+    
+    const columnsToAdd = [
+      { name: 'trial_status', type: 'VARCHAR(50)', default: "'no_trial'" },
+      { name: 'trial_started_at', type: 'TIMESTAMP WITH TIME ZONE', default: 'NULL' },
+      { name: 'trial_ends_at', type: 'TIMESTAMP WITH TIME ZONE', default: 'NULL' },
+      { name: 'payment_status', type: 'VARCHAR(50)', default: "'trial'" }
+    ];
+    
+    for (const column of columnsToAdd) {
+      if (!existingColumns.includes(column.name)) {
+        console.log(`➕ Adding column: ${column.name}`);
+        await client.query(`
+          ALTER TABLE organizations 
+          ADD COLUMN ${column.name} ${column.type} DEFAULT ${column.default};
+        `);
+      }
+    }
+    
+    // Add some sample trial data to existing organizations
+    const orgCount = await client.query('SELECT COUNT(*) FROM organizations WHERE trial_status = \'no_trial\' OR trial_status IS NULL');
+    if (parseInt(orgCount.rows[0].count) > 0) {
+      console.log('🎯 Adding sample trial data...');
+      
+      // Set some orgs as active trials
+      await client.query(`
+        UPDATE organizations 
+        SET 
+          trial_status = 'active',
+          trial_started_at = CURRENT_DATE - INTERVAL '7 days',
+          trial_ends_at = CURRENT_DATE + INTERVAL '14 days',
+          payment_status = 'trial'
+        WHERE id IN (
+          SELECT id FROM organizations 
+          WHERE trial_status = 'no_trial' OR trial_status IS NULL
+          ORDER BY created_at DESC 
+          LIMIT 5
+        );
+      `);
+      
+      // Set some as paid customers
+      await client.query(`
+        UPDATE organizations 
+        SET 
+          trial_status = 'converted',
+          payment_status = 'paid'
+        WHERE id IN (
+          SELECT id FROM organizations 
+          WHERE trial_status = 'no_trial' OR trial_status IS NULL
+          ORDER BY RANDOM()
+          LIMIT 2
+        );
+      `);
+    }
+    
+    console.log('✅ Trial columns setup complete');
     console.log('🎉 Production super admin setup complete!');
     
   } catch (error) {
