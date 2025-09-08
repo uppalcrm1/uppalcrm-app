@@ -608,27 +608,47 @@ router.delete('/organizations/:id', authenticateSuperAdmin, async (req, res) => 
         WHERE organization_id = $1
       `, [organizationId]);
 
-      // 2. Delete contacts
+      // 2. Delete user sessions
+      const sessionsDeleted = await client.query(`
+        DELETE FROM user_sessions WHERE organization_id = $1
+      `, [organizationId]);
+
+      // 3. Delete organization trial history
+      const trialHistoryDeleted = await client.query(`
+        DELETE FROM organization_trial_history WHERE organization_id = $1
+      `, [organizationId]);
+
+      // 4. Delete organization engagement records
+      const engagementDeleted = await client.query(`
+        DELETE FROM organization_engagement WHERE organization_id = $1
+      `, [organizationId]);
+
+      // 5. Delete organization subscriptions
+      const subscriptionsDeleted = await client.query(`
+        DELETE FROM organization_subscriptions WHERE organization_id = $1
+      `, [organizationId]);
+
+      // 6. Delete contacts
       const contactsDeleted = await client.query(`
         DELETE FROM contacts WHERE organization_id = $1
       `, [organizationId]);
 
-      // 3. Delete users
+      // 7. Delete users
       const usersDeleted = await client.query(`
         DELETE FROM users WHERE organization_id = $1
       `, [organizationId]);
 
-      // 4. Delete organization notes
+      // 8. Delete organization notes
       const notesDeleted = await client.query(`
         DELETE FROM organization_notes WHERE organization_id = $1
       `, [organizationId]);
 
-      // 5. Delete the organization itself
+      // 9. Delete the organization itself
       const orgDeleted = await client.query(`
         DELETE FROM organizations WHERE id = $1 RETURNING name
       `, [organizationId]);
 
-      console.log(`✅ Deleted organization "${org.name}": ${usersDeleted.rowCount} users, ${contactsDeleted.rowCount} contacts, ${notesDeleted.rowCount} notes`);
+      console.log(`✅ Deleted organization "${org.name}": ${usersDeleted.rowCount} users, ${contactsDeleted.rowCount} contacts, ${sessionsDeleted.rowCount} sessions, ${trialHistoryDeleted.rowCount} trial history, ${notesDeleted.rowCount} notes`);
 
       // Log the deletion for audit purposes
       await client.query(`
@@ -638,7 +658,7 @@ router.delete('/organizations/:id', authenticateSuperAdmin, async (req, res) => 
       `, [
         null, // No organization since it's deleted
         req.superAdmin.id,
-        `Organization "${org.name}" deleted by super admin. Had ${usersDeleted.rowCount} users and ${contactsDeleted.rowCount} contacts.`
+        `Organization "${org.name}" deleted by super admin. Had ${usersDeleted.rowCount} users, ${contactsDeleted.rowCount} contacts, ${sessionsDeleted.rowCount} sessions, and ${trialHistoryDeleted.rowCount} trial history records.`
       ]);
     });
 
