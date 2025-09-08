@@ -242,15 +242,21 @@ router.get('/dashboard', authenticateSuperAdmin, async (req, res) => {
   try {
     console.log('🔍 Super Admin dashboard request');
 
-    // Simple overview using production database structure (no trial columns exist)
+    // Overview using actual trial columns from organizations table
     const overview = await query(`
       SELECT 
+        (SELECT COUNT(*) FROM organizations WHERE trial_status = 'active') as active_trials,
+        (SELECT COUNT(*) FROM organizations WHERE trial_status = 'expired') as expired_trials,
+        (SELECT COUNT(*) FROM organizations WHERE payment_status = 'paid') as paid_customers,
+        (SELECT COUNT(*) FROM organizations WHERE DATE(created_at) = CURRENT_DATE) as new_signups_today,
+        (SELECT COUNT(*) FROM organizations WHERE trial_started_at IS NOT NULL AND DATE(trial_started_at) = CURRENT_DATE) as new_trials_today,
+        (SELECT COUNT(*) FROM organizations WHERE trial_ends_at BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days') as expiring_next_7_days,
+        (SELECT COUNT(*) FROM organizations WHERE trial_ends_at BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '1 day') as expiring_tomorrow,
+        (SELECT COUNT(*) FROM organizations) as total_organizations,
         (SELECT COUNT(*) FROM organizations WHERE is_active = true) as active_organizations,
         (SELECT COUNT(*) FROM organizations WHERE is_active = false) as inactive_organizations,
-        (SELECT COUNT(*) FROM organizations WHERE DATE(created_at) = CURRENT_DATE) as new_signups_today,
         (SELECT COUNT(*) FROM organizations WHERE DATE(created_at) >= CURRENT_DATE - INTERVAL '7 days') as new_signups_week,
-        (SELECT COUNT(*) FROM organizations WHERE DATE(created_at) >= CURRENT_DATE - INTERVAL '30 days') as new_signups_month,
-        (SELECT COUNT(*) FROM organizations) as total_organizations
+        (SELECT COUNT(*) FROM organizations WHERE DATE(created_at) >= CURRENT_DATE - INTERVAL '30 days') as new_signups_month
     `);
 
     console.log('📊 Dashboard overview query result:', overview.rows[0]);
@@ -284,17 +290,30 @@ router.get('/dashboard', authenticateSuperAdmin, async (req, res) => {
         u.first_name || ' ' || u.last_name as admin_name,
         u.last_login as admin_last_login,
         
-        -- Trial data if available
-        COALESCE(tv.trial_status, 'no_trial') as trial_status,
-        tv.days_remaining,
-        tv.engagement_score,
+        -- Actual trial data from organizations table
+        o.trial_status,
+        o.trial_started_at,
+        o.trial_ends_at,
+        o.payment_status,
+        CASE 
+          WHEN o.trial_ends_at IS NOT NULL THEN 
+            EXTRACT(days FROM o.trial_ends_at - CURRENT_DATE)
+          ELSE NULL 
+        END as days_remaining,
+        
+        -- Mock engagement score based on user activity (can be enhanced later)
+        CASE 
+          WHEN (SELECT COUNT(*) FROM users WHERE organization_id = o.id AND is_active = true) >= 5 THEN 85
+          WHEN (SELECT COUNT(*) FROM users WHERE organization_id = o.id AND is_active = true) >= 3 THEN 65
+          WHEN (SELECT COUNT(*) FROM users WHERE organization_id = o.id AND is_active = true) >= 1 THEN 45
+          ELSE 25
+        END as engagement_score,
         
         -- User count
         (SELECT COUNT(*) FROM users WHERE organization_id = o.id AND is_active = true) as active_users
         
       FROM organizations o
       LEFT JOIN users u ON u.organization_id = o.id AND u.role = 'admin'
-      LEFT JOIN trial_overview tv ON tv.organization_id = o.id
       WHERE o.is_active = true
       ORDER BY o.created_at DESC 
       LIMIT 10
@@ -313,19 +332,47 @@ router.get('/dashboard', authenticateSuperAdmin, async (req, res) => {
         u.email as admin_email,
         u.first_name || ' ' || u.last_name as admin_name,
         
-        -- Trial status
-        COALESCE(tv.trial_status, 'no_trial') as trial_status,
-        tv.days_remaining,
+        -- Actual trial data from organizations table
+        o.trial_status,
+        o.trial_started_at,
+        o.trial_ends_at,
+        CASE 
+          WHEN o.trial_ends_at IS NOT NULL THEN 
+            EXTRACT(days FROM o.trial_ends_at - CURRENT_DATE)
+          ELSE NULL 
+        END as days_remaining,
         
         -- Activity metrics  
         (SELECT COUNT(*) FROM users WHERE organization_id = o.id AND is_active = true) as active_users,
-        (SELECT COUNT(*) FROM organization_trial_history WHERE organization_id = o.id) as total_trials
+        0 as total_trials -- No trial history table exists yet
         
       FROM organizations o
       LEFT JOIN users u ON u.organization_id = o.id AND u.role = 'admin'
-      LEFT JOIN trial_overview tv ON tv.organization_id = o.id
       WHERE o.is_active = true
       ORDER BY o.created_at DESC
+      LIMIT 10
+    `);
+
+    // At risk trials
+    const atRiskTrials = await query(`
+      SELECT 
+        o.id as organization_id,
+        o.name as organization_name,
+        u.first_name || ' ' || u.last_name as admin_name,
+        u.email as admin_email,
+        o.trial_ends_at,
+        EXTRACT(days FROM o.trial_ends_at - CURRENT_DATE) as days_remaining,
+        CASE 
+          WHEN EXTRACT(days FROM o.trial_ends_at - CURRENT_DATE) <= 1 THEN 'Critical'
+          WHEN EXTRACT(days FROM o.trial_ends_at - CURRENT_DATE) <= 3 THEN 'High' 
+          ELSE 'Medium'
+        END as risk_level
+      FROM organizations o
+      LEFT JOIN users u ON u.organization_id = o.id AND u.role = 'admin'
+      WHERE o.trial_status = 'active' 
+        AND o.trial_ends_at IS NOT NULL
+        AND o.trial_ends_at BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days'
+      ORDER BY o.trial_ends_at ASC
       LIMIT 10
     `);
 
@@ -334,6 +381,7 @@ router.get('/dashboard', authenticateSuperAdmin, async (req, res) => {
       recent_metrics: recentMetrics.rows,
       top_organizations: topOrganizations.rows,
       recent_organizations: recentOrganizations.rows,
+      at_risk_trials: atRiskTrials.rows,
       last_updated: new Date()
     });
 
@@ -404,31 +452,36 @@ router.get('/organizations', authenticateSuperAdmin, async (req, res) => {
         `, [org.id]);
         org.active_user_count = userCount.rows[0].count;
 
-        // Get trial info from trial_overview if it exists
-        try {
-          const trialInfo = await query(`
-            SELECT trial_status, days_remaining, engagement_score, trial_ends_at
-            FROM trial_overview WHERE organization_id = $1
-          `, [org.id]);
+        // Get trial info directly from organizations table
+        const orgDetails = await query(`
+          SELECT trial_status, trial_started_at, trial_ends_at, payment_status,
+          CASE 
+            WHEN trial_ends_at IS NOT NULL THEN 
+              EXTRACT(days FROM trial_ends_at - CURRENT_DATE)
+            ELSE NULL 
+          END as days_remaining
+          FROM organizations WHERE id = $1
+        `, [org.id]);
+        
+        if (orgDetails.rows.length > 0) {
+          const details = orgDetails.rows[0];
+          org.trial_status = details.trial_status || 'no_trial';
+          org.trial_started_at = details.trial_started_at;
+          org.trial_ends_at = details.trial_ends_at;
+          org.days_remaining = details.days_remaining;
+          org.payment_status = details.payment_status;
           
-          if (trialInfo.rows.length > 0) {
-            const trial = trialInfo.rows[0];
-            org.trial_status = trial.trial_status;
-            org.days_remaining = trial.days_remaining;
-            org.engagement_score = trial.engagement_score;
-            org.trial_ends_at = trial.trial_ends_at;
-          } else {
-            org.trial_status = 'no_trial';
-          }
-        } catch (trialError) {
+          // Calculate engagement score based on user activity
+          org.engagement_score = org.active_user_count >= 5 ? 85 : 
+                                org.active_user_count >= 3 ? 65 : 
+                                org.active_user_count >= 1 ? 45 : 25;
+        } else {
           org.trial_status = 'no_trial';
+          org.engagement_score = 0;
         }
 
-        // Get trial history count
-        const trialHistory = await query(`
-          SELECT COUNT(*) as count FROM organization_trial_history WHERE organization_id = $1
-        `, [org.id]);
-        org.total_trials = trialHistory.rows[0].count;
+        // Set trial history count (table doesn't exist yet)
+        org.total_trials = 0;
 
       } catch (enhanceError) {
         console.log(`Failed to enhance org ${org.id}:`, enhanceError.message);
@@ -532,7 +585,7 @@ router.get('/expiring-trials', authenticateSuperAdmin, async (req, res) => {
 
     const expiringTrials = await query(`
       SELECT 
-        o.id,
+        o.id as organization_id,
         o.name as organization_name,
         u.first_name || ' ' || u.last_name as admin_name,
         u.email as admin_email,
@@ -544,9 +597,16 @@ router.get('/expiring-trials', authenticateSuperAdmin, async (req, res) => {
           WHEN EXTRACT(days FROM o.trial_ends_at - CURRENT_DATE) <= 1 THEN 'High'
           WHEN EXTRACT(days FROM o.trial_ends_at - CURRENT_DATE) <= 3 THEN 'Medium' 
           ELSE 'Low'
-        END as risk_level
+        END as risk_level,
+        -- Mock engagement score based on user activity
+        CASE 
+          WHEN (SELECT COUNT(*) FROM users WHERE organization_id = o.id AND is_active = true) >= 5 THEN 85
+          WHEN (SELECT COUNT(*) FROM users WHERE organization_id = o.id AND is_active = true) >= 3 THEN 65
+          WHEN (SELECT COUNT(*) FROM users WHERE organization_id = o.id AND is_active = true) >= 1 THEN 45
+          ELSE 25
+        END as engagement_score
       FROM organizations o
-      LEFT JOIN users u ON u.organization_id = o.id
+      LEFT JOIN users u ON u.organization_id = o.id AND u.role = 'admin'
       WHERE o.trial_status = 'active' 
         AND o.trial_ends_at IS NOT NULL
         AND o.trial_ends_at BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '${days} days'
