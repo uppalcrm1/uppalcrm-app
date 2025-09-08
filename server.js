@@ -19,6 +19,7 @@ const leadRoutes = require('./routes/leads');
 const contactRoutes = require('./routes/contacts');
 const trialRoutes = require('./routes/trials');
 const superAdminRoutes = require('./routes/super-admin');
+const publicLeadRoutes = require('./routes/public-leads');
 
 // Load environment variables
 require('dotenv').config();
@@ -79,6 +80,9 @@ app.use('/api/leads', rateLimiters.general, leadRoutes);
 app.use('/api/contacts', rateLimiters.general, contactRoutes);
 app.use('/api/trials', rateLimiters.general, trialRoutes);
 app.use('/api/super-admin', rateLimiters.general, superAdminRoutes);
+
+// Public routes (no authentication required)
+app.use('/api/public/leads', rateLimiters.strict, publicLeadRoutes);
 
 // API documentation endpoint
 app.get('/api', (req, res) => {
