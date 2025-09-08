@@ -19,7 +19,14 @@ const leadRoutes = require('./routes/leads');
 const contactRoutes = require('./routes/contacts');
 const trialRoutes = require('./routes/trials');
 const superAdminRoutes = require('./routes/super-admin');
-const publicLeadRoutes = require('./routes/public-leads');
+// Public leads routes (with error handling for production)
+let publicLeadRoutes;
+try {
+  publicLeadRoutes = require('./routes/public-leads');
+} catch (error) {
+  console.warn('⚠️ Public leads routes failed to load:', error.message);
+  publicLeadRoutes = null;
+}
 
 // Load environment variables
 require('dotenv').config();
@@ -82,7 +89,12 @@ app.use('/api/trials', rateLimiters.general, trialRoutes);
 app.use('/api/super-admin', rateLimiters.general, superAdminRoutes);
 
 // Public routes (no authentication required)
-app.use('/api/public/leads', rateLimiters.strict, publicLeadRoutes);
+if (publicLeadRoutes) {
+  app.use('/api/public/leads', rateLimiters.strict, publicLeadRoutes);
+  console.log('✅ Public leads API enabled');
+} else {
+  console.log('⚠️ Public leads API disabled due to loading error');
+}
 
 // API documentation endpoint
 app.get('/api', (req, res) => {
