@@ -6,6 +6,13 @@ const { query } = require('../database/connection');
 
 const router = express.Router();
 
+// Helper function to extract domain from email
+function extractDomainFromEmail(email) {
+  if (!email) return null;
+  const match = email.match(/@([^.]+\..+)$/);
+  return match ? match[1] : null;
+}
+
 // Public lead submission schema (simpler than internal lead schema)
 const publicLeadSchema = {
   body: Joi.object({
@@ -48,29 +55,58 @@ router.post('/',
         source: req.body.source
       });
 
-      // For public submissions, we need to determine which organization to assign the lead to
-      // Option 1: Default to a specific organization (e.g., main company org)
-      // Option 2: Create leads in a central pool for later assignment
-      // Option 3: Route based on domain or other criteria
+      // For public submissions, create a new organization with trial setup for each lead
+      const companyName = req.body.company || `${req.body.first_name} ${req.body.last_name}'s Company`;
+      const domain = extractDomainFromEmail(req.body.email);
       
-      // Let's use Option 1 for now - assign to first active organization
+      console.log(`📋 Creating new organization: ${companyName} for lead`);
+      
+      // Calculate trial dates (14-day trial)
+      const trialStartDate = new Date();
+      const trialEndDate = new Date();
+      trialEndDate.setDate(trialEndDate.getDate() + 14);
+      
+      // Create new organization with trial setup
       const orgResult = await query(`
-        SELECT id, name FROM organizations 
-        WHERE is_active = true 
-        ORDER BY created_at ASC 
-        LIMIT 1
-      `);
+        INSERT INTO organizations (
+          name, 
+          domain,
+          trial_status,
+          trial_started_at,
+          trial_ends_at,
+          payment_status,
+          subscription_plan,
+          max_users,
+          is_active,
+          created_at,
+          updated_at
+        ) VALUES (
+          $1, $2, 'active', $3, $4, 'trial', 'trial', 50, true, NOW(), NOW()
+        ) RETURNING id, name
+      `, [companyName, domain, trialStartDate, trialEndDate]);
       
-      if (orgResult.rows.length === 0) {
-        console.error('No active organizations found for lead assignment');
-        return res.status(500).json({
-          error: 'Service temporarily unavailable',
-          message: 'Unable to process lead submission at this time'
-        });
-      }
+      const newOrg = orgResult.rows[0];
+      console.log(`✅ Created organization: ${newOrg.name} (${newOrg.id}) with 14-day trial`);
       
-      const targetOrg = orgResult.rows[0];
-      console.log(`📋 Assigning lead to organization: ${targetOrg.name} (${targetOrg.id})`);
+      // Create admin user for this organization
+      const adminResult = await query(`
+        INSERT INTO users (
+          organization_id,
+          email,
+          first_name,
+          last_name,
+          role,
+          is_active,
+          email_verified,
+          created_at,
+          updated_at
+        ) VALUES (
+          $1, $2, $3, $4, 'admin', true, false, NOW(), NOW()
+        ) RETURNING id, email
+      `, [newOrg.id, req.body.email, req.body.first_name, req.body.last_name]);
+      
+      const adminUser = adminResult.rows[0];
+      console.log(`✅ Created admin user: ${adminUser.email} for organization`);
       
       // Prepare lead data
       const leadData = {
@@ -78,11 +114,11 @@ router.post('/',
         last_name: req.body.last_name,
         email: req.body.email,
         phone: req.body.phone || null,
-        company: req.body.company || null,
+        company: companyName,
         title: req.body.title || null,
         source: req.body.source || 'website',
         status: 'new',
-        priority: 'medium',
+        priority: 'high', // Marketing leads get high priority
         value: 0,
         notes: req.body.message ? 
           `Marketing submission: ${req.body.message}` + 
@@ -90,11 +126,11 @@ router.post('/',
           (req.body.utm_medium ? `\nUTM Medium: ${req.body.utm_medium}` : '') +
           (req.body.utm_campaign ? `\nUTM Campaign: ${req.body.utm_campaign}` : '') +
           (req.body.referrer_url ? `\nReferrer: ${req.body.referrer_url}` : '')
-          : 'Marketing website submission'
+          : 'Marketing website submission - New trial organization created'
       };
       
-      // Create the lead (no user ID since it's a public submission)
-      const lead = await Lead.create(leadData, targetOrg.id, null);
+      // Create the lead in the new organization
+      const lead = await Lead.create(leadData, newOrg.id, null);
       
       console.log(`✅ Lead created successfully: ${lead.id}`);
       
