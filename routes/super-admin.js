@@ -578,6 +578,36 @@ router.get('/business-leads', authenticateSuperAdmin, async (req, res) => {
   }
 });
 
+// DIAGNOSTIC - Check what orgs exist (temporary endpoint)
+router.get('/debug-organizations', authenticateSuperAdmin, async (req, res) => {
+  try {
+    console.log('🔍 DEBUG: Checking organizations in production database');
+    
+    const orgs = await query(`
+      SELECT 
+        id,
+        name,
+        domain,
+        trial_status,
+        is_active,
+        created_at
+      FROM organizations 
+      ORDER BY created_at DESC
+    `);
+    
+    res.json({
+      message: 'Production database organizations',
+      total_count: orgs.rows.length,
+      organizations: orgs.rows,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('DEBUG organizations error:', error);
+    res.status(500).json({ error: 'Debug failed', details: error.message });
+  }
+});
+
 // DELETE ORGANIZATION
 router.delete('/organizations/:id', authenticateSuperAdmin, async (req, res) => {
   try {
@@ -591,6 +621,7 @@ router.delete('/organizations/:id', authenticateSuperAdmin, async (req, res) => 
     );
 
     if (orgDetails.rows.length === 0) {
+      console.log(`❌ Organization ${organizationId} not found in database`);
       return res.status(404).json({ error: 'Organization not found' });
     }
 
