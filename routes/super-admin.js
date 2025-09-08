@@ -700,8 +700,24 @@ router.delete('/organizations/:id', authenticateSuperAdmin, async (req, res) => 
     });
 
   } catch (error) {
-    console.error('Delete organization error:', error);
-    res.status(500).json({ error: 'Failed to delete organization' });
+    console.error('❌ Delete organization error:', error);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      detail: error.detail,
+      hint: error.hint,
+      constraint: error.constraint,
+      table: error.table,
+      column: error.column
+    });
+    res.status(500).json({ 
+      error: 'Failed to delete organization',
+      debug: {
+        message: error.message,
+        code: error.code,
+        constraint: error.constraint
+      }
+    });
   }
 });
 
