@@ -628,6 +628,18 @@ router.delete('/organizations/:id', authenticateSuperAdmin, async (req, res) => 
     const org = orgDetails.rows[0];
     console.log(`📋 Deleting organization: "${org.name}" (${org.trial_status})`);
 
+    // Pre-check which tables exist to avoid transaction errors
+    console.log('🔍 Checking which tables exist in production...');
+    const tableChecks = await query(`
+      SELECT table_name 
+      FROM information_schema.tables 
+      WHERE table_schema = 'public' 
+        AND table_name IN ('user_sessions', 'organization_trial_history', 'organization_engagement', 'organization_subscriptions')
+    `);
+    
+    const existingTables = new Set(tableChecks.rows.map(row => row.table_name));
+    console.log('📋 Existing tables:', Array.from(existingTables));
+
     await transaction(async (client) => {
       // Delete in safe order to handle foreign key constraints
       console.log('🔄 Deleting related data...');
@@ -639,48 +651,48 @@ router.delete('/organizations/:id', authenticateSuperAdmin, async (req, res) => 
         WHERE organization_id = $1
       `, [organizationId]);
 
-      // 2. Delete user sessions (if table exists)
+      // 2. Delete user sessions (only if table exists)
       let sessionsDeleted = { rowCount: 0 };
-      try {
+      if (existingTables.has('user_sessions')) {
         sessionsDeleted = await client.query(`
           DELETE FROM user_sessions WHERE organization_id = $1
         `, [organizationId]);
-      } catch (e) {
-        if (e.code === '42P01') console.log('⚠️ user_sessions table does not exist, skipping');
-        else throw e;
+        console.log(`✅ Deleted ${sessionsDeleted.rowCount} user sessions`);
+      } else {
+        console.log('⚠️ user_sessions table does not exist, skipping');
       }
 
-      // 3. Delete organization trial history (if table exists)
+      // 3. Delete organization trial history (only if table exists)
       let trialHistoryDeleted = { rowCount: 0 };
-      try {
+      if (existingTables.has('organization_trial_history')) {
         trialHistoryDeleted = await client.query(`
           DELETE FROM organization_trial_history WHERE organization_id = $1
         `, [organizationId]);
-      } catch (e) {
-        if (e.code === '42P01') console.log('⚠️ organization_trial_history table does not exist, skipping');
-        else throw e;
+        console.log(`✅ Deleted ${trialHistoryDeleted.rowCount} trial history records`);
+      } else {
+        console.log('⚠️ organization_trial_history table does not exist, skipping');
       }
 
-      // 4. Delete organization engagement records (if table exists)
+      // 4. Delete organization engagement records (only if table exists)
       let engagementDeleted = { rowCount: 0 };
-      try {
+      if (existingTables.has('organization_engagement')) {
         engagementDeleted = await client.query(`
           DELETE FROM organization_engagement WHERE organization_id = $1
         `, [organizationId]);
-      } catch (e) {
-        if (e.code === '42P01') console.log('⚠️ organization_engagement table does not exist, skipping');
-        else throw e;
+        console.log(`✅ Deleted ${engagementDeleted.rowCount} engagement records`);
+      } else {
+        console.log('⚠️ organization_engagement table does not exist, skipping');
       }
 
-      // 5. Delete organization subscriptions (if table exists)
+      // 5. Delete organization subscriptions (only if table exists)
       let subscriptionsDeleted = { rowCount: 0 };
-      try {
+      if (existingTables.has('organization_subscriptions')) {
         subscriptionsDeleted = await client.query(`
           DELETE FROM organization_subscriptions WHERE organization_id = $1
         `, [organizationId]);
-      } catch (e) {
-        if (e.code === '42P01') console.log('⚠️ organization_subscriptions table does not exist, skipping');
-        else throw e;
+        console.log(`✅ Deleted ${subscriptionsDeleted.rowCount} subscriptions`);
+      } else {
+        console.log('⚠️ organization_subscriptions table does not exist, skipping');
       }
 
       // 6. Delete contacts
