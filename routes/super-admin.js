@@ -639,25 +639,49 @@ router.delete('/organizations/:id', authenticateSuperAdmin, async (req, res) => 
         WHERE organization_id = $1
       `, [organizationId]);
 
-      // 2. Delete user sessions
-      const sessionsDeleted = await client.query(`
-        DELETE FROM user_sessions WHERE organization_id = $1
-      `, [organizationId]);
+      // 2. Delete user sessions (if table exists)
+      let sessionsDeleted = { rowCount: 0 };
+      try {
+        sessionsDeleted = await client.query(`
+          DELETE FROM user_sessions WHERE organization_id = $1
+        `, [organizationId]);
+      } catch (e) {
+        if (e.code === '42P01') console.log('⚠️ user_sessions table does not exist, skipping');
+        else throw e;
+      }
 
-      // 3. Delete organization trial history
-      const trialHistoryDeleted = await client.query(`
-        DELETE FROM organization_trial_history WHERE organization_id = $1
-      `, [organizationId]);
+      // 3. Delete organization trial history (if table exists)
+      let trialHistoryDeleted = { rowCount: 0 };
+      try {
+        trialHistoryDeleted = await client.query(`
+          DELETE FROM organization_trial_history WHERE organization_id = $1
+        `, [organizationId]);
+      } catch (e) {
+        if (e.code === '42P01') console.log('⚠️ organization_trial_history table does not exist, skipping');
+        else throw e;
+      }
 
-      // 4. Delete organization engagement records
-      const engagementDeleted = await client.query(`
-        DELETE FROM organization_engagement WHERE organization_id = $1
-      `, [organizationId]);
+      // 4. Delete organization engagement records (if table exists)
+      let engagementDeleted = { rowCount: 0 };
+      try {
+        engagementDeleted = await client.query(`
+          DELETE FROM organization_engagement WHERE organization_id = $1
+        `, [organizationId]);
+      } catch (e) {
+        if (e.code === '42P01') console.log('⚠️ organization_engagement table does not exist, skipping');
+        else throw e;
+      }
 
-      // 5. Delete organization subscriptions
-      const subscriptionsDeleted = await client.query(`
-        DELETE FROM organization_subscriptions WHERE organization_id = $1
-      `, [organizationId]);
+      // 5. Delete organization subscriptions (if table exists)
+      let subscriptionsDeleted = { rowCount: 0 };
+      try {
+        subscriptionsDeleted = await client.query(`
+          DELETE FROM organization_subscriptions WHERE organization_id = $1
+        `, [organizationId]);
+      } catch (e) {
+        if (e.code === '42P01') console.log('⚠️ organization_subscriptions table does not exist, skipping');
+        else throw e;
+      }
 
       // 6. Delete contacts
       const contactsDeleted = await client.query(`
