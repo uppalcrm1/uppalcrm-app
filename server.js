@@ -97,11 +97,23 @@ app.use('/api/trials', rateLimiters.general, trialRoutes);
 app.use('/api/super-admin', rateLimiters.general, superAdminRoutes);
 
 // Public routes (no authentication required)
-if (publicLeadRoutes) {
+console.log('🔍 DEBUG: publicLeadRoutes type:', typeof publicLeadRoutes, 'value:', !!publicLeadRoutes);
+if (publicLeadRoutes && typeof publicLeadRoutes === 'function') {
   app.use('/api/public/leads', rateLimiters.strict, publicLeadRoutes);
   console.log('✅ Public leads API enabled');
 } else {
-  console.log('⚠️ Public leads API disabled due to loading error');
+  console.log('⚠️ Public leads API disabled. Type:', typeof publicLeadRoutes);
+  // Create a simple placeholder route
+  app.get('/api/public/leads/test', (req, res) => {
+    res.json({
+      message: 'Public leads API placeholder - full version failed to load',
+      timestamp: new Date().toISOString(),
+      debug: {
+        routeType: typeof publicLeadRoutes,
+        routeExists: !!publicLeadRoutes
+      }
+    });
+  });
 }
 
 // API documentation endpoint
