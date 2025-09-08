@@ -12,9 +12,11 @@ import {
   Plus,
   Eye,
   CheckCircle,
-  XCircle
+  XCircle,
+  Trash2
 } from 'lucide-react';
 import LoadingSpinner from './LoadingSpinner';
+import DeleteConfirmModal from './DeleteConfirmModal';
 
 const SuperAdminDashboard = () => {
   const [dashboardData, setDashboardData] = useState(null);
@@ -27,6 +29,11 @@ const SuperAdminDashboard = () => {
     status: 'all',
     search: '',
     temperature: 'all'
+  });
+  const [deleteModal, setDeleteModal] = useState({
+    isOpen: false,
+    organization: null,
+    loading: false
   });
 
   useEffect(() => {
@@ -146,6 +153,58 @@ const SuperAdminDashboard = () => {
   const handleLogout = () => {
     localStorage.removeItem('superAdminToken');
     window.location.reload();
+  };
+
+  const handleDeleteClick = (organization) => {
+    setDeleteModal({
+      isOpen: true,
+      organization: organization,
+      loading: false
+    });
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteModal.organization) return;
+
+    setDeleteModal(prev => ({ ...prev, loading: true }));
+
+    try {
+      const response = await fetch(`/api/super-admin/organizations/${deleteModal.organization.id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
+
+      if (response.ok) {
+        // Refresh data
+        fetchDashboardData();
+        if (activeTab === 'organizations') fetchOrganizations();
+        if (activeTab === 'expiring') fetchExpiringTrials();
+        
+        // Close modal
+        setDeleteModal({
+          isOpen: false,
+          organization: null,
+          loading: false
+        });
+      } else {
+        const errorData = await response.json();
+        console.error('Delete failed:', errorData);
+        alert('Failed to delete organization: ' + (errorData.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Delete error:', error);
+      alert('Failed to delete organization: ' + error.message);
+    } finally {
+      setDeleteModal(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteModal({
+      isOpen: false,
+      organization: null,
+      loading: false
+    });
   };
 
   const formatDate = (dateString) => {
@@ -454,22 +513,32 @@ const SuperAdminDashboard = () => {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          {org.trial_status === 'active' && (
-                            <div className="flex space-x-2">
-                              <button
-                                onClick={() => extendTrial(org.id, 7, 'Admin extension')}
-                                className="text-blue-600 hover:text-blue-900 text-sm font-medium"
-                              >
-                                +7 Days
-                              </button>
-                              <button
-                                onClick={() => extendTrial(org.id, 14, 'Extended evaluation')}
-                                className="text-green-600 hover:text-green-900 text-sm font-medium"
-                              >
-                                +14 Days
-                              </button>
-                            </div>
-                          )}
+                          <div className="flex items-center space-x-2">
+                            {org.trial_status === 'active' && (
+                              <>
+                                <button
+                                  onClick={() => extendTrial(org.id, 7, 'Admin extension')}
+                                  className="text-blue-600 hover:text-blue-900 text-sm font-medium"
+                                >
+                                  +7 Days
+                                </button>
+                                <button
+                                  onClick={() => extendTrial(org.id, 14, 'Extended evaluation')}
+                                  className="text-green-600 hover:text-green-900 text-sm font-medium"
+                                >
+                                  +14 Days
+                                </button>
+                                <span className="text-gray-300">|</span>
+                              </>
+                            )}
+                            <button
+                              onClick={() => handleDeleteClick(org)}
+                              className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50 transition-colors"
+                              title={`Delete ${org.organization_name}`}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -533,7 +602,7 @@ const SuperAdminDashboard = () => {
                         {getRiskBadge(trial.risk_level)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex space-x-2">
+                        <div className="flex items-center space-x-2">
                           <button
                             onClick={() => extendTrial(trial.organization_id, 7, 'Expiration prevention')}
                             className="text-blue-600 hover:text-blue-900 text-sm font-medium"
@@ -545,6 +614,17 @@ const SuperAdminDashboard = () => {
                             className="text-green-600 hover:text-green-900 text-sm font-medium"
                           >
                             +14 Days
+                          </button>
+                          <span className="text-gray-300">|</span>
+                          <button
+                            onClick={() => handleDeleteClick({
+                              id: trial.organization_id,
+                              organization_name: trial.organization_name
+                            })}
+                            className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50 transition-colors"
+                            title={`Delete ${trial.organization_name}`}
+                          >
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       </td>
@@ -642,6 +722,15 @@ const SuperAdminDashboard = () => {
           </div>
         )}
       </main>
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmModal
+        isOpen={deleteModal.isOpen}
+        onClose={handleDeleteCancel}
+        onConfirm={handleDeleteConfirm}
+        organizationName={deleteModal.organization?.organization_name}
+        loading={deleteModal.loading}
+      />
     </div>
   );
 };

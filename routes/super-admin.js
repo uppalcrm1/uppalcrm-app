@@ -578,6 +578,82 @@ router.get('/business-leads', authenticateSuperAdmin, async (req, res) => {
   }
 });
 
+// DELETE ORGANIZATION
+router.delete('/organizations/:id', authenticateSuperAdmin, async (req, res) => {
+  try {
+    const organizationId = req.params.id;
+    console.log(`🗑️ Super Admin deletion request for organization: ${organizationId}`);
+
+    // Get organization details first for logging
+    const orgDetails = await query(
+      'SELECT name, trial_status, created_at FROM organizations WHERE id = $1',
+      [organizationId]
+    );
+
+    if (orgDetails.rows.length === 0) {
+      return res.status(404).json({ error: 'Organization not found' });
+    }
+
+    const org = orgDetails.rows[0];
+    console.log(`📋 Deleting organization: "${org.name}" (${org.trial_status})`);
+
+    await transaction(async (client) => {
+      // Delete in safe order to handle foreign key constraints
+      console.log('🔄 Deleting related data...');
+
+      // 1. Update contacts to remove user references
+      await client.query(`
+        UPDATE contacts 
+        SET created_by = NULL, assigned_to = NULL 
+        WHERE organization_id = $1
+      `, [organizationId]);
+
+      // 2. Delete contacts
+      const contactsDeleted = await client.query(`
+        DELETE FROM contacts WHERE organization_id = $1
+      `, [organizationId]);
+
+      // 3. Delete users
+      const usersDeleted = await client.query(`
+        DELETE FROM users WHERE organization_id = $1
+      `, [organizationId]);
+
+      // 4. Delete organization notes
+      const notesDeleted = await client.query(`
+        DELETE FROM organization_notes WHERE organization_id = $1
+      `, [organizationId]);
+
+      // 5. Delete the organization itself
+      const orgDeleted = await client.query(`
+        DELETE FROM organizations WHERE id = $1 RETURNING name
+      `, [organizationId]);
+
+      console.log(`✅ Deleted organization "${org.name}": ${usersDeleted.rowCount} users, ${contactsDeleted.rowCount} contacts, ${notesDeleted.rowCount} notes`);
+
+      // Log the deletion for audit purposes
+      await client.query(`
+        INSERT INTO organization_notes (organization_id, admin_user_id, title, content, note_type)
+        SELECT $1, $2, 'Organization Deleted', $3, 'audit'
+        WHERE EXISTS (SELECT 1 FROM super_admin_users WHERE id = $2)
+      `, [
+        null, // No organization since it's deleted
+        req.superAdmin.id,
+        `Organization "${org.name}" deleted by super admin. Had ${usersDeleted.rowCount} users and ${contactsDeleted.rowCount} contacts.`
+      ]);
+    });
+
+    res.json({
+      message: 'Organization deleted successfully',
+      organization: org.name,
+      deleted_at: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('Delete organization error:', error);
+    res.status(500).json({ error: 'Failed to delete organization' });
+  }
+});
+
 // EXPIRING TRIALS
 router.get('/expiring-trials', authenticateSuperAdmin, async (req, res) => {
   try {
