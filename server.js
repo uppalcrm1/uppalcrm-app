@@ -98,9 +98,10 @@ app.use('/api/super-admin', rateLimiters.general, superAdminRoutes);
 
 // Public routes (no authentication required)
 console.log('🔍 DEBUG: publicLeadRoutes type:', typeof publicLeadRoutes, 'value:', !!publicLeadRoutes);
+console.log('🔍 DEBUG: rateLimiters.strict type:', typeof rateLimiters.strict);
 if (publicLeadRoutes && typeof publicLeadRoutes === 'function') {
-  app.use('/api/public/leads', rateLimiters.strict, publicLeadRoutes);
-  console.log('✅ Public leads API enabled');
+  app.use('/api/public/leads', rateLimiters.general, publicLeadRoutes);
+  console.log('✅ Public leads API enabled with general rate limiting');
 } else {
   console.log('⚠️ Public leads API disabled. Type:', typeof publicLeadRoutes);
   // Create a simple placeholder route
