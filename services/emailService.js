@@ -87,6 +87,136 @@ class EmailService {
    * @param {string} options.temporaryPassword - Temporary password
    * @param {string} options.organizationSlug - Organization slug
    */
+  /**
+   * Send admin notification when a new lead signs up
+   */
+  async sendLeadNotification({ leadName, leadEmail, leadCompany, leadPhone, leadMessage, organizationName, utmSource, utmMedium, utmCampaign }) {
+    if (!this.isAvailable()) {
+      console.log('📧 Email service not available, skipping lead notification');
+      return null;
+    }
+
+    const subject = `🎯 New Trial Signup: ${leadName} from ${leadCompany}`;
+    
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; }
+          .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+          .content { background: #ffffff; padding: 30px; border: 1px solid #e0e0e0; }
+          .lead-info { background: #f8f9ff; padding: 20px; border-radius: 8px; margin: 20px 0; }
+          .detail-row { margin: 10px 0; }
+          .label { font-weight: bold; color: #5a67d8; }
+          .utm-info { background: #fff5f5; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #e53e3e; }
+          .footer { background: #f7f7f7; padding: 20px; text-align: center; font-size: 12px; color: #666; border-radius: 0 0 8px 8px; }
+          .btn { display: inline-block; background: #5a67d8; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 10px 5px; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>🎯 New Trial Signup!</h1>
+          <p>A new lead has signed up through your marketing site</p>
+        </div>
+        
+        <div class="content">
+          <div class="lead-info">
+            <h2>Lead Information</h2>
+            <div class="detail-row"><span class="label">Name:</span> ${leadName}</div>
+            <div class="detail-row"><span class="label">Email:</span> ${leadEmail}</div>
+            <div class="detail-row"><span class="label">Company:</span> ${leadCompany}</div>
+            ${leadPhone ? `<div class="detail-row"><span class="label">Phone:</span> ${leadPhone}</div>` : ''}
+            <div class="detail-row"><span class="label">Organization Created:</span> ${organizationName}</div>
+            <div class="detail-row"><span class="label">Trial Period:</span> 14 days (expires ${new Date(Date.now() + 14*24*60*60*1000).toLocaleDateString()})</div>
+          </div>
+
+          ${leadMessage ? `
+          <div class="lead-info">
+            <h3>Message</h3>
+            <p>${leadMessage}</p>
+          </div>
+          ` : ''}
+
+          ${utmSource || utmMedium || utmCampaign ? `
+          <div class="utm-info">
+            <h3>Marketing Attribution</h3>
+            ${utmSource ? `<div class="detail-row"><span class="label">Source:</span> ${utmSource}</div>` : ''}
+            ${utmMedium ? `<div class="detail-row"><span class="label">Medium:</span> ${utmMedium}</div>` : ''}
+            ${utmCampaign ? `<div class="detail-row"><span class="label">Campaign:</span> ${utmCampaign}</div>` : ''}
+          </div>
+          ` : ''}
+
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="https://uppalcrm-frontend.onrender.com/super-admin" class="btn">View in Super Admin Dashboard</a>
+          </div>
+
+          <p><strong>Next Steps:</strong></p>
+          <ul>
+            <li>Contact the lead within 24 hours for best conversion rates</li>
+            <li>Review their trial usage in the super admin dashboard</li>
+            <li>Set up onboarding and demo if needed</li>
+          </ul>
+        </div>
+
+        <div class="footer">
+          <p>This notification was sent automatically from your UppalCRM marketing integration.</p>
+          <p>Lead signed up at: ${new Date().toLocaleString()}</p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const textContent = `
+New Trial Signup Alert!
+
+Lead Information:
+- Name: ${leadName}
+- Email: ${leadEmail}  
+- Company: ${leadCompany}
+${leadPhone ? `- Phone: ${leadPhone}` : ''}
+- Organization: ${organizationName}
+- Trial Period: 14 days
+
+${leadMessage ? `Message: ${leadMessage}` : ''}
+
+${utmSource || utmMedium || utmCampaign ? `
+Marketing Attribution:
+${utmSource ? `- Source: ${utmSource}` : ''}
+${utmMedium ? `- Medium: ${utmMedium}` : ''}
+${utmCampaign ? `- Campaign: ${utmCampaign}` : ''}
+` : ''}
+
+View in dashboard: https://uppalcrm-frontend.onrender.com/super-admin
+
+Signed up at: ${new Date().toLocaleString()}
+    `;
+
+    try {
+      const mailOptions = {
+        from: {
+          name: process.env.FROM_NAME || 'UppalCRM Marketing',
+          address: process.env.FROM_EMAIL || process.env.SMTP_USER
+        },
+        to: 'uppalcrm1@gmail.com',
+        subject: subject,
+        text: textContent,
+        html: htmlContent,
+        headers: {
+          'X-Entity-Ref-ID': `lead-signup-${Date.now()}`,
+          'X-Priority': '2' // High priority
+        }
+      };
+
+      const result = await this.transporter.sendMail(mailOptions);
+      console.log('✅ Lead notification sent to uppalcrm1@gmail.com:', result.messageId);
+      return result;
+    } catch (error) {
+      console.error('❌ Failed to send lead notification:', error);
+      return null;
+    }
+  }
+
   async sendWelcomeEmail({ organizationName, adminEmail, adminName, loginUrl, temporaryPassword, organizationSlug }) {
     if (!this.isAvailable()) {
       console.log('📧 Email service not available, skipping welcome email');

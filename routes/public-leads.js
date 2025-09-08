@@ -3,6 +3,7 @@ const Lead = require('../models/Lead');
 const { validate } = require('../middleware/validation');
 const Joi = require('joi');
 const { query } = require('../database/connection');
+const EmailService = require('../services/emailService');
 
 const router = express.Router();
 
@@ -133,6 +134,29 @@ router.post('/',
       const lead = await Lead.create(leadData, newOrg.id, null);
       
       console.log(`✅ Lead created successfully: ${lead.id}`);
+      
+      // Send email notification to admin
+      try {
+        const emailService = new EmailService();
+        await emailService.initialize();
+        
+        await emailService.sendLeadNotification({
+          leadName: `${req.body.first_name} ${req.body.last_name}`,
+          leadEmail: req.body.email,
+          leadCompany: companyName,
+          leadPhone: req.body.phone,
+          leadMessage: req.body.message,
+          organizationName: newOrg.name,
+          utmSource: req.body.utm_source,
+          utmMedium: req.body.utm_medium,
+          utmCampaign: req.body.utm_campaign
+        });
+        
+        console.log('✅ Admin notification email sent');
+      } catch (emailError) {
+        console.error('⚠️ Failed to send admin notification:', emailError.message);
+        // Don't fail the API call if email fails
+      }
       
       res.status(201).json({
         message: 'Thank you for your interest! We will be in touch soon.',
