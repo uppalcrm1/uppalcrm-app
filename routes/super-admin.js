@@ -717,16 +717,41 @@ router.delete('/organizations/:id', authenticateSuperAdmin, async (req, res) => 
 
       console.log(`✅ Deleted organization "${org.name}": ${usersDeleted.rowCount} users, ${contactsDeleted.rowCount} contacts, ${sessionsDeleted.rowCount} sessions, ${trialHistoryDeleted.rowCount} trial history, ${notesDeleted.rowCount} notes`);
 
-      // Log the deletion for audit purposes
-      await client.query(`
-        INSERT INTO organization_notes (organization_id, admin_user_id, title, content, note_type)
-        SELECT $1, $2, 'Organization Deleted', $3, 'audit'
-        WHERE EXISTS (SELECT 1 FROM super_admin_users WHERE id = $2)
-      `, [
-        null, // No organization since it's deleted
-        req.superAdmin.id,
-        `Organization "${org.name}" deleted by super admin. Had ${usersDeleted.rowCount} users, ${contactsDeleted.rowCount} contacts, ${sessionsDeleted.rowCount} sessions, and ${trialHistoryDeleted.rowCount} trial history records.`
-      ]);
+      // Log the deletion for audit purposes (skip if schema doesn't match)
+      try {
+        // Check organization_notes table schema
+        const notesSchema = await client.query(`
+          SELECT column_name 
+          FROM information_schema.columns 
+          WHERE table_name = 'organization_notes' 
+            AND column_name IN ('admin_user_id', 'user_id', 'created_by')
+        `);
+        
+        const hasAdminUserId = notesSchema.rows.some(row => row.column_name === 'admin_user_id');
+        const hasUserId = notesSchema.rows.some(row => row.column_name === 'user_id');
+        const hasCreatedBy = notesSchema.rows.some(row => row.column_name === 'created_by');
+        
+        if (hasAdminUserId) {
+          await client.query(`
+            INSERT INTO organization_notes (organization_id, admin_user_id, title, content, note_type)
+            VALUES ($1, $2, 'Organization Deleted', $3, 'audit')
+          `, [null, req.superAdmin.id, `Organization "${org.name}" deleted by super admin.`]);
+        } else if (hasUserId) {
+          await client.query(`
+            INSERT INTO organization_notes (organization_id, user_id, title, content, note_type)
+            VALUES ($1, $2, 'Organization Deleted', $3, 'audit')
+          `, [null, req.superAdmin.id, `Organization "${org.name}" deleted by super admin.`]);
+        } else if (hasCreatedBy) {
+          await client.query(`
+            INSERT INTO organization_notes (organization_id, created_by, title, content, note_type)
+            VALUES ($1, $2, 'Organization Deleted', $3, 'audit')
+          `, [null, req.superAdmin.id, `Organization "${org.name}" deleted by super admin.`]);
+        } else {
+          console.log('⚠️ organization_notes table schema incompatible for audit logging, skipping');
+        }
+      } catch (auditError) {
+        console.log('⚠️ Failed to log audit entry:', auditError.message);
+      }
     });
 
     res.json({
