@@ -1,5 +1,5 @@
 const express = require('express');
-const EmailService = require('../services/emailService');
+const emailService = require('../services/emailService');
 
 const router = express.Router();
 
@@ -23,7 +23,6 @@ router.post('/', async (req, res) => {
     }
     
     // Initialize email service
-    const emailService = new EmailService();
     await emailService.initialize();
     
     if (!emailService.isAvailable()) {
