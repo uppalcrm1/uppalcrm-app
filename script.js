@@ -117,6 +117,15 @@ function initTrialForm() {
             // Make real API call to registration endpoint
             const result = await simulateTrialSignup(data);
             
+            // ALSO send lead notification email to admin
+            try {
+                await sendLeadNotificationEmail(data, result);
+                console.log('✅ Lead notification email sent to admin');
+            } catch (emailError) {
+                console.warn('⚠️ Failed to send lead notification email:', emailError.message);
+                // Don't fail the signup if email fails
+            }
+            
             // Show success message with login details
             const loginUrl = `https://uppalcrm-frontend.onrender.com/login?org=${result.organizationSlug}`;
             const successMessage = `
@@ -401,6 +410,55 @@ async function simulateTrialSignup(data) {
             throw new Error(error.message || 'Failed to create account. Please try again or contact support.');
         }
     }
+}
+
+// Send lead notification email to admin
+async function sendLeadNotificationEmail(formData, registrationResult) {
+    try {
+        // Map form data to lead notification format
+        const leadData = {
+            first_name: formData.firstName,
+            last_name: formData.lastName,
+            email: formData.email,
+            phone: formData.phone || null,
+            company: formData.company,
+            message: `New trial signup from marketing site. Industry: ${formData.industry || 'Not specified'}, Team size: ${formData.teamSize || 'Not specified'}${formData.website ? `, Website: ${formData.website}` : ''}`,
+            source: 'website',
+            utm_source: getUTMParameter('utm_source'),
+            utm_medium: getUTMParameter('utm_medium'),
+            utm_campaign: getUTMParameter('utm_campaign'),
+            referrer_url: document.referrer || null
+        };
+        
+        console.log('📧 Sending lead notification email...', leadData);
+        
+        const response = await fetch('https://uppalcrm-api.onrender.com/api/public/leads', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(leadData)
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+            throw new Error(errorData.message || `Email notification failed: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        console.log('✅ Lead notification sent successfully:', result);
+        return result;
+        
+    } catch (error) {
+        console.error('❌ Failed to send lead notification email:', error);
+        throw error;
+    }
+}
+
+// Get UTM parameters from URL
+function getUTMParameter(paramName) {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get(paramName);
 }
 
 // Analytics tracking
