@@ -19,6 +19,7 @@ const leadRoutes = require('./routes/leads');
 const contactRoutes = require('./routes/contacts');
 const trialRoutes = require('./routes/trials');
 const superAdminRoutes = require('./routes/super-admin');
+const notifyAdminRoutes = require('./routes/notify-admin');
 // Public leads routes (simplified for production deployment)
 let publicLeadRoutes;
 try {
@@ -95,6 +96,7 @@ app.use('/api/leads', rateLimiters.general, leadRoutes);
 app.use('/api/contacts', rateLimiters.general, contactRoutes);
 app.use('/api/trials', rateLimiters.general, trialRoutes);
 app.use('/api/super-admin', rateLimiters.general, superAdminRoutes);
+app.use('/api/notify-admin', rateLimiters.general, notifyAdminRoutes);
 
 // Public routes (no authentication required)
 console.log('🔍 DEBUG: publicLeadRoutes type:', typeof publicLeadRoutes, 'value:', !!publicLeadRoutes);

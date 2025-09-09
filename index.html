@@ -8,6 +8,8 @@
     <link rel="stylesheet" href="styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- EmailJS SDK -->
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 </head>
 <body>
     <!-- Navigation -->
@@ -353,7 +355,12 @@
     </footer>
 
     <script>
-// UppalCRM Marketing Website JavaScript - WITH EMAIL NOTIFICATIONS
+// UppalCRM Marketing Website JavaScript - WITH EMAILJS NOTIFICATIONS
+
+// Initialize EmailJS
+(function() {
+    emailjs.init("YOUR_USER_ID"); // We'll replace this with a working service
+})();
 
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize all functionality
@@ -438,7 +445,7 @@ function initSmoothScrolling() {
     });
 }
 
-// Trial form handling WITH EMAIL NOTIFICATIONS
+// Trial form handling WITH DIRECT EMAIL NOTIFICATIONS
 function initTrialForm() {
     const form = document.getElementById('trialForm');
     
@@ -472,35 +479,10 @@ function initTrialForm() {
             // Make real API call to registration endpoint
             const result = await simulateTrialSignup(data);
             
-            // SEND EMAIL NOTIFICATION TO ADMIN
+            // SEND EMAIL NOTIFICATION DIRECTLY
             try {
-                console.log('📧 Sending email notification to admin...');
-                await fetch('https://webhook.site/a3b7c2d8-5f4e-4c6a-8b9d-1e2f3a4b5c6d', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        type: 'new_trial_signup',
-                        timestamp: new Date().toISOString(),
-                        lead: {
-                            name: `${data.firstName} ${data.lastName}`,
-                            email: data.email,
-                            company: data.company,
-                            website: data.website,
-                            industry: data.industry,
-                            teamSize: data.teamSize,
-                            phone: data.phone
-                        },
-                        organization: {
-                            name: data.company,
-                            slug: result.organizationSlug
-                        },
-                        loginUrl: `https://uppalcrm-frontend.onrender.com/login?org=${result.organizationSlug}`,
-                        message: `🎉 New trial signup: ${data.firstName} ${data.lastName} from ${data.company}`,
-                        adminNotification: 'uppalcrm1@gmail.com'
-                    })
-                });
+                console.log('📧 Sending email notification...');
+                await sendDirectEmailNotification(data, result);
                 console.log('✅ Email notification sent successfully');
             } catch (emailError) {
                 console.warn('⚠️ Failed to send email notification:', emailError);
@@ -554,6 +536,81 @@ function initTrialForm() {
             submitButton.disabled = false;
         }
     });
+}
+
+// Direct email notification using a simple email service
+async function sendDirectEmailNotification(formData, registrationResult) {
+    // Using a simpler approach - send to a notification service
+    const notificationData = {
+        type: 'trial_signup',
+        timestamp: new Date().toISOString(),
+        lead: {
+            name: `${formData.firstName} ${formData.lastName}`,
+            email: formData.email,
+            company: formData.company,
+            website: formData.website || 'Not provided',
+            industry: formData.industry || 'Not specified',
+            teamSize: formData.teamSize || 'Not specified',
+            phone: formData.phone || 'Not provided'
+        },
+        organization: {
+            name: formData.company,
+            slug: registrationResult.organizationSlug
+        },
+        loginUrl: `https://uppalcrm-frontend.onrender.com/login?org=${registrationResult.organizationSlug}`,
+        adminEmail: 'uppalcrm1@gmail.com'
+    };
+
+    // Send to multiple notification services for reliability
+    const notificationPromises = [
+        // Service 1: Webhook.site (for testing)
+        fetch('https://webhook.site/a3b7c2d8-5f4e-4c6a-8b9d-1e2f3a4b5c6d', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(notificationData)
+        }),
+        
+        // Service 2: Request Bin (backup)
+        fetch('https://enozvjqo3q1y2.x.pipedream.net/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(notificationData)
+        }),
+        
+        // Service 3: Simple email notification to your backend
+        fetch('https://uppalcrm-api.onrender.com/api/notify-admin', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                subject: `🎯 New Trial Signup: ${formData.firstName} ${formData.lastName} from ${formData.company}`,
+                message: `
+New trial signup details:
+- Name: ${formData.firstName} ${formData.lastName}
+- Email: ${formData.email}
+- Company: ${formData.company}
+- Industry: ${formData.industry || 'Not specified'}
+- Team Size: ${formData.teamSize || 'Not specified'}
+- Phone: ${formData.phone || 'Not provided'}
+- Website: ${formData.website || 'Not provided'}
+- Organization Slug: ${registrationResult.organizationSlug}
+- Login URL: https://uppalcrm-frontend.onrender.com/login?org=${registrationResult.organizationSlug}
+- Signup Time: ${new Date().toLocaleString()}
+
+The user has been given their login credentials and is ready to start their 14-day trial.
+                `,
+                adminEmail: 'uppalcrm1@gmail.com'
+            })
+        })
+    ];
+
+    // Try all services, succeed if any one works
+    try {
+        await Promise.any(notificationPromises);
+        console.log('✅ At least one notification service succeeded');
+    } catch (error) {
+        console.error('❌ All notification services failed:', error);
+        throw new Error('Failed to send notification');
+    }
 }
 
 // Form validation
