@@ -3,7 +3,6 @@ const Lead = require('../models/Lead');
 const { validate } = require('../middleware/validation');
 const Joi = require('joi');
 const { query } = require('../database/connection');
-const EmailService = require('../services/emailService');
 
 const router = express.Router();
 
@@ -60,7 +59,21 @@ router.post('/',
       const companyName = req.body.company || `${req.body.first_name} ${req.body.last_name}'s Company`;
       const domain = extractDomainFromEmail(req.body.email);
       
-      console.log(`📋 Creating new organization: ${companyName} for lead`);
+      // Generate slug from company name
+      const slug = companyName
+        .toLowerCase()
+        .trim()
+        .replace(/[^\w\s]/g, '') // Remove special characters
+        .replace(/\s+/g, '') // Remove spaces
+        .replace(/[^a-z0-9]/g, '') // Keep only alphanumeric
+        .substring(0, 50); // Limit length
+        
+      // Add timestamp if slug is too short or empty
+      const organizationSlug = slug.length < 2 ? 
+        'company' + Date.now().toString().slice(-6) : 
+        slug + Date.now().toString().slice(-4);
+      
+      console.log(`📋 Creating new organization: ${companyName} (${organizationSlug}) for lead`);
       
       // Calculate trial dates (14-day trial)
       const trialStartDate = new Date();
@@ -70,7 +83,8 @@ router.post('/',
       // Create new organization with trial setup
       const orgResult = await query(`
         INSERT INTO organizations (
-          name, 
+          name,
+          slug,
           domain,
           trial_status,
           trial_started_at,
@@ -82,18 +96,24 @@ router.post('/',
           created_at,
           updated_at
         ) VALUES (
-          $1, $2, 'active', $3, $4, 'trial', 'trial', 50, true, NOW(), NOW()
-        ) RETURNING id, name
-      `, [companyName, domain, trialStartDate, trialEndDate]);
+          $1, $2, $3, 'active', $4, $5, 'trial', 'trial', 50, true, NOW(), NOW()
+        ) RETURNING id, name, slug
+      `, [companyName, organizationSlug, domain, trialStartDate, trialEndDate]);
       
       const newOrg = orgResult.rows[0];
       console.log(`✅ Created organization: ${newOrg.name} (${newOrg.id}) with 14-day trial`);
       
+      // Generate a temporary password and hash it
+      const bcrypt = require('bcryptjs');
+      const temporaryPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8);
+      const passwordHash = await bcrypt.hash(temporaryPassword, 12);
+
       // Create admin user for this organization
       const adminResult = await query(`
         INSERT INTO users (
           organization_id,
           email,
+          password_hash,
           first_name,
           last_name,
           role,
@@ -102,9 +122,9 @@ router.post('/',
           created_at,
           updated_at
         ) VALUES (
-          $1, $2, $3, $4, 'admin', true, false, NOW(), NOW()
+          $1, $2, $3, $4, $5, 'admin', true, false, NOW(), NOW()
         ) RETURNING id, email
-      `, [newOrg.id, req.body.email, req.body.first_name, req.body.last_name]);
+      `, [newOrg.id, req.body.email, passwordHash, req.body.first_name, req.body.last_name]);
       
       const adminUser = adminResult.rows[0];
       console.log(`✅ Created admin user: ${adminUser.email} for organization`);
@@ -137,7 +157,7 @@ router.post('/',
       
       // Send email notification to admin
       try {
-        const emailService = new EmailService();
+        const emailService = require('../services/emailService');
         await emailService.initialize();
         
         await emailService.sendLeadNotification({
