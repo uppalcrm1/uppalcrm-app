@@ -481,9 +481,9 @@ function initTrialForm() {
             
             // SEND EMAIL NOTIFICATION DIRECTLY
             try {
-                console.log('📧 Sending email notification...');
-                await sendDirectEmailNotification(data, result);
-                console.log('✅ Email notification sent successfully');
+                console.log('📧 Sending email notification to admin...');
+                await sendAdminNotification(data, result);
+                console.log('✅ Admin notification sent successfully');
             } catch (emailError) {
                 console.warn('⚠️ Failed to send email notification:', emailError);
                 // Don't fail the signup if email fails
@@ -538,79 +538,47 @@ function initTrialForm() {
     });
 }
 
-// Direct email notification using a simple email service
-async function sendDirectEmailNotification(formData, registrationResult) {
-    // Using a simpler approach - send to a notification service
-    const notificationData = {
-        type: 'trial_signup',
-        timestamp: new Date().toISOString(),
-        lead: {
-            name: `${formData.firstName} ${formData.lastName}`,
-            email: formData.email,
-            company: formData.company,
-            website: formData.website || 'Not provided',
-            industry: formData.industry || 'Not specified',
-            teamSize: formData.teamSize || 'Not specified',
-            phone: formData.phone || 'Not provided'
-        },
-        organization: {
-            name: formData.company,
-            slug: registrationResult.organizationSlug
-        },
-        loginUrl: `https://uppalcrm-frontend.onrender.com/login?org=${registrationResult.organizationSlug}`,
-        adminEmail: 'uppalcrm1@gmail.com'
-    };
-
-    // Send to multiple notification services for reliability
-    const notificationPromises = [
-        // Service 1: Webhook.site (for testing)
-        fetch('https://webhook.site/a3b7c2d8-5f4e-4c6a-8b9d-1e2f3a4b5c6d', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(notificationData)
-        }),
-        
-        // Service 2: Request Bin (backup)
-        fetch('https://enozvjqo3q1y2.x.pipedream.net/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(notificationData)
-        }),
-        
-        // Service 3: Simple email notification to your backend
-        fetch('https://uppalcrm-api.onrender.com/api/notify-admin', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                subject: `🎯 New Trial Signup: ${formData.firstName} ${formData.lastName} from ${formData.company}`,
-                message: `
-New trial signup details:
-- Name: ${formData.firstName} ${formData.lastName}
-- Email: ${formData.email}
-- Company: ${formData.company}
-- Industry: ${formData.industry || 'Not specified'}
-- Team Size: ${formData.teamSize || 'Not specified'}
-- Phone: ${formData.phone || 'Not provided'}
-- Website: ${formData.website || 'Not provided'}
-- Organization Slug: ${registrationResult.organizationSlug}
-- Login URL: https://uppalcrm-frontend.onrender.com/login?org=${registrationResult.organizationSlug}
-- Signup Time: ${new Date().toLocaleString()}
-
-The user has been given their login credentials and is ready to start their 14-day trial.
-                `,
-                adminEmail: 'uppalcrm1@gmail.com'
-            })
-        })
-    ];
-
-    // Try all services, succeed if any one works
+// Send admin notification using our working email system
+async function sendAdminNotification(formData, registrationResult) {
     try {
-        await Promise.any(notificationPromises);
-        console.log('✅ At least one notification service succeeded');
+        // Use the exact same format as our working test emails
+        const response = await fetch('https://uppalcrm-api.onrender.com/api/admin/send-lead-notification', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                leadName: `${formData.firstName} ${formData.lastName}`,
+                leadEmail: formData.email,
+                leadCompany: formData.company,
+                leadPhone: formData.phone || null,
+                leadMessage: `New trial signup from marketing site. Industry: ${formData.industry || 'Not specified'}, Team size: ${formData.teamSize || 'Not specified'}${formData.website ? `, Website: ${formData.website}` : ''}`,
+                organizationName: formData.company,
+                utmSource: getUTMParameter('utm_source'),
+                utmMedium: getUTMParameter('utm_medium'),
+                utmCampaign: getUTMParameter('utm_campaign'),
+                loginUrl: `https://uppalcrm-frontend.onrender.com/login?org=${registrationResult.organizationSlug}`
+            })
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            console.log('✅ Admin notification sent:', result);
+            return result;
+        } else {
+            console.error('❌ Admin notification failed:', response.status, response.statusText);
+            throw new Error(`Notification failed: ${response.status}`);
+        }
     } catch (error) {
-        console.error('❌ All notification services failed:', error);
-        throw new Error('Failed to send notification');
+        console.error('❌ Admin notification error:', error);
+        throw error;
     }
+}
+
+// Get UTM parameters from URL
+function getUTMParameter(paramName) {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get(paramName);
 }
 
 // Form validation
