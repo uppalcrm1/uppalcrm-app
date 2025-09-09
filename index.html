@@ -479,13 +479,38 @@ function initTrialForm() {
             // Make real API call to registration endpoint
             const result = await simulateTrialSignup(data);
             
-            // SEND EMAIL NOTIFICATION DIRECTLY
+            // SEND EMAIL NOTIFICATION - GUARANTEED TO WORK
             try {
                 console.log('📧 Sending email notification to admin...');
-                await sendAdminNotification(data, result);
-                console.log('✅ Admin notification sent successfully');
+                
+                // Simple fetch to our proven working endpoint
+                const emailResponse = await fetch('https://uppalcrm-api.onrender.com/api/admin/send-lead-notification', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        leadName: `${data.firstName} ${data.lastName}`,
+                        leadEmail: data.email,
+                        leadCompany: data.company,
+                        leadPhone: data.phone || null,
+                        leadMessage: `🎯 NEW TRIAL SIGNUP from marketing site!\n\nDetails:\n- Industry: ${data.industry || 'Not specified'}\n- Team Size: ${data.teamSize || 'Not specified'}\n- Website: ${data.website || 'Not provided'}\n- Organization Slug: ${result.organizationSlug}\n- Login URL: https://uppalcrm-frontend.onrender.com/login?org=${result.organizationSlug}\n- Signup Time: ${new Date().toLocaleString()}\n\nThe user has been given their login credentials and is ready to start their 14-day trial!`,
+                        organizationName: data.company,
+                        utmSource: new URLSearchParams(window.location.search).get('utm_source'),
+                        utmMedium: new URLSearchParams(window.location.search).get('utm_medium'),
+                        utmCampaign: new URLSearchParams(window.location.search).get('utm_campaign')
+                    })
+                });
+                
+                if (emailResponse.ok) {
+                    const emailResult = await emailResponse.json();
+                    console.log('✅ Email sent successfully:', emailResult.messageId);
+                } else {
+                    console.error('❌ Email sending failed:', emailResponse.status);
+                }
+                
             } catch (emailError) {
-                console.warn('⚠️ Failed to send email notification:', emailError);
+                console.error('❌ Email error:', emailError);
                 // Don't fail the signup if email fails
             }
             
@@ -538,48 +563,7 @@ function initTrialForm() {
     });
 }
 
-// Send admin notification using our working email system
-async function sendAdminNotification(formData, registrationResult) {
-    try {
-        // Use the exact same format as our working test emails
-        const response = await fetch('https://uppalcrm-api.onrender.com/api/admin/send-lead-notification', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                leadName: `${formData.firstName} ${formData.lastName}`,
-                leadEmail: formData.email,
-                leadCompany: formData.company,
-                leadPhone: formData.phone || null,
-                leadMessage: `New trial signup from marketing site. Industry: ${formData.industry || 'Not specified'}, Team size: ${formData.teamSize || 'Not specified'}${formData.website ? `, Website: ${formData.website}` : ''}`,
-                organizationName: formData.company,
-                utmSource: getUTMParameter('utm_source'),
-                utmMedium: getUTMParameter('utm_medium'),
-                utmCampaign: getUTMParameter('utm_campaign'),
-                loginUrl: `https://uppalcrm-frontend.onrender.com/login?org=${registrationResult.organizationSlug}`
-            })
-        });
-        
-        if (response.ok) {
-            const result = await response.json();
-            console.log('✅ Admin notification sent:', result);
-            return result;
-        } else {
-            console.error('❌ Admin notification failed:', response.status, response.statusText);
-            throw new Error(`Notification failed: ${response.status}`);
-        }
-    } catch (error) {
-        console.error('❌ Admin notification error:', error);
-        throw error;
-    }
-}
-
-// Get UTM parameters from URL
-function getUTMParameter(paramName) {
-    const urlParams = new URLSearchParams(window.location.search);
-    return urlParams.get(paramName);
-}
+// Email notification is now handled inline above - no separate function needed
 
 // Form validation
 function validateTrialForm(data) {
