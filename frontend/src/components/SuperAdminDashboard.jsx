@@ -155,7 +155,7 @@ const SuperAdminDashboard = () => {
     }
   };
 
-  const convertToPaid = async (subscriptionPlan, paymentAmount, billingNotes) => {
+  const convertToPaid = async (subscriptionPlan, licenseCount, paymentAmount, billingCycle, billingNotes) => {
     if (!conversionModal.organization) return;
     
     setConversionModal(prev => ({ ...prev, loading: true }));
@@ -166,7 +166,9 @@ const SuperAdminDashboard = () => {
         headers: getAuthHeaders(),
         body: JSON.stringify({
           subscriptionPlan,
+          licenseCount,
           paymentAmount,
+          billingCycle,
           billingNotes
         })
       });
@@ -174,7 +176,7 @@ const SuperAdminDashboard = () => {
       const data = await response.json();
       
       if (response.ok) {
-        alert(`Successfully converted ${data.organization.name} to ${data.organization.subscription_plan} plan!`);
+        alert(`Successfully converted ${data.organization.name} to paid with ${data.organization.licenses} licenses at $${data.organization.monthly_cost}/month!`);
         
         // Refresh data
         if (activeTab === 'organizations') fetchOrganizations();
@@ -816,19 +818,47 @@ const SuperAdminDashboard = () => {
 const ConversionModal = ({ isOpen, onClose, onSubmit, organization, loading }) => {
   const [formData, setFormData] = useState({
     subscriptionPlan: 'standard',
-    paymentAmount: '15.00',
+    licenseCount: 5,
+    paymentAmount: '',
+    billingCycle: 'monthly',
     billingNotes: ''
   });
 
+  // Calculate payment amount when license count changes
+  React.useEffect(() => {
+    const pricePerUser = 15;
+    const monthlyAmount = formData.licenseCount * pricePerUser;
+    
+    let totalAmount = monthlyAmount;
+    if (formData.billingCycle === 'quarterly') {
+      totalAmount = monthlyAmount * 3 * 0.95; // 5% quarterly discount
+    } else if (formData.billingCycle === 'annual') {
+      totalAmount = monthlyAmount * 12 * 0.85; // 15% annual discount
+    }
+    
+    setFormData(prev => ({
+      ...prev,
+      paymentAmount: totalAmount.toFixed(2)
+    }));
+  }, [formData.licenseCount, formData.billingCycle]);
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSubmit(formData.subscriptionPlan, formData.paymentAmount, formData.billingNotes);
+    onSubmit(
+      formData.subscriptionPlan, 
+      formData.licenseCount, 
+      formData.paymentAmount, 
+      formData.billingCycle, 
+      formData.billingNotes
+    );
   };
 
   const resetForm = () => {
     setFormData({
       subscriptionPlan: 'standard',
-      paymentAmount: '15.00',
+      licenseCount: 5,
+      paymentAmount: '',
+      billingCycle: 'monthly',
       billingNotes: ''
     });
   };
@@ -841,6 +871,9 @@ const ConversionModal = ({ isOpen, onClose, onSubmit, organization, loading }) =
   }, [isOpen]);
 
   if (!isOpen) return null;
+
+  const pricePerUser = 15;
+  const monthlyTotal = formData.licenseCount * pricePerUser;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -859,26 +892,86 @@ const ConversionModal = ({ isOpen, onClose, onSubmit, organization, loading }) =
         </div>
         
         <form onSubmit={handleSubmit}>
+          {/* Subscription Plan Display */}
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Subscription Plan
             </label>
-            <div className="w-full border border-gray-300 rounded-md px-3 py-2 bg-gray-50 text-gray-700">
-              Standard Plan - $15/month
+            <div className="w-full border border-gray-300 rounded-md px-3 py-2 bg-gray-50">
+              <span className="text-gray-900 font-medium">Standard Plan - $15/user/month</span>
+              <p className="text-sm text-gray-600 mt-1">Complete CRM access with all features</p>
             </div>
-            <input type="hidden" name="subscriptionPlan" value="standard" />
           </div>
 
+          {/* License Count */}
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Payment Amount
+              Number of User Licenses *
             </label>
-            <div className="w-full border border-gray-300 rounded-md px-3 py-2 bg-gray-50 text-gray-700">
-              $15.00
-            </div>
-            <input type="hidden" name="paymentAmount" value="15.00" />
+            <input
+              type="number"
+              min="1"
+              max="1000"
+              value={formData.licenseCount}
+              onChange={(e) => setFormData(prev => ({
+                ...prev,
+                licenseCount: parseInt(e.target.value) || 1
+              }))}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={loading}
+              required
+            />
+            <p className="text-sm text-gray-600 mt-1">
+              Monthly cost: ${monthlyTotal}/month ({formData.licenseCount} users × $15)
+            </p>
           </div>
 
+          {/* Billing Cycle */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Billing Cycle
+            </label>
+            <select
+              value={formData.billingCycle}
+              onChange={(e) => setFormData(prev => ({
+                ...prev,
+                billingCycle: e.target.value
+              }))}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={loading}
+            >
+              <option value="monthly">Monthly</option>
+              <option value="quarterly">Quarterly (5% discount)</option>
+              <option value="annual">Annual (15% discount)</option>
+            </select>
+          </div>
+
+          {/* Payment Amount */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Payment Amount *
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={formData.paymentAmount}
+              onChange={(e) => setFormData(prev => ({
+                ...prev,
+                paymentAmount: e.target.value
+              }))}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={loading}
+              required
+            />
+            <p className="text-sm text-gray-600 mt-1">
+              {formData.billingCycle === 'monthly' && 'Monthly payment'}
+              {formData.billingCycle === 'quarterly' && 'Quarterly payment (3 months with 5% discount)'}
+              {formData.billingCycle === 'annual' && 'Annual payment (12 months with 15% discount)'}
+            </p>
+          </div>
+
+          {/* Billing Notes */}
           <div className="mb-6">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Billing Notes
@@ -907,10 +1000,10 @@ const ConversionModal = ({ isOpen, onClose, onSubmit, organization, loading }) =
             </button>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !formData.paymentAmount || formData.licenseCount < 1}
               className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {loading ? 'Converting...' : 'Convert to Standard Plan ($15/month)'}
+              {loading ? 'Converting...' : `Convert to Paid ($${formData.paymentAmount})`}
             </button>
           </div>
         </form>

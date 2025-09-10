@@ -1,6 +1,7 @@
 const express = require('express');
 const User = require('../models/User');
 const Organization = require('../models/Organization');
+const { checkLicenseLimit } = require('../controllers/licenseController');
 const { 
   validateCreateUser, 
   validateUpdateUser, 
@@ -133,22 +134,17 @@ router.get('/:id',
 router.post('/',
   requireAdmin,
   validateCreateUser,
+  checkLicenseLimit,
   async (req, res) => {
     try {
-      // Check if organization can add more users
-      const canAdd = await Organization.canAddUsers(req.organizationId);
-      if (!canAdd) {
-        return res.status(400).json({
-          error: 'User limit exceeded',
-          message: 'Cannot add more users to this organization'
-        });
-      }
-
       const user = await User.create(req.body, req.organizationId, req.user.id);
 
       res.status(201).json({
         message: 'User created successfully',
-        user: user.toJSON()
+        user: user.toJSON(),
+        license_info: {
+          remaining_seats: req.licenseInfo.available_seats - 1
+        }
       });
     } catch (error) {
       console.error('Create user error:', error);
@@ -160,9 +156,9 @@ router.post('/',
         });
       }
 
-      if (error.message.includes('User limit exceeded')) {
-        return res.status(400).json({
-          error: 'User limit exceeded',
+      if (error.message.includes('License limit exceeded')) {
+        return res.status(403).json({
+          error: 'License limit exceeded',
           message: error.message
         });
       }

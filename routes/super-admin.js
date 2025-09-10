@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { query, transaction } = require('../database/connection');
+const { getLicenseInfo, updateLicenses, getAllOrganizationsLicenses } = require('../controllers/licenseController');
 const router = express.Router();
 
 // Debug endpoint to test if routes are loading
@@ -542,24 +543,28 @@ router.put('/organizations/:id/trial', authenticateSuperAdmin, async (req, res) 
   }
 });
 
-// CONVERT TRIAL TO PAID
+// CONVERT TRIAL TO PAID WITH LICENSE SUPPORT
 router.put('/organizations/:id/convert-to-paid', authenticateSuperAdmin, async (req, res) => {
   try {
     const organizationId = req.params.id;
-    const { subscriptionPlan, paymentAmount, billingNotes } = req.body;
+    const { 
+      subscriptionPlan, 
+      licenseCount, 
+      paymentAmount, 
+      billingCycle, 
+      billingNotes 
+    } = req.body;
 
     // Validate inputs
-    if (!subscriptionPlan || !paymentAmount) {
+    if (!subscriptionPlan || !licenseCount || !paymentAmount) {
       return res.status(400).json({ 
-        error: 'Subscription plan and payment amount are required' 
+        error: 'Subscription plan, license count, and payment amount are required' 
       });
     }
 
-    // Validate subscription plan - only 'standard' plan available
-    const validPlans = ['standard'];
-    if (!validPlans.includes(subscriptionPlan)) {
+    if (licenseCount < 1) {
       return res.status(400).json({ 
-        error: 'Invalid subscription plan. Must be: standard' 
+        error: 'License count must be at least 1' 
       });
     }
 
@@ -580,34 +585,72 @@ router.put('/organizations/:id/convert-to-paid', authenticateSuperAdmin, async (
       });
     }
 
-    // Perform the conversion within a transaction
+    // Begin transaction
     await transaction(async (client) => {
       // Update organization to paid status
       await client.query(`
         UPDATE organizations 
         SET 
           trial_status = 'converted',
-          payment_status = 'active',
+          payment_status = 'paid',
           subscription_plan = $1,
+          purchased_licenses = $2,
+          billing_cycle = $3,
           converted_at = NOW(),
-          billing_notes = $2,
+          billing_notes = $4,
           updated_at = NOW()
-        WHERE id = $3 AND trial_status = 'active'
-      `, [subscriptionPlan, billingNotes, organizationId]);
+        WHERE id = $5 AND trial_status = 'active'
+      `, [subscriptionPlan, licenseCount, billingCycle || 'monthly', billingNotes, organizationId]);
 
-      // Update the subscription record if it exists
+      // Create or update organization license record
       await client.query(`
-        UPDATE organization_subscriptions 
-        SET 
+        INSERT INTO organization_licenses 
+        (organization_id, quantity, price_per_license, billing_cycle, status, purchased_date)
+        VALUES ($1, $2, $3, $4, 'active', NOW())
+        ON CONFLICT (organization_id) 
+        DO UPDATE SET 
+          quantity = $2,
+          price_per_license = $3,
+          billing_cycle = $4,
           status = 'active',
-          subscription_started_at = NOW(),
-          subscription_ends_at = NOW() + interval '1 month',
-          next_billing_date = NOW() + interval '1 month',
-          last_payment_at = NOW(),
-          last_payment_amount = $1,
           updated_at = NOW()
-        WHERE organization_id = $2 AND status = 'trial'
-      `, [parseFloat(paymentAmount), organizationId]);
+      `, [organizationId, licenseCount, 15.00, billingCycle || 'monthly']);
+
+      // Create billing event
+      const nextBillingDate = new Date();
+      if (billingCycle === 'quarterly') {
+        nextBillingDate.setMonth(nextBillingDate.getMonth() + 3);
+      } else if (billingCycle === 'annual') {
+        nextBillingDate.setFullYear(nextBillingDate.getFullYear() + 1);
+      } else {
+        nextBillingDate.setMonth(nextBillingDate.getMonth() + 1);
+      }
+
+      await client.query(`
+        INSERT INTO billing_events 
+        (organization_id, billing_period_start, billing_period_end, licenses_count, price_per_license, total_amount, billing_status, payment_reference, notes)
+        VALUES ($1, NOW(), $2, $3, $4, $5, 'paid', $6, $7)
+      `, [
+        organizationId,
+        nextBillingDate,
+        licenseCount,
+        15.00,
+        parseFloat(paymentAmount),
+        'Initial conversion payment',
+        billingNotes
+      ]);
+
+      // Create license history entry
+      await client.query(`
+        INSERT INTO license_usage_history 
+        (organization_id, action, previous_count, new_count, price_change, reason, performed_by)
+        VALUES ($1, 'added', 0, $2, $3, 'Initial trial conversion', $4)
+      `, [
+        organizationId,
+        licenseCount,
+        parseFloat(paymentAmount),
+        req.superAdmin?.id
+      ]);
 
       // Update trial history
       await client.query(`
@@ -624,10 +667,12 @@ router.put('/organizations/:id/convert-to-paid', authenticateSuperAdmin, async (
         VALUES ($1, $2, $3, $4, NOW())
       `, [
         organizationId,
-        'trial_converted_to_paid',
+        'trial_converted_to_paid_with_licenses',
         JSON.stringify({
           subscriptionPlan,
+          licenseCount,
           paymentAmount: parseFloat(paymentAmount),
+          billingCycle: billingCycle || 'monthly',
           billingNotes,
           convertedBy: req.superAdmin?.email || 'super_admin',
           previousStatus: currentOrg.trial_status,
@@ -639,13 +684,16 @@ router.put('/organizations/:id/convert-to-paid', authenticateSuperAdmin, async (
 
     res.json({
       success: true,
-      message: `Successfully converted ${currentOrg.name} to ${subscriptionPlan} plan`,
+      message: `Successfully converted ${currentOrg.name} to paid with ${licenseCount} licenses`,
       organization: {
         id: organizationId,
         name: currentOrg.name,
         trial_status: 'converted',
-        payment_status: 'active',
+        payment_status: 'paid',
         subscription_plan: subscriptionPlan,
+        licenses: licenseCount,
+        monthly_cost: licenseCount * 15,
+        billing_cycle: billingCycle || 'monthly',
         converted_at: new Date().toISOString()
       }
     });
@@ -951,5 +999,18 @@ router.get('/expiring-trials', authenticateSuperAdmin, async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+// ===============================
+// LICENSE MANAGEMENT ROUTES
+// ===============================
+
+// Get all organizations with license information
+router.get('/organizations/licenses', authenticateSuperAdmin, getAllOrganizationsLicenses);
+
+// Get detailed license info for specific organization
+router.get('/organizations/:organizationId/license-info', authenticateSuperAdmin, getLicenseInfo);
+
+// Update licenses for organization
+router.put('/organizations/:organizationId/licenses', authenticateSuperAdmin, updateLicenses);
 
 module.exports = router;

@@ -187,7 +187,7 @@ class Organization {
   }
 
   /**
-   * Check if organization can add more users
+   * Check if organization can add more users based on purchased licenses
    * @param {string} organizationId - Organization ID
    * @returns {boolean} Whether more users can be added
    */
@@ -195,19 +195,20 @@ class Organization {
     const result = await query(`
       SELECT 
         COUNT(u.id) as user_count,
-        o.max_users
+        COALESCE(ol.quantity, o.purchased_licenses, 5) as purchased_licenses
       FROM organizations o
+      LEFT JOIN organization_licenses ol ON ol.organization_id = o.id AND ol.status = 'active'
       LEFT JOIN users u ON u.organization_id = o.id AND u.is_active = true
       WHERE o.id = $1 AND o.is_active = true
-      GROUP BY o.max_users
+      GROUP BY ol.quantity, o.purchased_licenses
     `, [organizationId]);
 
     if (result.rows.length === 0) {
       return false;
     }
 
-    const { user_count, max_users } = result.rows[0];
-    return parseInt(user_count) < parseInt(max_users);
+    const { user_count, purchased_licenses } = result.rows[0];
+    return parseInt(user_count) < parseInt(purchased_licenses);
   }
 
   /**
