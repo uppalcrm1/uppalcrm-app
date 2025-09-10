@@ -555,11 +555,11 @@ router.put('/organizations/:id/convert-to-paid', authenticateSuperAdmin, async (
       });
     }
 
-    // Validate subscription plan
-    const validPlans = ['starter', 'professional', 'business', 'enterprise'];
+    // Validate subscription plan - only 'standard' plan available
+    const validPlans = ['standard'];
     if (!validPlans.includes(subscriptionPlan)) {
       return res.status(400).json({ 
-        error: 'Invalid subscription plan. Must be: starter, professional, business, or enterprise' 
+        error: 'Invalid subscription plan. Must be: standard' 
       });
     }
 

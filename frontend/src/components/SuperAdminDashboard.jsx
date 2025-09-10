@@ -596,7 +596,7 @@ const SuperAdminDashboard = () => {
                             )}
                             {org.trial_status === 'converted' && (
                               <span className="inline-flex items-center px-3 py-1 text-xs font-medium text-green-800 bg-green-100 rounded">
-                                ✓ Paid ({org.subscription_plan || 'Professional'})
+                                ✓ Paid (Standard - $15/month)
                               </span>
                             )}
                             <button
@@ -815,24 +815,20 @@ const SuperAdminDashboard = () => {
 // Conversion Modal Component
 const ConversionModal = ({ isOpen, onClose, onSubmit, organization, loading }) => {
   const [formData, setFormData] = useState({
-    subscriptionPlan: 'professional',
-    paymentAmount: '',
+    subscriptionPlan: 'standard',
+    paymentAmount: '15.00',
     billingNotes: ''
   });
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!formData.paymentAmount) {
-      alert('Please enter payment amount');
-      return;
-    }
     onSubmit(formData.subscriptionPlan, formData.paymentAmount, formData.billingNotes);
   };
 
   const resetForm = () => {
     setFormData({
-      subscriptionPlan: 'professional',
-      paymentAmount: '',
+      subscriptionPlan: 'standard',
+      paymentAmount: '15.00',
       billingNotes: ''
     });
   };
@@ -865,43 +861,22 @@ const ConversionModal = ({ isOpen, onClose, onSubmit, organization, loading }) =
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Subscription Plan *
+              Subscription Plan
             </label>
-            <select
-              value={formData.subscriptionPlan}
-              onChange={(e) => setFormData(prev => ({
-                ...prev,
-                subscriptionPlan: e.target.value
-              }))}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-              disabled={loading}
-            >
-              <option value="starter">Starter - $49/month</option>
-              <option value="professional">Professional - $149/month</option>
-              <option value="business">Business - $299/month</option>
-              <option value="enterprise">Enterprise - Custom</option>
-            </select>
+            <div className="w-full border border-gray-300 rounded-md px-3 py-2 bg-gray-50 text-gray-700">
+              Standard Plan - $15/month
+            </div>
+            <input type="hidden" name="subscriptionPlan" value="standard" />
           </div>
 
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Payment Amount *
+              Payment Amount
             </label>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={formData.paymentAmount}
-              onChange={(e) => setFormData(prev => ({
-                ...prev,
-                paymentAmount: e.target.value
-              }))}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="149.00"
-              required
-              disabled={loading}
-            />
+            <div className="w-full border border-gray-300 rounded-md px-3 py-2 bg-gray-50 text-gray-700">
+              $15.00
+            </div>
+            <input type="hidden" name="paymentAmount" value="15.00" />
           </div>
 
           <div className="mb-6">
@@ -932,10 +907,10 @@ const ConversionModal = ({ isOpen, onClose, onSubmit, organization, loading }) =
             </button>
             <button
               type="submit"
-              disabled={loading || !formData.paymentAmount}
+              disabled={loading}
               className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {loading ? 'Converting...' : 'Convert to Paid'}
+              {loading ? 'Converting...' : 'Convert to Standard Plan ($15/month)'}
             </button>
           </div>
         </form>
