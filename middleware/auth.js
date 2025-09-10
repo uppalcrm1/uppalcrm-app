@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const Organization = require('../models/Organization');
+const Trial = require('../models/Trial');
 const jwt = require('jsonwebtoken');
 
 /**
@@ -231,6 +232,57 @@ const requireOrganization = (req, res, next) => {
   next();
 };
 
+/**
+ * Middleware to check subscription access
+ * Ensures organization has valid trial or paid subscription
+ */
+const checkSubscriptionAccess = async (req, res, next) => {
+  try {
+    if (!req.user || !req.user.organization_id) {
+      return res.status(401).json({
+        error: 'Authentication required',
+        message: 'User not authenticated'
+      });
+    }
+
+    // Get trial status for the organization
+    const trialStatus = await Trial.getTrialStatus(req.user.organization_id);
+    
+    if (!trialStatus) {
+      return res.status(403).json({
+        error: 'Subscription required',
+        message: 'Organization not found'
+      });
+    }
+
+    // Check if organization has valid access
+    const hasValidAccess = 
+      trialStatus.trial_status === 'active' ||           // Active trial
+      trialStatus.trial_status === 'converted' ||        // Converted to paid
+      trialStatus.payment_status === 'active';           // Active subscription
+
+    if (!hasValidAccess) {
+      return res.status(403).json({
+        error: 'Subscription required',
+        message: 'Your trial has expired. Please upgrade to continue using this feature.',
+        trial_status: trialStatus.trial_status,
+        payment_status: trialStatus.payment_status,
+        can_upgrade: true
+      });
+    }
+
+    // Add trial info to request for use in routes
+    req.trialStatus = trialStatus;
+    next();
+  } catch (error) {
+    console.error('Subscription access check error:', error);
+    res.status(500).json({
+      error: 'Server error',
+      message: 'Failed to verify subscription access'
+    });
+  }
+};
+
 module.exports = {
   authenticateToken,
   requireRole,
@@ -240,5 +292,6 @@ module.exports = {
   resolveOrganization,
   canManageUsers,
   validateOrganizationContext,
-  optionalAuth
+  optionalAuth,
+  checkSubscriptionAccess
 };

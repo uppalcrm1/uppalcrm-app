@@ -304,6 +304,61 @@ class Trial {
   }
 
   /**
+   * Get all organizations with trial data (admin function)
+   */
+  static async getTrialOrganizations() {
+    try {
+      const result = await query(`
+        SELECT 
+          o.id,
+          o.name,
+          o.slug,
+          o.created_at,
+          o.trial_started_at,
+          o.trial_ends_at,
+          o.trial_status,
+          o.trial_days,
+          o.payment_status,
+          o.subscription_ends_at,
+          o.grace_period_ends_at,
+          o.total_trial_count,
+          o.last_trial_at,
+          o.is_active,
+          CASE 
+            WHEN o.trial_ends_at IS NOT NULL AND o.trial_ends_at > NOW() 
+            THEN EXTRACT(DAY FROM o.trial_ends_at - NOW())::INTEGER
+            ELSE 0
+          END as days_remaining,
+          s.plan_name,
+          s.billing_cycle,
+          s.price_per_month,
+          s.last_payment_amount,
+          s.last_payment_at,
+          s.next_billing_date,
+          (SELECT COUNT(*) FROM users WHERE organization_id = o.id AND is_active = true) as user_count
+        FROM organizations o
+        LEFT JOIN organization_subscriptions s ON s.organization_id = o.id
+        WHERE o.trial_status IS NOT NULL
+        ORDER BY 
+          CASE o.trial_status
+            WHEN 'active' THEN 1
+            WHEN 'expired' THEN 2
+            WHEN 'converted' THEN 3
+            WHEN 'cancelled' THEN 4
+            ELSE 5
+          END,
+          o.trial_ends_at ASC NULLS LAST,
+          o.created_at DESC
+      `);
+
+      return result.rows;
+    } catch (error) {
+      console.error('Error getting trial organizations:', error);
+      throw new Error('Failed to get trial organizations');
+    }
+  }
+
+  /**
    * Get trial statistics (admin function)
    */
   static async getTrialStatistics() {

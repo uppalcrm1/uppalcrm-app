@@ -353,6 +353,12 @@ export const trialAPI = {
 
   // Admin functions
   admin: {
+    // Get all organizations with trial data
+    getTrialOrganizations: async () => {
+      const response = await api.get('/trials/admin/organizations')
+      return response.data
+    },
+
     // Expire trials manually
     expireTrials: async () => {
       const response = await api.post('/trials/admin/expire')

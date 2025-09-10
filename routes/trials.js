@@ -353,6 +353,32 @@ router.post('/admin/expire',
 );
 
 /**
+ * GET /api/trials/admin/organizations
+ * Get all organizations with trial data (admin only)
+ */
+router.get('/admin/organizations',
+  authenticateToken,
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const organizations = await Trial.getTrialOrganizations();
+
+      res.json({
+        message: 'Trial organizations retrieved successfully',
+        organizations: organizations,
+        count: organizations.length
+      });
+    } catch (error) {
+      console.error('Error getting trial organizations:', error);
+      res.status(500).json({
+        error: 'Internal server error',
+        message: 'Failed to get trial organizations'
+      });
+    }
+  }
+);
+
+/**
  * GET /api/trials/admin/statistics
  * Get trial statistics (admin only)
  */
