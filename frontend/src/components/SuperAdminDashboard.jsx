@@ -35,6 +35,11 @@ const SuperAdminDashboard = () => {
     organization: null,
     loading: false
   });
+  const [conversionModal, setConversionModal] = useState({
+    isOpen: false,
+    organization: null,
+    loading: false
+  });
 
   useEffect(() => {
     fetchDashboardData();
@@ -148,6 +153,57 @@ const SuperAdminDashboard = () => {
     } catch (error) {
       console.error('Error extending trial:', error);
     }
+  };
+
+  const convertToPaid = async (subscriptionPlan, paymentAmount, billingNotes) => {
+    if (!conversionModal.organization) return;
+    
+    setConversionModal(prev => ({ ...prev, loading: true }));
+    
+    try {
+      const response = await fetch(`/api/super-admin/organizations/${conversionModal.organization.id}/convert-to-paid`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          subscriptionPlan,
+          paymentAmount,
+          billingNotes
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        alert(`Successfully converted ${data.organization.name} to ${data.organization.subscription_plan} plan!`);
+        
+        // Refresh data
+        if (activeTab === 'organizations') fetchOrganizations();
+        if (activeTab === 'expiring') fetchExpiringTrials();
+        fetchDashboardData();
+        
+        // Close modal
+        setConversionModal({ isOpen: false, organization: null, loading: false });
+      } else {
+        alert(`Conversion failed: ${data.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error converting trial:', error);
+      alert('Conversion failed: Network error');
+    } finally {
+      setConversionModal(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  const handleConvertClick = (organization) => {
+    if (organization.trial_status !== 'active') {
+      alert('Only active trial organizations can be converted to paid');
+      return;
+    }
+    setConversionModal({
+      isOpen: true,
+      organization: organization,
+      loading: false
+    });
   };
 
   const handleLogout = () => {
@@ -528,8 +584,20 @@ const SuperAdminDashboard = () => {
                                 >
                                   +14 Days
                                 </button>
+                                <button
+                                  onClick={() => handleConvertClick(org)}
+                                  className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
+                                  title="Convert this trial organization to paid"
+                                >
+                                  Convert to Paid
+                                </button>
                                 <span className="text-gray-300">|</span>
                               </>
+                            )}
+                            {org.trial_status === 'converted' && (
+                              <span className="inline-flex items-center px-3 py-1 text-xs font-medium text-green-800 bg-green-100 rounded">
+                                ✓ Paid ({org.subscription_plan || 'Professional'})
+                              </span>
                             )}
                             <button
                               onClick={() => handleDeleteClick(org)}
@@ -731,6 +799,147 @@ const SuperAdminDashboard = () => {
         organizationName={deleteModal.organization?.organization_name}
         loading={deleteModal.loading}
       />
+
+      {/* Conversion Modal */}
+      <ConversionModal
+        isOpen={conversionModal.isOpen}
+        onClose={() => setConversionModal({ isOpen: false, organization: null, loading: false })}
+        onSubmit={convertToPaid}
+        organization={conversionModal.organization}
+        loading={conversionModal.loading}
+      />
+    </div>
+  );
+};
+
+// Conversion Modal Component
+const ConversionModal = ({ isOpen, onClose, onSubmit, organization, loading }) => {
+  const [formData, setFormData] = useState({
+    subscriptionPlan: 'professional',
+    paymentAmount: '',
+    billingNotes: ''
+  });
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!formData.paymentAmount) {
+      alert('Please enter payment amount');
+      return;
+    }
+    onSubmit(formData.subscriptionPlan, formData.paymentAmount, formData.billingNotes);
+  };
+
+  const resetForm = () => {
+    setFormData({
+      subscriptionPlan: 'professional',
+      paymentAmount: '',
+      billingNotes: ''
+    });
+  };
+
+  // Reset form when modal closes
+  React.useEffect(() => {
+    if (!isOpen) {
+      resetForm();
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-medium text-gray-900">
+            Convert {organization?.organization_name} to Paid
+          </h3>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+            disabled={loading}
+          >
+            ✕
+          </button>
+        </div>
+        
+        <form onSubmit={handleSubmit}>
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Subscription Plan *
+            </label>
+            <select
+              value={formData.subscriptionPlan}
+              onChange={(e) => setFormData(prev => ({
+                ...prev,
+                subscriptionPlan: e.target.value
+              }))}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
+              disabled={loading}
+            >
+              <option value="starter">Starter - $49/month</option>
+              <option value="professional">Professional - $149/month</option>
+              <option value="business">Business - $299/month</option>
+              <option value="enterprise">Enterprise - Custom</option>
+            </select>
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Payment Amount *
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={formData.paymentAmount}
+              onChange={(e) => setFormData(prev => ({
+                ...prev,
+                paymentAmount: e.target.value
+              }))}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="149.00"
+              required
+              disabled={loading}
+            />
+          </div>
+
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Billing Notes
+            </label>
+            <textarea
+              value={formData.billingNotes}
+              onChange={(e) => setFormData(prev => ({
+                ...prev,
+                billingNotes: e.target.value
+              }))}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              rows="3"
+              placeholder="Payment method, invoice number, special terms, etc."
+              disabled={loading}
+            />
+          </div>
+
+          <div className="flex justify-end space-x-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+              disabled={loading}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading || !formData.paymentAmount}
+              className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {loading ? 'Converting...' : 'Convert to Paid'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 };

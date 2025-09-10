@@ -542,6 +542,123 @@ router.put('/organizations/:id/trial', authenticateSuperAdmin, async (req, res) 
   }
 });
 
+// CONVERT TRIAL TO PAID
+router.put('/organizations/:id/convert-to-paid', authenticateSuperAdmin, async (req, res) => {
+  try {
+    const organizationId = req.params.id;
+    const { subscriptionPlan, paymentAmount, billingNotes } = req.body;
+
+    // Validate inputs
+    if (!subscriptionPlan || !paymentAmount) {
+      return res.status(400).json({ 
+        error: 'Subscription plan and payment amount are required' 
+      });
+    }
+
+    // Validate subscription plan
+    const validPlans = ['starter', 'professional', 'business', 'enterprise'];
+    if (!validPlans.includes(subscriptionPlan)) {
+      return res.status(400).json({ 
+        error: 'Invalid subscription plan. Must be: starter, professional, business, or enterprise' 
+      });
+    }
+
+    // Get current organization to verify it's in trial status
+    const orgCheck = await query(
+      'SELECT trial_status, payment_status, name FROM organizations WHERE id = $1',
+      [organizationId]
+    );
+
+    if (orgCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Organization not found' });
+    }
+
+    const currentOrg = orgCheck.rows[0];
+    if (currentOrg.trial_status !== 'active') {
+      return res.status(400).json({ 
+        error: `Organization is not in active trial status. Current status: ${currentOrg.trial_status}` 
+      });
+    }
+
+    // Perform the conversion within a transaction
+    await transaction(async (client) => {
+      // Update organization to paid status
+      await client.query(`
+        UPDATE organizations 
+        SET 
+          trial_status = 'converted',
+          payment_status = 'active',
+          subscription_plan = $1,
+          converted_at = NOW(),
+          billing_notes = $2,
+          updated_at = NOW()
+        WHERE id = $3 AND trial_status = 'active'
+      `, [subscriptionPlan, billingNotes, organizationId]);
+
+      // Update the subscription record if it exists
+      await client.query(`
+        UPDATE organization_subscriptions 
+        SET 
+          status = 'active',
+          subscription_started_at = NOW(),
+          subscription_ends_at = NOW() + interval '1 month',
+          next_billing_date = NOW() + interval '1 month',
+          last_payment_at = NOW(),
+          last_payment_amount = $1,
+          updated_at = NOW()
+        WHERE organization_id = $2 AND status = 'trial'
+      `, [parseFloat(paymentAmount), organizationId]);
+
+      // Update trial history
+      await client.query(`
+        UPDATE organization_trial_history 
+        SET 
+          trial_outcome = 'converted',
+          converted_at = NOW()
+        WHERE organization_id = $1 AND trial_outcome = 'active'
+      `, [organizationId]);
+
+      // Create audit log entry
+      await client.query(`
+        INSERT INTO audit_logs (organization_id, action, details, performed_by, performed_at)
+        VALUES ($1, $2, $3, $4, NOW())
+      `, [
+        organizationId,
+        'trial_converted_to_paid',
+        JSON.stringify({
+          subscriptionPlan,
+          paymentAmount: parseFloat(paymentAmount),
+          billingNotes,
+          convertedBy: req.superAdmin?.email || 'super_admin',
+          previousStatus: currentOrg.trial_status,
+          previousPaymentStatus: currentOrg.payment_status
+        }),
+        req.superAdmin?.email || 'super_admin'
+      ]);
+    });
+
+    res.json({
+      success: true,
+      message: `Successfully converted ${currentOrg.name} to ${subscriptionPlan} plan`,
+      organization: {
+        id: organizationId,
+        name: currentOrg.name,
+        trial_status: 'converted',
+        payment_status: 'active',
+        subscription_plan: subscriptionPlan,
+        converted_at: new Date().toISOString()
+      }
+    });
+
+  } catch (error) {
+    console.error('Trial conversion error:', error);
+    res.status(500).json({ 
+      error: 'Internal server error during conversion',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
 // BUSINESS LEADS
 router.get('/business-leads', authenticateSuperAdmin, async (req, res) => {
   try {
