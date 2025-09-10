@@ -3,6 +3,7 @@ const Lead = require('../models/Lead');
 const { validate } = require('../middleware/validation');
 const Joi = require('joi');
 const { query } = require('../database/connection');
+const bcrypt = require('bcryptjs');
 
 const router = express.Router();
 
@@ -104,7 +105,6 @@ router.post('/',
       console.log(`✅ Created organization: ${newOrg.name} (${newOrg.id}) with 14-day trial`);
       
       // Generate a temporary password and hash it
-      const bcrypt = require('bcryptjs');
       const temporaryPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8);
       const passwordHash = await bcrypt.hash(temporaryPassword, 12);
 
