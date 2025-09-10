@@ -58,8 +58,36 @@ router.post('/register',
         }
       };
 
-      // Send email asynchronously (don't wait for it)
+      // Send lead notification email to admin (non-blocking)
+      const sendLeadNotification = async () => {
+        try {
+          await emailService.sendLeadNotification({
+            leadName: `${admin.first_name} ${admin.last_name}`,
+            leadEmail: admin.email,
+            leadCompany: result.organization.name,
+            leadPhone: null, // Phone not captured in basic registration
+            leadMessage: `New trial signup via marketing site registration form`,
+            organizationName: result.organization.name,
+            utmSource: 'marketing-site',
+            utmMedium: 'registration',
+            utmCampaign: 'trial-signup'
+          });
+          
+          console.log(`✅ Lead notification sent to uppalcrm1@gmail.com for ${admin.first_name} ${admin.last_name}`);
+        } catch (emailError) {
+          console.error('Failed to send lead notification:', {
+            error: emailError.message,
+            organizationId: result.organization.id,
+            adminEmail: admin.email,
+            organizationName: result.organization.name
+          });
+          // Don't throw error - email failure shouldn't prevent registration success
+        }
+      };
+
+      // Send emails asynchronously (don't wait for them)
       sendWelcomeEmail();
+      sendLeadNotification();
 
       res.status(201).json({
         message: 'Organization created successfully',
