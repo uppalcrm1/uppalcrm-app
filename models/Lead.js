@@ -53,6 +53,9 @@ class Lead {
     }
 
     try {
+      // Set organization context for RLS
+      await query(`SELECT set_config('app.current_organization_id', $1, true)`, [organizationId]);
+      
       const result = await query(`
         INSERT INTO leads (
           organization_id, title, company, first_name, last_name, email, phone,
