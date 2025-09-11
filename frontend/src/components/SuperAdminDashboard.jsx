@@ -90,6 +90,12 @@ const SuperAdminDashboard = () => {
       
       if (response.ok) {
         const data = await response.json();
+        console.log('📊 Organizations data:', data.organizations.map(org => ({
+          id: org.id,
+          name: org.organization_name,
+          trial_status: org.trial_status,
+          payment_status: org.payment_status
+        })));
         setOrganizations(data.organizations);
       }
     } catch (error) {
@@ -178,10 +184,15 @@ const SuperAdminDashboard = () => {
       if (response.ok) {
         alert(`Successfully converted ${data.organization.name} to paid with ${data.organization.licenses} licenses at $${data.organization.monthly_cost}/month!`);
         
-        // Refresh data
-        if (activeTab === 'organizations') fetchOrganizations();
-        if (activeTab === 'expiring') fetchExpiringTrials();
-        fetchDashboardData();
+        console.log('🔄 Conversion successful, refreshing data...');
+        
+        // Refresh data with a small delay to ensure database changes are propagated
+        setTimeout(async () => {
+          if (activeTab === 'organizations') await fetchOrganizations();
+          if (activeTab === 'expiring') await fetchExpiringTrials();
+          await fetchDashboardData();
+          console.log('✅ Data refreshed after conversion');
+        }, 1000);
         
         // Close modal
         setConversionModal({ isOpen: false, organization: null, loading: false });
