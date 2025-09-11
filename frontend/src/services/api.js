@@ -50,11 +50,15 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     const message = error.response?.data?.message || error.message || 'An error occurred'
+    const isSupedAdminRoute = error.config?.url?.includes('/api/super-admin')
     
     if (error.response?.status === 401) {
-      clearAuth()
-      window.location.href = '/login'
-      toast.error('Session expired. Please log in again.')
+      // Don't interfere with super admin authentication
+      if (!isSupedAdminRoute) {
+        clearAuth()
+        window.location.href = '/login'
+        toast.error('Session expired. Please log in again.')
+      }
     } else if (error.response?.status >= 500) {
       toast.error('Server error. Please try again later.')
     } else if (error.response?.status === 429) {

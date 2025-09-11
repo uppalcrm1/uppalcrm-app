@@ -55,7 +55,10 @@ const SuperAdminDashboard = () => {
 
   const getAuthHeaders = () => {
     const token = localStorage.getItem('superAdminToken');
-    console.log('🔑 Getting auth token:', token ? `${token.substring(0, 20)}...` : 'null');
+    const regularToken = localStorage.getItem('authToken');
+    
+    console.log('🔑 Getting superAdmin token:', token ? `${token.substring(0, 20)}...` : 'null');
+    console.log('🔑 Regular auth token present:', regularToken ? 'yes' : 'no');
     
     if (!token) {
       console.error('❌ No superAdminToken found in localStorage');
@@ -64,10 +67,14 @@ const SuperAdminDashboard = () => {
       return {};
     }
     
-    return {
+    // Ensure we're using the super admin token, not the regular user token
+    const headers = {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json'
     };
+    
+    console.log('🔄 Using Authorization header:', headers.Authorization.substring(0, 30) + '...');
+    return headers;
   };
 
   const fetchDashboardData = async () => {

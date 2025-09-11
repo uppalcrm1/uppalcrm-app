@@ -9,10 +9,15 @@ const SuperAdminApp = () => {
 
   useEffect(() => {
     const token = localStorage.getItem('superAdminToken');
-    console.log('🔑 SuperAdminApp token check:', token ? `${token.substring(0, 20)}...` : 'null');
+    const regularToken = localStorage.getItem('authToken');
+    
+    console.log('🔑 SuperAdminApp superAdmin token check:', token ? `${token.substring(0, 20)}...` : 'null');
+    console.log('🔑 Regular auth token present:', regularToken ? 'yes' : 'no');
     
     if (token) {
-      console.log('🔄 Validating token with dashboard API...');
+      console.log('🔄 Validating superAdmin token with dashboard API...');
+      console.log('🔄 Using Authorization header:', `Bearer ${token.substring(0, 20)}...`);
+      
       fetch('/api/super-admin/dashboard', {
         headers: { 
           'Authorization': `Bearer ${token}`,
