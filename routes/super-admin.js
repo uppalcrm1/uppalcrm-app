@@ -657,8 +657,15 @@ router.put('/organizations/:id/convert-to-paid', authenticateSuperAdmin, async (
       console.log('📝 Update query:', updateQuery);
       console.log('📝 Update params:', updateParams);
       
-      await client.query(updateQuery, updateParams);
-      console.log('✅ Updated organizations table');
+      const updateResult = await client.query(updateQuery, updateParams);
+      console.log('✅ Updated organizations table - rows affected:', updateResult.rowCount);
+      
+      if (updateResult.rowCount === 0) {
+        console.log('⚠️  WARNING: No rows were updated! Organization may not be in active trial status.');
+        // Check current status
+        const statusCheck = await client.query('SELECT trial_status, payment_status FROM organizations WHERE id = $1', [organizationId]);
+        console.log('📊 Current organization status:', statusCheck.rows[0]);
+      }
 
       // Try to create organization license record (if table exists)
       try {
