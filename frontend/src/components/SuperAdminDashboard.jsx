@@ -53,23 +53,50 @@ const SuperAdminDashboard = () => {
     if (activeTab === 'leads') fetchBusinessLeads();
   }, [activeTab, filters]);
 
-  const getAuthHeaders = () => ({
-    'Authorization': `Bearer ${localStorage.getItem('superAdminToken')}`,
-    'Content-Type': 'application/json'
-  });
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('superAdminToken');
+    console.log('🔑 Getting auth token:', token ? `${token.substring(0, 20)}...` : 'null');
+    
+    if (!token) {
+      console.error('❌ No superAdminToken found in localStorage');
+      // Redirect to login if no token
+      handleLogout();
+      return {};
+    }
+    
+    return {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    };
+  };
 
   const fetchDashboardData = async () => {
     try {
+      console.log('🔄 Fetching dashboard data...');
+      const headers = getAuthHeaders();
+      console.log('🔄 Dashboard API headers:', Object.keys(headers));
+      
       const response = await fetch('/api/super-admin/dashboard', {
-        headers: getAuthHeaders()
+        headers: headers
       });
+      
+      console.log('📡 Dashboard API response status:', response.status);
       
       if (response.ok) {
         const data = await response.json();
+        console.log('✅ Dashboard data loaded successfully');
         setDashboardData(data);
+      } else {
+        console.error('❌ Dashboard API failed:', response.status, response.statusText);
+        if (response.status === 401 || response.status === 403) {
+          console.error('❌ Dashboard authentication failed - redirecting to login');
+          handleLogout();
+        }
+        const errorData = await response.json().catch(() => ({}));
+        console.error('❌ Dashboard error details:', errorData);
       }
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
+      console.error('❌ Error fetching dashboard data:', error);
     } finally {
       setLoading(false);
     }
@@ -84,9 +111,15 @@ const SuperAdminDashboard = () => {
         limit: 50
       });
       
+      console.log('🔄 Fetching organizations with params:', params.toString());
+      const headers = getAuthHeaders();
+      console.log('🔄 Using headers:', Object.keys(headers));
+      
       const response = await fetch(`/api/super-admin/organizations?${params}`, {
-        headers: getAuthHeaders()
+        headers: headers
       });
+      
+      console.log('📡 Organizations API response status:', response.status);
       
       if (response.ok) {
         const data = await response.json();
@@ -97,9 +130,17 @@ const SuperAdminDashboard = () => {
           payment_status: org.payment_status
         })));
         setOrganizations(data.organizations);
+      } else {
+        console.error('❌ Organizations API failed:', response.status, response.statusText);
+        if (response.status === 401 || response.status === 403) {
+          console.error('❌ Authentication failed - redirecting to login');
+          handleLogout();
+        }
+        const errorData = await response.json().catch(() => ({}));
+        console.error('❌ Error details:', errorData);
       }
     } catch (error) {
-      console.error('Error fetching organizations:', error);
+      console.error('❌ Error fetching organizations:', error);
     }
   };
 

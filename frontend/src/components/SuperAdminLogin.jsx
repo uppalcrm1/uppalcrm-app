@@ -23,9 +23,17 @@ const SuperAdminLogin = ({ onLogin }) => {
       const data = await response.json();
 
       if (response.ok) {
+        console.log('✅ Super admin login successful');
+        console.log('🔑 Storing token in localStorage:', data.token ? `${data.token.substring(0, 20)}...` : 'null');
         localStorage.setItem('superAdminToken', data.token);
+        
+        // Verify token was stored
+        const storedToken = localStorage.getItem('superAdminToken');
+        console.log('🔍 Verification - token stored:', storedToken ? `${storedToken.substring(0, 20)}...` : 'null');
+        
         onLogin(data.admin);
       } else {
+        console.error('❌ Super admin login failed:', data.error);
         setError(data.error || 'Login failed');
       }
     } catch (error) {
