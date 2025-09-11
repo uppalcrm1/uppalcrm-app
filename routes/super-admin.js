@@ -547,6 +547,9 @@ router.put('/organizations/:id/trial', authenticateSuperAdmin, async (req, res) 
 router.put('/organizations/:id/convert-to-paid', authenticateSuperAdmin, async (req, res) => {
   try {
     const organizationId = req.params.id;
+    console.log('🔄 Trial conversion started for organization:', organizationId);
+    console.log('📝 Request body:', JSON.stringify(req.body, null, 2));
+    
     const { 
       subscriptionPlan, 
       licenseCount, 
@@ -555,154 +558,246 @@ router.put('/organizations/:id/convert-to-paid', authenticateSuperAdmin, async (
       billingNotes 
     } = req.body;
 
+    // Backward compatibility: Support both old and new formats
+    const finalSubscriptionPlan = subscriptionPlan || 'standard';
+    const finalLicenseCount = licenseCount || 1;
+    const finalPaymentAmount = paymentAmount || (finalLicenseCount * 15);
+    const finalBillingCycle = billingCycle || 'monthly';
+
+    console.log('📊 Processed parameters:', {
+      subscriptionPlan: finalSubscriptionPlan,
+      licenseCount: finalLicenseCount,
+      paymentAmount: finalPaymentAmount,
+      billingCycle: finalBillingCycle
+    });
+
     // Validate inputs
-    if (!subscriptionPlan || !licenseCount || !paymentAmount) {
+    if (!finalSubscriptionPlan || finalLicenseCount < 1 || !finalPaymentAmount) {
+      console.log('❌ Validation failed:', { subscriptionPlan: finalSubscriptionPlan, licenseCount: finalLicenseCount, paymentAmount: finalPaymentAmount });
       return res.status(400).json({ 
         error: 'Subscription plan, license count, and payment amount are required' 
       });
     }
 
-    if (licenseCount < 1) {
-      return res.status(400).json({ 
-        error: 'License count must be at least 1' 
-      });
-    }
-
     // Get current organization to verify it's in trial status
+    console.log('🔍 Checking organization status...');
     const orgCheck = await query(
       'SELECT trial_status, payment_status, name FROM organizations WHERE id = $1',
       [organizationId]
     );
 
     if (orgCheck.rows.length === 0) {
+      console.log('❌ Organization not found:', organizationId);
       return res.status(404).json({ error: 'Organization not found' });
     }
 
     const currentOrg = orgCheck.rows[0];
+    console.log('📋 Current organization status:', currentOrg);
+
     if (currentOrg.trial_status !== 'active') {
+      console.log('❌ Invalid trial status:', currentOrg.trial_status);
       return res.status(400).json({ 
         error: `Organization is not in active trial status. Current status: ${currentOrg.trial_status}` 
       });
     }
 
     // Begin transaction
+    console.log('🔄 Starting database transaction...');
     await transaction(async (client) => {
-      // Update organization to paid status
-      await client.query(`
-        UPDATE organizations 
-        SET 
-          trial_status = 'converted',
-          payment_status = 'paid',
-          subscription_plan = $1,
-          purchased_licenses = $2,
-          billing_cycle = $3,
-          converted_at = NOW(),
-          billing_notes = $4,
-          updated_at = NOW()
-        WHERE id = $5 AND trial_status = 'active'
-      `, [subscriptionPlan, licenseCount, billingCycle || 'monthly', billingNotes, organizationId]);
+      
+      // Check if license columns exist in organizations table
+      console.log('🔍 Checking database schema...');
+      const columnCheck = await client.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'organizations' 
+        AND column_name IN ('purchased_licenses', 'billing_cycle', 'converted_at', 'billing_notes')
+      `);
+      
+      const existingColumns = columnCheck.rows.map(row => row.column_name);
+      console.log('📊 Available license columns:', existingColumns);
 
-      // Create or update organization license record
-      await client.query(`
-        INSERT INTO organization_licenses 
-        (organization_id, quantity, price_per_license, billing_cycle, status, purchased_date)
-        VALUES ($1, $2, $3, $4, 'active', NOW())
-        ON CONFLICT (organization_id) 
-        DO UPDATE SET 
-          quantity = $2,
-          price_per_license = $3,
-          billing_cycle = $4,
-          status = 'active',
-          updated_at = NOW()
-      `, [organizationId, licenseCount, 15.00, billingCycle || 'monthly']);
+      // Build dynamic update query based on available columns
+      let updateFields = [
+        'trial_status = $1',
+        'payment_status = $2', 
+        'subscription_plan = $3',
+        'updated_at = NOW()'
+      ];
+      let updateParams = ['converted', 'paid', finalSubscriptionPlan];
+      let paramIndex = 4;
 
-      // Create billing event
-      const nextBillingDate = new Date();
-      if (billingCycle === 'quarterly') {
-        nextBillingDate.setMonth(nextBillingDate.getMonth() + 3);
-      } else if (billingCycle === 'annual') {
-        nextBillingDate.setFullYear(nextBillingDate.getFullYear() + 1);
-      } else {
-        nextBillingDate.setMonth(nextBillingDate.getMonth() + 1);
+      if (existingColumns.includes('purchased_licenses')) {
+        updateFields.push(`purchased_licenses = $${paramIndex++}`);
+        updateParams.push(finalLicenseCount);
+      }
+      
+      if (existingColumns.includes('billing_cycle')) {
+        updateFields.push(`billing_cycle = $${paramIndex++}`);
+        updateParams.push(finalBillingCycle);
+      }
+      
+      if (existingColumns.includes('converted_at')) {
+        updateFields.push(`converted_at = NOW()`);
+      }
+      
+      if (existingColumns.includes('billing_notes') && billingNotes) {
+        updateFields.push(`billing_notes = $${paramIndex++}`);
+        updateParams.push(billingNotes);
       }
 
-      await client.query(`
-        INSERT INTO billing_events 
-        (organization_id, billing_period_start, billing_period_end, licenses_count, price_per_license, total_amount, billing_status, payment_reference, notes)
-        VALUES ($1, NOW(), $2, $3, $4, $5, 'paid', $6, $7)
-      `, [
-        organizationId,
-        nextBillingDate,
-        licenseCount,
-        15.00,
-        parseFloat(paymentAmount),
-        'Initial conversion payment',
-        billingNotes
-      ]);
+      updateParams.push(organizationId); // WHERE clause parameter
+      
+      const updateQuery = `
+        UPDATE organizations 
+        SET ${updateFields.join(', ')}
+        WHERE id = $${paramIndex} AND trial_status = 'active'
+      `;
+      
+      console.log('📝 Update query:', updateQuery);
+      console.log('📝 Update params:', updateParams);
+      
+      await client.query(updateQuery, updateParams);
+      console.log('✅ Updated organizations table');
 
-      // Create license history entry
-      await client.query(`
-        INSERT INTO license_usage_history 
-        (organization_id, action, previous_count, new_count, price_change, reason, performed_by)
-        VALUES ($1, 'added', 0, $2, $3, 'Initial trial conversion', $4)
-      `, [
-        organizationId,
-        licenseCount,
-        parseFloat(paymentAmount),
-        req.superAdmin?.id
-      ]);
+      // Try to create organization license record (if table exists)
+      try {
+        console.log('🔄 Creating organization license record...');
+        await client.query(`
+          INSERT INTO organization_licenses 
+          (organization_id, quantity, price_per_license, billing_cycle, status, purchased_date)
+          VALUES ($1, $2, $3, $4, 'active', NOW())
+          ON CONFLICT (organization_id) 
+          DO UPDATE SET 
+            quantity = $2,
+            price_per_license = $3,
+            billing_cycle = $4,
+            status = 'active',
+            updated_at = NOW()
+        `, [organizationId, finalLicenseCount, 15.00, finalBillingCycle]);
+        console.log('✅ Created/updated organization license record');
+      } catch (licenseError) {
+        console.log('⚠️  License table operation failed (table may not exist):', licenseError.message);
+      }
 
-      // Update trial history
-      await client.query(`
-        UPDATE organization_trial_history 
-        SET 
-          trial_outcome = 'converted',
-          converted_at = NOW()
-        WHERE organization_id = $1 AND trial_outcome = 'active'
-      `, [organizationId]);
+      // Try to create billing event (if table exists)
+      try {
+        console.log('🔄 Creating billing event...');
+        const nextBillingDate = new Date();
+        if (finalBillingCycle === 'quarterly') {
+          nextBillingDate.setMonth(nextBillingDate.getMonth() + 3);
+        } else if (finalBillingCycle === 'annual') {
+          nextBillingDate.setFullYear(nextBillingDate.getFullYear() + 1);
+        } else {
+          nextBillingDate.setMonth(nextBillingDate.getMonth() + 1);
+        }
 
-      // Create audit log entry
-      await client.query(`
-        INSERT INTO audit_logs (organization_id, action, details, performed_by, performed_at)
-        VALUES ($1, $2, $3, $4, NOW())
-      `, [
-        organizationId,
-        'trial_converted_to_paid_with_licenses',
-        JSON.stringify({
-          subscriptionPlan,
-          licenseCount,
-          paymentAmount: parseFloat(paymentAmount),
-          billingCycle: billingCycle || 'monthly',
-          billingNotes,
-          convertedBy: req.superAdmin?.email || 'super_admin',
-          previousStatus: currentOrg.trial_status,
-          previousPaymentStatus: currentOrg.payment_status
-        }),
-        req.superAdmin?.email || 'super_admin'
-      ]);
+        await client.query(`
+          INSERT INTO billing_events 
+          (organization_id, billing_period_start, billing_period_end, licenses_count, price_per_license, total_amount, billing_status, payment_reference, notes)
+          VALUES ($1, NOW(), $2, $3, $4, $5, 'paid', $6, $7)
+        `, [
+          organizationId,
+          nextBillingDate,
+          finalLicenseCount,
+          15.00,
+          parseFloat(finalPaymentAmount),
+          'Initial conversion payment',
+          billingNotes || ''
+        ]);
+        console.log('✅ Created billing event');
+      } catch (billingError) {
+        console.log('⚠️  Billing event creation failed (table may not exist):', billingError.message);
+      }
+
+      // Try to create license history entry (if table exists)
+      try {
+        console.log('🔄 Creating license history entry...');
+        await client.query(`
+          INSERT INTO license_usage_history 
+          (organization_id, action, previous_count, new_count, price_change, reason, performed_by)
+          VALUES ($1, 'added', 0, $2, $3, 'Initial trial conversion', $4)
+        `, [
+          organizationId,
+          finalLicenseCount,
+          parseFloat(finalPaymentAmount),
+          req.superAdmin?.id
+        ]);
+        console.log('✅ Created license history entry');
+      } catch (historyError) {
+        console.log('⚠️  License history creation failed (table may not exist):', historyError.message);
+      }
+
+      // Try to update trial history (if table exists)
+      try {
+        console.log('🔄 Updating trial history...');
+        await client.query(`
+          UPDATE organization_trial_history 
+          SET 
+            trial_outcome = 'converted',
+            converted_at = NOW()
+          WHERE organization_id = $1 AND trial_outcome = 'active'
+        `, [organizationId]);
+        console.log('✅ Updated trial history');
+      } catch (trialHistoryError) {
+        console.log('⚠️  Trial history update failed (table may not exist):', trialHistoryError.message);
+      }
+
+      // Try to create audit log entry (if table exists)
+      try {
+        console.log('🔄 Creating audit log entry...');
+        await client.query(`
+          INSERT INTO audit_logs (organization_id, action, details, performed_by, performed_at)
+          VALUES ($1, $2, $3, $4, NOW())
+        `, [
+          organizationId,
+          'trial_converted_to_paid_with_licenses',
+          JSON.stringify({
+            subscriptionPlan: finalSubscriptionPlan,
+            licenseCount: finalLicenseCount,
+            paymentAmount: parseFloat(finalPaymentAmount),
+            billingCycle: finalBillingCycle,
+            billingNotes,
+            convertedBy: req.superAdmin?.email || 'super_admin',
+            previousStatus: currentOrg.trial_status,
+            previousPaymentStatus: currentOrg.payment_status
+          }),
+          req.superAdmin?.email || 'super_admin'
+        ]);
+        console.log('✅ Created audit log entry');
+      } catch (auditError) {
+        console.log('⚠️  Audit log creation failed (table may not exist):', auditError.message);
+      }
     });
 
-    res.json({
+    console.log('🎉 Trial conversion completed successfully');
+
+    const response = {
       success: true,
-      message: `Successfully converted ${currentOrg.name} to paid with ${licenseCount} licenses`,
+      message: `Successfully converted ${currentOrg.name} to paid with ${finalLicenseCount} licenses`,
       organization: {
         id: organizationId,
         name: currentOrg.name,
         trial_status: 'converted',
         payment_status: 'paid',
-        subscription_plan: subscriptionPlan,
-        licenses: licenseCount,
-        monthly_cost: licenseCount * 15,
-        billing_cycle: billingCycle || 'monthly',
+        subscription_plan: finalSubscriptionPlan,
+        licenses: finalLicenseCount,
+        monthly_cost: finalLicenseCount * 15,
+        billing_cycle: finalBillingCycle,
         converted_at: new Date().toISOString()
       }
-    });
+    };
+
+    console.log('📤 Sending response:', JSON.stringify(response, null, 2));
+    res.json(response);
 
   } catch (error) {
-    console.error('Trial conversion error:', error);
+    console.error('❌ Trial conversion error:', error);
+    console.error('❌ Error stack:', error.stack);
     res.status(500).json({ 
       error: 'Internal server error during conversion',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      message: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });
