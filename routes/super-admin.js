@@ -1102,6 +1102,58 @@ router.get('/expiring-trials', authenticateSuperAdmin, async (req, res) => {
   }
 });
 
+// DEBUG ENDPOINT - Check organization status after conversion
+router.get('/debug/organization/:name', authenticateSuperAdmin, async (req, res) => {
+  try {
+    const { name } = req.params;
+    console.log(`🔍 DEBUG: Checking organization status for: ${name}`);
+
+    if (!name) {
+      return res.status(400).json({ error: 'Organization name is required' });
+    }
+
+    // Query organization with ILIKE for case-insensitive search
+    const result = await query(`
+      SELECT 
+        id,
+        name,
+        account_status,
+        subscription_plan,
+        purchased_licenses,
+        converted_at
+      FROM organizations 
+      WHERE name ILIKE $1
+      ORDER BY created_at DESC
+    `, [`%${name}%`]);
+
+    if (result.rows.length === 0) {
+      console.log(`❌ No organization found matching: ${name}`);
+      return res.status(404).json({ 
+        error: 'No organization found', 
+        searched_name: name 
+      });
+    }
+
+    console.log(`✅ Found ${result.rows.length} organization(s) matching: ${name}`);
+    
+    res.json({
+      message: 'Organization status check',
+      searched_name: name,
+      organizations: result.rows,
+      total_found: result.rows.length,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('❌ Debug organization check error:', error);
+    res.status(500).json({ 
+      error: 'Internal server error during organization check',
+      message: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
+
 // ===============================
 // LICENSE MANAGEMENT ROUTES
 // ===============================

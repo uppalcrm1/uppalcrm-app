@@ -276,6 +276,40 @@ const SuperAdminDashboard = () => {
     });
   };
 
+  const checkOrganizationStatus = async (organizationName) => {
+    try {
+      const response = await fetch(`/api/super-admin/debug/organization/${encodeURIComponent(organizationName)}`, {
+        headers: getAuthHeaders()
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.organizations && data.organizations.length > 0) {
+          const org = data.organizations[0]; // Take the first match
+          const statusInfo = `
+Organization Status Check:
+• Name: ${org.name}
+• ID: ${org.id}
+• Account Status: ${org.account_status || 'N/A'}
+• Subscription Plan: ${org.subscription_plan || 'N/A'}
+• Purchased Licenses: ${org.purchased_licenses || 'N/A'}
+• Converted At: ${org.converted_at ? new Date(org.converted_at).toLocaleString() : 'N/A'}
+
+Last checked: ${new Date().toLocaleString()}`;
+          alert(statusInfo);
+        } else {
+          alert(`No organization found matching: "${organizationName}"`);
+        }
+      } else {
+        const errorData = await response.json();
+        alert(`Failed to check status: ${errorData.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error checking organization status:', error);
+      alert('Failed to check organization status: Network error');
+    }
+  };
+
   const formatDate = (dateString) => {
     if (!dateString) return '-';
     return new Date(dateString).toLocaleDateString();
@@ -605,12 +639,38 @@ const SuperAdminDashboard = () => {
                                   Convert to Paid
                                 </button>
                                 <span className="text-gray-300">|</span>
+                                <button
+                                  onClick={() => checkOrganizationStatus(org.organization_name)}
+                                  className="inline-flex items-center px-3 py-1 border border-gray-300 text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                                  title="Check organization status in database"
+                                >
+                                  Check Status
+                                </button>
+                                <span className="text-gray-300">|</span>
                               </>
                             )}
                             {org.trial_status === 'converted' && (
-                              <span className="inline-flex items-center px-3 py-1 text-xs font-medium text-green-800 bg-green-100 rounded">
-                                ✓ Paid (Standard - $15/month)
-                              </span>
+                              <>
+                                <span className="inline-flex items-center px-3 py-1 text-xs font-medium text-green-800 bg-green-100 rounded">
+                                  ✓ Paid (Standard - $15/month)
+                                </span>
+                                <button
+                                  onClick={() => checkOrganizationStatus(org.organization_name)}
+                                  className="inline-flex items-center px-3 py-1 border border-gray-300 text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors ml-2"
+                                  title="Check organization status in database"
+                                >
+                                  Check Status
+                                </button>
+                              </>
+                            )}
+                            {org.trial_status !== 'active' && org.trial_status !== 'converted' && (
+                              <button
+                                onClick={() => checkOrganizationStatus(org.organization_name)}
+                                className="inline-flex items-center px-3 py-1 border border-gray-300 text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors mr-2"
+                                title="Check organization status in database"
+                              >
+                                Check Status
+                              </button>
                             )}
                             <button
                               onClick={() => handleDeleteClick(org)}
