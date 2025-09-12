@@ -1146,6 +1146,71 @@ router.get('/expiring-trials', authenticateSuperAdmin, async (req, res) => {
   }
 });
 
+// DIAGNOSTIC - Test database schema and updates
+router.get('/debug/database-test/:orgId', authenticateSuperAdmin, async (req, res) => {
+  try {
+    const { orgId } = req.params;
+    console.log(`🔧 DATABASE DIAGNOSTIC for org: ${orgId}`);
+
+    // 1. Check organization table schema
+    const schemaCheck = await query(`
+      SELECT column_name, data_type, is_nullable, column_default
+      FROM information_schema.columns 
+      WHERE table_name = 'organizations'
+      ORDER BY ordinal_position
+    `);
+
+    // 2. Get current organization data
+    const currentOrg = await query(`
+      SELECT * FROM organizations WHERE id = $1
+    `, [orgId]);
+
+    // 3. Test a simple update
+    let testUpdateResult = null;
+    try {
+      testUpdateResult = await query(`
+        UPDATE organizations 
+        SET updated_at = NOW() 
+        WHERE id = $1
+        RETURNING id, trial_status, payment_status
+      `, [orgId]);
+    } catch (updateError) {
+      testUpdateResult = { error: updateError.message };
+    }
+
+    // 4. Test the actual conversion update
+    let conversionTestResult = null;
+    try {
+      conversionTestResult = await query(`
+        UPDATE organizations 
+        SET trial_status = 'converted', payment_status = 'paid'
+        WHERE id = $1 AND trial_status = 'active'
+        RETURNING id, trial_status, payment_status
+      `, [orgId]);
+    } catch (conversionError) {
+      conversionTestResult = { error: conversionError.message };
+    }
+
+    res.json({
+      message: 'Database diagnostic complete',
+      organization_id: orgId,
+      schema: schemaCheck.rows,
+      current_data: currentOrg.rows[0] || null,
+      test_update_result: testUpdateResult,
+      conversion_test_result: conversionTestResult,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('❌ Database diagnostic error:', error);
+    res.status(500).json({ 
+      error: 'Database diagnostic failed',
+      message: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
+
 // DEBUG ENDPOINT - Check organization status after conversion
 router.get('/debug/organization/:name', authenticateSuperAdmin, async (req, res) => {
   try {

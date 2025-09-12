@@ -378,6 +378,45 @@ const SuperAdminDashboard = () => {
     });
   };
 
+  const testDatabaseOperations = async (organizationId, organizationName) => {
+    try {
+      console.log('🔧 Testing database operations for org ID:', organizationId);
+      const response = await fetch(`/api/super-admin/debug/database-test/${encodeURIComponent(organizationId)}`, {
+        headers: getAuthHeaders()
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('🔧 Database test results:', data);
+        
+        const testInfo = `
+DATABASE DIAGNOSTIC RESULTS:
+• Organization ID: ${data.organization_id}
+• Current trial_status: ${data.current_data?.trial_status || 'N/A'}
+• Current payment_status: ${data.current_data?.payment_status || 'N/A'}
+
+SCHEMA TEST:
+• trial_status column exists: ${data.schema.some(col => col.column_name === 'trial_status') ? 'YES' : 'NO'}
+• payment_status column exists: ${data.schema.some(col => col.column_name === 'payment_status') ? 'YES' : 'NO'}
+
+UPDATE TESTS:
+• Simple update: ${data.test_update_result?.error ? 'FAILED - ' + data.test_update_result.error : 'SUCCESS'}
+• Conversion update: ${data.conversion_test_result?.error ? 'FAILED - ' + data.conversion_test_result.error : 'SUCCESS'}
+
+Rows affected by conversion test: ${data.conversion_test_result?.rows?.length || 0}
+
+Tested at: ${new Date().toLocaleString()}`;
+        alert(testInfo);
+      } else {
+        const errorData = await response.json();
+        alert(`Database test failed: ${errorData.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Database test error:', error);
+      alert('Database test failed: Network error');
+    }
+  };
+
   const checkOrganizationStatus = async (organizationName) => {
     try {
       const response = await fetch(`/api/super-admin/debug/organization/${encodeURIComponent(organizationName)}`, {
@@ -752,6 +791,13 @@ Last checked: ${new Date().toLocaleString()}`;
                                 >
                                   Check Status
                                 </button>
+                                <button
+                                  onClick={() => testDatabaseOperations(org.id, org.organization_name)}
+                                  className="inline-flex items-center px-3 py-1 border border-orange-300 text-xs font-medium rounded text-orange-700 bg-orange-50 hover:bg-orange-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-colors ml-1"
+                                  title="Test database operations and schema"
+                                >
+                                  Test DB
+                                </button>
                                 <span className="text-gray-300">|</span>
                               </>
                             )}
@@ -766,6 +812,13 @@ Last checked: ${new Date().toLocaleString()}`;
                                   title="Check organization status in database"
                                 >
                                   Check Status
+                                </button>
+                                <button
+                                  onClick={() => testDatabaseOperations(org.id, org.organization_name)}
+                                  className="inline-flex items-center px-3 py-1 border border-orange-300 text-xs font-medium rounded text-orange-700 bg-orange-50 hover:bg-orange-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-colors ml-1"
+                                  title="Test database operations and schema"
+                                >
+                                  Test DB
                                 </button>
                               </>
                             )}
