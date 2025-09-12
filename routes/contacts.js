@@ -336,10 +336,76 @@ router.get('/stats',
       });
     } catch (error) {
       console.error('Get contact stats error:', error);
+      
+      // Return detailed error information for debugging
       res.status(500).json({
         error: 'Failed to retrieve statistics',
         message: 'Unable to get contact statistics',
-        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        details: {
+          message: error.message,
+          stack: error.stack,
+          code: error.code,
+          name: error.name,
+          organizationId: req.organizationId,
+          timestamp: new Date().toISOString()
+        }
+      });
+    }
+  }
+);
+
+/**
+ * GET /contacts/debug
+ * Debug endpoint to test database connection and table creation
+ */
+router.get('/debug',
+  async (req, res) => {
+    try {
+      const { query } = require('../database/connection');
+      const debug = {
+        timestamp: new Date().toISOString(),
+        organizationId: req.organizationId,
+        steps: []
+      };
+
+      // Step 1: Test basic query
+      debug.steps.push({ step: 1, name: 'Testing basic query' });
+      const basicTest = await query('SELECT NOW() as current_time');
+      debug.steps.push({ step: 1, result: 'SUCCESS', data: basicTest.rows[0] });
+
+      // Step 2: Check if organizations table exists
+      debug.steps.push({ step: 2, name: 'Checking organizations table' });
+      const orgCheck = await query(`
+        SELECT table_name FROM information_schema.tables 
+        WHERE table_schema = 'public' AND table_name = 'organizations'
+      `);
+      debug.steps.push({ step: 2, result: 'SUCCESS', exists: orgCheck.rows.length > 0 });
+
+      // Step 3: Check if contacts table exists
+      debug.steps.push({ step: 3, name: 'Checking contacts table' });
+      const contactsCheck = await query(`
+        SELECT table_name FROM information_schema.tables 
+        WHERE table_schema = 'public' AND table_name = 'contacts'
+      `);
+      debug.steps.push({ step: 3, result: 'SUCCESS', exists: contactsCheck.rows.length > 0 });
+
+      // Step 4: Check UUID extension
+      debug.steps.push({ step: 4, name: 'Checking UUID extension' });
+      const uuidCheck = await query(`
+        SELECT extname FROM pg_extension WHERE extname = 'uuid-ossp'
+      `);
+      debug.steps.push({ step: 4, result: 'SUCCESS', exists: uuidCheck.rows.length > 0 });
+
+      res.json(debug);
+    } catch (error) {
+      res.status(500).json({
+        error: 'Debug failed',
+        details: {
+          message: error.message,
+          stack: error.stack,
+          code: error.code,
+          name: error.name
+        }
       });
     }
   }
