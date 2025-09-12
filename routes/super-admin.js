@@ -1147,6 +1147,30 @@ router.get('/expiring-trials', authenticateSuperAdmin, async (req, res) => {
   }
 });
 
+// MIGRATION - Create essential CRM tables
+router.post('/migration/create-crm-tables', authenticateSuperAdmin, async (req, res) => {
+  try {
+    console.log('🚀 Creating essential CRM tables via super admin...');
+    
+    const { createEssentialCRMTables } = require('../scripts/create-essential-crm-tables');
+    await createEssentialCRMTables();
+    
+    res.json({
+      success: true,
+      message: 'Essential CRM tables created successfully',
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('❌ CRM table creation error:', error);
+    res.status(500).json({
+      error: 'Failed to create CRM tables',
+      message: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
+
 // DIAGNOSTIC - Test database schema and updates
 router.get('/debug/database-test/:orgId', authenticateSuperAdmin, async (req, res) => {
   try {

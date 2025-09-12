@@ -378,6 +378,27 @@ const SuperAdminDashboard = () => {
     });
   };
 
+  const createCRMTables = async () => {
+    try {
+      console.log('🚀 Creating essential CRM tables...');
+      const response = await fetch('/api/super-admin/migration/create-crm-tables', {
+        method: 'POST',
+        headers: getAuthHeaders()
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        alert(`✅ CRM Tables Created Successfully!\n\nTables created: leads, contacts\nWith indexes and proper relationships.\n\nCompleted at: ${new Date(data.timestamp).toLocaleString()}`);
+      } else {
+        const errorData = await response.json();
+        alert(`❌ Failed to create CRM tables: ${errorData.error}`);
+      }
+    } catch (error) {
+      console.error('CRM table creation error:', error);
+      alert('❌ Failed to create CRM tables: Network error');
+    }
+  };
+
   const testDatabaseOperations = async (organizationId, organizationName) => {
     try {
       console.log('🔧 Testing database operations for org ID:', organizationId);
@@ -512,6 +533,13 @@ Last checked: ${new Date().toLocaleString()}`;
               <span className="text-sm text-gray-600">
                 Last updated: {dashboardData?.last_updated ? formatDate(dashboardData.last_updated) : '-'}
               </span>
+              <button
+                onClick={createCRMTables}
+                className="inline-flex items-center px-4 py-2 border border-green-300 text-sm font-medium rounded-md text-green-700 bg-green-50 hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
+                title="Create essential CRM tables (leads, contacts)"
+              >
+                Create CRM Tables
+              </button>
               <button
                 onClick={handleLogout}
                 className="flex items-center text-gray-600 hover:text-gray-900"
