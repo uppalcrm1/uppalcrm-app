@@ -1035,17 +1035,32 @@ class Contact {
         console.log('✅ Contacts table auto-created successfully');
       }
 
+      // First, check what columns actually exist in the table
+      const columnCheck = await query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'contacts' AND table_schema = 'public'
+      `, [], organizationId);
+      
+      const existingColumns = columnCheck.rows.map(row => row.column_name);
+      console.log('Existing columns in contacts table:', existingColumns);
+      
+      // Build stats query based on available columns
+      const hasType = existingColumns.includes('type');
+      const hasConvertedFromLead = existingColumns.includes('converted_from_lead_id');
+      const hasValue = existingColumns.includes('value');
+      
       const statsQuery = `
         SELECT 
           COUNT(*) as total_contacts,
           COUNT(CASE WHEN status = 'active' THEN 1 END) as active_contacts,
-          COUNT(CASE WHEN type = 'customer' THEN 1 END) as customers,
-          COUNT(CASE WHEN type = 'prospect' THEN 1 END) as prospects,
-          COUNT(CASE WHEN converted_from_lead_id IS NOT NULL THEN 1 END) as converted_from_leads,
+          ${hasType ? "COUNT(CASE WHEN type = 'customer' THEN 1 END)" : "0"} as customers,
+          ${hasType ? "COUNT(CASE WHEN type = 'prospect' THEN 1 END)" : "0"} as prospects,
+          ${hasConvertedFromLead ? "COUNT(CASE WHEN converted_from_lead_id IS NOT NULL THEN 1 END)" : "0"} as converted_from_leads,
           COUNT(CASE WHEN created_at >= NOW() - INTERVAL '7 days' THEN 1 END) as new_this_week,
           COUNT(CASE WHEN created_at >= NOW() - INTERVAL '30 days' THEN 1 END) as new_this_month,
-          COALESCE(SUM(value), 0) as total_value,
-          COALESCE(AVG(value), 0) as average_value
+          ${hasValue ? "COALESCE(SUM(value), 0)" : "0"} as total_value,
+          ${hasValue ? "COALESCE(AVG(value), 0)" : "0"} as average_value
         FROM contacts 
         WHERE organization_id = $1
       `;
