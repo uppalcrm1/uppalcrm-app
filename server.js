@@ -89,6 +89,63 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Public debug endpoint (no auth required)
+app.get('/debug', async (req, res) => {
+  try {
+    const { query } = require('./database/connection');
+    const debug = {
+      timestamp: new Date().toISOString(),
+      steps: []
+    };
+
+    // Step 1: Test basic query
+    debug.steps.push({ step: 1, name: 'Testing basic database connection' });
+    const basicTest = await query('SELECT NOW() as current_time');
+    debug.steps.push({ step: 1, result: 'SUCCESS', data: basicTest.rows[0] });
+
+    // Step 2: Check if organizations table exists
+    debug.steps.push({ step: 2, name: 'Checking organizations table' });
+    const orgCheck = await query(`
+      SELECT table_name FROM information_schema.tables 
+      WHERE table_schema = 'public' AND table_name = 'organizations'
+    `);
+    debug.steps.push({ step: 2, result: 'SUCCESS', exists: orgCheck.rows.length > 0 });
+
+    // Step 3: Check if contacts table exists
+    debug.steps.push({ step: 3, name: 'Checking contacts table' });
+    const contactsCheck = await query(`
+      SELECT table_name FROM information_schema.tables 
+      WHERE table_schema = 'public' AND table_name = 'contacts'
+    `);
+    debug.steps.push({ step: 3, result: 'SUCCESS', exists: contactsCheck.rows.length > 0 });
+
+    // Step 4: Check UUID extension
+    debug.steps.push({ step: 4, name: 'Checking UUID extension' });
+    const uuidCheck = await query(`
+      SELECT extname FROM pg_extension WHERE extname = 'uuid-ossp'
+    `);
+    debug.steps.push({ step: 4, result: 'SUCCESS', exists: uuidCheck.rows.length > 0 });
+
+    // Step 5: Test UUID generation
+    debug.steps.push({ step: 5, name: 'Testing UUID generation' });
+    const uuidTest = await query('SELECT uuid_generate_v4() as test_uuid');
+    debug.steps.push({ step: 5, result: 'SUCCESS', uuid: uuidTest.rows[0].test_uuid });
+
+    res.json(debug);
+  } catch (error) {
+    res.status(500).json({
+      error: 'Debug failed',
+      details: {
+        message: error.message,
+        stack: error.stack,
+        code: error.code,
+        name: error.name,
+        timestamp: new Date().toISOString()
+      }
+    });
+  }
+});
+
 // API routes with rate limiting
 app.use('/api/auth', rateLimiters.general, authRoutes);
 app.use('/api/users', rateLimiters.general, userRoutes);
