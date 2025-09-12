@@ -270,8 +270,10 @@ router.get('/stats',
   async (req, res) => {
     try {
       console.log('Getting contact stats for organization:', req.organizationId);
+      console.log('User details:', { id: req.user?.id, organization_id: req.user?.organization_id });
       
       if (!req.organizationId) {
+        console.error('Missing organization context - req.organizationId is null/undefined');
         return res.status(400).json({
           error: 'Missing organization context',
           message: 'Organization ID is required'
@@ -284,7 +286,7 @@ router.get('/stats',
       console.log('🔧 Ensuring contacts table exists...');
       
       // Enable UUID extension if not exists
-      await query(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`);
+      await query(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`, [], req.organizationId);
       
       await query(`
         CREATE TABLE IF NOT EXISTS contacts (
@@ -310,14 +312,14 @@ router.get('/stats',
           next_follow_up TIMESTAMP WITH TIME ZONE,
           converted_from_lead_id UUID REFERENCES leads(id)
         )
-      `);
+      `, [], req.organizationId);
       
       await query(`
         CREATE INDEX IF NOT EXISTS idx_contacts_organization_id ON contacts(organization_id);
         CREATE INDEX IF NOT EXISTS idx_contacts_email ON contacts(email);
         CREATE INDEX IF NOT EXISTS idx_contacts_status ON contacts(status);
         CREATE INDEX IF NOT EXISTS idx_contacts_type ON contacts(type);
-      `);
+      `, [], req.organizationId);
       
       console.log('✅ Contacts table ready');
 
@@ -336,6 +338,13 @@ router.get('/stats',
       });
     } catch (error) {
       console.error('Get contact stats error:', error);
+      console.error('Error context:', {
+        organizationId: req.organizationId,
+        userId: req.user?.id,
+        userOrgId: req.user?.organization_id,
+        hasUser: !!req.user,
+        timestamp: new Date().toISOString()
+      });
       
       // Return detailed error information for debugging
       res.status(500).json({
@@ -347,6 +356,8 @@ router.get('/stats',
           code: error.code,
           name: error.name,
           organizationId: req.organizationId,
+          userId: req.user?.id,
+          userOrgId: req.user?.organization_id,
           timestamp: new Date().toISOString()
         }
       });
