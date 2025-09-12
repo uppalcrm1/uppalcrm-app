@@ -1117,10 +1117,14 @@ router.get('/debug/organization/:name', authenticateSuperAdmin, async (req, res)
       SELECT 
         id,
         name,
-        account_status,
         subscription_plan,
-        purchased_licenses,
-        converted_at
+        trial_status,
+        payment_status,
+        is_active,
+        created_at,
+        updated_at,
+        domain,
+        max_users
       FROM organizations 
       WHERE name ILIKE $1
       ORDER BY created_at DESC

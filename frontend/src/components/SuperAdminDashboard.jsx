@@ -392,10 +392,14 @@ const SuperAdminDashboard = () => {
 Organization Status Check:
 • Name: ${org.name}
 • ID: ${org.id}
-• Account Status: ${org.account_status || 'N/A'}
+• Domain: ${org.domain || 'N/A'}
+• Trial Status: ${org.trial_status || 'N/A'}
+• Payment Status: ${org.payment_status || 'N/A'}
 • Subscription Plan: ${org.subscription_plan || 'N/A'}
-• Purchased Licenses: ${org.purchased_licenses || 'N/A'}
-• Converted At: ${org.converted_at ? new Date(org.converted_at).toLocaleString() : 'N/A'}
+• Is Active: ${org.is_active ? 'Yes' : 'No'}
+• Max Users: ${org.max_users || 'N/A'}
+• Created: ${org.created_at ? new Date(org.created_at).toLocaleString() : 'N/A'}
+• Updated: ${org.updated_at ? new Date(org.updated_at).toLocaleString() : 'N/A'}
 
 Last checked: ${new Date().toLocaleString()}`;
           alert(statusInfo);
