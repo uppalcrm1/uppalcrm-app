@@ -45,6 +45,20 @@ if (organizationSlug) {
   api.defaults.headers.common['X-Organization-Slug'] = organizationSlug
 }
 
+// Request interceptor for debugging
+api.interceptors.request.use(
+  (config) => {
+    // Debug: Log all outgoing requests
+    console.log('🚀 API Request:', config.method?.toUpperCase(), config.url)
+    console.log('  - Headers:', config.headers)
+    return config
+  },
+  (error) => {
+    console.error('❌ Request interceptor error:', error)
+    return Promise.reject(error)
+  }
+)
+
 // Response interceptor for error handling
 api.interceptors.response.use(
   (response) => response,
@@ -224,6 +238,13 @@ export const contactsAPI = {
   },
   
   getStats: async () => {
+    // Debug: Log current auth state before making request
+    console.log('📋 Debug - Making contacts/stats request with:')
+    console.log('  - Authorization header:', api.defaults.headers.common['Authorization'])
+    console.log('  - X-Organization-Slug header:', api.defaults.headers.common['X-Organization-Slug'])
+    console.log('  - localStorage authToken:', localStorage.getItem('authToken'))
+    console.log('  - localStorage organizationSlug:', localStorage.getItem('organizationSlug'))
+    
     const response = await api.get('/contacts/stats')
     return response.data
   },
