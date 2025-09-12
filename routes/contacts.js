@@ -318,8 +318,16 @@ router.get('/stats',
         CREATE INDEX IF NOT EXISTS idx_contacts_organization_id ON contacts(organization_id);
         CREATE INDEX IF NOT EXISTS idx_contacts_email ON contacts(email);
         CREATE INDEX IF NOT EXISTS idx_contacts_status ON contacts(status);
-        CREATE INDEX IF NOT EXISTS idx_contacts_type ON contacts(type);
       `, [], req.organizationId);
+      
+      // Add type column if it doesn't exist
+      try {
+        await query(`ALTER TABLE contacts ADD COLUMN IF NOT EXISTS type VARCHAR(50) DEFAULT 'customer'`, [], req.organizationId);
+        await query(`CREATE INDEX IF NOT EXISTS idx_contacts_type ON contacts(type)`, [], req.organizationId);
+        console.log('✅ Added type column and index');
+      } catch (error) {
+        console.log('Note: Type column may already exist or cannot be added:', error.message);
+      }
       
       console.log('✅ Contacts table ready');
 

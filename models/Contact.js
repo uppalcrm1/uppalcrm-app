@@ -1039,8 +1039,8 @@ class Contact {
         SELECT 
           COUNT(*) as total_contacts,
           COUNT(CASE WHEN status = 'active' THEN 1 END) as active_contacts,
-          0 as customers,
-          0 as prospects,
+          COUNT(CASE WHEN type = 'customer' THEN 1 END) as customers,
+          COUNT(CASE WHEN type = 'prospect' THEN 1 END) as prospects,
           COUNT(CASE WHEN converted_from_lead_id IS NOT NULL THEN 1 END) as converted_from_leads,
           COUNT(CASE WHEN created_at >= NOW() - INTERVAL '7 days' THEN 1 END) as new_this_week,
           COUNT(CASE WHEN created_at >= NOW() - INTERVAL '30 days' THEN 1 END) as new_this_month,
