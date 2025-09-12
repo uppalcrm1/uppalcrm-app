@@ -411,8 +411,41 @@ class Lead {
       console.log('Table check result:', tableCheck.rows);
       
       if (tableCheck.rows.length === 0) {
-        console.error('Leads table does not exist!');
-        throw new Error('Leads table not found in database. Please run migrations.');
+        console.error('Leads table does not exist! Creating it automatically...');
+        
+        // Auto-create the leads table
+        await query(`
+          CREATE TABLE IF NOT EXISTS leads (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+            title VARCHAR(255),
+            company VARCHAR(255),
+            first_name VARCHAR(100),
+            last_name VARCHAR(100),
+            email VARCHAR(255),
+            phone VARCHAR(50),
+            source VARCHAR(100) DEFAULT 'manual',
+            status VARCHAR(50) DEFAULT 'new',
+            priority VARCHAR(20) DEFAULT 'medium',
+            value DECIMAL(10,2) DEFAULT 0,
+            notes TEXT,
+            assigned_to UUID REFERENCES users(id),
+            created_by UUID REFERENCES users(id),
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            last_contact_date TIMESTAMP WITH TIME ZONE,
+            next_follow_up TIMESTAMP WITH TIME ZONE
+          )
+        `);
+        
+        // Create indexes
+        await query(`
+          CREATE INDEX IF NOT EXISTS idx_leads_organization_id ON leads(organization_id);
+          CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status);
+          CREATE INDEX IF NOT EXISTS idx_leads_assigned_to ON leads(assigned_to);
+        `);
+        
+        console.log('✅ Leads table auto-created successfully');
       }
 
       // First, let's check if we have the old simple leads table or new comprehensive one
