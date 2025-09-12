@@ -210,12 +210,33 @@ const SuperAdminDashboard = () => {
   };
 
   const convertToPaid = async (subscriptionPlan, licenseCount, paymentAmount, billingCycle, billingNotes) => {
-    if (!conversionModal.organization) return;
+    if (!conversionModal.organization) {
+      console.error('❌ No organization selected for conversion');
+      return;
+    }
+    
+    console.log('🔄 Converting organization:', conversionModal.organization);
+    console.log('🔄 Organization ID:', conversionModal.organization.id);
+    console.log('🔄 Organization name:', conversionModal.organization.organization_name);
     
     setConversionModal(prev => ({ ...prev, loading: true }));
     
     try {
-      const response = await fetch(`/api/super-admin/organizations/${conversionModal.organization.id}/convert-to-paid`, {
+      const orgId = conversionModal.organization.id;
+      console.log('🔄 Using organization ID for API call:', orgId);
+      
+      // Validation check for organization ID
+      if (!orgId || orgId === '[ORG_ID]' || orgId === 'undefined' || orgId === 'null') {
+        console.error('❌ Invalid organization ID detected:', orgId);
+        console.error('❌ Full organization object:', conversionModal.organization);
+        alert('Error: Invalid organization ID. Please refresh and try again.');
+        return;
+      }
+      
+      const apiUrl = `/api/super-admin/organizations/${orgId}/convert-to-paid`;
+      console.log('🔄 API URL:', apiUrl);
+      
+      const response = await fetch(apiUrl, {
         method: 'PUT',
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -256,10 +277,21 @@ const SuperAdminDashboard = () => {
   };
 
   const handleConvertClick = (organization) => {
+    console.log('🔄 Convert button clicked for organization:', organization);
+    console.log('🔄 Organization ID available:', organization.id);
+    console.log('🔄 Organization trial status:', organization.trial_status);
+    
     if (organization.trial_status !== 'active') {
       alert('Only active trial organizations can be converted to paid');
       return;
     }
+    
+    console.log('✅ Setting conversion modal with organization:', {
+      id: organization.id,
+      name: organization.organization_name,
+      trial_status: organization.trial_status
+    });
+    
     setConversionModal({
       isOpen: true,
       organization: organization,
