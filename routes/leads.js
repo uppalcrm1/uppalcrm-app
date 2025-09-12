@@ -206,6 +206,41 @@ router.get('/stats',
         });
       }
 
+      // Ensure leads table exists before getting stats
+      const { query } = require('../database/connection');
+      
+      console.log('🔧 Ensuring leads table exists...');
+      await query(`
+        CREATE TABLE IF NOT EXISTS leads (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+          title VARCHAR(255),
+          company VARCHAR(255),
+          first_name VARCHAR(100),
+          last_name VARCHAR(100),
+          email VARCHAR(255),
+          phone VARCHAR(50),
+          source VARCHAR(100) DEFAULT 'manual',
+          status VARCHAR(50) DEFAULT 'new',
+          priority VARCHAR(20) DEFAULT 'medium',
+          value DECIMAL(10,2) DEFAULT 0,
+          notes TEXT,
+          assigned_to UUID REFERENCES users(id),
+          created_by UUID REFERENCES users(id),
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          last_contact_date TIMESTAMP WITH TIME ZONE,
+          next_follow_up TIMESTAMP WITH TIME ZONE
+        )
+      `);
+      
+      await query(`
+        CREATE INDEX IF NOT EXISTS idx_leads_organization_id ON leads(organization_id);
+        CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status);
+      `);
+      
+      console.log('✅ Leads table ready');
+
       const stats = await Lead.getStats(req.organizationId);
       console.log('Raw stats from database:', stats);
       

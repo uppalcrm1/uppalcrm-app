@@ -278,6 +278,45 @@ router.get('/stats',
         });
       }
 
+      // Ensure contacts table exists before getting stats
+      const { query } = require('../database/connection');
+      
+      console.log('🔧 Ensuring contacts table exists...');
+      await query(`
+        CREATE TABLE IF NOT EXISTS contacts (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+          title VARCHAR(255),
+          company VARCHAR(255),
+          first_name VARCHAR(100) NOT NULL,
+          last_name VARCHAR(100) NOT NULL,
+          email VARCHAR(255),
+          phone VARCHAR(50),
+          status VARCHAR(50) DEFAULT 'active',
+          type VARCHAR(50) DEFAULT 'customer',
+          source VARCHAR(100),
+          priority VARCHAR(20) DEFAULT 'medium',
+          value DECIMAL(10,2) DEFAULT 0,
+          notes TEXT,
+          assigned_to UUID REFERENCES users(id),
+          created_by UUID REFERENCES users(id),
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          last_contact_date TIMESTAMP WITH TIME ZONE,
+          next_follow_up TIMESTAMP WITH TIME ZONE,
+          converted_from_lead_id UUID REFERENCES leads(id)
+        )
+      `);
+      
+      await query(`
+        CREATE INDEX IF NOT EXISTS idx_contacts_organization_id ON contacts(organization_id);
+        CREATE INDEX IF NOT EXISTS idx_contacts_email ON contacts(email);
+        CREATE INDEX IF NOT EXISTS idx_contacts_status ON contacts(status);
+        CREATE INDEX IF NOT EXISTS idx_contacts_type ON contacts(type);
+      `);
+      
+      console.log('✅ Contacts table ready');
+
       const stats = await Contact.getStats(req.organizationId);
       console.log('Raw stats from database:', stats);
       
