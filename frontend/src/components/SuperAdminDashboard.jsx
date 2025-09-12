@@ -224,12 +224,34 @@ const SuperAdminDashboard = () => {
     try {
       const orgId = conversionModal.organization.id;
       console.log('🔄 Using organization ID for API call:', orgId);
+      console.log('🔄 Organization ID type:', typeof orgId);
+      console.log('🔄 Organization ID length:', orgId ? orgId.length : 'N/A');
       
       // Validation check for organization ID
-      if (!orgId || orgId === '[ORG_ID]' || orgId === 'undefined' || orgId === 'null') {
+      if (!orgId || 
+          orgId === '[ORG_ID]' || 
+          orgId === 'undefined' || 
+          orgId === 'null' ||
+          orgId === undefined ||
+          orgId === null ||
+          typeof orgId !== 'string' ||
+          orgId.trim() === '') {
         console.error('❌ Invalid organization ID detected:', orgId);
+        console.error('❌ Organization ID type:', typeof orgId);
         console.error('❌ Full organization object:', conversionModal.organization);
-        alert('Error: Invalid organization ID. Please refresh and try again.');
+        console.error('❌ Organization keys:', Object.keys(conversionModal.organization));
+        alert('Error: Invalid organization ID detected. Please refresh the page and try again.');
+        setConversionModal(prev => ({ ...prev, loading: false }));
+        return;
+      }
+      
+      // Additional UUID validation (basic format check)
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(orgId)) {
+        console.error('❌ Organization ID is not a valid UUID:', orgId);
+        console.error('❌ Full organization object:', conversionModal.organization);
+        alert('Error: Organization ID is not in valid UUID format. Please refresh and try again.');
+        setConversionModal(prev => ({ ...prev, loading: false }));
         return;
       }
       
