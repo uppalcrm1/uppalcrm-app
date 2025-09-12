@@ -658,13 +658,39 @@ router.put('/organizations/:id/convert-to-paid', authenticateSuperAdmin, async (
       console.log('📝 Update params:', updateParams);
       
       const updateResult = await client.query(updateQuery, updateParams);
-      console.log('✅ Updated organizations table - rows affected:', updateResult.rowCount);
+      console.log('✅ Update query executed');
+      console.log('📊 Rows affected:', updateResult.rowCount);
+      console.log('📊 Update result:', updateResult);
       
       if (updateResult.rowCount === 0) {
-        console.log('⚠️  WARNING: No rows were updated! Organization may not be in active trial status.');
-        // Check current status
-        const statusCheck = await client.query('SELECT trial_status, payment_status FROM organizations WHERE id = $1', [organizationId]);
-        console.log('📊 Current organization status:', statusCheck.rows[0]);
+        console.log('❌ CRITICAL: No rows were updated! Investigating...');
+        
+        // Check if organization exists
+        const orgExists = await client.query('SELECT id, trial_status, payment_status FROM organizations WHERE id = $1', [organizationId]);
+        console.log('📋 Organization exists check:', orgExists.rows);
+        
+        if (orgExists.rows.length === 0) {
+          throw new Error(`Organization with ID ${organizationId} not found`);
+        }
+        
+        const currentStatus = orgExists.rows[0];
+        console.log('📊 Current organization status:', currentStatus);
+        
+        if (currentStatus.trial_status !== 'active') {
+          throw new Error(`Cannot convert organization with trial_status: ${currentStatus.trial_status}. Must be 'active'.`);
+        }
+        
+        // Try a simpler update to see if there are permission or other issues
+        console.log('🔄 Attempting simple test update...');
+        const testUpdate = await client.query(
+          'UPDATE organizations SET updated_at = NOW() WHERE id = $1',
+          [organizationId]
+        );
+        console.log('📊 Test update result:', testUpdate.rowCount);
+        
+        if (testUpdate.rowCount === 0) {
+          throw new Error('Unable to update organization table - possible permission or constraint issue');
+        }
       }
 
       // Try to create organization license record (if table exists)
@@ -778,6 +804,24 @@ router.put('/organizations/:id/convert-to-paid', authenticateSuperAdmin, async (
     });
 
     console.log('🎉 Trial conversion completed successfully');
+    
+    // Verify the update worked by querying the organization again
+    console.log('🔍 Verifying conversion results...');
+    const verificationQuery = await query(
+      'SELECT trial_status, payment_status, subscription_plan FROM organizations WHERE id = $1',
+      [organizationId]
+    );
+    
+    if (verificationQuery.rows.length > 0) {
+      const finalStatus = verificationQuery.rows[0];
+      console.log('📊 Final organization status after conversion:', finalStatus);
+      
+      if (finalStatus.trial_status !== 'converted' || finalStatus.payment_status !== 'paid') {
+        console.log('⚠️  WARNING: Conversion may not have completed properly!');
+        console.log('Expected: trial_status=converted, payment_status=paid');
+        console.log('Actual:', finalStatus);
+      }
+    }
 
     const response = {
       success: true,
