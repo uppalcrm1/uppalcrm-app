@@ -210,6 +210,10 @@ router.get('/stats',
       const { query } = require('../database/connection');
       
       console.log('🔧 Ensuring leads table exists...');
+      
+      // Enable UUID extension if not exists
+      await query(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`);
+      
       await query(`
         CREATE TABLE IF NOT EXISTS leads (
           id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
