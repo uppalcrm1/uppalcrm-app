@@ -101,20 +101,20 @@ router.get('/',
       const sortOrder = order.toLowerCase() === 'asc' ? 'ASC' : 'DESC';
 
       const query = `
-        SELECT 
-          id,
+        SELECT DISTINCT
+          users.id,
           CONCAT(first_name, ' ', last_name) as name,
-          email,
-          role,
-          status,
-          last_login,
-          created_at,
-          updated_at,
-          is_first_login,
-          failed_login_attempts
+          users.email,
+          COALESCE(users.role, 'user') as role,
+          COALESCE(users.status, 'active') as status,
+          users.last_login,
+          users.created_at,
+          users.updated_at,
+          COALESCE(users.is_first_login, false) as is_first_login,
+          COALESCE(users.failed_login_attempts, 0) as failed_login_attempts
         FROM users 
         ${searchCondition}
-        ORDER BY ${sortColumn === 'name' ? 'CONCAT(first_name, \' \', last_name)' : sortColumn} ${sortOrder}
+        ORDER BY ${sortColumn === 'name' ? 'CONCAT(first_name, \' \', last_name)' : `users.${sortColumn}`} ${sortOrder}
         LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
       `;
 
