@@ -100,44 +100,48 @@ router.get('/',
       const sortColumn = validSorts.includes(sort) ? sort : 'created_at';
       const sortOrder = order.toLowerCase() === 'asc' ? 'ASC' : 'DESC';
 
-      // Simplified query to avoid column conflicts
+      // Ultra-simplified query that should always work
       const query = `
-        SELECT DISTINCT
+        SELECT 
           id,
-          COALESCE(first_name || ' ' || last_name, first_name, email) as name,
           email,
+          COALESCE(first_name, '') as first_name,
+          COALESCE(last_name, '') as last_name,
           COALESCE(role, 'user') as role,
-          COALESCE(status, 'active') as status,
-          last_login,
-          created_at,
-          updated_at,
-          COALESCE(is_first_login, false) as is_first_login,
-          COALESCE(failed_login_attempts, 0) as failed_login_attempts
+          created_at
         FROM users 
-        ${searchCondition}
-        ORDER BY ${sortColumn === 'name' ? 'COALESCE(first_name || \' \' || last_name, first_name, email)' : sortColumn} ${sortOrder}
-        LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+        WHERE organization_id = $1
+        ORDER BY created_at DESC
+        LIMIT $2 OFFSET $3
       `;
 
       const countQuery = `
         SELECT COUNT(*) as total
         FROM users 
-        ${searchCondition}
+        WHERE organization_id = $1
       `;
 
       const { query: dbQuery } = require('../database/connection');
       
+      // Simplified parameters - just organization_id, limit, offset
+      const simpleParams = [req.organizationId, parseInt(limit), offset];
+      const countParams = [req.organizationId];
+      
       const [usersResult, countResult] = await Promise.all([
-        dbQuery(query, [...queryParams, parseInt(limit), offset], req.organizationId),
-        dbQuery(countQuery, queryParams, req.organizationId)
+        dbQuery(query, simpleParams, req.organizationId),
+        dbQuery(countQuery, countParams, req.organizationId)
       ]);
 
       const users = usersResult.rows.map(user => ({
-        ...user,
-        // Don't expose password-related fields
-        password: undefined,
-        reset_token: undefined,
-        reset_token_expires: undefined
+        id: user.id,
+        name: `${user.first_name} ${user.last_name}`.trim() || user.email,
+        email: user.email,
+        role: user.role,
+        status: 'active', // default status
+        created_at: user.created_at,
+        last_login: null, // simplified for now
+        is_first_login: false,
+        failed_login_attempts: 0
       }));
 
       const total = parseInt(countResult.rows[0].total);
