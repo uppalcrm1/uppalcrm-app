@@ -78,7 +78,7 @@ router.get('/',
       let paramIndex = 2;
 
       if (search) {
-        searchCondition += ` AND (CONCAT(first_name, ' ', last_name) ILIKE $${paramIndex} OR email ILIKE $${paramIndex})`;
+        searchCondition += ` AND (COALESCE(first_name || ' ' || last_name, first_name, email) ILIKE $${paramIndex} OR email ILIKE $${paramIndex})`;
         queryParams.push(`%${search}%`);
         paramIndex++;
       }
@@ -100,21 +100,22 @@ router.get('/',
       const sortColumn = validSorts.includes(sort) ? sort : 'created_at';
       const sortOrder = order.toLowerCase() === 'asc' ? 'ASC' : 'DESC';
 
+      // Simplified query to avoid column conflicts
       const query = `
         SELECT DISTINCT
-          users.id,
-          CONCAT(first_name, ' ', last_name) as name,
-          users.email,
-          COALESCE(users.role, 'user') as role,
-          COALESCE(users.status, 'active') as status,
-          users.last_login,
-          users.created_at,
-          users.updated_at,
-          COALESCE(users.is_first_login, false) as is_first_login,
-          COALESCE(users.failed_login_attempts, 0) as failed_login_attempts
+          id,
+          COALESCE(first_name || ' ' || last_name, first_name, email) as name,
+          email,
+          COALESCE(role, 'user') as role,
+          COALESCE(status, 'active') as status,
+          last_login,
+          created_at,
+          updated_at,
+          COALESCE(is_first_login, false) as is_first_login,
+          COALESCE(failed_login_attempts, 0) as failed_login_attempts
         FROM users 
         ${searchCondition}
-        ORDER BY ${sortColumn === 'name' ? 'CONCAT(first_name, \' \', last_name)' : `users.${sortColumn}`} ${sortOrder}
+        ORDER BY ${sortColumn === 'name' ? 'COALESCE(first_name || \' \' || last_name, first_name, email)' : sortColumn} ${sortOrder}
         LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
       `;
 
@@ -156,12 +157,19 @@ router.get('/',
 
     } catch (error) {
       console.error('Get users error:', error);
+      console.error('SQL Query:', query);
+      console.error('Query Params:', queryParams);
+      console.error('Organization ID:', req.organizationId);
+      
       res.status(500).json({
         error: 'Failed to retrieve users',
         message: 'Unable to get users list',
         details: {
           message: error.message,
-          timestamp: new Date().toISOString()
+          code: error.code,
+          timestamp: new Date().toISOString(),
+          sql: query,
+          params: queryParams
         }
       });
     }
