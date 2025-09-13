@@ -243,6 +243,15 @@ app.get('/api', (req, res) => {
         'POST /api/contacts/licenses/:licenseId/transfer': 'Transfer license between contacts',
         'POST /api/contacts/downloads/record': 'Record software download',
         'POST /api/contacts/activations/record': 'Record software activation'
+      },
+      'user-management': {
+        'GET /api/user-management': 'List users with pagination and filtering (admin only)',
+        'POST /api/user-management': 'Create new user with auto-generated password (admin only)',
+        'PUT /api/user-management/:id': 'Update user details (admin only)',
+        'POST /api/user-management/:id/reset-password': 'Reset user password (admin only)',
+        'DELETE /api/user-management/:id': 'Delete/deactivate user (admin only)',
+        'POST /api/user-management/bulk': 'Perform bulk operations on users (admin only)',
+        'GET /api/user-management/audit-log': 'Get user management audit log (admin only)'
       }
     },
     authentication: 'Bearer token required for authenticated endpoints',
