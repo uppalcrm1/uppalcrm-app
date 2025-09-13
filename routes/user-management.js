@@ -281,7 +281,7 @@ router.post('/',
  */
 router.put('/:id',
   requireRole('admin'),
-  validateUuidParam('id'),
+  validateUuidParam,
   validate(userManagementSchemas.updateUser),
   async (req, res) => {
     try {
@@ -370,7 +370,7 @@ router.put('/:id',
  */
 router.post('/:id/reset-password',
   requireRole('admin'),
-  validateUuidParam('id'),
+  validateUuidParam,
   async (req, res) => {
     try {
       const userId = req.params.id;
@@ -456,7 +456,7 @@ router.post('/:id/reset-password',
  */
 router.delete('/:id',
   requireRole('admin'),
-  validateUuidParam('id'),
+  validateUuidParam,
   async (req, res) => {
     try {
       const userId = req.params.id;
