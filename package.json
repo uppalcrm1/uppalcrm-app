@@ -15,7 +15,8 @@
     "test:contacts": "node test/runTests.js contacts",
     "test:verbose": "VERBOSE=true node test/runTests.js",
     "test:dev": "NODE_ENV=test node test/runTests.js",
-    "test:contacts-only": "node test/contacts.test.js"
+    "test:contacts-only": "node test/contacts.test.js",
+    "migrate:user-management": "node migrations/add-user-management-fields.js"
   },
   "dependencies": {
     "axios": "^1.11.0",

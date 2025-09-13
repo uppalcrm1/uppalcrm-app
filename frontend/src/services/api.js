@@ -398,4 +398,49 @@ export const trialAPI = {
   }
 }
 
+// User Management API
+export const userManagementAPI = {
+  // Get all users with pagination and filtering
+  getUsers: async (params = {}) => {
+    const response = await api.get('/user-management', { params })
+    return response.data
+  },
+
+  // Create new user
+  createUser: async (userData) => {
+    const response = await api.post('/user-management', userData)
+    return response.data
+  },
+
+  // Update user
+  updateUser: async (userId, updates) => {
+    const response = await api.put(`/user-management/${userId}`, updates)
+    return response.data
+  },
+
+  // Reset user password
+  resetPassword: async (userId) => {
+    const response = await api.post(`/user-management/${userId}/reset-password`)
+    return response.data
+  },
+
+  // Delete/deactivate user
+  deleteUser: async (userId) => {
+    const response = await api.delete(`/user-management/${userId}`)
+    return response.data
+  },
+
+  // Bulk operations
+  bulkOperation: async (operationData) => {
+    const response = await api.post('/user-management/bulk', operationData)
+    return response.data
+  },
+
+  // Get audit log
+  getAuditLog: async (params = {}) => {
+    const response = await api.get('/user-management/audit-log', { params })
+    return response.data
+  }
+}
+
 export default api

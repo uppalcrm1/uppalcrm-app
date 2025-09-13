@@ -149,6 +149,7 @@ app.get('/debug', async (req, res) => {
 // API routes with rate limiting
 app.use('/api/auth', rateLimiters.general, authRoutes);
 app.use('/api/users', rateLimiters.general, userRoutes);
+app.use('/api/user-management', rateLimiters.general, require('./routes/user-management'));
 app.use('/api/organizations', rateLimiters.general, organizationRoutes);
 app.use('/api/leads', rateLimiters.general, leadRoutes);
 app.use('/api/contacts', rateLimiters.general, contactRoutes);

@@ -8,15 +8,20 @@ class User {
     this.id = data.id;
     this.organization_id = data.organization_id;
     this.email = data.email;
+    this.name = data.name || `${data.first_name || ''} ${data.last_name || ''}`.trim();
     this.first_name = data.first_name;
     this.last_name = data.last_name;
     this.role = data.role || 'user';
+    this.status = data.status || 'active';
     this.permissions = data.permissions || [];
     this.last_login = data.last_login;
     this.email_verified = data.email_verified || false;
     this.is_active = data.is_active !== false;
+    this.is_first_login = data.is_first_login || false;
+    this.failed_login_attempts = data.failed_login_attempts || 0;
     this.created_at = data.created_at;
     this.updated_at = data.updated_at;
+    this.deleted_at = data.deleted_at;
     this.created_by = data.created_by;
   }
 
@@ -477,6 +482,172 @@ class User {
       created_at: this.created_at,
       updated_at: this.updated_at
     };
+  }
+
+  /**
+   * Enhanced create method for user management system
+   * @param {Object} userData - User data
+   * @returns {User} Created user instance
+   */
+  static async create(userData) {
+    const { 
+      name, 
+      email, 
+      password, 
+      role = 'user', 
+      organization_id, 
+      created_by,
+      status = 'active'
+    } = userData;
+
+    // Validate required fields
+    if (!name || !email || !password || !organization_id) {
+      throw new Error('Missing required fields: name, email, password, organization_id');
+    }
+
+    // Split name into first and last name
+    const nameParts = name.trim().split(' ');
+    const first_name = nameParts[0];
+    const last_name = nameParts.slice(1).join(' ') || '';
+
+    // Hash password
+    const passwordHash = await bcrypt.hash(password, parseInt(process.env.BCRYPT_ROUNDS) || 12);
+
+    try {
+      const result = await query(`
+        INSERT INTO users (
+          organization_id, 
+          email, 
+          password_hash, 
+          first_name, 
+          last_name, 
+          role, 
+          status,
+          is_first_login,
+          created_by,
+          created_at,
+          updated_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+        RETURNING *
+      `, [
+        organization_id,
+        email.toLowerCase(),
+        passwordHash,
+        first_name,
+        last_name,
+        role,
+        status,
+        true, // is_first_login
+        created_by
+      ], organization_id);
+
+      return new User(result.rows[0]);
+    } catch (error) {
+      if (error.code === '23505') { // Unique violation
+        throw new Error('User with this email already exists');
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Enhanced update method for user management
+   * @param {string} id - User ID
+   * @param {Object} updates - Fields to update
+   * @param {string} organizationId - Organization ID
+   * @returns {User|null} Updated user
+   */
+  static async update(id, updates, organizationId) {
+    const allowedFields = [
+      'name', 'email', 'role', 'status', 'first_name', 'last_name', 
+      'is_first_login', 'failed_login_attempts', 'password', 'deleted_at'
+    ];
+    
+    const updateFields = Object.keys(updates).filter(key => allowedFields.includes(key));
+    
+    if (updateFields.length === 0) {
+      throw new Error('No valid fields to update');
+    }
+
+    // Handle special cases
+    const processedUpdates = { ...updates };
+    
+    // If updating name, split into first/last name
+    if (processedUpdates.name) {
+      const nameParts = processedUpdates.name.trim().split(' ');
+      processedUpdates.first_name = nameParts[0];
+      processedUpdates.last_name = nameParts.slice(1).join(' ') || '';
+      delete processedUpdates.name;
+    }
+
+    // If updating password, hash it
+    if (processedUpdates.password) {
+      processedUpdates.password_hash = await bcrypt.hash(processedUpdates.password, 12);
+      delete processedUpdates.password;
+    }
+
+    // If updating email, lowercase it
+    if (processedUpdates.email) {
+      processedUpdates.email = processedUpdates.email.toLowerCase();
+    }
+
+    const finalUpdateFields = Object.keys(processedUpdates).filter(key => 
+      [...allowedFields, 'password_hash'].includes(key)
+    );
+
+    if (finalUpdateFields.length === 0) {
+      throw new Error('No valid fields to update after processing');
+    }
+
+    const setClause = finalUpdateFields.map((field, index) => 
+      `${field} = $${index + 3}`
+    ).join(', ');
+    
+    const values = [
+      id, 
+      organizationId, 
+      ...finalUpdateFields.map(field => processedUpdates[field])
+    ];
+
+    try {
+      const result = await query(`
+        UPDATE users 
+        SET ${setClause}, updated_at = NOW()
+        WHERE id = $1 AND organization_id = $2
+        RETURNING *
+      `, values, organizationId);
+
+      if (result.rows.length === 0) {
+        return null;
+      }
+
+      return new User(result.rows[0]);
+    } catch (error) {
+      if (error.code === '23505') { // Unique violation
+        throw new Error('User with this email already exists');
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Find user by ID within organization
+   * @param {string} id - User ID
+   * @param {string} organizationId - Organization ID
+   * @returns {User|null} User instance or null
+   */
+  static async findById(id, organizationId) {
+    const result = await query(`
+      SELECT * FROM users 
+      WHERE id = $1 AND organization_id = $2
+    `, [id, organizationId], organizationId);
+
+    if (result.rows.length === 0) {
+      return null;
+    }
+
+    return new User(result.rows[0]);
   }
 }
 
