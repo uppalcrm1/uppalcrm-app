@@ -78,7 +78,7 @@ router.get('/',
       let paramIndex = 2;
 
       if (search) {
-        searchCondition += ` AND (name ILIKE $${paramIndex} OR email ILIKE $${paramIndex})`;
+        searchCondition += ` AND (CONCAT(first_name, ' ', last_name) ILIKE $${paramIndex} OR email ILIKE $${paramIndex})`;
         queryParams.push(`%${search}%`);
         paramIndex++;
       }
@@ -103,7 +103,7 @@ router.get('/',
       const query = `
         SELECT 
           id,
-          name,
+          CONCAT(first_name, ' ', last_name) as name,
           email,
           role,
           status,
@@ -114,7 +114,7 @@ router.get('/',
           failed_login_attempts
         FROM users 
         ${searchCondition}
-        ORDER BY ${sortColumn} ${sortOrder}
+        ORDER BY ${sortColumn === 'name' ? 'CONCAT(first_name, \' \', last_name)' : sortColumn} ${sortOrder}
         LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
       `;
 
@@ -195,7 +195,7 @@ router.post('/',
                           crypto.randomBytes(2).toString('hex').toUpperCase() + 
                           '!@#'[Math.floor(Math.random() * 3)];
 
-      // Create user
+      // Create user - User model will handle name splitting internally
       const userData = {
         name,
         email,
