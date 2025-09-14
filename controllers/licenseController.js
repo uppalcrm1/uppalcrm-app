@@ -74,6 +74,11 @@ const getLicenseInfo = async (req, res) => {
 // Update organization licenses (Super Admin only)
 const updateLicenses = async (req, res) => {
   try {
+    console.log('🔧 UPDATE LICENSES: Starting license update process');
+    console.log('🔧 Request params:', req.params);
+    console.log('🔧 Request body:', req.body);
+    console.log('🔧 Super Admin user:', req.superAdmin?.id);
+    
     const { organizationId } = req.params;
     const { newLicenseCount, reason, effectiveDate } = req.body;
 
@@ -187,8 +192,13 @@ const updateLicenses = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Update licenses error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('❌ UPDATE LICENSES ERROR:', error.message);
+    console.error('❌ Full error:', error);
+    console.error('❌ Stack trace:', error.stack);
+    res.status(500).json({ 
+      error: 'Internal server error',
+      debug: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 
