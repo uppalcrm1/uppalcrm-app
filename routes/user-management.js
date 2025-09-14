@@ -206,7 +206,7 @@ router.post('/',
 
       // Now let's try with minimal database operations
       const { query: dbQuery } = require('../database/connection');
-      const bcrypt = require('bcrypt');
+      const bcrypt = require('bcryptjs');
 
       // Generate simple password
       const tempPassword = 'TempPass123!';
