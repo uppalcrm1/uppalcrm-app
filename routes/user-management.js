@@ -70,25 +70,27 @@ router.get('/license-info',
       } catch (funcError) {
         console.log('Database function failed, trying direct query:', funcError.message);
         
-        // Fallback to direct query if function doesn't exist
+        // Fallback to direct query using only organizations table (more reliable)
+        console.log('🔧 USER MANAGEMENT: Using fallback query for organization:', req.organizationId);
         result = await dbQuery(`
           SELECT 
             o.id as organization_id,
             o.name as organization_name,
-            COALESCE(ol.quantity, o.purchased_licenses, 5) as purchased_licenses,
+            o.purchased_licenses,
             COUNT(u.id) FILTER (WHERE u.is_active = true OR u.is_active IS NULL) as active_users,
-            (COALESCE(ol.quantity, o.purchased_licenses, 5) - COUNT(u.id) FILTER (WHERE u.is_active = true OR u.is_active IS NULL))::INTEGER as available_seats,
-            (COALESCE(ol.quantity, o.purchased_licenses, 5) * COALESCE(ol.price_per_license, 15.00)) as monthly_cost,
+            (o.purchased_licenses - COUNT(u.id) FILTER (WHERE u.is_active = true OR u.is_active IS NULL))::INTEGER as available_seats,
+            (o.purchased_licenses * 15.00) as monthly_cost,
             CASE 
-              WHEN COALESCE(ol.quantity, o.purchased_licenses, 5) = 0 THEN 0
-              ELSE ROUND((COUNT(u.id) FILTER (WHERE u.is_active = true OR u.is_active IS NULL)::DECIMAL / COALESCE(ol.quantity, o.purchased_licenses, 5)) * 100)::INTEGER 
+              WHEN o.purchased_licenses = 0 THEN 0
+              ELSE ROUND((COUNT(u.id) FILTER (WHERE u.is_active = true OR u.is_active IS NULL)::DECIMAL / o.purchased_licenses) * 100)::INTEGER 
             END as utilization_percentage
           FROM organizations o
-          LEFT JOIN organization_licenses ol ON ol.organization_id = o.id AND ol.status = 'active'
           LEFT JOIN users u ON u.organization_id = o.id
           WHERE o.id = $1
-          GROUP BY o.id, o.name, ol.quantity, o.purchased_licenses, ol.price_per_license
+          GROUP BY o.id, o.name, o.purchased_licenses
         `, [req.organizationId], req.organizationId);
+        
+        console.log('🔧 USER MANAGEMENT: Query result:', result.rows[0]);
       }
 
       if (result.rows.length === 0) {
