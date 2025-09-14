@@ -332,6 +332,37 @@ const startServer = async () => {
     EngagementTracker.init();
     console.log('📊 Background jobs initialized');
     
+    // One-time license field sync on startup
+    try {
+      const checkResult = await query(`
+        SELECT COUNT(*) as discrepant_count
+        FROM organizations 
+        WHERE max_users != purchased_licenses
+      `);
+      
+      const discrepantCount = parseInt(checkResult.rows[0].discrepant_count);
+      
+      if (discrepantCount > 0) {
+        console.log(`🔧 Found ${discrepantCount} organizations with license field discrepancies - syncing...`);
+        
+        const updateResult = await query(`
+          UPDATE organizations 
+          SET max_users = purchased_licenses, updated_at = NOW() 
+          WHERE max_users != purchased_licenses
+          RETURNING name, max_users, purchased_licenses
+        `);
+        
+        console.log('✅ License field sync completed:');
+        updateResult.rows.forEach(org => {
+          console.log(`  - ${org.name}: max_users = ${org.max_users}, purchased_licenses = ${org.purchased_licenses}`);
+        });
+      } else {
+        console.log('✅ License fields are already synchronized');
+      }
+    } catch (error) {
+      console.error('⚠️  License field sync failed:', error.message);
+    }
+    
     app.listen(PORT, () => {
       console.log(`🚀 UppalCRM Server running on port ${PORT}`);
       console.log(`📊 API Documentation: http://localhost:${PORT}/api`);
