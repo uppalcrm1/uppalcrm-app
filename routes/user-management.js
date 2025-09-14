@@ -193,9 +193,17 @@ router.post('/',
 
       console.log('Creating new user:', { name, email, role });
 
+      const { query: dbQuery } = require('../database/connection');
+      const bcrypt = require('bcrypt');
+
       // Check if user already exists
-      const existingUser = await User.findByEmail(email);
-      if (existingUser) {
+      const existingUserResult = await dbQuery(
+        'SELECT id FROM users WHERE email = $1 AND organization_id = $2',
+        [email.toLowerCase(), req.organizationId],
+        req.organizationId
+      );
+      
+      if (existingUserResult.rows.length > 0) {
         return res.status(409).json({
           error: 'User already exists',
           message: 'A user with this email address already exists'
@@ -207,80 +215,91 @@ router.post('/',
                           crypto.randomBytes(2).toString('hex').toUpperCase() + 
                           '!@#'[Math.floor(Math.random() * 3)];
 
-      // Create user - User model will handle name splitting internally
-      const userData = {
-        name,
-        email,
-        password: tempPassword,
-        role,
-        organization_id: req.organizationId,
-        created_by: req.user.id,
-        is_first_login: true,
-        status: 'active'
-      };
+      // Hash password
+      const passwordHash = await bcrypt.hash(tempPassword, 12);
 
-      const newUser = await User.create(userData);
+      // Split name into first and last name
+      const nameParts = name.trim().split(' ');
+      const firstName = nameParts[0];
+      const lastName = nameParts.slice(1).join(' ') || '';
 
-      // Log the action
-      await AuditLog.create({
-        user_id: req.user.id,
-        organization_id: req.organizationId,
-        action: 'USER_CREATED',
-        resource_type: 'user',
-        resource_id: newUser.id,
-        details: {
-          target_user: { name, email, role },
-          created_by: req.user.name
-        }
-      });
+      // Create user with simplified direct insert
+      const newUserResult = await dbQuery(`
+        INSERT INTO users (
+          organization_id, 
+          email, 
+          password_hash, 
+          first_name, 
+          last_name, 
+          role,
+          created_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, NOW())
+        RETURNING id, email, first_name, last_name, role, created_at
+      `, [
+        req.organizationId,
+        email.toLowerCase(),
+        passwordHash,
+        firstName,
+        lastName,
+        role || 'user'
+      ], req.organizationId);
 
-      // Send welcome email with credentials
+      const newUser = newUserResult.rows[0];
+
+      // Simplified audit logging (skip if it fails)
       try {
-        await sendEmail({
-          to: email,
-          subject: 'Welcome to Uppal CRM - Your Account Details',
-          template: 'user-welcome',
-          data: {
-            name,
-            email,
-            password: tempPassword,
-            loginUrl: process.env.FRONTEND_URL || 'https://your-crm-domain.com',
-            organizationName: 'Uppal Solutions',
-            createdBy: req.user.name
+        await AuditLog.create({
+          user_id: req.user.id,
+          organization_id: req.organizationId,
+          action: 'USER_CREATED',
+          resource_type: 'user',
+          resource_id: newUser.id,
+          details: {
+            target_user: { name, email, role },
+            created_by: req.user.name || req.user.email
           }
         });
-
-        console.log(`Welcome email sent to ${email}`);
-      } catch (emailError) {
-        console.error('Failed to send welcome email:', emailError);
-        // Don't fail the user creation if email fails
+      } catch (auditError) {
+        console.error('Failed to create audit log (non-critical):', auditError);
       }
 
-      // Return user data without password
+      // Skip email for now to isolate the issue
+      console.log('User created successfully. Email notifications disabled for debugging.');
+
+      // Return user data 
       const userResponse = {
         id: newUser.id,
-        name: newUser.name,
+        name: `${newUser.first_name} ${newUser.last_name}`.trim() || email,
         email: newUser.email,
         role: newUser.role,
-        status: newUser.status,
+        status: 'active',
         created_at: newUser.created_at,
-        is_first_login: true
+        is_first_login: true,
+        failed_login_attempts: 0
       };
 
       res.status(201).json({
         message: 'User created successfully',
         user: userResponse,
-        email_sent: true
+        password: tempPassword, // Include temporarily for debugging
+        email_sent: false
       });
 
     } catch (error) {
       console.error('Create user error:', error);
+      console.error('User data:', { name, email, role });
+      console.error('Organization ID:', req.organizationId);
+      console.error('Created by:', req.user?.id);
+      
       res.status(500).json({
         error: 'Failed to create user',
         message: 'Unable to create new user',
         details: {
           message: error.message,
-          timestamp: new Date().toISOString()
+          code: error.code,
+          timestamp: new Date().toISOString(),
+          step: 'user_creation'
         }
       });
     }
