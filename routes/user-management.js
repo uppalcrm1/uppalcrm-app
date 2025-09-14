@@ -204,11 +204,47 @@ router.post('/',
         });
       }
 
-      // Return success without database operations for now
+      // Now let's try with minimal database operations
+      const { query: dbQuery } = require('../database/connection');
+      const bcrypt = require('bcrypt');
+
+      // Generate simple password
+      const tempPassword = 'TempPass123!';
+      
+      // Hash password
+      const passwordHash = await bcrypt.hash(tempPassword, 12);
+
+      // Split name 
+      const nameParts = name.trim().split(' ');
+      const firstName = nameParts[0];
+      const lastName = nameParts.slice(1).join(' ') || '';
+
+      // Try simple database insert
+      const result = await dbQuery(`
+        INSERT INTO users (organization_id, email, password_hash, first_name, last_name, role)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING id, email, first_name, last_name, role
+      `, [
+        req.organizationId,
+        email.toLowerCase(), 
+        passwordHash,
+        firstName,
+        lastName,
+        role || 'user'
+      ], req.organizationId);
+
+      const newUser = result.rows[0];
+
       return res.status(201).json({
-        message: 'User creation endpoint working (database operations disabled for debugging)',
-        data: { name, email, role },
-        timestamp: new Date().toISOString()
+        message: 'User created successfully with database',
+        user: {
+          id: newUser.id,
+          name: `${newUser.first_name} ${newUser.last_name}`.trim(),
+          email: newUser.email,
+          role: newUser.role,
+          status: 'active'
+        },
+        password: tempPassword
       });
 
     } catch (error) {
