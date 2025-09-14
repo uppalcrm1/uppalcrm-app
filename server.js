@@ -343,7 +343,7 @@ const startServer = async () => {
       const discrepantCount = parseInt(checkResult.rows[0].discrepant_count);
       
       if (discrepantCount > 0) {
-        console.log(`🔧 Found ${discrepantCount} organizations with license field discrepancies - syncing...`);
+        console.log(`🔧 STARTUP SYNC: Found ${discrepantCount} organizations with license field discrepancies - syncing...`);
         
         const updateResult = await query(`
           UPDATE organizations 
