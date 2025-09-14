@@ -235,8 +235,48 @@ router.post('/',
 
       const newUser = result.rows[0];
 
+      // Send team member invitation email
+      try {
+        const emailService = require('../services/emailService');
+        
+        // Get organization info for email
+        const orgQuery = await dbQuery(`
+          SELECT name, slug FROM organizations WHERE id = $1
+        `, [req.organizationId], req.organizationId);
+        
+        const organization = orgQuery.rows[0];
+        const organizationName = organization?.name || 'Your Organization';
+        
+        // Get inviter info
+        const inviterQuery = await dbQuery(`
+          SELECT first_name, last_name FROM users WHERE id = $1
+        `, [req.user.id], req.organizationId);
+        
+        const inviter = inviterQuery.rows[0];
+        const invitedBy = inviter ? `${inviter.first_name} ${inviter.last_name}`.trim() : 'Team Admin';
+        
+        // Construct login URL
+        const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const loginUrl = `${baseUrl}/login`;
+        
+        await emailService.sendTeamMemberInvitation({
+          memberName: `${firstName} ${lastName}`.trim(),
+          memberEmail: email,
+          organizationName,
+          invitedBy,
+          loginUrl,
+          temporaryPassword: tempPassword
+        });
+        
+        console.log(`📧 Invitation email sent to ${email}`);
+        
+      } catch (emailError) {
+        console.error('❌ Failed to send invitation email:', emailError);
+        // Don't fail the user creation if email fails
+      }
+
       return res.status(201).json({
-        message: 'User created successfully with database',
+        message: 'User created successfully and invitation email sent',
         user: {
           id: newUser.id,
           name: `${newUser.first_name} ${newUser.last_name}`.trim(),
