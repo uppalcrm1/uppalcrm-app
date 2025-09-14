@@ -86,16 +86,18 @@ const updateLicenses = async (req, res) => {
       return res.status(400).json({ error: 'License count must be at least 1' });
     }
 
-    // Get current license info
+    // Get current license info (use only organizations table for reliability)
+    console.log('🔧 Getting current license info for organization:', organizationId);
     const currentResult = await query(`
       SELECT 
-        COALESCE(ol.quantity, o.purchased_licenses, 5) as current_count,
-        COALESCE(ol.price_per_license, o.license_price_per_user, 15.00) as price_per_license,
+        o.purchased_licenses as current_count,
+        15.00 as price_per_license,
         o.name
       FROM organizations o
-      LEFT JOIN organization_licenses ol ON ol.organization_id = o.id AND ol.status = 'active'
       WHERE o.id = $1
     `, [organizationId]);
+    
+    console.log('🔧 Current license data:', currentResult.rows[0]);
 
     if (currentResult.rows.length === 0) {
       return res.status(404).json({ error: 'Organization not found' });
