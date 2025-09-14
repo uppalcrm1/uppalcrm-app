@@ -51,6 +51,54 @@ const userManagementSchemas = {
 };
 
 /**
+ * GET /user-management/license-info
+ * Get organization license information and usage
+ */
+router.get('/license-info',
+  requireRole('admin'),
+  async (req, res) => {
+    try {
+      const { query: dbQuery } = require('../database/connection');
+      
+      // Use the database function to get comprehensive license info
+      const result = await dbQuery(`
+        SELECT * FROM get_organization_license_info($1)
+      `, [req.organizationId], req.organizationId);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({
+          error: 'Organization not found',
+          message: 'Could not retrieve license information'
+        });
+      }
+
+      const licenseInfo = result.rows[0];
+      
+      res.json({
+        success: true,
+        licenseInfo: {
+          organizationId: licenseInfo.organization_id,
+          organizationName: licenseInfo.organization_name,
+          purchasedLicenses: licenseInfo.purchased_licenses,
+          activeUsers: parseInt(licenseInfo.active_users),
+          availableSeats: licenseInfo.available_seats,
+          monthlyCost: parseFloat(licenseInfo.monthly_cost),
+          utilizationPercentage: licenseInfo.utilization_percentage,
+          canAddUsers: licenseInfo.available_seats > 0
+        }
+      });
+
+    } catch (error) {
+      console.error('License info error:', error);
+      res.status(500).json({
+        error: 'Failed to retrieve license information',
+        message: error.message
+      });
+    }
+  }
+);
+
+/**
  * GET /user-management
  * Get all users in the organization with pagination and filtering
  */
@@ -204,8 +252,36 @@ router.post('/',
         });
       }
 
-      // Now let's try with minimal database operations
+      // Check license limits before creating user
       const { query: dbQuery } = require('../database/connection');
+      
+      // Get current license info
+      const licenseResult = await dbQuery(`
+        SELECT * FROM get_organization_license_info($1)
+      `, [req.organizationId], req.organizationId);
+      
+      if (licenseResult.rows.length === 0) {
+        return res.status(404).json({
+          error: 'Organization not found',
+          message: 'Could not retrieve license information'
+        });
+      }
+      
+      const licenseInfo = licenseResult.rows[0];
+      
+      // Check if we can add more users
+      if (licenseInfo.available_seats <= 0) {
+        return res.status(403).json({
+          error: 'License limit exceeded',
+          message: `Cannot add user. You have ${licenseInfo.active_users}/${licenseInfo.purchased_licenses} licenses in use. Please purchase additional licenses to add more users.`,
+          licenseInfo: {
+            purchasedLicenses: licenseInfo.purchased_licenses,
+            activeUsers: parseInt(licenseInfo.active_users),
+            availableSeats: licenseInfo.available_seats
+          }
+        });
+      }
+
       const bcrypt = require('bcryptjs');
 
       // Generate simple password
