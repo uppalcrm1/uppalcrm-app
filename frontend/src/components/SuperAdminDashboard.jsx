@@ -40,6 +40,11 @@ const SuperAdminDashboard = () => {
     organization: null,
     loading: false
   });
+  const [licenseModal, setLicenseModal] = useState({
+    isOpen: false,
+    organization: null,
+    loading: false
+  });
 
   useEffect(() => {
     fetchDashboardData();
@@ -376,6 +381,53 @@ const SuperAdminDashboard = () => {
       organization: null,
       loading: false
     });
+  };
+
+  const updateLicenses = async (newLicenseCount, reason, effectiveDate) => {
+    if (!licenseModal.organization) {
+      console.error('❌ No organization selected for license update');
+      return;
+    }
+
+    setLicenseModal(prev => ({ ...prev, loading: true }));
+
+    try {
+      const orgId = licenseModal.organization.id;
+      console.log('🔄 Updating licenses for organization:', orgId);
+
+      const response = await fetch(`/api/super-admin/organizations/${orgId}/licenses`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          newLicenseCount,
+          reason,
+          effectiveDate
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        alert(`✅ Successfully updated ${data.changes.previous_licenses} → ${data.changes.new_licenses} licenses!\n\nNew monthly cost: $${data.changes.new_monthly_cost}\nCost change: ${data.changes.cost_change >= 0 ? '+' : ''}$${data.changes.cost_change}`);
+        
+        // Refresh data
+        setTimeout(async () => {
+          if (activeTab === 'organizations') await fetchOrganizations();
+          await fetchDashboardData();
+          console.log('✅ Data refreshed after license update');
+        }, 1000);
+
+        // Close modal
+        setLicenseModal({ isOpen: false, organization: null, loading: false });
+      } else {
+        alert(`❌ License update failed: ${data.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('License update error:', error);
+      alert('❌ License update failed: Network error');
+    } finally {
+      setLicenseModal(prev => ({ ...prev, loading: false }));
+    }
   };
 
   const createCRMTables = async () => {
@@ -820,6 +872,13 @@ Last checked: ${new Date().toLocaleString()}`;
                                   Check Status
                                 </button>
                                 <button
+                                  onClick={() => setLicenseModal({ isOpen: true, organization: org, loading: false })}
+                                  className="inline-flex items-center px-3 py-1 border border-blue-300 text-xs font-medium rounded text-blue-700 bg-blue-50 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors ml-1"
+                                  title="Update license count for this organization"
+                                >
+                                  Manage Licenses
+                                </button>
+                                <button
                                   onClick={() => testDatabaseOperations(org.id, org.organization_name)}
                                   className="inline-flex items-center px-3 py-1 border border-orange-300 text-xs font-medium rounded text-orange-700 bg-orange-50 hover:bg-orange-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-colors ml-1"
                                   title="Test database operations and schema"
@@ -840,6 +899,13 @@ Last checked: ${new Date().toLocaleString()}`;
                                   title="Check organization status in database"
                                 >
                                   Check Status
+                                </button>
+                                <button
+                                  onClick={() => setLicenseModal({ isOpen: true, organization: org, loading: false })}
+                                  className="inline-flex items-center px-3 py-1 border border-blue-300 text-xs font-medium rounded text-blue-700 bg-blue-50 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors ml-1"
+                                  title="Update license count for this organization"
+                                >
+                                  Manage Licenses
                                 </button>
                                 <button
                                   onClick={() => testDatabaseOperations(org.id, org.organization_name)}
@@ -1068,6 +1134,15 @@ Last checked: ${new Date().toLocaleString()}`;
         organization={conversionModal.organization}
         loading={conversionModal.loading}
       />
+
+      {/* License Management Modal */}
+      <LicenseModal
+        isOpen={licenseModal.isOpen}
+        onClose={() => setLicenseModal({ isOpen: false, organization: null, loading: false })}
+        onSubmit={updateLicenses}
+        organization={licenseModal.organization}
+        loading={licenseModal.loading}
+      />
     </div>
   );
 };
@@ -1262,6 +1337,146 @@ const ConversionModal = ({ isOpen, onClose, onSubmit, organization, loading }) =
               className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? 'Converting...' : `Convert to Paid ($${formData.paymentAmount})`}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// License Management Modal Component
+const LicenseModal = ({ isOpen, onClose, onSubmit, organization, loading }) => {
+  const [formData, setFormData] = useState({
+    newLicenseCount: 5,
+    reason: '',
+    effectiveDate: new Date().toISOString().split('T')[0]
+  });
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (formData.newLicenseCount < 1) {
+      alert('License count must be at least 1');
+      return;
+    }
+    onSubmit(
+      parseInt(formData.newLicenseCount),
+      formData.reason,
+      formData.effectiveDate
+    );
+  };
+
+  const resetForm = () => {
+    setFormData({
+      newLicenseCount: 5,
+      reason: '',
+      effectiveDate: new Date().toISOString().split('T')[0]
+    });
+  };
+
+  // Reset form when modal closes
+  React.useEffect(() => {
+    if (!isOpen) {
+      resetForm();
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const pricePerUser = 15;
+  const newMonthlyCost = formData.newLicenseCount * pricePerUser;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-medium text-gray-900">
+            Manage Licenses - {organization?.organization_name}
+          </h3>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+            disabled={loading}
+          >
+            ✕
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          {/* New License Count */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              New License Count *
+            </label>
+            <input
+              type="number"
+              min="1"
+              max="1000"
+              value={formData.newLicenseCount}
+              onChange={(e) => setFormData(prev => ({
+                ...prev,
+                newLicenseCount: parseInt(e.target.value) || 1
+              }))}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={loading}
+              required
+            />
+            <p className="text-sm text-gray-600 mt-1">
+              New monthly cost: ${newMonthlyCost}/month ({formData.newLicenseCount} users × $15)
+            </p>
+          </div>
+
+          {/* Reason */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Reason for Change *
+            </label>
+            <textarea
+              value={formData.reason}
+              onChange={(e) => setFormData(prev => ({
+                ...prev,
+                reason: e.target.value
+              }))}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              rows="3"
+              placeholder="e.g., Customer requested 2 additional licenses for new team members"
+              disabled={loading}
+              required
+            />
+          </div>
+
+          {/* Effective Date */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Effective Date
+            </label>
+            <input
+              type="date"
+              value={formData.effectiveDate}
+              onChange={(e) => setFormData(prev => ({
+                ...prev,
+                effectiveDate: e.target.value
+              }))}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={loading}
+            />
+          </div>
+
+          <div className="flex justify-end space-x-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+              disabled={loading}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading || !formData.reason.trim() || formData.newLicenseCount < 1}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {loading ? 'Updating...' : `Update to ${formData.newLicenseCount} Licenses`}
             </button>
           </div>
         </form>
