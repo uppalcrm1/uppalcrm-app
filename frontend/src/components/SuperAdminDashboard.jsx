@@ -395,7 +395,8 @@ const SuperAdminDashboard = () => {
       const orgId = licenseModal.organization.id;
       console.log('🔄 Updating licenses for organization:', orgId);
 
-      const response = await fetch(`/api/super-admin/organizations/${orgId}/licenses`, {
+      const API_BASE_URL = import.meta?.env?.VITE_API_URL || 'https://uppalcrm-api.onrender.com/api';
+      const response = await fetch(`${API_BASE_URL}/super-admin/organizations/${orgId}/licenses`, {
         method: 'PUT',
         headers: getAuthHeaders(),
         body: JSON.stringify({
