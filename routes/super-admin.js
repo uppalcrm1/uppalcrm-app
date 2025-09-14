@@ -1305,6 +1305,33 @@ router.get('/organizations/:organizationId/license-info', authenticateSuperAdmin
 // Update licenses for organization
 router.put('/organizations/:organizationId/licenses', authenticateSuperAdmin, updateLicenses);
 
+// Public endpoint to check current license values (debug)
+router.get('/public-check-license-values', async (req, res) => {
+  try {
+    console.log('🔍 Checking current license values in database...');
+    
+    const result = await query(`
+      SELECT 
+        id, name, slug, 
+        purchased_licenses, 
+        max_users,
+        (purchased_licenses = max_users) as are_synced
+      FROM organizations 
+      WHERE slug = 'uppalsolutionsltd' OR name LIKE '%Uppal%'
+    `);
+    
+    res.json({
+      success: true,
+      timestamp: new Date().toISOString(),
+      organizations: result.rows,
+      message: 'Current database values for license fields'
+    });
+  } catch (error) {
+    console.error('❌ Error checking license values:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Public endpoint for one-time license sync (temporary fix)
 router.post('/public-sync-license-fields', async (req, res) => {
   try {
