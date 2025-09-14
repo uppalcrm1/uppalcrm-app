@@ -60,10 +60,36 @@ router.get('/license-info',
     try {
       const { query: dbQuery } = require('../database/connection');
       
-      // Use the database function to get comprehensive license info
-      const result = await dbQuery(`
-        SELECT * FROM get_organization_license_info($1)
-      `, [req.organizationId], req.organizationId);
+      // Use the database function to get comprehensive license info, with fallback to direct query
+      let result;
+      
+      try {
+        result = await dbQuery(`
+          SELECT * FROM get_organization_license_info($1)
+        `, [req.organizationId], req.organizationId);
+      } catch (funcError) {
+        console.log('Database function failed, trying direct query:', funcError.message);
+        
+        // Fallback to direct query if function doesn't exist
+        result = await dbQuery(`
+          SELECT 
+            o.id as organization_id,
+            o.name as organization_name,
+            COALESCE(ol.quantity, o.purchased_licenses, 5) as purchased_licenses,
+            COUNT(u.id) FILTER (WHERE u.is_active = true OR u.is_active IS NULL) as active_users,
+            (COALESCE(ol.quantity, o.purchased_licenses, 5) - COUNT(u.id) FILTER (WHERE u.is_active = true OR u.is_active IS NULL))::INTEGER as available_seats,
+            (COALESCE(ol.quantity, o.purchased_licenses, 5) * COALESCE(ol.price_per_license, 15.00)) as monthly_cost,
+            CASE 
+              WHEN COALESCE(ol.quantity, o.purchased_licenses, 5) = 0 THEN 0
+              ELSE ROUND((COUNT(u.id) FILTER (WHERE u.is_active = true OR u.is_active IS NULL)::DECIMAL / COALESCE(ol.quantity, o.purchased_licenses, 5)) * 100)::INTEGER 
+            END as utilization_percentage
+          FROM organizations o
+          LEFT JOIN organization_licenses ol ON ol.organization_id = o.id AND ol.status = 'active'
+          LEFT JOIN users u ON u.organization_id = o.id
+          WHERE o.id = $1
+          GROUP BY o.id, o.name, ol.quantity, o.purchased_licenses, ol.price_per_license
+        `, [req.organizationId], req.organizationId);
+      }
 
       if (result.rows.length === 0) {
         return res.status(404).json({
