@@ -189,9 +189,12 @@ router.post('/',
   // validate(userManagementSchemas.createUser), // Temporarily disabled for debugging
   async (req, res) => {
     try {
-      const { name, email, role = 'user' } = req.body;
+      console.log('POST /user-management hit');
+      console.log('Request body:', req.body);
+      console.log('User:', req.user?.email);
+      console.log('Organization:', req.organizationId);
 
-      console.log('Creating new user:', { name, email, role });
+      const { name, email, role = 'user' } = req.body;
 
       // Basic validation
       if (!name || !email) {
@@ -201,113 +204,21 @@ router.post('/',
         });
       }
 
-      const { query: dbQuery } = require('../database/connection');
-      const bcrypt = require('bcrypt');
-
-      // Check if user already exists
-      const existingUserResult = await dbQuery(
-        'SELECT id FROM users WHERE email = $1 AND organization_id = $2',
-        [email.toLowerCase(), req.organizationId],
-        req.organizationId
-      );
-      
-      if (existingUserResult.rows.length > 0) {
-        return res.status(409).json({
-          error: 'User already exists',
-          message: 'A user with this email address already exists'
-        });
-      }
-
-      // Generate secure password
-      const tempPassword = crypto.randomBytes(8).toString('hex') + 
-                          crypto.randomBytes(2).toString('hex').toUpperCase() + 
-                          '!@#'[Math.floor(Math.random() * 3)];
-
-      // Hash password
-      const passwordHash = await bcrypt.hash(tempPassword, 12);
-
-      // Split name into first and last name
-      const nameParts = name.trim().split(' ');
-      const firstName = nameParts[0];
-      const lastName = nameParts.slice(1).join(' ') || '';
-
-      // Create user with simplified direct insert
-      const newUserResult = await dbQuery(`
-        INSERT INTO users (
-          organization_id, 
-          email, 
-          password_hash, 
-          first_name, 
-          last_name, 
-          role,
-          created_at
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, NOW())
-        RETURNING id, email, first_name, last_name, role, created_at
-      `, [
-        req.organizationId,
-        email.toLowerCase(),
-        passwordHash,
-        firstName,
-        lastName,
-        role || 'user'
-      ], req.organizationId);
-
-      const newUser = newUserResult.rows[0];
-
-      // Simplified audit logging (skip if it fails)
-      try {
-        await AuditLog.create({
-          user_id: req.user.id,
-          organization_id: req.organizationId,
-          action: 'USER_CREATED',
-          resource_type: 'user',
-          resource_id: newUser.id,
-          details: {
-            target_user: { name, email, role },
-            created_by: req.user.name || req.user.email
-          }
-        });
-      } catch (auditError) {
-        console.error('Failed to create audit log (non-critical):', auditError);
-      }
-
-      // Skip email for now to isolate the issue
-      console.log('User created successfully. Email notifications disabled for debugging.');
-
-      // Return user data 
-      const userResponse = {
-        id: newUser.id,
-        name: `${newUser.first_name} ${newUser.last_name}`.trim() || email,
-        email: newUser.email,
-        role: newUser.role,
-        status: 'active',
-        created_at: newUser.created_at,
-        is_first_login: true,
-        failed_login_attempts: 0
-      };
-
-      res.status(201).json({
-        message: 'User created successfully',
-        user: userResponse,
-        password: tempPassword, // Include temporarily for debugging
-        email_sent: false
+      // Return success without database operations for now
+      return res.status(201).json({
+        message: 'User creation endpoint working (database operations disabled for debugging)',
+        data: { name, email, role },
+        timestamp: new Date().toISOString()
       });
 
     } catch (error) {
-      console.error('Create user error:', error);
-      console.error('User data:', { name, email, role });
-      console.error('Organization ID:', req.organizationId);
-      console.error('Created by:', req.user?.id);
+      console.error('Create user error (minimal test version):', error);
       
       res.status(500).json({
-        error: 'Failed to create user',
-        message: 'Unable to create new user',
+        error: 'Failed to create user (minimal test)',
+        message: error.message,
         details: {
-          message: error.message,
-          code: error.code,
-          timestamp: new Date().toISOString(),
-          step: 'user_creation'
+          timestamp: new Date().toISOString()
         }
       });
     }
