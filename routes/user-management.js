@@ -591,7 +591,10 @@ router.delete('/:id',
     try {
       const userId = req.params.id;
 
-      console.log('Deleting user:', userId);
+      console.log('🔧 USER DELETE: Starting user deletion process');
+      console.log('🔧 User ID:', userId);
+      console.log('🔧 Organization ID:', req.organizationId);
+      console.log('🔧 Requesting user:', req.user.id);
 
       // Prevent admin from deleting themselves
       if (userId === req.user.id) {
@@ -602,33 +605,45 @@ router.delete('/:id',
       }
 
       // Get user data
+      console.log('🔧 Finding user by ID...');
       const user = await User.findById(userId, req.organizationId);
       if (!user) {
+        console.log('❌ User not found');
         return res.status(404).json({
           error: 'User not found',
           message: 'User does not exist in this organization'
         });
       }
+      console.log('✅ User found:', user.name);
 
       // Soft delete - set status to inactive
+      console.log('🔧 Updating user status to inactive...');
       await User.update(userId, {
         status: 'inactive',
         deleted_at: new Date()
       }, req.organizationId);
+      console.log('✅ User status updated');
 
-      // Log the action
-      await AuditLog.create({
-        user_id: req.user.id,
-        organization_id: req.organizationId,
-        action: 'USER_DELETED',
-        resource_type: 'user',
-        resource_id: userId,
-        details: {
-          target_user: user.name,
-          deleted_by: req.user.name
-        }
-      });
+      // Log the action (try-catch to prevent audit failures from blocking deletion)
+      try {
+        console.log('🔧 Creating audit log...');
+        await AuditLog.create({
+          user_id: req.user.id,
+          organization_id: req.organizationId,
+          action: 'USER_DELETED',
+          resource_type: 'user',
+          resource_id: userId,
+          details: {
+            target_user: user.name,
+            deleted_by: req.user.name
+          }
+        });
+        console.log('✅ Audit log created');
+      } catch (auditError) {
+        console.warn('⚠️ Audit log creation failed (non-critical):', auditError.message);
+      }
 
+      console.log('✅ User deletion completed successfully');
       res.json({
         message: 'User removed successfully'
       });
