@@ -1305,6 +1305,79 @@ router.get('/organizations/:organizationId/license-info', authenticateSuperAdmin
 // Update licenses for organization
 router.put('/organizations/:organizationId/licenses', authenticateSuperAdmin, updateLicenses);
 
+// Public endpoint for one-time license sync (temporary fix)
+router.post('/public-sync-license-fields', async (req, res) => {
+  try {
+    console.log('🔧 PUBLIC SYNC: Starting license field synchronization...');
+    
+    // Check for organizations with field discrepancies
+    const checkResult = await query(`
+      SELECT 
+        id, name, slug,
+        max_users,
+        purchased_licenses,
+        (max_users != purchased_licenses) as has_discrepancy
+      FROM organizations 
+      WHERE max_users != purchased_licenses OR max_users IS NULL
+    `);
+    
+    console.log(`📊 Found ${checkResult.rows.length} organizations with license field discrepancies`);
+    
+    if (checkResult.rows.length === 0) {
+      return res.json({
+        success: true,
+        message: 'All organizations already have synchronized license fields',
+        updated: 0,
+        organizations: []
+      });
+    }
+    
+    // Update max_users to match purchased_licenses for all discrepant organizations
+    const updateResult = await query(`
+      UPDATE organizations 
+      SET max_users = purchased_licenses, updated_at = NOW() 
+      WHERE max_users != purchased_licenses OR max_users IS NULL
+      RETURNING id, name, slug, max_users, purchased_licenses
+    `);
+    
+    console.log(`✅ Successfully updated ${updateResult.rows.length} organizations`);
+    
+    // Verify the sync worked
+    const verifyResult = await query(`
+      SELECT COUNT(*) as discrepant_count
+      FROM organizations 
+      WHERE max_users != purchased_licenses
+    `);
+    
+    const discrepantCount = parseInt(verifyResult.rows[0].discrepant_count);
+    const success = discrepantCount === 0;
+    
+    res.json({
+      success,
+      message: success 
+        ? 'All license fields are now synchronized!' 
+        : `Warning: ${discrepantCount} organizations still have discrepancies`,
+      updated: updateResult.rows.length,
+      organizations: updateResult.rows.map(org => ({
+        id: org.id,
+        name: org.name,
+        slug: org.slug,
+        max_users: org.max_users,
+        purchased_licenses: org.purchased_licenses
+      })),
+      remaining_discrepancies: discrepantCount
+    });
+    
+  } catch (error) {
+    console.error('❌ Error syncing license fields:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to sync license fields',
+      message: error.message
+    });
+  }
+});
+
 // Sync license fields to resolve discrepancies between max_users and purchased_licenses
 router.post('/sync-license-fields', authenticateSuperAdmin, async (req, res) => {
   try {
