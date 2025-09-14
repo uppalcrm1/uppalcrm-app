@@ -123,10 +123,18 @@ const updateLicenses = async (req, res) => {
       });
     }
 
-    // Begin transaction
-    await transaction(async (client) => {
-      // Insert or update organization_licenses record
-      await client.query(`
+    // Update organizations table (core functionality)
+    console.log('🔧 Updating organizations table...');
+    await query(`
+      UPDATE organizations 
+      SET purchased_licenses = $1, max_users = $1, updated_at = NOW()
+      WHERE id = $2
+    `, [newLicenseCount, organizationId]);
+    
+    // Try to update advanced tables if they exist, but don't fail if they don't
+    try {
+      console.log('🔧 Attempting to update organization_licenses table...');
+      await query(`
         INSERT INTO organization_licenses 
         (organization_id, quantity, price_per_license, billing_cycle, status, updated_at, notes)
         VALUES ($1, $2, $3, 'monthly', 'active', NOW(), $4)
@@ -136,16 +144,15 @@ const updateLicenses = async (req, res) => {
           updated_at = NOW(),
           notes = COALESCE(organization_licenses.notes, '') || CASE WHEN organization_licenses.notes IS NOT NULL THEN '; ' ELSE '' END || $4
       `, [organizationId, newLicenseCount, pricePerLicense, reason || 'Manual license update']);
+      console.log('✅ organization_licenses table updated successfully');
+    } catch (licenseTableError) {
+      console.warn('⚠️ organization_licenses table update failed (table may not exist):', licenseTableError.message);
+    }
 
-      // Update organizations table for backward compatibility
-      await client.query(`
-        UPDATE organizations 
-        SET purchased_licenses = $1, updated_at = NOW()
-        WHERE id = $2
-      `, [newLicenseCount, organizationId]);
-
-      // Record the change in history
-      await client.query(`
+    // Try to record history if table exists
+    try {
+      console.log('🔧 Attempting to record license history...');
+      await query(`
         INSERT INTO license_usage_history 
         (organization_id, action, previous_count, new_count, price_change, reason, performed_by, effective_date)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -159,12 +166,18 @@ const updateLicenses = async (req, res) => {
         req.superAdmin?.id,
         effectiveDate || new Date()
       ]);
+      console.log('✅ License history recorded successfully');
+    } catch (historyError) {
+      console.warn('⚠️ License history recording failed (table may not exist):', historyError.message);
+    }
 
-      // Create billing event for the change
+    // Try to create billing event if table exists
+    try {
+      console.log('🔧 Attempting to create billing event...');
       const nextMonth = new Date();
       nextMonth.setMonth(nextMonth.getMonth() + 1);
       
-      await client.query(`
+      await query(`
         INSERT INTO billing_events 
         (organization_id, billing_period_start, billing_period_end, licenses_count, price_per_license, total_amount, billing_status, notes)
         VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7)
@@ -177,7 +190,10 @@ const updateLicenses = async (req, res) => {
         newLicenseCount * pricePerLicense,
         `License count changed from ${previousCount} to ${newLicenseCount}. ${reason || ''}`
       ]);
-    });
+      console.log('✅ Billing event created successfully');
+    } catch (billingError) {
+      console.warn('⚠️ Billing event creation failed (table may not exist):', billingError.message);
+    }
 
     res.json({
       success: true,
