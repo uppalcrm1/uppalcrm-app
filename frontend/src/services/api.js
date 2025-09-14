@@ -440,6 +440,12 @@ export const userManagementAPI = {
   getAuditLog: async (params = {}) => {
     const response = await api.get('/user-management/audit-log', { params })
     return response.data
+  },
+
+  // Get license information
+  getLicenseInfo: async () => {
+    const response = await api.get('/user-management/license-info')
+    return response.data
   }
 }
 

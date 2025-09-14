@@ -62,11 +62,23 @@ const UserManagementSystem = () => {
     staleTime: 60000, // 1 minute
   });
 
+  // Fetch license information
+  const { 
+    data: licenseData, 
+    isLoading: loadingLicense,
+    error: licenseError 
+  } = useQuery({
+    queryKey: ['license-info'],
+    queryFn: userManagementAPI.getLicenseInfo,
+    staleTime: 60000, // 1 minute
+  });
+
   // Mutations
   const createUserMutation = useMutation({
     mutationFn: userManagementAPI.createUser,
     onSuccess: () => {
       queryClient.invalidateQueries(['users']);
+      queryClient.invalidateQueries(['license-info']); // Refresh license info after user creation
       toast.success('User created successfully! Credentials sent via email.');
       setNewUser({ name: '', email: '', role: 'user' });
       setShowAddUser(false);
@@ -268,6 +280,79 @@ const UserManagementSystem = () => {
               <p className="text-gray-600 mt-2">
                 Manage team members and their access to your CRM ({pagination.total_users || 0} total)
               </p>
+              
+              {/* License Information */}
+              {licenseData?.licenseInfo && (
+                <div className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-6">
+                      <div className="flex items-center gap-2">
+                        <Shield className="text-blue-600" size={20} />
+                        <div>
+                          <div className="font-semibold text-gray-900">
+                            {licenseData.licenseInfo.activeUsers}/{licenseData.licenseInfo.purchasedLicenses} Licenses Used
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            {licenseData.licenseInfo.availableSeats} seats available
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <div className="w-32 bg-gray-200 rounded-full h-2">
+                          <div 
+                            className={`h-2 rounded-full transition-all duration-300 ${
+                              licenseData.licenseInfo.utilizationPercentage >= 90 
+                                ? 'bg-red-500' 
+                                : licenseData.licenseInfo.utilizationPercentage >= 80 
+                                ? 'bg-yellow-500' 
+                                : 'bg-green-500'
+                            }`}
+                            style={{ width: `${Math.min(100, licenseData.licenseInfo.utilizationPercentage)}%` }}
+                          />
+                        </div>
+                        <span className="text-sm font-medium text-gray-700">
+                          {licenseData.licenseInfo.utilizationPercentage}%
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="text-right">
+                      <div className="font-semibold text-gray-900">
+                        ${licenseData.licenseInfo.monthlyCost}/month
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        $15 per user
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {licenseData.licenseInfo.availableSeats === 0 && (
+                    <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+                      <AlertCircle size={16} className="inline mr-1" />
+                      License limit reached. Purchase additional licenses to add more users.
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {loadingLicense && (
+                <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg animate-pulse">
+                  <div className="flex items-center gap-2">
+                    <Shield className="text-gray-400" size={20} />
+                    <div className="text-gray-500">Loading license information...</div>
+                  </div>
+                </div>
+              )}
+              
+              {licenseError && (
+                <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <div className="flex items-center gap-2 text-red-700">
+                    <AlertCircle size={20} />
+                    <div>Failed to load license information</div>
+                  </div>
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-3">
               {selectedUsers.length > 0 && (
@@ -336,10 +421,25 @@ const UserManagementSystem = () => {
               
               <button
                 onClick={() => setShowAddUser(true)}
-                className="bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center gap-2"
+                disabled={licenseData?.licenseInfo?.availableSeats === 0}
+                className={`px-6 py-3 rounded-lg font-medium transition-colors flex items-center gap-2 ${
+                  licenseData?.licenseInfo?.availableSeats === 0
+                    ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
+                title={
+                  licenseData?.licenseInfo?.availableSeats === 0
+                    ? 'License limit reached. Purchase additional licenses to add more users.'
+                    : 'Add a new team member'
+                }
               >
                 <UserPlus size={20} />
                 Add Team Member
+                {licenseData?.licenseInfo && (
+                  <span className="ml-1 text-xs opacity-75">
+                    ({licenseData.licenseInfo.availableSeats} left)
+                  </span>
+                )}
               </button>
             </div>
           </div>
