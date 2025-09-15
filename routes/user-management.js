@@ -58,40 +58,32 @@ router.get('/license-info',
   requireRole('admin'),
   async (req, res) => {
     try {
+      console.log('🔥🔥🔥 LICENSE-INFO ENDPOINT HIT! Organization ID:', req.organizationId);
       const { query: dbQuery } = require('../database/connection');
       
-      // Use the database function to get comprehensive license info, with fallback to direct query
-      let result;
+      // Use direct query for reliable results - bypassing database function
+      console.log('🔧 USER MANAGEMENT: Using direct query for organization:', req.organizationId);
+      const result = await dbQuery(`
+        SELECT 
+          o.id as organization_id,
+          o.name as organization_name,
+          o.purchased_licenses,
+          COUNT(u.id) FILTER (WHERE u.is_active = true) as active_users,
+          (o.purchased_licenses - COUNT(u.id) FILTER (WHERE u.is_active = true))::INTEGER as available_seats,
+          (o.purchased_licenses * 15.00) as monthly_cost,
+          CASE 
+            WHEN o.purchased_licenses = 0 THEN 0
+            ELSE ROUND((COUNT(u.id) FILTER (WHERE u.is_active = true)::DECIMAL / o.purchased_licenses) * 100)::INTEGER 
+          END as utilization_percentage
+        FROM organizations o
+        LEFT JOIN users u ON u.organization_id = o.id
+        WHERE o.id = $1
+        GROUP BY o.id, o.name, o.purchased_licenses
+      `, [req.organizationId], req.organizationId);
       
-      try {
-        result = await dbQuery(`
-          SELECT * FROM get_organization_license_info($1)
-        `, [req.organizationId], req.organizationId);
-      } catch (funcError) {
-        console.log('Database function failed, trying direct query:', funcError.message);
-        
-        // Fallback to direct query using only organizations table (more reliable)
-        console.log('🔧 USER MANAGEMENT: Using fallback query for organization:', req.organizationId);
-        result = await dbQuery(`
-          SELECT 
-            o.id as organization_id,
-            o.name as organization_name,
-            o.purchased_licenses,
-            COUNT(u.id) FILTER (WHERE u.is_active = true OR u.is_active IS NULL) as active_users,
-            (o.purchased_licenses - COUNT(u.id) FILTER (WHERE u.is_active = true OR u.is_active IS NULL))::INTEGER as available_seats,
-            (o.purchased_licenses * 15.00) as monthly_cost,
-            CASE 
-              WHEN o.purchased_licenses = 0 THEN 0
-              ELSE ROUND((COUNT(u.id) FILTER (WHERE u.is_active = true OR u.is_active IS NULL)::DECIMAL / o.purchased_licenses) * 100)::INTEGER 
-            END as utilization_percentage
-          FROM organizations o
-          LEFT JOIN users u ON u.organization_id = o.id
-          WHERE o.id = $1
-          GROUP BY o.id, o.name, o.purchased_licenses
-        `, [req.organizationId], req.organizationId);
-        
-        console.log('🔧 USER MANAGEMENT: Query result:', result.rows[0]);
-      }
+      console.log('🔧 USER MANAGEMENT: Query result:', result.rows[0]);
+      console.log('🔧 USER MANAGEMENT: Active users count:', result.rows[0]?.active_users);
+      console.log('🔧 USER MANAGEMENT: Total licenses:', result.rows[0]?.purchased_licenses);
 
       if (result.rows.length === 0) {
         return res.status(404).json({
@@ -176,7 +168,7 @@ router.get('/',
       const sortColumn = validSorts.includes(sort) ? sort : 'created_at';
       const sortOrder = order.toLowerCase() === 'asc' ? 'ASC' : 'DESC';
 
-      // Ultra-simplified query that should always work
+      // Ultra-simplified query that should always work (exclude inactive users)
       const query = `
         SELECT 
           id,
@@ -186,7 +178,7 @@ router.get('/',
           COALESCE(role, 'user') as role,
           created_at
         FROM users 
-        WHERE organization_id = $1
+        WHERE organization_id = $1 AND is_active = true
         ORDER BY created_at DESC
         LIMIT $2 OFFSET $3
       `;
