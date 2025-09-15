@@ -649,13 +649,23 @@ router.delete('/:id',
       });
 
     } catch (error) {
-      console.error('Delete user error:', error);
+      console.error('❌ USER DELETE ERROR:', error.message);
+      console.error('❌ Full error object:', error);
+      console.error('❌ Stack trace:', error.stack);
       res.status(500).json({
         error: 'Failed to delete user',
         message: 'Unable to remove user',
         details: {
           message: error.message,
-          timestamp: new Date().toISOString()
+          stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+          timestamp: new Date().toISOString(),
+          // Include more debug info in production for this specific issue
+          debugInfo: {
+            userId: req.params.id,
+            organizationId: req.organizationId,
+            errorType: error.constructor.name,
+            errorCode: error.code
+          }
         }
       });
     }
