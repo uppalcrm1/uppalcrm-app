@@ -10,6 +10,7 @@ import LeadsPage from './pages/LeadsPage'
 import Contacts from './pages/Contacts'
 import TeamPage from './pages/TeamPage'
 import SettingsPage from './pages/SettingsPage'
+import ZapierIntegrationPage from './pages/settings/ZapierIntegrationPage'
 import SuperAdminApp from './components/SuperAdminApp'
 
 const ProtectedRoute = ({ children }) => {
@@ -71,6 +72,7 @@ function App() {
         <Route path="contacts" element={<Contacts />} />
         <Route path="team" element={<TeamPage />} />
         <Route path="settings" element={<SettingsPage />} />
+        <Route path="integrations/zapier" element={<ZapierIntegrationPage />} />
       </Route>
 
       {/* Catch all route */}

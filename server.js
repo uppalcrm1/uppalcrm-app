@@ -21,6 +21,8 @@ const trialRoutes = require('./routes/trials');
 const superAdminRoutes = require('./routes/super-admin');
 const notifyAdminRoutes = require('./routes/notify-admin');
 const adminRoutes = require('./routes/admin');
+const webhooksRoutes = require('./routes/webhooks');
+const apiKeysRoutes = require('./routes/api-keys');
 // Public leads routes (simplified for production deployment)
 let publicLeadRoutes;
 try {
@@ -41,17 +43,21 @@ try {
 // Load environment variables
 require('dotenv').config();
 
+// Validate environment configuration
+const { validateEnvironment } = require('./utils/envValidation');
+const envConfig = validateEnvironment();
+
 // Import background jobs
 const EngagementTracker = require('./jobs/engagementTracking');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = envConfig.port;
 
 // Trust proxy settings (for rate limiting and IP detection)
 app.set('trust proxy', 1);
 
 // Rate limiters
-const rateLimiters = createRateLimiters();
+const rateLimiters = createRateLimiters(envConfig);
 
 // Security middleware
 app.use(securityHeaders);
@@ -158,6 +164,12 @@ app.use('/api/super-admin', rateLimiters.general, superAdminRoutes);
 app.use('/api/notify-admin', rateLimiters.general, notifyAdminRoutes);
 app.use('/api/admin', rateLimiters.general, adminRoutes);
 
+// Webhook routes (external integrations - use webhook-specific rate limiting)
+app.use('/api/webhooks', rateLimiters.webhook, webhooksRoutes);
+
+// API Keys management routes (admin functionality)
+app.use('/api/organizations/current/api-keys', rateLimiters.general, apiKeysRoutes);
+
 // Public routes (no authentication required)
 console.log('🔍 DEBUG: publicLeadRoutes type:', typeof publicLeadRoutes, 'value:', !!publicLeadRoutes);
 console.log('🔍 DEBUG: rateLimiters.strict type:', typeof rateLimiters.strict);
@@ -252,6 +264,19 @@ app.get('/api', (req, res) => {
         'DELETE /api/user-management/:id': 'Delete/deactivate user (admin only)',
         'POST /api/user-management/bulk': 'Perform bulk operations on users (admin only)',
         'GET /api/user-management/audit-log': 'Get user management audit log (admin only)'
+      },
+      webhooks: {
+        'POST /api/webhooks/:webhookId': 'Generic webhook endpoint for integrations (API key required)',
+        'POST /api/webhooks/leads': 'Direct lead creation webhook for Zapier (API key required)',
+        'GET /api/webhooks/test/:webhookId': 'Test webhook endpoint for validation (API key required)'
+      },
+      'api-keys': {
+        'GET /api/organizations/current/api-keys': 'List organization API keys (admin only)',
+        'POST /api/organizations/current/api-keys': 'Create new API key (admin only)',
+        'DELETE /api/organizations/current/api-keys/:id': 'Deactivate API key (admin only)',
+        'GET /api/organizations/current/api-keys/:id/usage': 'Get API key usage statistics (admin only)',
+        'PUT /api/organizations/current/api-keys/:id/permissions': 'Update API key permissions (admin only)',
+        'PUT /api/organizations/current/api-keys/:id/rate-limit': 'Update API key rate limit (admin only)'
       }
     },
     authentication: 'Bearer token required for authenticated endpoints',
@@ -334,6 +359,7 @@ const startServer = async () => {
     
     // One-time license field sync on startup
     try {
+      const { query } = require('./database/connection');
       const checkResult = await query(`
         SELECT COUNT(*) as discrepant_count
         FROM organizations 

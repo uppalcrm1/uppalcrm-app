@@ -13,9 +13,13 @@
     "check:database": "node scripts/check-database.js",
     "test": "node test/runTests.js",
     "test:contacts": "node test/runTests.js contacts",
+    "test:api-keys": "node test/runTests.js api-keys",
+    "test:webhooks": "node test/runTests.js webhooks",
     "test:verbose": "VERBOSE=true node test/runTests.js",
     "test:dev": "NODE_ENV=test node test/runTests.js",
     "test:contacts-only": "node test/contacts.test.js",
+    "test:api-keys-only": "node test/api-keys.test.js",
+    "test:webhooks-only": "node test/webhooks.test.js",
     "migrate:user-management": "node migrations/add-user-management-fields.js"
   },
   "dependencies": {

@@ -2,6 +2,8 @@
 
 const path = require('path');
 const { runAllContactTests } = require('./contacts.test.js');
+const { runAllApiKeyTests } = require('./api-keys.test.js');
+const { runAllWebhookTests } = require('./webhooks.test.js');
 
 // Test runner configuration
 const config = {
@@ -100,6 +102,16 @@ const testSuites = {
     name: 'Contact Management System Tests',
     runner: runAllContactTests,
     description: 'Comprehensive tests for contact CRUD, conversion, devices, licenses, and trials'
+  },
+  'api-keys': {
+    name: 'API Key Management Tests',
+    runner: runAllApiKeyTests,
+    description: 'Tests for API key creation, authentication, rate limiting, and multi-tenant isolation'
+  },
+  webhooks: {
+    name: 'Webhook Integration Tests',
+    runner: runAllWebhookTests,
+    description: 'Tests for Zapier webhook endpoints, field mapping, and lead creation workflows'
   }
   // Additional test suites can be added here
   // leads: { name: 'Lead Management Tests', runner: runLeadTests },
@@ -207,6 +219,10 @@ function printFinalSummary(testResults) {
     console.log('• MAC address validation and device registration');
     console.log('• License generation and management');
     console.log('• Trial creation and expiration handling');
+    console.log('• API key creation and authentication');
+    console.log('• Webhook endpoints and field mapping');
+    console.log('• Zapier integration workflows');
+    console.log('• Rate limiting and security controls');
     console.log('• Multi-tenant data isolation');
     console.log('• API security and validation');
     

@@ -14,6 +14,9 @@ import {
   Search,
   Building2,
   ChevronDown,
+  ChevronRight,
+  Zap,
+  Puzzle,
 } from 'lucide-react'
 import LoadingSpinner from './LoadingSpinner'
 
@@ -22,6 +25,14 @@ const navigation = [
   { name: 'Leads', href: '/leads', icon: Users },
   { name: 'Contacts', href: '/contacts', icon: UserPlus },
   { name: 'Team', href: '/team', icon: UserCheck },
+  { 
+    name: 'Integrations', 
+    icon: Puzzle, 
+    hasSubmenu: true,
+    children: [
+      { name: 'Zapier', href: '/integrations/zapier', icon: Zap },
+    ]
+  },
   { name: 'Settings', href: '/settings', icon: Settings },
 ]
 
@@ -29,6 +40,7 @@ const DashboardLayout = () => {
   const { user, organization, logout, isLoading } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [submenuOpen, setSubmenuOpen] = useState({})
   const location = useLocation()
 
   if (isLoading) {
@@ -37,6 +49,17 @@ const DashboardLayout = () => {
 
   const handleLogout = async () => {
     await logout()
+  }
+
+  const toggleSubmenu = (itemName) => {
+    setSubmenuOpen(prev => ({
+      ...prev,
+      [itemName]: !prev[itemName]
+    }))
+  }
+
+  const isSubmenuItemActive = (children) => {
+    return children?.some(child => location.pathname === child.href)
   }
 
   return (
@@ -76,6 +99,67 @@ const DashboardLayout = () => {
           <nav className="flex-1 px-4 py-6 space-y-1">
             {navigation.map((item) => {
               const Icon = item.icon
+              
+              // Handle items with submenus
+              if (item.hasSubmenu && item.children) {
+                const isAnyChildActive = isSubmenuItemActive(item.children)
+                const isSubmenuExpanded = submenuOpen[item.name] || isAnyChildActive
+                
+                return (
+                  <div key={item.name}>
+                    {/* Parent menu item */}
+                    <button
+                      onClick={() => toggleSubmenu(item.name)}
+                      className={`
+                        w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium rounded-lg transition-colors
+                        ${isAnyChildActive 
+                          ? 'bg-primary-50 text-primary-700' 
+                          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                        }
+                      `}
+                    >
+                      <div className="flex items-center">
+                        <Icon size={20} className="mr-3" />
+                        {item.name}
+                      </div>
+                      <ChevronRight 
+                        size={16} 
+                        className={`transition-transform ${isSubmenuExpanded ? 'rotate-90' : ''}`}
+                      />
+                    </button>
+                    
+                    {/* Submenu items */}
+                    {isSubmenuExpanded && (
+                      <div className="ml-6 mt-1 space-y-1">
+                        {item.children.map((child) => {
+                          const ChildIcon = child.icon
+                          const isChildActive = location.pathname === child.href
+                          
+                          return (
+                            <NavLink
+                              key={child.name}
+                              to={child.href}
+                              className={`
+                                flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors
+                                ${isChildActive 
+                                  ? 'bg-primary-100 text-primary-700 border-r-2 border-primary-600' 
+                                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                                }
+                              `}
+                              onClick={() => setSidebarOpen(false)}
+                            >
+                              <ChildIcon size={18} className="mr-3" />
+                              {child.name}
+                            </NavLink>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )
+              }
+              
+              // Handle regular menu items
               const isActive = location.pathname === item.href
               
               return (
@@ -150,7 +234,21 @@ const DashboardLayout = () => {
               
               <div className="hidden sm:block">
                 <h2 className="text-lg font-semibold text-gray-900">
-                  {navigation.find(item => item.href === location.pathname)?.name || 'Dashboard'}
+                  {(() => {
+                    // Check direct navigation items
+                    const directItem = navigation.find(item => item.href === location.pathname)
+                    if (directItem) return directItem.name
+                    
+                    // Check submenu items
+                    for (const item of navigation) {
+                      if (item.children) {
+                        const childItem = item.children.find(child => child.href === location.pathname)
+                        if (childItem) return childItem.name
+                      }
+                    }
+                    
+                    return 'Dashboard'
+                  })()}
                 </h2>
               </div>
             </div>

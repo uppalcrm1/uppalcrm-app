@@ -1,0 +1,509 @@
+{
+  "description": "Sample Zapier payload examples for testing UppalCRM webhook integration",
+  "version": "1.0",
+  "last_updated": "2024-01-15",
+  "payloads": {
+    "google_forms": {
+      "description": "Google Forms submission via Zapier",
+      "source": "Google Forms → Zapier → UppalCRM",
+      "payload": {
+        "Timestamp": "2024/01/15 10:30:00 AM GMT",
+        "Full Name": "John Doe",
+        "Email Address": "john.doe@forms.google.com",
+        "Phone Number": "555-123-4567",
+        "Company Name": "Google Forms Test Corp",
+        "Job Title": "Marketing Director",
+        "How did you hear about us?": "Google Search",
+        "What is your budget range?": "$10,000 - $50,000",
+        "When do you need our services?": "Within 3 months",
+        "Additional Comments": "Looking for enterprise software solution to manage our growing team."
+      },
+      "expected_mapping": {
+        "first_name": "John",
+        "last_name": "Doe",
+        "email": "john.doe@forms.google.com",
+        "phone": "555-123-4567",
+        "company": "Google Forms Test Corp",
+        "title": "Marketing Director",
+        "source": "Google Forms",
+        "notes": "Budget: $10,000 - $50,000. Timeline: Within 3 months. How they found us: Google Search. Additional Comments: Looking for enterprise software solution to manage our growing team."
+      }
+    },
+    "typeform": {
+      "description": "Typeform submission via Zapier",
+      "source": "Typeform → Zapier → UppalCRM",
+      "payload": {
+        "form_id": "abc123def",
+        "form_name": "Product Interest Survey",
+        "submitted_at": "2024-01-15T10:30:00Z",
+        "email": "typeform.user@example.com",
+        "name": "Jane Smith",
+        "phone": "555-987-6543",
+        "company_name": "Typeform Integration Ltd",
+        "job_role": "Product Manager",
+        "interested_in": ["Enterprise License", "API Access", "Custom Integration"],
+        "company_size": "50-100 employees",
+        "budget_range": "$25k-100k",
+        "timeline": "Q2 2024",
+        "pain_points": "Manual data entry, lack of integration with existing tools",
+        "current_tools": ["Salesforce", "HubSpot", "Slack"]
+      },
+      "expected_mapping": {
+        "first_name": "Jane",
+        "last_name": "Smith",
+        "email": "typeform.user@example.com",
+        "phone": "555-987-6543",
+        "company": "Typeform Integration Ltd",
+        "title": "Product Manager",
+        "source": "Typeform",
+        "notes": "Interested in: Enterprise License, API Access, Custom Integration. Company size: 50-100 employees. Budget: $25k-100k. Timeline: Q2 2024. Pain points: Manual data entry, lack of integration with existing tools. Current tools: Salesforce, HubSpot, Slack"
+      }
+    },
+    "mailchimp_subscriber": {
+      "description": "Mailchimp new subscriber via Zapier",
+      "source": "Mailchimp → Zapier → UppalCRM",
+      "payload": {
+        "id": "abc123def456789",
+        "email_address": "subscriber@mailchimp.test",
+        "unique_email_id": "def456abc789",
+        "web_id": 123456789,
+        "email_type": "html",
+        "status": "subscribed",
+        "merge_fields": {
+          "FNAME": "Mailchimp",
+          "LNAME": "Subscriber",
+          "PHONE": "555-111-2222",
+          "COMPANY": "Email Marketing Solutions",
+          "WEBSITE": "https://emailmarketing.example.com",
+          "JOBTITLE": "Email Marketing Manager"
+        },
+        "interests": {
+          "product_updates": true,
+          "newsletters": true,
+          "webinars": false
+        },
+        "stats": {
+          "avg_open_rate": 0.25,
+          "avg_click_rate": 0.05
+        },
+        "ip_signup": "192.168.1.100",
+        "timestamp_signup": "2024-01-15T10:30:00+00:00",
+        "source": "Website signup form",
+        "tags": ["lead", "newsletter", "interested_in_demo"]
+      },
+      "expected_mapping": {
+        "first_name": "Mailchimp",
+        "last_name": "Subscriber",
+        "email": "subscriber@mailchimp.test",
+        "phone": "555-111-2222",
+        "company": "Email Marketing Solutions",
+        "title": "Email Marketing Manager",
+        "website": "https://emailmarketing.example.com",
+        "source": "Mailchimp",
+        "notes": "Subscribed to: product_updates, newsletters. Source: Website signup form. Tags: lead, newsletter, interested_in_demo"
+      }
+    },
+    "linkedin_lead_gen": {
+      "description": "LinkedIn Lead Gen Form submission via Zapier",
+      "source": "LinkedIn Lead Gen → Zapier → UppalCRM",
+      "payload": {
+        "Campaign ID": "12345678",
+        "Campaign Name": "Software Solutions Q1 2024",
+        "Form ID": "987654321",
+        "Form Name": "Download Enterprise Guide",
+        "Creative ID": "456789123",
+        "LinkedIn Member ID": "abc123def456",
+        "First Name": "LinkedIn",
+        "Last Name": "Professional",
+        "Email": "linkedin.pro@business.com",
+        "Phone": "555-777-8888",
+        "Company": "Professional Services Inc",
+        "Job Title": "Director of Operations",
+        "LinkedIn Profile": "https://linkedin.com/in/professional",
+        "Seniority": "Director",
+        "Company Size": "201-500",
+        "Industry": "Information Technology and Services",
+        "Years of Experience": "10-15 years",
+        "Interested in Demo": "Yes",
+        "Budget Authority": "Yes",
+        "Implementation Timeline": "Within 6 months",
+        "Current Solution": "Spreadsheets and manual processes"
+      },
+      "expected_mapping": {
+        "first_name": "LinkedIn",
+        "last_name": "Professional",
+        "email": "linkedin.pro@business.com",
+        "phone": "555-777-8888",
+        "company": "Professional Services Inc",
+        "title": "Director of Operations",
+        "linkedin_url": "https://linkedin.com/in/professional",
+        "source": "LinkedIn",
+        "notes": "Campaign: Software Solutions Q1 2024. Seniority: Director. Company Size: 201-500. Industry: Information Technology and Services. Experience: 10-15 years. Interested in Demo: Yes. Budget Authority: Yes. Timeline: Within 6 months. Current Solution: Spreadsheets and manual processes"
+      }
+    },
+    "facebook_lead_ads": {
+      "description": "Facebook Lead Ads submission via Zapier",
+      "source": "Facebook Lead Ads → Zapier → UppalCRM",
+      "payload": {
+        "ad_id": "123456789012345",
+        "ad_name": "Enterprise Software Solutions",
+        "form_id": "987654321098765",
+        "form_name": "Get Free Consultation",
+        "created_time": "2024-01-15T10:30:00+0000",
+        "full_name": "Facebook User",
+        "email": "facebook.user@social.com",
+        "phone_number": "+15559998888",
+        "company_name": "Social Media Corp",
+        "job_title": "Social Media Manager",
+        "company_size": "11-50 employees",
+        "industry": "Marketing and Advertising",
+        "interested_products": "CRM Software",
+        "how_soon": "Immediately",
+        "monthly_budget": "$1,000 - $5,000"
+      },
+      "expected_mapping": {
+        "first_name": "Facebook",
+        "last_name": "User",
+        "email": "facebook.user@social.com",
+        "phone": "+15559998888",
+        "company": "Social Media Corp",
+        "title": "Social Media Manager",
+        "source": "Facebook Ads",
+        "notes": "Ad: Enterprise Software Solutions. Company Size: 11-50 employees. Industry: Marketing and Advertising. Interested in: CRM Software. Timeline: Immediately. Budget: $1,000 - $5,000"
+      }
+    },
+    "hubspot_form": {
+      "description": "HubSpot form submission via Zapier",
+      "source": "HubSpot → Zapier → UppalCRM",
+      "payload": {
+        "vid": 123456,
+        "portal-id": 987654,
+        "form-id": "abcd-1234-efgh-5678",
+        "form-title": "Contact Sales Form",
+        "page-url": "https://company.com/contact-sales",
+        "page-title": "Contact Our Sales Team",
+        "timestamp": "2024-01-15T10:30:00.000Z",
+        "properties": {
+          "firstname": {
+            "value": "HubSpot",
+            "timestamp": "2024-01-15T10:30:00.000Z"
+          },
+          "lastname": {
+            "value": "Contact",
+            "timestamp": "2024-01-15T10:30:00.000Z"
+          },
+          "email": {
+            "value": "hubspot.contact@company.com",
+            "timestamp": "2024-01-15T10:30:00.000Z"
+          },
+          "phone": {
+            "value": "555-333-4444",
+            "timestamp": "2024-01-15T10:30:00.000Z"
+          },
+          "company": {
+            "value": "HubSpot Integration Co",
+            "timestamp": "2024-01-15T10:30:00.000Z"
+          },
+          "jobtitle": {
+            "value": "Integration Specialist",
+            "timestamp": "2024-01-15T10:30:00.000Z"
+          },
+          "website": {
+            "value": "https://hubspotintegration.com",
+            "timestamp": "2024-01-15T10:30:00.000Z"
+          },
+          "lifecyclestage": {
+            "value": "lead",
+            "timestamp": "2024-01-15T10:30:00.000Z"
+          },
+          "lead_source": {
+            "value": "Website",
+            "timestamp": "2024-01-15T10:30:00.000Z"
+          },
+          "message": {
+            "value": "Interested in learning more about your enterprise solutions and API capabilities.",
+            "timestamp": "2024-01-15T10:30:00.000Z"
+          }
+        }
+      },
+      "expected_mapping": {
+        "first_name": "HubSpot",
+        "last_name": "Contact",
+        "email": "hubspot.contact@company.com",
+        "phone": "555-333-4444",
+        "company": "HubSpot Integration Co",
+        "title": "Integration Specialist",
+        "website": "https://hubspotintegration.com",
+        "source": "HubSpot",
+        "notes": "Form: Contact Sales Form. Page: Contact Our Sales Team. Lifecycle Stage: lead. Lead Source: Website. Message: Interested in learning more about your enterprise solutions and API capabilities."
+      }
+    },
+    "calendly_booking": {
+      "description": "Calendly appointment booking via Zapier",
+      "source": "Calendly → Zapier → UppalCRM",
+      "payload": {
+        "event": "invitee.created",
+        "time": "2024-01-15T10:30:00.000000Z",
+        "payload": {
+          "event": {
+            "uuid": "AAAAAAAAAAAAAAAA",
+            "name": "30 Minute Consultation",
+            "status": "active",
+            "start_time": "2024-01-20T15:00:00.000000Z",
+            "end_time": "2024-01-20T15:30:00.000000Z",
+            "event_type": {
+              "uuid": "BBBBBBBBBBBBBBBB",
+              "name": "30 Minute Consultation",
+              "duration": 30,
+              "slug": "30min"
+            },
+            "location": {
+              "type": "zoom",
+              "join_url": "https://zoom.us/j/123456789"
+            }
+          },
+          "invitee": {
+            "uuid": "CCCCCCCCCCCCCCCC",
+            "first_name": "Calendly",
+            "last_name": "Booker",
+            "name": "Calendly Booker",
+            "email": "calendly.booker@appointment.com",
+            "text_reminder_number": "+15556667777",
+            "timezone": "America/New_York",
+            "created_at": "2024-01-15T10:30:00.000000Z",
+            "is_reschedule": false,
+            "payment": null,
+            "questions_and_answers": [
+              {
+                "question": "Please share your company name",
+                "answer": "Appointment Scheduling Inc"
+              },
+              {
+                "question": "What is your role?",
+                "answer": "Operations Manager"
+              },
+              {
+                "question": "What would you like to discuss?",
+                "answer": "Interested in learning about your enterprise features and pricing options"
+              }
+            ]
+          }
+        }
+      },
+      "expected_mapping": {
+        "first_name": "Calendly",
+        "last_name": "Booker",
+        "email": "calendly.booker@appointment.com",
+        "phone": "+15556667777",
+        "company": "Appointment Scheduling Inc",
+        "title": "Operations Manager",
+        "source": "Calendly",
+        "notes": "Appointment: 30 Minute Consultation on 2024-01-20 at 15:00. Discussion topic: Interested in learning about your enterprise features and pricing options. Meeting: Zoom (https://zoom.us/j/123456789)"
+      }
+    },
+    "shopify_customer": {
+      "description": "Shopify new customer via Zapier",
+      "source": "Shopify → Zapier → UppalCRM",
+      "payload": {
+        "id": 1234567890,
+        "email": "shopify.customer@ecommerce.com",
+        "accepts_marketing": true,
+        "created_at": "2024-01-15T10:30:00-05:00",
+        "updated_at": "2024-01-15T10:30:00-05:00",
+        "first_name": "Shopify",
+        "last_name": "Customer",
+        "orders_count": 1,
+        "state": "enabled",
+        "total_spent": "299.99",
+        "last_order_id": 9876543210,
+        "note": "Interested in bulk pricing for teams",
+        "verified_email": true,
+        "multipass_identifier": null,
+        "tax_exempt": false,
+        "phone": "+15554443333",
+        "tags": "enterprise, bulk_pricing, new_customer",
+        "currency": "USD",
+        "addresses": [
+          {
+            "id": 1111111111,
+            "customer_id": 1234567890,
+            "first_name": "Shopify",
+            "last_name": "Customer",
+            "company": "E-commerce Solutions Ltd",
+            "address1": "123 Commerce Street",
+            "address2": "Suite 400",
+            "city": "New York",
+            "province": "New York",
+            "country": "United States",
+            "zip": "10001",
+            "phone": "+15554443333",
+            "name": "Shopify Customer",
+            "province_code": "NY",
+            "country_code": "US",
+            "country_name": "United States",
+            "default": true
+          }
+        ],
+        "default_address": {
+          "id": 1111111111,
+          "customer_id": 1234567890,
+          "first_name": "Shopify",
+          "last_name": "Customer",
+          "company": "E-commerce Solutions Ltd",
+          "address1": "123 Commerce Street",
+          "address2": "Suite 400",
+          "city": "New York",
+          "province": "New York",
+          "country": "United States",
+          "zip": "10001",
+          "phone": "+15554443333"
+        }
+      },
+      "expected_mapping": {
+        "first_name": "Shopify",
+        "last_name": "Customer",
+        "email": "shopify.customer@ecommerce.com",
+        "phone": "+15554443333",
+        "company": "E-commerce Solutions Ltd",
+        "source": "Shopify",
+        "notes": "Customer since: 2024-01-15. Orders: 1. Total spent: $299.99. Tags: enterprise, bulk_pricing, new_customer. Note: Interested in bulk pricing for teams. Address: 123 Commerce Street, Suite 400, New York, NY 10001"
+      }
+    },
+    "minimal_webhook": {
+      "description": "Minimal webhook payload with just email",
+      "source": "Custom Integration → Zapier → UppalCRM",
+      "payload": {
+        "email": "minimal@test.com"
+      },
+      "expected_mapping": {
+        "email": "minimal@test.com",
+        "source": "Webhook"
+      }
+    },
+    "complex_nested": {
+      "description": "Complex nested payload structure",
+      "source": "Complex System → Zapier → UppalCRM",
+      "payload": {
+        "lead_data": {
+          "personal_info": {
+            "contact_details": {
+              "primary_email": "complex@nested.test",
+              "full_name": "Complex Structure",
+              "mobile_phone": "555-999-0000"
+            },
+            "demographics": {
+              "age_range": "35-44",
+              "income_bracket": "$75k-100k"
+            }
+          },
+          "business_info": {
+            "employment": {
+              "company_name": "Nested Data Corporation",
+              "job_title": "Data Architect",
+              "industry_sector": "Technology",
+              "company_size": "500-1000"
+            },
+            "contact_preferences": {
+              "preferred_contact_time": "9-12 AM",
+              "timezone": "EST"
+            }
+          }
+        },
+        "metadata": {
+          "source_campaign": "complex_integration_test",
+          "lead_score": 85,
+          "qualification_status": "MQL",
+          "assigned_rep": "john.smith@company.com",
+          "tags": ["high-priority", "enterprise", "architect"],
+          "custom_fields": {
+            "budget_authority": true,
+            "decision_timeline": "Q2 2024",
+            "current_solution": "Legacy system"
+          }
+        },
+        "tracking": {
+          "utm_source": "google",
+          "utm_medium": "cpc",
+          "utm_campaign": "enterprise_software",
+          "landing_page": "/enterprise-solutions",
+          "referrer": "https://google.com"
+        }
+      },
+      "expected_mapping": {
+        "first_name": "Complex",
+        "last_name": "Structure",
+        "email": "complex@nested.test",
+        "phone": "555-999-0000",
+        "company": "Nested Data Corporation",
+        "title": "Data Architect",
+        "source": "complex_integration_test",
+        "notes": "Industry: Technology. Company Size: 500-1000. Age: 35-44. Income: $75k-100k. Lead Score: 85. Status: MQL. Budget Authority: Yes. Timeline: Q2 2024. Current Solution: Legacy system. UTM: google/cpc/enterprise_software. Tags: high-priority, enterprise, architect"
+      }
+    }
+  },
+  "testing_scenarios": {
+    "field_mapping_tests": [
+      {
+        "name": "Standard Field Mapping",
+        "payload_key": "linkedin_lead_gen",
+        "expected_fields": ["first_name", "last_name", "email", "phone", "company", "title"]
+      },
+      {
+        "name": "Nested Field Extraction",
+        "payload_key": "complex_nested",
+        "expected_fields": ["email", "company", "title", "phone"]
+      },
+      {
+        "name": "Name Splitting",
+        "payload_key": "google_forms",
+        "expected_behavior": "Full Name should be split into first_name and last_name"
+      },
+      {
+        "name": "Merge Fields Processing",
+        "payload_key": "mailchimp_subscriber",
+        "expected_behavior": "merge_fields object should be flattened"
+      }
+    ],
+    "validation_tests": [
+      {
+        "name": "Minimal Required Data",
+        "payload_key": "minimal_webhook",
+        "expected_behavior": "Should create lead with just email"
+      },
+      {
+        "name": "Rich Data Processing",
+        "payload_key": "hubspot_form",
+        "expected_behavior": "Should handle complex HubSpot properties structure"
+      }
+    ],
+    "integration_specific_tests": [
+      {
+        "integration": "Google Forms",
+        "payload_key": "google_forms",
+        "specific_validations": [
+          "Timestamp handling",
+          "Multiple choice field processing",
+          "Long text field handling"
+        ]
+      },
+      {
+        "integration": "Calendly",
+        "payload_key": "calendly_booking",
+        "specific_validations": [
+          "Event timing extraction",
+          "Q&A processing",
+          "Meeting link preservation"
+        ]
+      },
+      {
+        "integration": "Shopify",
+        "payload_key": "shopify_customer",
+        "specific_validations": [
+          "Address information processing",
+          "Purchase history context",
+          "Tag system handling"
+        ]
+      }
+    ]
+  }
+}

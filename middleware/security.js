@@ -4,11 +4,11 @@ const helmet = require('helmet');
 /**
  * Rate limiting configurations for different endpoints
  */
-const createRateLimiters = () => {
+const createRateLimiters = (envConfig = {}) => {
   // General API rate limiting
   const generalLimiter = rateLimit({
-    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-    max: parseInt(process.env.RATE_LIMIT_MAX) || 100, // requests per window
+    windowMs: envConfig.rateLimitWindowMs || 15 * 60 * 1000, // 15 minutes
+    max: envConfig.rateLimitMax || 100, // requests per window
     message: {
       error: 'Too many requests',
       message: 'Please try again later'
@@ -76,11 +76,39 @@ const createRateLimiters = () => {
     }
   });
 
+  // Webhook rate limiting (stricter for external integrations)
+  const webhookLimiter = rateLimit({
+    windowMs: envConfig.webhookRateLimitWindowMs || 15 * 60 * 1000, // 15 minutes
+    max: envConfig.webhookRateLimitMax || 5, // 5 requests per window
+    message: {
+      error: 'Webhook rate limit exceeded',
+      message: 'Too many webhook requests. Please check your integration settings.'
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    skipSuccessfulRequests: false, // Count all webhook requests
+    keyGenerator: (req) => {
+      // Rate limit by API key if available, otherwise by IP
+      const apiKey = req.headers['x-api-key'];
+      const orgId = req.organizationId || 'unknown';
+      const ip = req.ip;
+      
+      if (apiKey) {
+        // Extract organization from API key for better rate limiting
+        const keyPrefix = apiKey.split('_')[1] || 'unknown';
+        return `webhook:${keyPrefix}:${apiKey.substring(0, 10)}`;
+      }
+      
+      return `webhook:${orgId}:${ip}`;
+    }
+  });
+
   return {
     general: generalLimiter,
     auth: authLimiter,
     registration: registrationLimiter,
-    passwordReset: passwordResetLimiter
+    passwordReset: passwordResetLimiter,
+    webhook: webhookLimiter
   };
 };
 
@@ -292,6 +320,15 @@ const configureCORS = () => {
         return callback(null, true);
       }
       
+      // Allow Zapier domains for webhook functionality
+      if (origin && (
+        origin.includes('zapier.com') ||
+        origin.includes('zapierusercontent.com') ||
+        origin.includes('hooks.zapier.com')
+      )) {
+        return callback(null, true);
+      }
+      
       callback(new Error('Not allowed by CORS'));
     },
     credentials: true,
@@ -303,7 +340,10 @@ const configureCORS = () => {
       'Accept',
       'Authorization',
       'X-Organization-Slug',
-      'X-Organization-ID'
+      'X-Organization-ID',
+      'X-API-Key',
+      'X-Webhook-Id',
+      'X-Webhook-Source'
     ]
   };
 };
