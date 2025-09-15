@@ -171,7 +171,8 @@ const FieldManager = () => {
 
       setFieldData({
         ...data,
-        systemFields: mergedSystemFields
+        systemFields: mergedSystemFields,
+        limits: data.limits || { maxCustomFields: 15, maxContacts: 5000, maxFieldOptions: 20 }
       });
     } catch (error) {
       console.error('Error loading field data:', error);
@@ -182,8 +183,8 @@ const FieldManager = () => {
 
   const addOption = () => {
     if (newOption.trim() && !newField.field_options.includes(newOption.trim())) {
-      if (newField.field_options.length >= fieldData.limits.maxFieldOptions) {
-        setErrors(prev => ({...prev, options: [`Maximum ${fieldData.limits.maxFieldOptions} options allowed`]}));
+      if (newField.field_options.length >= (fieldData.limits?.maxFieldOptions || 20)) {
+        setErrors(prev => ({...prev, options: [`Maximum ${fieldData.limits?.maxFieldOptions || 20} options allowed`]}));
         return;
       }
       setNewField(prev => ({
@@ -360,7 +361,7 @@ const FieldManager = () => {
 
   const addSystemOption = () => {
     if (newSystemOption.trim() && !systemFieldOptions.includes(newSystemOption.trim())) {
-      if (systemFieldOptions.length >= fieldData.limits.maxFieldOptions) {
+      if (systemFieldOptions.length >= (fieldData.limits?.maxFieldOptions || 20)) {
         return;
       }
       setSystemFieldOptions(prev => [...prev, newSystemOption.trim()]);
@@ -793,7 +794,7 @@ const FieldManager = () => {
               {editingSystemField.type === 'select' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Dropdown Options (max {fieldData.limits.maxFieldOptions})
+                    Dropdown Options (max {fieldData.limits?.maxFieldOptions || 20})
                   </label>
                   <div className="space-y-2">
                     {systemFieldOptions.map((option, index) => (
@@ -824,7 +825,7 @@ const FieldManager = () => {
                       </button>
                     </div>
                     <div className="text-xs text-gray-500">
-                      {systemFieldOptions.length}/{fieldData.limits.maxFieldOptions} options
+                      {systemFieldOptions.length}/{fieldData.limits?.maxFieldOptions || 20} options
                     </div>
                   </div>
                 </div>
