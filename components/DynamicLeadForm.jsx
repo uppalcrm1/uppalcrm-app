@@ -23,7 +23,7 @@ const DynamicLeadForm = ({ onSubmit, initialData = {} }) => {
 
   const loadFormConfig = async () => {
     try {
-      const response = await fetch('/api/leads/form-config', {
+      const response = await fetch('/api/custom-fields/form-config', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -87,23 +87,15 @@ const DynamicLeadForm = ({ onSubmit, initialData = {} }) => {
   const validateForm = () => {
     const newErrors = {};
 
-    // Validate system fields
-    const systemFieldConfig = {
-      firstName: { required: true, label: 'First Name' },
-      lastName: { required: true, label: 'Last Name' }
-    };
-
-    Object.entries(systemFieldConfig).forEach(([fieldName, config]) => {
-      const isEnabled = formConfig.defaultFields.find(f => f.field_name === fieldName)?.is_enabled !== false;
-      const isRequired = config.required || formConfig.defaultFields.find(f => f.field_name === fieldName)?.is_required;
-
-      if (isEnabled && isRequired && !formData[fieldName]?.trim()) {
-        newErrors[fieldName] = `${config.label} is required`;
+    // Validate system fields based on configuration
+    formConfig.systemFields?.forEach(field => {
+      if (field.is_required && !formData[field.field_name]?.trim()) {
+        newErrors[field.field_name] = `${field.field_label} is required`;
       }
     });
 
     // Validate custom fields
-    formConfig.customFields.forEach(field => {
+    formConfig.customFields?.forEach(field => {
       if (field.is_required && !formData.customFields[field.field_name]?.toString().trim()) {
         newErrors[`custom_${field.field_name}`] = `${field.field_label} is required`;
       }
@@ -310,6 +302,13 @@ const DynamicLeadForm = ({ onSubmit, initialData = {} }) => {
   };
 
   const getSystemFieldOptions = (fieldName) => {
+    // First check if we have custom options from the system field configuration
+    const systemField = formConfig.systemFields?.find(f => f.field_name === fieldName);
+    if (systemField && systemField.field_options) {
+      return systemField.field_options;
+    }
+
+    // Fallback to defaults
     switch (fieldName) {
       case 'source':
         return ['Website', 'Referral', 'Social', 'Cold-call', 'Email', 'Advertisement', 'Trade-show', 'Other'];
@@ -323,25 +322,8 @@ const DynamicLeadForm = ({ onSubmit, initialData = {} }) => {
   };
 
   const getEnabledSystemFields = () => {
-    const systemFields = [
-      { name: 'firstName', label: 'First Name', type: 'text', required: true },
-      { name: 'lastName', label: 'Last Name', type: 'text', required: true },
-      { name: 'email', label: 'Email', type: 'email', required: false },
-      { name: 'phone', label: 'Phone', type: 'tel', required: false },
-      { name: 'company', label: 'Company', type: 'text', required: false },
-      { name: 'source', label: 'Source', type: 'select', required: false },
-      { name: 'status', label: 'Status', type: 'select', required: false },
-      { name: 'priority', label: 'Priority', type: 'select', required: false },
-      { name: 'potentialValue', label: 'Potential Value ($)', type: 'number', required: false },
-      { name: 'assignedTo', label: 'Assign To', type: 'text', required: false },
-      { name: 'nextFollowUp', label: 'Next Follow Up', type: 'date', required: false },
-      { name: 'notes', label: 'Notes', type: 'textarea', required: false }
-    ];
-
-    return systemFields.filter(field => {
-      const config = formConfig.defaultFields.find(f => f.field_name === field.name);
-      return config ? config.is_enabled : true; // Default to enabled if no config
-    });
+    // Use the system fields from the API response
+    return formConfig.systemFields || [];
   };
 
   if (loading) {
