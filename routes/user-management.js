@@ -616,12 +616,16 @@ router.delete('/:id',
       }
       console.log('✅ User found:', user.name);
 
-      // Soft delete - use only is_active field (production compatibility)
-      console.log('🔧 Updating user to inactive using is_active field...');
-      await User.update(userId, {
-        is_active: false
-      }, req.organizationId);
-      console.log('✅ User set to inactive');
+      // Soft delete - use direct database query for maximum compatibility
+      console.log('🔧 Updating user to inactive using direct query...');
+      const { query: dbQuery } = require('../database/connection');
+      const updateResult = await dbQuery(`
+        UPDATE users 
+        SET is_active = false, updated_at = NOW()
+        WHERE id = $1 AND organization_id = $2
+      `, [userId, req.organizationId]);
+      
+      console.log('✅ User set to inactive, rows affected:', updateResult.rowCount);
 
       // Log the action (try-catch to prevent audit failures from blocking deletion)
       try {
