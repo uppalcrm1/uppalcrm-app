@@ -616,13 +616,13 @@ router.delete('/:id',
       }
       console.log('✅ User found:', user.name);
 
-      // Soft delete - set status to inactive
-      console.log('🔧 Updating user status to inactive...');
+      // Soft delete - use is_active field instead of status (production compatibility)
+      console.log('🔧 Updating user to inactive using is_active field...');
       await User.update(userId, {
-        status: 'inactive',
+        is_active: false,
         deleted_at: new Date()
       }, req.organizationId);
-      console.log('✅ User status updated');
+      console.log('✅ User set to inactive');
 
       // Log the action (try-catch to prevent audit failures from blocking deletion)
       try {
