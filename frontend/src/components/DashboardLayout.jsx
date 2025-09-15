@@ -17,22 +17,26 @@ import {
   ChevronRight,
   Zap,
   Puzzle,
+  Plus,
+  Sliders,
 } from 'lucide-react'
 import LoadingSpinner from './LoadingSpinner'
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Leads', href: '/leads', icon: Users },
+  { name: 'Add New Lead', href: '/leads/new', icon: Plus },
   { name: 'Contacts', href: '/contacts', icon: UserPlus },
   { name: 'Team', href: '/team', icon: UserCheck },
-  { 
-    name: 'Integrations', 
-    icon: Puzzle, 
+  {
+    name: 'Integrations',
+    icon: Puzzle,
     hasSubmenu: true,
     children: [
       { name: 'Zapier', href: '/integrations/zapier', icon: Zap },
     ]
   },
+  { name: 'Field Configuration', href: '/admin/fields', icon: Sliders },
   { name: 'Settings', href: '/settings', icon: Settings },
 ]
 

@@ -1,17 +1,76 @@
 const express = require('express');
 const Lead = require('../models/Lead');
-const { 
+const {
   validateUuidParam,
   validate,
-  schemas 
+  schemas
 } = require('../middleware/validation');
-const { 
-  authenticateToken, 
-  validateOrganizationContext 
+const {
+  authenticateToken,
+  validateOrganizationContext
 } = require('../middleware/auth');
 const Joi = require('joi');
+const db = require('../database/connection');
 
 const router = express.Router();
+
+// Add this helper function to get field configurations
+const getFieldConfigurations = async (organizationId) => {
+  const customFields = await db.query(`
+    SELECT field_name, field_label, field_type, field_options, is_required, sort_order
+    FROM custom_field_definitions
+    WHERE organization_id = $1 AND is_enabled = true
+    ORDER BY sort_order ASC, created_at ASC
+  `, [organizationId]);
+
+  const defaultFields = await db.query(`
+    SELECT field_name, is_enabled, is_required, sort_order
+    FROM default_field_configurations
+    WHERE organization_id = $1
+  `, [organizationId]);
+
+  return {
+    customFields: customFields.rows,
+    defaultFields: defaultFields.rows
+  };
+};
+
+// Add validation for custom fields
+const validateCustomFields = (customFields, fieldConfigs) => {
+  const errors = [];
+
+  // Validate required custom fields
+  for (const field of fieldConfigs.customFields) {
+    if (field.is_required && !customFields[field.field_name]) {
+      errors.push(`${field.field_label} is required`);
+    }
+
+    // Validate field types
+    if (customFields[field.field_name]) {
+      const value = customFields[field.field_name];
+
+      switch (field.field_type) {
+        case 'email':
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+            errors.push(`${field.field_label} must be a valid email`);
+          }
+          break;
+        case 'number':
+          if (isNaN(value)) {
+            errors.push(`${field.field_label} must be a number`);
+          }
+          break;
+        case 'select':
+          if (field.field_options && !field.field_options.includes(value)) {
+            errors.push(`${field.field_label} must be one of: ${field.field_options.join(', ')}`);
+          }
+          break;
+      }
+    }
+  }
+
+  return errors;
+};
 
 // Apply authentication and organization validation to all routes
 router.use(authenticateToken);
@@ -129,7 +188,7 @@ router.get('/',
     try {
       console.log('Getting leads for organization:', req.organizationId);
       console.log('Query params:', req.query);
-      
+
       // Check if organization ID exists
       if (!req.organizationId) {
         console.error('Missing organization ID in request');
@@ -139,8 +198,8 @@ router.get('/',
         });
       }
 
-      const { 
-        page = 1, 
+      const {
+        page = 1,
         limit = 20,
         status,
         priority,
@@ -152,24 +211,40 @@ router.get('/',
       } = req.query;
 
       const offset = (page - 1) * limit;
-      
-      const result = await Lead.findByOrganization(req.organizationId, {
-        limit: parseInt(limit),
-        offset: parseInt(offset),
-        status,
-        priority,
-        assigned_to,
-        source,
-        search,
-        sort,
-        order
-      });
 
-      console.log(`Found ${result.leads.length} leads out of ${result.pagination.total} total`);
+      // Updated to include custom_fields in the query
+      const leads = await db.query(`
+        SELECT id, first_name, last_name, email, phone, company, source, status,
+               priority, potential_value, assigned_to, next_follow_up, notes,
+               custom_fields, created_at, updated_at
+        FROM leads
+        WHERE organization_id = $1
+        ORDER BY ${sort} ${order.toUpperCase()}
+        LIMIT $2 OFFSET $3
+      `, [req.organizationId, limit, offset]);
+
+      // Get total count for pagination
+      const countResult = await db.query(`
+        SELECT COUNT(*) as total
+        FROM leads
+        WHERE organization_id = $1
+      `, [req.organizationId]);
+
+      const total = parseInt(countResult.rows[0].total);
+      const totalPages = Math.ceil(total / limit);
+
+      console.log(`Found ${leads.rows.length} leads out of ${total} total`);
 
       res.json({
-        leads: result.leads.map(lead => lead.toJSON()),
-        pagination: result.pagination
+        leads: leads.rows,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          totalPages,
+          hasNextPage: page < totalPages,
+          hasPrevPage: page > 1
+        }
       });
     } catch (error) {
       console.error('Get leads error:', error);
@@ -306,35 +381,51 @@ router.get('/:id',
 
 /**
  * POST /leads
- * Create new lead
+ * Create new lead with custom fields support
  */
-router.post('/',
-  validate(leadSchemas.createLead),
-  async (req, res) => {
-    try {
-      const lead = await Lead.create(req.body, req.organizationId, req.user.id);
+router.post('/', authenticateToken, async (req, res) => {
+  try {
+    const {
+      firstName, lastName, email, phone, company, source,
+      status, priority, potentialValue, assignedTo, nextFollowUp, notes,
+      customFields = {} // Accept custom fields
+    } = req.body;
 
-      res.status(201).json({
-        message: 'Lead created successfully',
-        lead: lead.toJSON()
-      });
-    } catch (error) {
-      console.error('Create lead error:', error);
-      
-      if (error.message.includes('already exists')) {
-        return res.status(409).json({
-          error: 'Lead creation failed',
-          message: error.message
-        });
-      }
+    // Get field configurations for validation
+    const fieldConfigs = await getFieldConfigurations(req.organizationId);
 
-      res.status(500).json({
-        error: 'Lead creation failed',
-        message: 'Unable to create lead'
+    // Validate custom fields
+    const validationErrors = validateCustomFields(customFields, fieldConfigs);
+
+    if (validationErrors.length > 0) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: validationErrors
       });
     }
+
+    const result = await db.query(`
+      INSERT INTO leads
+      (organization_id, first_name, last_name, email, phone, company, source,
+       status, priority, potential_value, assigned_to, next_follow_up, notes, custom_fields, created_by)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+      RETURNING id, first_name, last_name, email, phone, company, source, status,
+                priority, potential_value, assigned_to, next_follow_up, notes, custom_fields, created_at
+    `, [
+      req.organizationId, firstName, lastName, email, phone, company, source,
+      status || 'new', priority || 'medium', potentialValue, assignedTo, nextFollowUp, notes,
+      JSON.stringify(customFields), req.userId
+    ]);
+
+    res.status(201).json({
+      message: 'Lead created successfully',
+      lead: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Error creating lead:', error);
+    res.status(500).json({ error: 'Failed to create lead' });
   }
-);
+});
 
 /**
  * PUT /leads/:id
@@ -434,5 +525,19 @@ router.delete('/:id',
     }
   }
 );
+
+/**
+ * GET /leads/form-config
+ * Get form configuration for dynamic form rendering
+ */
+router.get('/form-config', authenticateToken, async (req, res) => {
+  try {
+    const fieldConfigs = await getFieldConfigurations(req.organizationId);
+    res.json(fieldConfigs);
+  } catch (error) {
+    console.error('Error fetching form config:', error);
+    res.status(500).json({ error: 'Failed to fetch form configuration' });
+  }
+});
 
 module.exports = router;

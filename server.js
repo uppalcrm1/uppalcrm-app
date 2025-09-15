@@ -23,6 +23,7 @@ const notifyAdminRoutes = require('./routes/notify-admin');
 const adminRoutes = require('./routes/admin');
 const webhooksRoutes = require('./routes/webhooks');
 const apiKeysRoutes = require('./routes/api-keys');
+const customFieldsRoutes = require('./routes/customFields');
 // Public leads routes (simplified for production deployment)
 let publicLeadRoutes;
 try {
@@ -170,6 +171,9 @@ app.use('/api/webhooks', rateLimiters.webhook, webhooksRoutes);
 // API Keys management routes (admin functionality)
 app.use('/api/organizations/current/api-keys', rateLimiters.general, apiKeysRoutes);
 
+// Custom Fields management routes
+app.use('/api/custom-fields', rateLimiters.general, customFieldsRoutes);
+
 // Public routes (no authentication required)
 console.log('🔍 DEBUG: publicLeadRoutes type:', typeof publicLeadRoutes, 'value:', !!publicLeadRoutes);
 console.log('🔍 DEBUG: rateLimiters.strict type:', typeof rateLimiters.strict);
@@ -277,6 +281,13 @@ app.get('/api', (req, res) => {
         'GET /api/organizations/current/api-keys/:id/usage': 'Get API key usage statistics (admin only)',
         'PUT /api/organizations/current/api-keys/:id/permissions': 'Update API key permissions (admin only)',
         'PUT /api/organizations/current/api-keys/:id/rate-limit': 'Update API key rate limit (admin only)'
+      },
+      'custom-fields': {
+        'GET /api/custom-fields': 'Get all custom fields and configuration',
+        'POST /api/custom-fields': 'Create new custom field (rate limited: 10/day)',
+        'PUT /api/custom-fields/:fieldId': 'Update custom field',
+        'DELETE /api/custom-fields/:fieldId': 'Delete custom field',
+        'PUT /api/custom-fields/default/:fieldName': 'Update default field configuration'
       }
     },
     authentication: 'Bearer token required for authenticated endpoints',

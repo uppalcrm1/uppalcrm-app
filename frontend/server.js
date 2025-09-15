@@ -7,7 +7,7 @@ const port = process.env.PORT || 3000;
 
 // Proxy API requests to backend
 app.use('/api', createProxyMiddleware({
-  target: 'https://uppalcrm-api.onrender.com',
+  target: 'http://localhost:3004',
   changeOrigin: true,
   pathRewrite: {
     '^/api': '/api'
@@ -16,7 +16,7 @@ app.use('/api', createProxyMiddleware({
 
 // Proxy health checks
 app.use('/health', createProxyMiddleware({
-  target: 'https://uppalcrm-api.onrender.com',
+  target: 'http://localhost:3004',
   changeOrigin: true
 }));
 

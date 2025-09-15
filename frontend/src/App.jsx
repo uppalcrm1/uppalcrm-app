@@ -12,6 +12,8 @@ import TeamPage from './pages/TeamPage'
 import SettingsPage from './pages/SettingsPage'
 import ZapierIntegrationPage from './pages/settings/ZapierIntegrationPage'
 import SuperAdminApp from './components/SuperAdminApp'
+import FieldManager from './components/FieldManager'
+import DynamicLeadForm from './components/DynamicLeadForm'
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuth()
@@ -73,6 +75,8 @@ function App() {
         <Route path="team" element={<TeamPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="integrations/zapier" element={<ZapierIntegrationPage />} />
+        <Route path="admin/fields" element={<FieldManager />} />
+        <Route path="leads/new" element={<DynamicLeadForm />} />
       </Route>
 
       {/* Catch all route */}
