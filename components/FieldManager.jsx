@@ -163,7 +163,9 @@ const FieldManager = () => {
                      legacyConfig?.is_enabled !== undefined ? legacyConfig.is_enabled : true,
           is_required: customConfig?.is_required !== undefined ? customConfig.is_required :
                       legacyConfig?.is_required !== undefined ? legacyConfig.is_required : defaultField.required,
-          is_deleted: customConfig?.is_deleted || false
+          is_deleted: customConfig?.is_deleted || false,
+          editable: defaultField.editable,
+          deletable: defaultField.deletable
         };
       }).filter(field => !field.is_deleted); // Filter out deleted fields
 
