@@ -249,18 +249,82 @@ router.get('/', authenticateToken, async (req, res) => {
 
     console.log('Custom fields found:', customFields.rows.length);
 
-    // Try to get system field configurations, but don't fail if table doesn't exist
-    let systemFields = { rows: [] };
+    // Build system fields from defaults + stored configurations
+    const systemFieldDefaults = {
+      firstName: { label: 'First Name', type: 'text', required: true, editable: false },
+      lastName: { label: 'Last Name', type: 'text', required: true, editable: false },
+      email: { label: 'Email', type: 'email', required: false, editable: true },
+      phone: { label: 'Phone', type: 'tel', required: false, editable: true },
+      company: { label: 'Company', type: 'text', required: false, editable: true },
+      source: {
+        label: 'Source',
+        type: 'select',
+        required: false,
+        editable: true,
+        options: ['Website', 'Referral', 'Social', 'Cold-call', 'Email', 'Advertisement', 'Trade-show', 'Other']
+      },
+      status: {
+        label: 'Status',
+        type: 'select',
+        required: false,
+        editable: true,
+        options: ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'converted', 'lost']
+      },
+      priority: {
+        label: 'Priority',
+        type: 'select',
+        required: false,
+        editable: true,
+        options: ['low', 'medium', 'high']
+      },
+      potentialValue: { label: 'Potential Value ($)', type: 'number', required: false, editable: true },
+      assignedTo: { label: 'Assign To', type: 'text', required: false, editable: true },
+      nextFollowUp: { label: 'Next Follow Up', type: 'date', required: false, editable: true },
+      notes: { label: 'Notes', type: 'textarea', required: false, editable: true }
+    };
+
+    // Get any stored configurations for system fields
+    let storedConfigs = {};
     try {
-      systemFields = await db.query(`
-        SELECT field_name, field_label, field_type, field_options, is_enabled, is_required, is_deleted, sort_order
-        FROM system_field_configurations
+      const configResult = await db.query(`
+        SELECT field_name, field_options, is_enabled, is_required, sort_order
+        FROM default_field_configurations
         WHERE organization_id = $1
       `, [req.organizationId]);
-      console.log('System fields found:', systemFields.rows.length);
-    } catch (systemError) {
-      console.log('System fields table not found, using default fields only');
+
+      configResult.rows.forEach(config => {
+        storedConfigs[config.field_name] = config;
+      });
+      console.log('Stored system field configs found:', Object.keys(storedConfigs).length);
+    } catch (configError) {
+      console.log('No stored system field configs found');
     }
+
+    // Build complete system fields list
+    const systemFields = { rows: [] };
+    Object.entries(systemFieldDefaults).forEach(([fieldName, fieldDef]) => {
+      const storedConfig = storedConfigs[fieldName] || {};
+
+      // Use stored field options if they exist, otherwise use defaults
+      let fieldOptions = fieldDef.options || null;
+      if (storedConfig.field_options) {
+        fieldOptions = storedConfig.field_options;
+      }
+
+      systemFields.rows.push({
+        field_name: fieldName,
+        field_label: fieldDef.label,
+        field_type: fieldDef.type,
+        field_options: fieldOptions,
+        is_enabled: storedConfig.is_enabled !== undefined ? storedConfig.is_enabled : true,
+        is_required: storedConfig.is_required !== undefined ? storedConfig.is_required : fieldDef.required,
+        is_deleted: false,
+        sort_order: storedConfig.sort_order || 0,
+        editable: fieldDef.editable
+      });
+    });
+
+    console.log('System fields built:', systemFields.rows.length);
 
     // Get default field configurations (for backward compatibility)
     let defaultFields = { rows: [] };
