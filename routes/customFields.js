@@ -89,9 +89,22 @@ const updateFieldSchema = Joi.object({
 // Get all custom fields and configuration
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    console.log('Custom fields GET request - orgId:', req.organizationId);
+    console.log('🔍 Custom fields GET request debugging:');
+    console.log('  - req.user:', req.user ? 'EXISTS' : 'NULL');
+    console.log('  - req.organizationId:', req.organizationId);
+    console.log('  - Headers Authorization:', req.headers.authorization ? 'EXISTS' : 'MISSING');
+    console.log('  - Headers X-Organization-Slug:', req.headers['x-organization-slug']);
+
+    if (!req.organizationId) {
+      console.error('❌ Missing organizationId in request');
+      return res.status(400).json({
+        error: 'Missing organization context',
+        details: 'Organization ID is required'
+      });
+    }
 
     // Get custom fields
+    console.log('📝 Querying custom_field_definitions...');
     const customFields = await db.query(`
       SELECT id, field_name, field_label, field_type, field_options,
              is_required, is_enabled, sort_order, created_at
