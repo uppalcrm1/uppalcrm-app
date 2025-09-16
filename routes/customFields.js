@@ -86,6 +86,48 @@ const updateFieldSchema = Joi.object({
   sort_order: Joi.number().integer().min(0)
 });
 
+// Debug endpoint to check authentication
+router.get('/debug', authenticateToken, async (req, res) => {
+  try {
+    const debugInfo = {
+      timestamp: new Date().toISOString(),
+      authentication: {
+        userExists: !!req.user,
+        userId: req.user?.id,
+        userEmail: req.user?.email,
+        organizationId: req.organizationId,
+        userOrganizationId: req.user?.organization_id
+      },
+      headers: {
+        authorization: req.headers.authorization ? 'Bearer ***' : 'MISSING',
+        organizationSlug: req.headers['x-organization-slug'],
+        contentType: req.headers['content-type']
+      },
+      database: {
+        connectionExists: !!db
+      }
+    };
+
+    // Test a simple database query
+    try {
+      const testQuery = await db.query('SELECT NOW() as current_time');
+      debugInfo.database.queryTest = 'SUCCESS';
+      debugInfo.database.currentTime = testQuery.rows[0]?.current_time;
+    } catch (dbError) {
+      debugInfo.database.queryTest = 'FAILED';
+      debugInfo.database.error = dbError.message;
+    }
+
+    res.json(debugInfo);
+  } catch (error) {
+    res.status(500).json({
+      error: 'Debug endpoint failed',
+      details: error.message,
+      stack: error.stack
+    });
+  }
+});
+
 // Get all custom fields and configuration
 router.get('/', authenticateToken, async (req, res) => {
   try {
