@@ -6,6 +6,95 @@ const Joi = require('joi');
 const rateLimit = require('express-rate-limit');
 
 // Add this helper function at the top after imports
+const ensureTablesExist = async () => {
+  try {
+    console.log('🔧 Ensuring custom field tables exist...');
+
+    // Create custom field definitions table
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS custom_field_definitions (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+        field_name VARCHAR(50) NOT NULL,
+        field_label VARCHAR(100) NOT NULL,
+        field_type VARCHAR(20) NOT NULL CHECK (field_type IN ('text', 'select', 'number', 'date', 'email', 'tel', 'textarea')),
+        field_options JSONB,
+        is_required BOOLEAN DEFAULT FALSE,
+        is_enabled BOOLEAN DEFAULT TRUE,
+        sort_order INTEGER DEFAULT 0,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        created_by UUID REFERENCES users(id),
+
+        UNIQUE(organization_id, field_name),
+        CONSTRAINT field_name_length CHECK (length(field_name) <= 50),
+        CONSTRAINT field_label_length CHECK (length(field_label) <= 100)
+      );
+    `);
+
+    // Create default field configurations table
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS default_field_configurations (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+        field_name VARCHAR(50) NOT NULL,
+        is_enabled BOOLEAN DEFAULT TRUE,
+        is_required BOOLEAN DEFAULT FALSE,
+        sort_order INTEGER DEFAULT 0,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+
+        UNIQUE(organization_id, field_name)
+      );
+    `);
+
+    // Create organization usage tracking table
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS organization_usage (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+        custom_fields_count INTEGER DEFAULT 0,
+        contacts_count INTEGER DEFAULT 0,
+        last_updated TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+
+        UNIQUE(organization_id)
+      );
+    `);
+
+    // Enable RLS on new tables
+    await db.query(`
+      ALTER TABLE custom_field_definitions ENABLE ROW LEVEL SECURITY;
+      ALTER TABLE default_field_configurations ENABLE ROW LEVEL SECURITY;
+      ALTER TABLE organization_usage ENABLE ROW LEVEL SECURITY;
+    `);
+
+    // Create RLS policies
+    await db.query(`
+      DROP POLICY IF EXISTS custom_fields_isolation ON custom_field_definitions;
+      CREATE POLICY custom_fields_isolation ON custom_field_definitions
+        FOR ALL TO PUBLIC
+        USING (organization_id = current_setting('app.current_organization_id')::uuid);
+    `);
+
+    await db.query(`
+      DROP POLICY IF EXISTS default_fields_isolation ON default_field_configurations;
+      CREATE POLICY default_fields_isolation ON default_field_configurations
+        FOR ALL TO PUBLIC
+        USING (organization_id = current_setting('app.current_organization_id')::uuid);
+    `);
+
+    await db.query(`
+      DROP POLICY IF EXISTS usage_isolation ON organization_usage;
+      CREATE POLICY usage_isolation ON organization_usage
+        FOR ALL TO PUBLIC
+        USING (organization_id = current_setting('app.current_organization_id')::uuid);
+    `);
+
+    console.log('✅ Custom field tables ensured');
+  } catch (error) {
+    console.log('⚠️ Table creation error (may already exist):', error.message);
+  }
+};
+
 const ensureSystemFieldsTable = async () => {
   try {
     await db.query(`
@@ -144,6 +233,9 @@ router.get('/', authenticateToken, async (req, res) => {
         details: 'Organization ID is required'
       });
     }
+
+    // Ensure tables exist before querying
+    await ensureTablesExist();
 
     // Get custom fields
     console.log('📝 Querying custom_field_definitions...');
