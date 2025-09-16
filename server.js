@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const { version } = require('./package.json');
 const { testConnection } = require('./database/connection');
 const { 
   securityHeaders, 
@@ -92,7 +93,7 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
-    version: '1.0.0'
+    version
   });
 });
 
@@ -199,7 +200,7 @@ if (publicLeadRoutes && typeof publicLeadRoutes === 'function') {
 app.get('/api', (req, res) => {
   res.json({
     name: 'UppalCRM API',
-    version: '1.0.0',
+    version,
     description: 'Multi-tenant CRM API for software licensing businesses',
     endpoints: {
       auth: {
@@ -303,7 +304,7 @@ app.get('/', (req, res) => {
   } else {
     res.json({
       name: 'UppalCRM API',
-      version: '1.0.0',
+      version,
       status: 'API service running',
       super_admin: '/api/super-admin/login'
     });
