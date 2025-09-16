@@ -35,7 +35,7 @@ const ensureSystemFieldsTable = async () => {
     await db.query(`
       DROP POLICY IF EXISTS system_fields_isolation ON system_field_configurations;
       CREATE POLICY system_fields_isolation ON system_field_configurations
-        FOR ALL TO authenticated_users
+        FOR ALL TO PUBLIC
         USING (organization_id = current_setting('app.current_organization_id')::uuid);
     `);
   } catch (error) {

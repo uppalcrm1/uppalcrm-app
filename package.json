@@ -1,6 +1,6 @@
 {
   "name": "uppal-crm",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Multi-tenant CRM for software licensing businesses",
   "main": "server.js",
   "scripts": {
