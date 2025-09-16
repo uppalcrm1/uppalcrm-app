@@ -89,9 +89,9 @@ const updateFieldSchema = Joi.object({
 // Get all custom fields and configuration
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    // Ensure system fields table exists
-    await ensureSystemFieldsTable();
+    console.log('Custom fields GET request - orgId:', req.organizationId);
 
+    // Get custom fields
     const customFields = await db.query(`
       SELECT id, field_name, field_label, field_type, field_options,
              is_required, is_enabled, sort_order, created_at
@@ -100,28 +100,51 @@ router.get('/', authenticateToken, async (req, res) => {
       ORDER BY sort_order ASC, created_at ASC
     `, [req.organizationId]);
 
-    // Get system field configurations (from new table)
-    const systemFields = await db.query(`
-      SELECT field_name, field_label, field_type, field_options, is_enabled, is_required, is_deleted, sort_order
-      FROM system_field_configurations
-      WHERE organization_id = $1
-    `, [req.organizationId]);
+    console.log('Custom fields found:', customFields.rows.length);
 
-    // Get legacy default field configurations (for backward compatibility)
-    const defaultFields = await db.query(`
-      SELECT field_name, is_enabled, is_required, sort_order
-      FROM default_field_configurations
-      WHERE organization_id = $1
-    `, [req.organizationId]);
+    // Try to get system field configurations, but don't fail if table doesn't exist
+    let systemFields = { rows: [] };
+    try {
+      systemFields = await db.query(`
+        SELECT field_name, field_label, field_type, field_options, is_enabled, is_required, is_deleted, sort_order
+        FROM system_field_configurations
+        WHERE organization_id = $1
+      `, [req.organizationId]);
+      console.log('System fields found:', systemFields.rows.length);
+    } catch (systemError) {
+      console.log('System fields table not found, using default fields only');
+    }
+
+    // Get default field configurations (for backward compatibility)
+    let defaultFields = { rows: [] };
+    try {
+      defaultFields = await db.query(`
+        SELECT field_name, is_enabled, is_required, sort_order
+        FROM default_field_configurations
+        WHERE organization_id = $1
+      `, [req.organizationId]);
+      console.log('Default fields found:', defaultFields.rows.length);
+    } catch (defaultError) {
+      console.log('Default fields table not found, using empty array');
+    }
 
     // Get usage statistics
-    const usage = await db.query(`
-      SELECT custom_fields_count, contacts_count
-      FROM organization_usage
-      WHERE organization_id = $1
-    `, [req.organizationId]);
+    let usage = { rows: [{ custom_fields_count: 0, contacts_count: 0 }] };
+    try {
+      const usageResult = await db.query(`
+        SELECT custom_fields_count, contacts_count
+        FROM organization_usage
+        WHERE organization_id = $1
+      `, [req.organizationId]);
+      if (usageResult.rows.length > 0) {
+        usage = usageResult;
+      }
+      console.log('Usage stats:', usage.rows[0]);
+    } catch (usageError) {
+      console.log('Usage table not found, using defaults');
+    }
 
-    res.json({
+    const response = {
       customFields: customFields.rows,
       systemFields: systemFields.rows,
       defaultFields: defaultFields.rows, // Keep for backward compatibility
@@ -131,10 +154,17 @@ router.get('/', authenticateToken, async (req, res) => {
         maxContacts: 5000,
         maxFieldOptions: 20
       }
-    });
+    };
+
+    console.log('Sending response with keys:', Object.keys(response));
+    res.json(response);
   } catch (error) {
     console.error('Error fetching custom fields:', error);
-    res.status(500).json({ error: 'Failed to fetch custom fields' });
+    console.error('Error stack:', error.stack);
+    res.status(500).json({
+      error: 'Failed to fetch custom fields',
+      details: error.message
+    });
   }
 });
 
