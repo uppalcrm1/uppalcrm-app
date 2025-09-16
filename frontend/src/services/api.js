@@ -398,6 +398,44 @@ export const trialAPI = {
   }
 }
 
+// Custom Fields API
+export const customFieldsAPI = {
+  getFields: async () => {
+    const response = await api.get('/custom-fields')
+    return response.data
+  },
+
+  createField: async (fieldData) => {
+    const response = await api.post('/custom-fields', fieldData)
+    return response.data
+  },
+
+  updateField: async (fieldId, fieldData) => {
+    const response = await api.put(`/custom-fields/${fieldId}`, fieldData)
+    return response.data
+  },
+
+  deleteField: async (fieldId) => {
+    const response = await api.delete(`/custom-fields/${fieldId}`)
+    return response.data
+  },
+
+  toggleField: async (fieldId, enabled) => {
+    const response = await api.put(`/custom-fields/${fieldId}/toggle`, { enabled })
+    return response.data
+  },
+
+  getFormConfig: async () => {
+    const response = await api.get('/custom-fields/form-config')
+    return response.data
+  },
+
+  updateSystemField: async (fieldName, fieldData) => {
+    const response = await api.put(`/custom-fields/default/${fieldName}`, fieldData)
+    return response.data
+  }
+}
+
 // User Management API
 export const userManagementAPI = {
   // Get all users with pagination and filtering

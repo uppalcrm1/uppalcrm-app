@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Eye, EyeOff, AlertCircle, Database, Shield, CheckCircle, X } from 'lucide-react';
+import { Plus, Trash2, Eye, EyeOff, AlertCircle, Database, Shield, CheckCircle, X, Edit } from 'lucide-react';
+import { customFieldsAPI } from '../services/api';
 
 const FieldManager = () => {
   const [fieldData, setFieldData] = useState({
@@ -20,6 +21,9 @@ const FieldManager = () => {
   });
   const [newOption, setNewOption] = useState('');
   const [errors, setErrors] = useState({});
+  const [editingSystemField, setEditingSystemField] = useState(null);
+  const [systemFieldOptions, setSystemFieldOptions] = useState([]);
+  const [newSystemOption, setNewSystemOption] = useState('');
 
   useEffect(() => {
     loadFieldData();
@@ -27,13 +31,145 @@ const FieldManager = () => {
 
   const loadFieldData = async () => {
     try {
-      const response = await fetch('/api/custom-fields', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+      const data = await customFieldsAPI.getFields();
+
+      // Merge system field configurations with defaults
+      const systemFieldDefaults = [
+        {
+          name: 'firstName',
+          label: 'First Name',
+          type: 'text',
+          required: true,
+          editable: false,
+          deletable: false,
+          options: null
+        },
+        {
+          name: 'lastName',
+          label: 'Last Name',
+          type: 'text',
+          required: true,
+          editable: false,
+          deletable: false,
+          options: null
+        },
+        {
+          name: 'email',
+          label: 'Email',
+          type: 'email',
+          required: false,
+          editable: true,
+          deletable: true,
+          options: null
+        },
+        {
+          name: 'phone',
+          label: 'Phone',
+          type: 'tel',
+          required: false,
+          editable: true,
+          deletable: true,
+          options: null
+        },
+        {
+          name: 'company',
+          label: 'Company',
+          type: 'text',
+          required: false,
+          editable: true,
+          deletable: true,
+          options: null
+        },
+        {
+          name: 'source',
+          label: 'Source',
+          type: 'select',
+          required: false,
+          editable: true,
+          deletable: true,
+          options: ['Website', 'Referral', 'Social', 'Cold-call', 'Email', 'Advertisement', 'Trade-show', 'Other']
+        },
+        {
+          name: 'status',
+          label: 'Status',
+          type: 'select',
+          required: false,
+          editable: true,
+          deletable: true,
+          options: ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'converted', 'lost']
+        },
+        {
+          name: 'priority',
+          label: 'Priority',
+          type: 'select',
+          required: false,
+          editable: true,
+          deletable: true,
+          options: ['low', 'medium', 'high']
+        },
+        {
+          name: 'potentialValue',
+          label: 'Potential Value ($)',
+          type: 'number',
+          required: false,
+          editable: true,
+          deletable: true,
+          options: null
+        },
+        {
+          name: 'assignedTo',
+          label: 'Assign To',
+          type: 'text',
+          required: false,
+          editable: true,
+          deletable: true,
+          options: null
+        },
+        {
+          name: 'nextFollowUp',
+          label: 'Next Follow Up',
+          type: 'date',
+          required: false,
+          editable: true,
+          deletable: true,
+          options: null
+        },
+        {
+          name: 'notes',
+          label: 'Notes',
+          type: 'textarea',
+          required: false,
+          editable: true,
+          deletable: true,
+          options: null
         }
+      ];
+
+      // Merge system field configurations with defaults
+      const mergedSystemFields = systemFieldDefaults.map(defaultField => {
+        const customConfig = data.systemFields?.find(f => f.field_name === defaultField.name);
+        const legacyConfig = data.defaultFields?.find(f => f.field_name === defaultField.name);
+
+        return {
+          ...defaultField,
+          label: customConfig?.field_label || defaultField.label,
+          type: customConfig?.field_type || defaultField.type,
+          options: customConfig?.field_options || defaultField.options,
+          is_enabled: customConfig?.is_enabled !== undefined ? customConfig.is_enabled :
+                     legacyConfig?.is_enabled !== undefined ? legacyConfig.is_enabled : true,
+          is_required: customConfig?.is_required !== undefined ? customConfig.is_required :
+                      legacyConfig?.is_required !== undefined ? legacyConfig.is_required : defaultField.required,
+          is_deleted: customConfig?.is_deleted || false,
+          editable: defaultField.editable,
+          deletable: defaultField.deletable
+        };
+      }).filter(field => !field.is_deleted); // Filter out deleted fields
+
+      setFieldData({
+        ...data,
+        systemFields: mergedSystemFields,
+        limits: data.limits || { maxCustomFields: 15, maxContacts: 5000, maxFieldOptions: 20 }
       });
-      const data = await response.json();
-      setFieldData(data);
     } catch (error) {
       console.error('Error loading field data:', error);
     } finally {
@@ -43,8 +179,8 @@ const FieldManager = () => {
 
   const addOption = () => {
     if (newOption.trim() && !newField.field_options.includes(newOption.trim())) {
-      if (newField.field_options.length >= fieldData.limits.maxFieldOptions) {
-        setErrors(prev => ({...prev, options: [`Maximum ${fieldData.limits.maxFieldOptions} options allowed`]}));
+      if (newField.field_options.length >= (fieldData.limits?.maxFieldOptions || 20)) {
+        setErrors(prev => ({...prev, options: [`Maximum ${fieldData.limits?.maxFieldOptions || 20} options allowed`]}));
         return;
       }
       setNewField(prev => ({
@@ -88,20 +224,7 @@ const FieldManager = () => {
         return;
       }
 
-      const response = await fetch('/api/custom-fields', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify(newField)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        setErrors({general: [errorData.error]});
-        return;
-      }
+      await customFieldsAPI.createField(newField);
 
       await loadFieldData();
       setNewField({
@@ -123,12 +246,7 @@ const FieldManager = () => {
     }
 
     try {
-      await fetch(`/api/custom-fields/${fieldId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
+      await customFieldsAPI.deleteField(fieldId);
       await loadFieldData();
     } catch (error) {
       console.error('Error deleting field:', error);
@@ -137,14 +255,7 @@ const FieldManager = () => {
 
   const toggleCustomField = async (fieldId, currentEnabled) => {
     try {
-      await fetch(`/api/custom-fields/${fieldId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({ is_enabled: !currentEnabled })
-      });
+      await customFieldsAPI.toggleField(fieldId, !currentEnabled);
       await loadFieldData();
     } catch (error) {
       console.error('Error toggling field:', error);
@@ -153,28 +264,80 @@ const FieldManager = () => {
 
   const toggleDefaultField = async (fieldName, currentEnabled) => {
     try {
-      await fetch(`/api/custom-fields/default/${fieldName}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({ is_enabled: !currentEnabled })
-      });
+      await customFieldsAPI.updateSystemField(fieldName, { is_enabled: !currentEnabled });
       await loadFieldData();
     } catch (error) {
       console.error('Error toggling default field:', error);
     }
   };
 
+  const deleteSystemField = async (fieldName) => {
+    if (!confirm(`Are you sure you want to delete the ${fieldName} field? This will remove it from all lead forms.`)) {
+      return;
+    }
+
+    try {
+      console.log('Attempting to delete system field:', fieldName);
+      await customFieldsAPI.updateSystemField(fieldName, {
+        is_deleted: true,
+        is_enabled: false
+      });
+      console.log('System field deletion request sent successfully');
+      await loadFieldData();
+      alert(`${fieldName} field has been deleted successfully.`);
+    } catch (error) {
+      console.error('Error deleting system field:', error);
+      alert(`Failed to delete ${fieldName} field: ${error.message || 'Please try again.'}`);
+    }
+  };
+
+  const updateSystemField = async () => {
+    try {
+      const updateData = {
+        is_enabled: editingSystemField.is_enabled,
+        is_required: editingSystemField.is_required,
+        field_label: editingSystemField.label,
+        field_type: editingSystemField.type
+      };
+
+      // If it's a select field, include options
+      if (editingSystemField.type === 'select') {
+        updateData.field_options = systemFieldOptions;
+      }
+
+      await customFieldsAPI.updateSystemField(editingSystemField.name, updateData);
+
+      await loadFieldData();
+      setEditingSystemField(null);
+      setSystemFieldOptions([]);
+      setNewSystemOption('');
+    } catch (error) {
+      console.error('Error updating system field:', error);
+    }
+  };
+
+  const addSystemOption = () => {
+    if (newSystemOption.trim() && !systemFieldOptions.includes(newSystemOption.trim())) {
+      if (systemFieldOptions.length >= (fieldData.limits?.maxFieldOptions || 20)) {
+        return;
+      }
+      setSystemFieldOptions(prev => [...prev, newSystemOption.trim()]);
+      setNewSystemOption('');
+    }
+  };
+
+  const removeSystemOption = (index) => {
+    setSystemFieldOptions(prev => prev.filter((_, i) => i !== index));
+  };
+
   if (loading) {
     return <div className="flex justify-center p-8">Loading...</div>;
   }
 
-  const { customFields, defaultFields, usage, limits } = fieldData;
-  const remainingFields = limits.maxCustomFields - usage.custom_fields_count;
-  const atLimit = usage.custom_fields_count >= limits.maxCustomFields;
-  const nearLimit = usage.custom_fields_count >= limits.maxCustomFields * 0.8;
+  const { customFields, defaultFields, usage, limits } = fieldData || {};
+  const remainingFields = (limits?.maxCustomFields || 10) - (usage?.custom_fields_count || 0);
+  const atLimit = (usage?.custom_fields_count || 0) >= (limits?.maxCustomFields || 10);
+  const nearLimit = (usage?.custom_fields_count || 0) >= (limits?.maxCustomFields || 10) * 0.8;
 
   return (
     <div className="max-w-6xl mx-auto p-6 bg-gray-50 min-h-screen">
@@ -195,14 +358,14 @@ const FieldManager = () => {
                 <Database className="w-4 h-4 text-gray-400" />
               </div>
               <div className="text-2xl font-bold text-gray-900">
-                {usage.custom_fields_count}
-                <span className="text-sm font-normal text-gray-500">/{limits.maxCustomFields}</span>
+                {usage?.custom_fields_count || 0}
+                <span className="text-sm font-normal text-gray-500">/{limits?.maxCustomFields || 10}</span>
               </div>
               <div className="mt-2">
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div
                     className={`h-2 rounded-full ${nearLimit ? 'bg-red-500' : 'bg-green-500'}`}
-                    style={{ width: `${Math.min((usage.custom_fields_count / limits.maxCustomFields) * 100, 100)}%` }}
+                    style={{ width: `${Math.min(((usage?.custom_fields_count || 0) / (limits?.maxCustomFields || 10)) * 100, 100)}%` }}
                   />
                 </div>
                 <span className="text-xs text-gray-500 mt-1">{remainingFields} remaining</span>
@@ -216,18 +379,18 @@ const FieldManager = () => {
                 <Shield className="w-4 h-4 text-gray-400" />
               </div>
               <div className="text-2xl font-bold text-gray-900">
-                {usage.contacts_count.toLocaleString()}
-                <span className="text-sm font-normal text-gray-500">/{limits.maxContacts.toLocaleString()}</span>
+                {(usage?.contacts_count || 0).toLocaleString()}
+                <span className="text-sm font-normal text-gray-500">/{(limits?.maxContacts || 1000).toLocaleString()}</span>
               </div>
               <div className="mt-2">
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div
                     className="h-2 rounded-full bg-purple-500"
-                    style={{ width: `${(usage.contacts_count / limits.maxContacts) * 100}%` }}
+                    style={{ width: `${((usage?.contacts_count || 0) / (limits?.maxContacts || 1000)) * 100}%` }}
                   />
                 </div>
                 <span className="text-xs text-gray-500 mt-1">
-                  {(limits.maxContacts - usage.contacts_count).toLocaleString()} remaining
+                  {((limits?.maxContacts || 1000) - (usage?.contacts_count || 0)).toLocaleString()} remaining
                 </span>
               </div>
             </div>
@@ -240,7 +403,7 @@ const FieldManager = () => {
                 <span className="font-medium text-amber-800">Approaching Field Limit</span>
               </div>
               <p className="text-sm text-amber-700 mt-1">
-                You're using {usage.custom_fields_count} of {limits.maxCustomFields} custom fields.
+                You're using {usage?.custom_fields_count || 0} of {limits?.maxCustomFields || 10} custom fields.
                 Plan your remaining fields carefully.
               </p>
             </div>
@@ -274,45 +437,71 @@ const FieldManager = () => {
           <div className="mb-8">
             <h3 className="text-lg font-medium text-gray-900 mb-4">System Fields</h3>
             <div className="space-y-3">
-              {[
-                { name: 'firstName', label: 'First Name', required: true },
-                { name: 'lastName', label: 'Last Name', required: true },
-                { name: 'email', label: 'Email', required: false },
-                { name: 'phone', label: 'Phone', required: false },
-                { name: 'company', label: 'Company', required: false },
-                { name: 'source', label: 'Source', required: false },
-              ].map(systemField => {
-                const config = defaultFields.find(f => f.field_name === systemField.name) || { is_enabled: true };
-
+              {fieldData.systemFields?.map(systemField => {
                 return (
                   <div key={systemField.name} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg bg-gray-50">
                     <div className="flex items-center gap-4">
                       <button
-                        onClick={() => toggleDefaultField(systemField.name, config.is_enabled)}
-                        disabled={systemField.required}
+                        onClick={() => toggleDefaultField(systemField.name, systemField.is_enabled)}
+                        disabled={!systemField.deletable}
                         className={`p-1 rounded ${
-                          systemField.required
+                          !systemField.deletable
                             ? 'text-gray-400 cursor-not-allowed'
-                            : config.is_enabled
+                            : systemField.is_enabled
                               ? 'text-green-600 hover:bg-green-50'
                               : 'text-gray-400 hover:bg-gray-100'
                         }`}
+                        title={!systemField.deletable ? 'Required field cannot be hidden' : 'Toggle field visibility'}
                       >
-                        {config.is_enabled ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
+                        {systemField.is_enabled ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
                       </button>
                       <div>
                         <div className="font-medium text-gray-900">
                           {systemField.label}
-                          {systemField.required && <span className="text-red-500 ml-1">*</span>}
+                          {!systemField.deletable && <span className="text-red-500 ml-1">*</span>}
+                          {systemField.is_required && systemField.deletable && <span className="text-orange-500 ml-1">*</span>}
                         </div>
                         <div className="text-sm text-gray-500">
-                          System Field {systemField.required && '• Required'}
+                          {systemField.type}
+                          {systemField.options && ` • ${systemField.options.length} options`}
+                          • System Field
+                          {!systemField.deletable && ' • Core Required'}
+                          {systemField.is_required && systemField.deletable && ' • Required'}
                         </div>
                       </div>
                     </div>
-                    <span className="text-sm text-gray-500">
-                      {config.is_enabled ? 'Visible' : 'Hidden'}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-500">
+                        {systemField.is_enabled ? 'Visible' : 'Hidden'}
+                      </span>
+                      {systemField.editable && (
+                        <button
+                          onClick={() => {
+                            setEditingSystemField({
+                              ...systemField,
+                              is_enabled: systemField.is_enabled,
+                              is_required: systemField.is_required
+                            });
+                            if (systemField.type === 'select' && systemField.options) {
+                              setSystemFieldOptions([...systemField.options]);
+                            }
+                          }}
+                          className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                          title="Edit Field"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                      )}
+                      {systemField.deletable && (
+                        <button
+                          onClick={() => deleteSystemField(systemField.name)}
+                          className="p-1 text-red-600 hover:bg-red-50 rounded"
+                          title="Delete Field"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -322,12 +511,12 @@ const FieldManager = () => {
           {/* Custom Fields */}
           <div>
             <h3 className="text-lg font-medium text-gray-900 mb-4">
-              Custom Fields ({usage.custom_fields_count}/{limits.maxCustomFields})
+              Custom Fields ({usage?.custom_fields_count || 0}/{limits?.maxCustomFields || 10})
             </h3>
 
-            {customFields.length > 0 ? (
+            {(customFields || []).length > 0 ? (
               <div className="space-y-3">
-                {customFields.map(field => (
+                {(customFields || []).map(field => (
                   <div key={field.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
                     <div className="flex items-center gap-4">
                       <button
@@ -522,6 +711,96 @@ const FieldManager = () => {
                   });
                   setErrors({});
                   setNewOption('');
+                }}
+                className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-400"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit System Field Modal */}
+      {editingSystemField && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">
+              Edit {editingSystemField.label} Field
+            </h3>
+
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="systemRequired"
+                  checked={editingSystemField.is_required || false}
+                  onChange={(e) => setEditingSystemField(prev => ({
+                    ...prev,
+                    is_required: e.target.checked
+                  }))}
+                  disabled={!editingSystemField.deletable}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <label htmlFor="systemRequired" className="text-sm text-gray-700">
+                  Make this field required
+                  {!editingSystemField.deletable && ' (Cannot change for core fields)'}
+                </label>
+              </div>
+
+              {editingSystemField.type === 'select' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Dropdown Options (max {fieldData.limits?.maxFieldOptions || 20})
+                  </label>
+                  <div className="space-y-2">
+                    {systemFieldOptions.map((option, index) => (
+                      <div key={index} className="flex gap-2">
+                        <span className="flex-1 p-2 bg-gray-50 rounded border text-sm">{option}</span>
+                        <button
+                          onClick={() => removeSystemOption(index)}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newSystemOption}
+                        onChange={(e) => setNewSystemOption(e.target.value)}
+                        placeholder="Add option"
+                        className="flex-1 p-2 border border-gray-300 rounded"
+                        onKeyPress={(e) => e.key === 'Enter' && addSystemOption()}
+                      />
+                      <button
+                        onClick={addSystemOption}
+                        className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                      >
+                        Add
+                      </button>
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {systemFieldOptions.length}/{fieldData.limits?.maxFieldOptions || 20} options
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={updateSystemField}
+                className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700"
+              >
+                Save Changes
+              </button>
+              <button
+                onClick={() => {
+                  setEditingSystemField(null);
+                  setSystemFieldOptions([]);
+                  setNewSystemOption('');
                 }}
                 className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-400"
               >
