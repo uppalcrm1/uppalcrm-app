@@ -211,6 +211,7 @@ router.get('/',
     try {
       console.log('Getting leads for organization:', req.organizationId);
       console.log('Query params:', req.query);
+      console.log('Value column being used:', valueColumnName);
 
       // Check if organization ID exists
       if (!req.organizationId) {
@@ -274,12 +275,18 @@ router.get('/',
       console.error('Error details:', {
         message: error.message,
         stack: error.stack,
-        organizationId: req.organizationId
+        organizationId: req.organizationId,
+        valueColumnName: valueColumnName,
+        query: `SELECT id, first_name, last_name, email, phone, company, source, status,
+               priority, ${valueColumnName}, assigned_to, next_follow_up, notes,
+               custom_fields, created_at, updated_at`,
+        params: [req.organizationId, 20, 0]
       });
       res.status(500).json({
         error: 'Failed to retrieve leads',
         message: 'Unable to get leads list',
-        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        details: error.message, // Temporarily show in production for debugging
+        valueColumn: valueColumnName
       });
     }
   }
