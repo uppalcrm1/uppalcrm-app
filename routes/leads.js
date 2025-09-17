@@ -236,11 +236,11 @@ router.get('/',
 
       const offset = (page - 1) * limit;
 
-      // Updated to include custom_fields in the query
+      // Query leads without custom_fields column
       const leads = await db.query(`
         SELECT id, first_name, last_name, email, phone, company, source, status,
                priority, ${valueColumnName}, assigned_to, next_follow_up, notes,
-               custom_fields, created_at, updated_at
+               created_at, updated_at
         FROM leads
         WHERE organization_id = $1
         ORDER BY ${sort} ${order.toUpperCase()}
@@ -279,7 +279,7 @@ router.get('/',
         valueColumnName: valueColumnName,
         query: `SELECT id, first_name, last_name, email, phone, company, source, status,
                priority, ${valueColumnName}, assigned_to, next_follow_up, notes,
-               custom_fields, created_at, updated_at`,
+               created_at, updated_at`,
         params: [req.organizationId, 20, 0]
       });
       res.status(500).json({
@@ -437,14 +437,14 @@ router.post('/', authenticateToken, async (req, res) => {
     const result = await db.query(`
       INSERT INTO leads
       (organization_id, first_name, last_name, email, phone, company, source,
-       status, priority, ${valueColumnName}, assigned_to, next_follow_up, notes, custom_fields, created_by)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+       status, priority, ${valueColumnName}, assigned_to, next_follow_up, notes, created_by)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
       RETURNING id, first_name, last_name, email, phone, company, source, status,
-                priority, ${valueColumnName}, assigned_to, next_follow_up, notes, custom_fields, created_at
+                priority, ${valueColumnName}, assigned_to, next_follow_up, notes, created_at
     `, [
       req.organizationId, firstName, lastName, email, phone, company, source,
       status || 'new', priority || 'medium', potentialValue, assignedTo, nextFollowUp, notes,
-      JSON.stringify(customFields), req.userId
+      req.userId
     ]);
 
     res.status(201).json({
