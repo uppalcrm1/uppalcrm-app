@@ -30,6 +30,8 @@ const DynamicLeadForm = ({ onSubmit, initialData = {} }) => {
       });
       const data = await response.json();
       console.log('Form config loaded:', data);
+      console.log('System fields from API:', data.systemFields);
+      console.log('Potential Value field in systemFields?', data.systemFields?.find(f => f.field_name === 'potentialValue'));
       setFormConfig(data);
 
       // Initialize form data dynamically based on enabled system fields
@@ -52,6 +54,9 @@ const DynamicLeadForm = ({ onSubmit, initialData = {} }) => {
       });
 
       console.log('Initialized form data for enabled fields:', Object.keys(initialFormData));
+
+      // Temporary alert for debugging
+      alert(`Debug: Found ${data.systemFields?.length || 0} system fields. Potential Value included: ${data.systemFields?.some(f => f.field_name === 'potentialValue') ? 'YES' : 'NO'}`);
 
       setFormData(prev => ({ ...initialFormData, ...prev }));
     } catch (error) {
