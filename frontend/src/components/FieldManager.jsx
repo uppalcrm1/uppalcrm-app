@@ -35,6 +35,13 @@ const FieldManager = () => {
       console.log('API Response data:', data);
       console.log('data.systemFields:', data.systemFields);
 
+      // Check if source field has updated options in API response
+      const sourceFromAPI = data.systemFields?.find(f => f.field_name === 'source');
+      if (sourceFromAPI) {
+        console.log('Source field from API:', sourceFromAPI);
+        console.log('Source options from API:', sourceFromAPI.field_options);
+      }
+
       // Merge system field configurations with defaults
       const systemFieldDefaults = [
         {
@@ -151,6 +158,15 @@ const FieldManager = () => {
       const mergedSystemFields = systemFieldDefaults.map(defaultField => {
         const customConfig = data.systemFields?.find(f => f.field_name === defaultField.name);
         const legacyConfig = data.defaultFields?.find(f => f.field_name === defaultField.name);
+
+        // Debug the source field specifically
+        if (defaultField.name === 'source') {
+          console.log('DEBUG Source field merge:');
+          console.log('  defaultField.options:', defaultField.options);
+          console.log('  customConfig:', customConfig);
+          console.log('  customConfig?.field_options:', customConfig?.field_options);
+          console.log('  Final options will be:', customConfig?.field_options || defaultField.options);
+        }
 
         return {
           ...defaultField,
