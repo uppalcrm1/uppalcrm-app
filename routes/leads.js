@@ -76,6 +76,29 @@ const validateCustomFields = (customFields, fieldConfigs) => {
 router.use(authenticateToken);
 router.use(validateOrganizationContext);
 
+// Database compatibility helper - detects which value column exists
+let valueColumnName = 'value'; // default
+const detectValueColumn = async () => {
+  try {
+    const { query } = require('../database/connection');
+    const result = await query(`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_name = 'leads' AND column_name IN ('value', 'potential_value')
+      LIMIT 1
+    `);
+    if (result.rows.length > 0) {
+      valueColumnName = result.rows[0].column_name;
+      console.log(`🔧 Using value column: ${valueColumnName}`);
+    }
+  } catch (error) {
+    console.log('⚠️ Could not detect value column, using default: value');
+  }
+};
+
+// Initialize column detection
+detectValueColumn();
+
 /**
  * GET /leads/debug/tables
  * Debug endpoint to check database tables (development only)
@@ -215,7 +238,7 @@ router.get('/',
       // Updated to include custom_fields in the query
       const leads = await db.query(`
         SELECT id, first_name, last_name, email, phone, company, source, status,
-               priority, value, assigned_to, next_follow_up, notes,
+               priority, ${valueColumnName}, assigned_to, next_follow_up, notes,
                custom_fields, created_at, updated_at
         FROM leads
         WHERE organization_id = $1
@@ -407,10 +430,10 @@ router.post('/', authenticateToken, async (req, res) => {
     const result = await db.query(`
       INSERT INTO leads
       (organization_id, first_name, last_name, email, phone, company, source,
-       status, priority, value, assigned_to, next_follow_up, notes, custom_fields, created_by)
+       status, priority, ${valueColumnName}, assigned_to, next_follow_up, notes, custom_fields, created_by)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
       RETURNING id, first_name, last_name, email, phone, company, source, status,
-                priority, value, assigned_to, next_follow_up, notes, custom_fields, created_at
+                priority, ${valueColumnName}, assigned_to, next_follow_up, notes, custom_fields, created_at
     `, [
       req.organizationId, firstName, lastName, email, phone, company, source,
       status || 'new', priority || 'medium', potentialValue, assignedTo, nextFollowUp, notes,
