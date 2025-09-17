@@ -622,7 +622,9 @@ router.put('/default/:fieldName', authenticateToken, async (req, res) => {
 // Get form configuration for dynamic form rendering (updated version)
 router.get('/form-config', authenticateToken, async (req, res) => {
   try {
-    await ensureSystemFieldsTable();
+    await ensureTablesExist();
+
+    console.log('🔍 Form config request for organization:', req.organizationId);
 
     // Get custom fields
     const customFields = await db.query(`
@@ -632,69 +634,89 @@ router.get('/form-config', authenticateToken, async (req, res) => {
       ORDER BY sort_order ASC, created_at ASC
     `, [req.organizationId]);
 
-    // Get system field configurations
-    const systemFieldConfigs = await db.query(`
-      SELECT field_name, field_label, field_type, field_options, is_enabled, is_required, is_deleted
-      FROM system_field_configurations
-      WHERE organization_id = $1
-    `, [req.organizationId]);
-
-    // Default system fields with fallback configurations
-    const defaultSystemFields = {
-      firstName: { label: 'First Name', type: 'text', required: true, enabled: true },
-      lastName: { label: 'Last Name', type: 'text', required: true, enabled: true },
-      email: { label: 'Email', type: 'email', required: false, enabled: true },
-      phone: { label: 'Phone', type: 'tel', required: false, enabled: true },
-      company: { label: 'Company', type: 'text', required: false, enabled: true },
+    // Define system field defaults
+    const systemFieldDefaults = {
+      firstName: { label: 'First Name', type: 'text', required: true, editable: false },
+      lastName: { label: 'Last Name', type: 'text', required: true, editable: false },
+      email: { label: 'Email', type: 'email', required: false, editable: true },
+      phone: { label: 'Phone', type: 'tel', required: false, editable: true },
+      company: { label: 'Company', type: 'text', required: false, editable: true },
       source: {
         label: 'Source',
         type: 'select',
         required: false,
-        enabled: true,
+        editable: true,
         options: ['Website', 'Referral', 'Social', 'Cold-call', 'Email', 'Advertisement', 'Trade-show', 'Other']
       },
       status: {
         label: 'Status',
         type: 'select',
         required: false,
-        enabled: true,
+        editable: true,
         options: ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'converted', 'lost']
       },
       priority: {
         label: 'Priority',
         type: 'select',
         required: false,
-        enabled: true,
+        editable: true,
         options: ['low', 'medium', 'high']
       },
-      potentialValue: { label: 'Potential Value ($)', type: 'number', required: false, enabled: true },
-      assignedTo: { label: 'Assign To', type: 'text', required: false, enabled: true },
-      nextFollowUp: { label: 'Next Follow Up', type: 'date', required: false, enabled: true },
-      notes: { label: 'Notes', type: 'textarea', required: false, enabled: true }
+      potentialValue: { label: 'Potential Value ($)', type: 'number', required: false, editable: true },
+      assignedTo: { label: 'Assign To', type: 'text', required: false, editable: true },
+      nextFollowUp: { label: 'Next Follow Up', type: 'date', required: false, editable: true },
+      notes: { label: 'Notes', type: 'textarea', required: false, editable: true }
     };
 
-    // Build system fields array with custom configurations
-    const systemFields = Object.keys(defaultSystemFields).map(fieldName => {
-      const customConfig = systemFieldConfigs.rows.find(f => f.field_name === fieldName);
-      const defaultConfig = defaultSystemFields[fieldName];
+    // Get any stored configurations for system fields from default_field_configurations
+    let storedConfigs = {};
+    try {
+      const configResult = await db.query(`
+        SELECT field_name, field_options, is_enabled, is_required, sort_order
+        FROM default_field_configurations
+        WHERE organization_id = $1
+      `, [req.organizationId]);
 
-      if (customConfig && customConfig.is_deleted) {
-        return null; // Field is deleted
+      configResult.rows.forEach(config => {
+        storedConfigs[config.field_name] = config;
+      });
+      console.log('Form config stored configs found:', Object.keys(storedConfigs).length);
+    } catch (configError) {
+      console.log('No stored system field configs found for form');
+    }
+
+    // Build complete system fields list for form (only enabled fields)
+    const systemFields = [];
+    Object.entries(systemFieldDefaults).forEach(([fieldName, fieldDef]) => {
+      const storedConfig = storedConfigs[fieldName] || {};
+
+      // Use stored field options if they exist, otherwise use defaults
+      let fieldOptions = fieldDef.options || null;
+      if (storedConfig.field_options) {
+        fieldOptions = storedConfig.field_options;
       }
 
-      return {
-        field_name: fieldName,
-        field_label: customConfig?.field_label || defaultConfig.label,
-        field_type: customConfig?.field_type || defaultConfig.type,
-        field_options: customConfig?.field_options || defaultConfig.options,
-        is_required: customConfig?.is_required !== undefined ? customConfig.is_required : defaultConfig.required,
-        is_enabled: customConfig?.is_enabled !== undefined ? customConfig.is_enabled : defaultConfig.enabled
-      };
-    }).filter(Boolean); // Remove null entries (deleted fields)
+      const isEnabled = storedConfig.is_enabled !== undefined ? storedConfig.is_enabled : true;
+
+      // Only include enabled fields in the form
+      if (isEnabled) {
+        systemFields.push({
+          field_name: fieldName,
+          field_label: fieldDef.label,
+          field_type: fieldDef.type,
+          field_options: fieldOptions,
+          is_required: storedConfig.is_required !== undefined ? storedConfig.is_required : fieldDef.required,
+          is_enabled: true,
+          sort_order: storedConfig.sort_order || 0
+        });
+      }
+    });
+
+    console.log('Form config system fields count:', systemFields.length);
 
     res.json({
       customFields: customFields.rows,
-      systemFields: systemFields.filter(f => f.is_enabled) // Only return enabled fields
+      systemFields: systemFields
     });
   } catch (error) {
     console.error('Error fetching form config:', error);
