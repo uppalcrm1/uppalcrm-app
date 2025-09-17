@@ -215,7 +215,7 @@ router.get('/',
       // Updated to include custom_fields in the query
       const leads = await db.query(`
         SELECT id, first_name, last_name, email, phone, company, source, status,
-               priority, potential_value, assigned_to, next_follow_up, notes,
+               priority, value, assigned_to, next_follow_up, notes,
                custom_fields, created_at, updated_at
         FROM leads
         WHERE organization_id = $1
@@ -407,10 +407,10 @@ router.post('/', authenticateToken, async (req, res) => {
     const result = await db.query(`
       INSERT INTO leads
       (organization_id, first_name, last_name, email, phone, company, source,
-       status, priority, potential_value, assigned_to, next_follow_up, notes, custom_fields, created_by)
+       status, priority, value, assigned_to, next_follow_up, notes, custom_fields, created_by)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
       RETURNING id, first_name, last_name, email, phone, company, source, status,
-                priority, potential_value, assigned_to, next_follow_up, notes, custom_fields, created_at
+                priority, value, assigned_to, next_follow_up, notes, custom_fields, created_at
     `, [
       req.organizationId, firstName, lastName, email, phone, company, source,
       status || 'new', priority || 'medium', potentialValue, assignedTo, nextFollowUp, notes,

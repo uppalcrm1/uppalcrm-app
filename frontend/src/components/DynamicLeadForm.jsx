@@ -55,9 +55,6 @@ const DynamicLeadForm = ({ onSubmit, initialData = {} }) => {
 
       console.log('Initialized form data for enabled fields:', Object.keys(initialFormData));
 
-      // Temporary alert for debugging
-      alert(`Debug: Found ${data.systemFields?.length || 0} system fields. Potential Value included: ${data.systemFields?.some(f => f.field_name === 'potentialValue') ? 'YES' : 'NO'}`);
-
       setFormData(prev => ({ ...initialFormData, ...prev }));
     } catch (error) {
       console.error('Error loading form config:', error);
