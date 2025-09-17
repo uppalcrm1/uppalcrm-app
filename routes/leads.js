@@ -236,23 +236,76 @@ router.get('/',
 
       const offset = (page - 1) * limit;
 
+      // Validate sort column to prevent SQL injection
+      const validSortColumns = ['created_at', 'updated_at', 'first_name', 'last_name', 'company', 'value', 'status'];
+      const sortColumn = validSortColumns.includes(sort) ? sort : 'created_at';
+
+      // Validate order direction
+      const orderDirection = order.toLowerCase() === 'asc' ? 'ASC' : 'DESC';
+
+      // Build WHERE conditions and parameters
+      let whereConditions = ['organization_id = $1'];
+      let queryParams = [req.organizationId];
+      let paramIndex = 2;
+
+      if (status) {
+        whereConditions.push(`status = $${paramIndex}`);
+        queryParams.push(status);
+        paramIndex++;
+      }
+
+      if (priority) {
+        whereConditions.push(`priority = $${paramIndex}`);
+        queryParams.push(priority);
+        paramIndex++;
+      }
+
+      if (assigned_to) {
+        whereConditions.push(`assigned_to = $${paramIndex}`);
+        queryParams.push(assigned_to);
+        paramIndex++;
+      }
+
+      if (source) {
+        whereConditions.push(`source = $${paramIndex}`);
+        queryParams.push(source);
+        paramIndex++;
+      }
+
+      if (search) {
+        whereConditions.push(`(
+          first_name ILIKE $${paramIndex} OR
+          last_name ILIKE $${paramIndex} OR
+          email ILIKE $${paramIndex} OR
+          company ILIKE $${paramIndex}
+        )`);
+        queryParams.push(`%${search}%`);
+        paramIndex++;
+      }
+
+      const whereClause = whereConditions.join(' AND ');
+
+      // Add pagination parameters
+      queryParams.push(limit, offset);
+
       // Query leads without custom_fields column
       const leads = await db.query(`
         SELECT id, first_name, last_name, email, phone, company, source, status,
                priority, ${valueColumnName}, assigned_to, next_follow_up, notes,
                created_at, updated_at
         FROM leads
-        WHERE organization_id = $1
-        ORDER BY ${sort} ${order.toUpperCase()}
-        LIMIT $2 OFFSET $3
-      `, [req.organizationId, limit, offset]);
+        WHERE ${whereClause}
+        ORDER BY ${sortColumn} ${orderDirection}
+        LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+      `, queryParams);
 
-      // Get total count for pagination
+      // Get total count for pagination with same filters
+      const countParams = queryParams.slice(0, -2); // Remove limit and offset
       const countResult = await db.query(`
         SELECT COUNT(*) as total
         FROM leads
-        WHERE organization_id = $1
-      `, [req.organizationId]);
+        WHERE ${whereClause}
+      `, countParams);
 
       const total = parseInt(countResult.rows[0].total);
       const totalPages = Math.ceil(total / limit);
