@@ -38,6 +38,7 @@ const ensureTablesExist = async () => {
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
         organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
         field_name VARCHAR(50) NOT NULL,
+        field_options JSONB,
         is_enabled BOOLEAN DEFAULT TRUE,
         is_required BOOLEAN DEFAULT FALSE,
         sort_order INTEGER DEFAULT 0,
@@ -45,6 +46,12 @@ const ensureTablesExist = async () => {
 
         UNIQUE(organization_id, field_name)
       );
+    `);
+
+    // Add field_options column if it doesn't exist (for existing tables)
+    await db.query(`
+      ALTER TABLE default_field_configurations
+      ADD COLUMN IF NOT EXISTS field_options JSONB;
     `);
 
     // Create organization usage tracking table
@@ -570,18 +577,20 @@ router.put('/default/:fieldName', authenticateToken, async (req, res) => {
 
     const result = await db.query(`
       INSERT INTO default_field_configurations
-      (organization_id, field_name, is_enabled, is_required, sort_order, updated_at)
-      VALUES ($1, $2, $3, $4, $5, NOW())
+      (organization_id, field_name, field_options, is_enabled, is_required, sort_order, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, NOW())
       ON CONFLICT (organization_id, field_name)
       DO UPDATE SET
+        field_options = EXCLUDED.field_options,
         is_enabled = EXCLUDED.is_enabled,
         is_required = EXCLUDED.is_required,
         sort_order = EXCLUDED.sort_order,
         updated_at = NOW()
-      RETURNING field_name, is_enabled, is_required, sort_order
+      RETURNING field_name, field_options, is_enabled, is_required, sort_order
     `, [
       req.organizationId,
       fieldName,
+      JSON.stringify(fieldConfig.options),
       fieldConfig.is_enabled,
       fieldConfig.is_required,
       0 // default sort order
