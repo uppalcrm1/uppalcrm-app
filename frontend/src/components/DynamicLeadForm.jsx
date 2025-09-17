@@ -29,29 +29,29 @@ const DynamicLeadForm = ({ onSubmit, initialData = {} }) => {
         }
       });
       const data = await response.json();
+      console.log('Form config loaded:', data);
       setFormConfig(data);
 
-      // Initialize form data
-      const initialFormData = {
-        firstName: '',
-        lastName: '',
-        email: '',
-        phone: '',
-        company: '',
-        source: '',
-        status: 'new',
-        priority: 'medium',
-        potentialValue: '',
-        assignedTo: '',
-        nextFollowUp: '',
-        notes: '',
-        customFields: {}
-      };
+      // Initialize form data dynamically based on enabled system fields
+      const initialFormData = { customFields: {} };
+
+      // Initialize system fields based on what's enabled in the config
+      data.systemFields.forEach(field => {
+        let defaultValue = '';
+        if (field.field_type === 'select') {
+          // Set default values for select fields
+          if (field.field_name === 'status') defaultValue = 'new';
+          else if (field.field_name === 'priority') defaultValue = 'medium';
+        }
+        initialFormData[field.field_name] = defaultValue;
+      });
 
       // Initialize custom fields
       data.customFields.forEach(field => {
         initialFormData.customFields[field.field_name] = '';
       });
+
+      console.log('Initialized form data for enabled fields:', Object.keys(initialFormData));
 
       setFormData(prev => ({ ...initialFormData, ...prev }));
     } catch (error) {
