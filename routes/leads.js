@@ -212,6 +212,7 @@ router.get('/',
       console.log('Getting leads for organization:', req.organizationId);
       console.log('Query params:', req.query);
       console.log('Value column being used:', valueColumnName);
+      console.log('🔄 Updated leads endpoint - no custom_fields column');
 
       // Check if organization ID exists
       if (!req.organizationId) {
