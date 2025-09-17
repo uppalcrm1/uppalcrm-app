@@ -32,6 +32,8 @@ const FieldManager = () => {
   const loadFieldData = async () => {
     try {
       const data = await customFieldsAPI.getFields();
+      console.log('API Response data:', data);
+      console.log('data.systemFields:', data.systemFields);
 
       // Merge system field configurations with defaults
       const systemFieldDefaults = [
@@ -164,6 +166,9 @@ const FieldManager = () => {
           deletable: defaultField.deletable
         };
       }).filter(field => !field.is_deleted); // Filter out deleted fields
+
+      console.log('Merged system fields:', mergedSystemFields);
+      console.log('Source field after merge:', mergedSystemFields.find(f => f.name === 'source'));
 
       setFieldData({
         ...data,
@@ -305,14 +310,22 @@ const FieldManager = () => {
         updateData.field_options = systemFieldOptions;
       }
 
-      await customFieldsAPI.updateSystemField(editingSystemField.name, updateData);
+      console.log('Updating system field:', editingSystemField.name, updateData);
+      const result = await customFieldsAPI.updateSystemField(editingSystemField.name, updateData);
+      console.log('Update result:', result);
 
+      console.log('Reloading field data...');
       await loadFieldData();
+      console.log('Field data reloaded');
+
       setEditingSystemField(null);
       setSystemFieldOptions([]);
       setNewSystemOption('');
+
+      alert(`${editingSystemField.label} field has been updated successfully!`);
     } catch (error) {
       console.error('Error updating system field:', error);
+      alert(`Failed to update ${editingSystemField.label} field: ${error.message || 'Please try again.'}`);
     }
   };
 
