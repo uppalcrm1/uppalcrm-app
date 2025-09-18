@@ -478,11 +478,37 @@ router.get('/:id',
  */
 router.post('/', authenticateToken, async (req, res) => {
   try {
+    console.log('🔍 Creating lead with data:', req.body);
+    console.log('🔍 Organization ID:', req.organizationId);
+    console.log('🔍 User ID:', req.userId);
+    console.log('🔍 Value column name:', valueColumnName);
+
     const {
       firstName, lastName, email, phone, company, source,
       status, priority, potentialValue, assignedTo, nextFollowUp, notes,
       customFields = {} // Accept custom fields
     } = req.body;
+
+    // Validate required fields
+    if (!firstName || !lastName) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        message: 'First name and last name are required'
+      });
+    }
+
+    // Validate authentication context
+    if (!req.organizationId || !req.userId) {
+      return res.status(401).json({
+        error: 'Authentication failed',
+        message: 'Missing organization or user context'
+      });
+    }
+
+    // Ensure value column is detected
+    if (!valueColumnName) {
+      await detectValueColumn();
+    }
 
     // Get field configurations for validation
     const fieldConfigs = await getFieldConfigurations(req.organizationId);
