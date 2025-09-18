@@ -166,11 +166,12 @@ const DynamicLeadForm = ({ onSubmit, initialData = {} }) => {
   };
 
   const renderField = (field, isCustom = false) => {
-    const fieldName = isCustom ? field.field_name : field.name;
-    const fieldLabel = isCustom ? field.field_label : field.label;
-    const fieldType = isCustom ? field.field_type : field.type;
+    // Backend sends all fields (system and custom) with same structure
+    const fieldName = field.field_name;
+    const fieldLabel = field.field_label;
+    const fieldType = field.field_type;
     const fieldValue = isCustom ? formData.customFields[fieldName] || '' : formData[fieldName] || '';
-    const isRequired = isCustom ? field.is_required : field.required;
+    const isRequired = field.is_required;
     const errorKey = isCustom ? `custom_${fieldName}` : fieldName;
 
     const getFieldIcon = (type) => {
@@ -201,7 +202,7 @@ const DynamicLeadForm = ({ onSubmit, initialData = {} }) => {
 
     switch (fieldType) {
       case 'select':
-        const options = isCustom ? field.field_options : getSystemFieldOptions(fieldName);
+        const options = field.field_options;
         return (
           <div key={fieldName}>
             <label className="block text-sm font-medium text-gray-700 mb-2">
