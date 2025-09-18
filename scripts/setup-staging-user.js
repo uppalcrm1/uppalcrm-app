@@ -22,13 +22,18 @@ async function setupStagingUser() {
     // Drop and recreate organizations table to fix schema
     await pool.query('DROP TABLE IF EXISTS organizations CASCADE');
 
-    // Create organizations table with correct schema
+    // Create organizations table with complete schema
     await pool.query(`
       CREATE TABLE organizations (
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
         name VARCHAR(255) NOT NULL,
         slug VARCHAR(100) UNIQUE NOT NULL,
         is_active BOOLEAN DEFAULT true,
+        settings JSONB DEFAULT '{}',
+        subscription_plan VARCHAR(50) DEFAULT 'starter',
+        max_users INTEGER DEFAULT 10,
+        purchased_licenses INTEGER DEFAULT 10,
+        domain VARCHAR(255),
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       )
@@ -37,7 +42,7 @@ async function setupStagingUser() {
     // Drop and recreate users table to fix schema
     await pool.query('DROP TABLE IF EXISTS users CASCADE');
 
-    // Create users table with correct schema
+    // Create users table with complete schema
     await pool.query(`
       CREATE TABLE users (
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -49,6 +54,10 @@ async function setupStagingUser() {
         role VARCHAR(50) DEFAULT 'admin',
         is_active BOOLEAN DEFAULT true,
         last_login TIMESTAMP WITH TIME ZONE,
+        email_verified BOOLEAN DEFAULT false,
+        permissions JSONB DEFAULT '[]',
+        status VARCHAR(50) DEFAULT 'active',
+        created_by UUID,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       )
