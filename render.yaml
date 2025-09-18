@@ -1,33 +1,31 @@
-# Render Blueprint for UppalCRM
-# This file can be used to deploy the entire stack with one click
+# Render Blueprint for UppalCRM Staging Environment
+# Deploy from 'staging' branch for testing before production
 
 services:
-  # PostgreSQL Database
+  # PostgreSQL Database (Staging)
   - type: pserv
-    name: uppalcrm-database
+    name: uppalcrm-database-staging
     plan: free
-    databaseName: uppalcrm
-    user: uppalcrm_user
-    region: ohio
 
-  # Backend API Service  
+  # Backend API Service (Staging)
   - type: web
-    name: uppalcrm-api
+    name: uppalcrm-api-staging
     runtime: node
     plan: free
     buildCommand: npm install
     startCommand: node server.js
     healthCheckPath: /health
+    branch: staging  # Deploy from staging branch
     envVars:
       - key: NODE_ENV
-        value: production
+        value: staging
       - key: DATABASE_URL
         fromDatabase:
-          name: uppalcrm-database
+          name: uppalcrm-database-staging
           property: connectionString
       - key: JWT_SECRET
         generateValue: true
-      - key: JWT_REFRESH_SECRET  
+      - key: JWT_REFRESH_SECRET
         generateValue: true
       - key: JWT_EXPIRES_IN
         value: "1h"
@@ -40,15 +38,16 @@ services:
       - key: RATE_LIMIT_MAX
         value: "100"
       - key: FRONTEND_URL
-        value: https://uppalcrm-frontend.onrender.com
+        value: https://uppalcrm-frontend-staging.onrender.com
 
-  # Frontend Web Service with Express
+  # Frontend Web Service (Staging)
   - type: web
-    name: uppalcrm-frontend
+    name: uppalcrm-frontend-staging
     runtime: node
     buildCommand: npm install && npm run build
     startCommand: npm start
     rootDir: frontend
+    branch: staging  # Deploy from staging branch
     envVars:
       - key: VITE_API_URL
-        value: https://uppalcrm-api.onrender.com/api
+        value: https://uppalcrm-api-staging.onrender.com/api
