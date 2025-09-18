@@ -152,6 +152,11 @@ export const usersAPI = {
   getStats: async () => {
     const response = await api.get('/users/stats')
     return response.data
+  },
+
+  getUsersForAssignment: async () => {
+    const response = await api.get('/users/for-assignment')
+    return response.data
   }
 }
 

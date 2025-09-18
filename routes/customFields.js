@@ -289,7 +289,7 @@ router.get('/', async (req, res) => {
         options: ['low', 'medium', 'high']
       },
       potentialValue: { label: 'Potential Value ($)', type: 'number', required: false, editable: true },
-      assignedTo: { label: 'Assign To', type: 'text', required: false, editable: true },
+      assignedTo: { label: 'Assign To', type: 'user_select', required: false, editable: true },
       nextFollowUp: { label: 'Next Follow Up', type: 'date', required: false, editable: true },
       notes: { label: 'Notes', type: 'textarea', required: false, editable: true }
     };
@@ -544,7 +544,7 @@ router.put('/default/:fieldName', async (req, res) => {
         options: ['low', 'medium', 'high']
       },
       potentialValue: { label: 'Potential Value ($)', type: 'number', required: false, editable: true },
-      assignedTo: { label: 'Assign To', type: 'text', required: false, editable: true },
+      assignedTo: { label: 'Assign To', type: 'user_select', required: false, editable: true },
       nextFollowUp: { label: 'Next Follow Up', type: 'date', required: false, editable: true },
       notes: { label: 'Notes', type: 'textarea', required: false, editable: true }
     };
@@ -667,7 +667,7 @@ router.get('/form-config', async (req, res) => {
         options: ['low', 'medium', 'high']
       },
       potentialValue: { label: 'Potential Value ($)', type: 'number', required: false, editable: true },
-      assignedTo: { label: 'Assign To', type: 'text', required: false, editable: true },
+      assignedTo: { label: 'Assign To', type: 'user_select', required: false, editable: true },
       nextFollowUp: { label: 'Next Follow Up', type: 'date', required: false, editable: true },
       notes: { label: 'Notes', type: 'textarea', required: false, editable: true }
     };

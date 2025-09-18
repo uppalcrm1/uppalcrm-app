@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Save, User, Building, Mail, Phone, Calendar, DollarSign } from 'lucide-react';
-import { customFieldsAPI, leadsAPI } from '../services/api';
+import { customFieldsAPI, leadsAPI, usersAPI } from '../services/api';
 
 const DynamicLeadForm = ({ onSubmit, initialData = {} }) => {
   const [formConfig, setFormConfig] = useState({ customFields: [], defaultFields: [] });
@@ -8,6 +8,7 @@ const DynamicLeadForm = ({ onSubmit, initialData = {} }) => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
+  const [availableUsers, setAvailableUsers] = useState([]);
 
   useEffect(() => {
     loadFormConfig();
@@ -31,6 +32,16 @@ const DynamicLeadForm = ({ onSubmit, initialData = {} }) => {
       console.log('✅ Form config loaded:', data);
 
       setFormConfig(data);
+
+      // Load available users for assignment
+      try {
+        const usersData = await usersAPI.getUsersForAssignment();
+        console.log('✅ Users for assignment loaded:', usersData);
+        setAvailableUsers(usersData.users || []);
+      } catch (usersError) {
+        console.error('❌ Error loading users for assignment:', usersError);
+        setAvailableUsers([]);
+      }
 
       // Initialize form data dynamically based on enabled system fields
       const initialFormData = { customFields: {} };
@@ -241,6 +252,36 @@ const DynamicLeadForm = ({ onSubmit, initialData = {} }) => {
                 <option key={option} value={option}>{option}</option>
               ))}
             </select>
+            {errors[errorKey] && (
+              <p className="text-red-600 text-sm mt-1">{errors[errorKey]}</p>
+            )}
+          </div>
+        );
+
+      case 'user_select':
+        return (
+          <div key={fieldName}>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              {fieldLabel}
+              {isRequired && <span className="text-red-500 ml-1">*</span>}
+            </label>
+            <div className="relative">
+              <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
+                <User className="w-4 h-4 text-gray-400" />
+              </div>
+              <select
+                value={fieldValue}
+                onChange={(e) => handleInputChange(fieldName, e.target.value, isCustom)}
+                className={`${baseClasses} pl-10`}
+              >
+                <option value="">Select Team Member</option>
+                {availableUsers.map(user => (
+                  <option key={user.id} value={user.id}>
+                    {user.label} ({user.email})
+                  </option>
+                ))}
+              </select>
+            </div>
             {errors[errorKey] && (
               <p className="text-red-600 text-sm mt-1">{errors[errorKey]}</p>
             )}

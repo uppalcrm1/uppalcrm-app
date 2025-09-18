@@ -305,6 +305,45 @@ router.delete('/:id',
 );
 
 /**
+ * GET /users/for-assignment
+ * Get users for lead/contact assignment (simple list)
+ */
+router.get('/for-assignment',
+  async (req, res) => {
+    try {
+      const { query } = require('../database/connection');
+
+      const users = await query(`
+        SELECT
+          id,
+          first_name,
+          last_name,
+          email,
+          CONCAT(first_name, ' ', last_name) as full_name
+        FROM users
+        WHERE organization_id = $1 AND is_active = true
+        ORDER BY first_name ASC, last_name ASC
+      `, [req.organizationId], req.organizationId);
+
+      res.json({
+        users: users.rows.map(user => ({
+          id: user.id,
+          value: user.id,
+          label: user.full_name,
+          email: user.email
+        }))
+      });
+    } catch (error) {
+      console.error('Get users for assignment error:', error);
+      res.status(500).json({
+        error: 'Failed to retrieve users',
+        message: 'Unable to get users for assignment'
+      });
+    }
+  }
+);
+
+/**
  * GET /users/stats
  * Get user statistics for the organization
  */
