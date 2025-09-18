@@ -311,6 +311,7 @@ router.delete('/:id',
 router.get('/for-assignment',
   async (req, res) => {
     try {
+      console.log('🔍 Getting users for assignment - Organization ID:', req.organizationId);
       const { query } = require('../database/connection');
 
       const users = await query(`
@@ -319,19 +320,25 @@ router.get('/for-assignment',
           first_name,
           last_name,
           email,
-          CONCAT(first_name, ' ', last_name) as full_name
+          (first_name || ' ' || last_name) as full_name
         FROM users
         WHERE organization_id = $1 AND is_active = true
         ORDER BY first_name ASC, last_name ASC
       `, [req.organizationId], req.organizationId);
 
+      console.log('✅ Found users for assignment:', users.rows.length);
+
+      const formattedUsers = users.rows.map(user => ({
+        id: user.id,
+        value: user.id,
+        label: user.full_name || `${user.first_name} ${user.last_name}`,
+        email: user.email
+      }));
+
+      console.log('📝 Formatted users:', formattedUsers);
+
       res.json({
-        users: users.rows.map(user => ({
-          id: user.id,
-          value: user.id,
-          label: user.full_name,
-          email: user.email
-        }))
+        users: formattedUsers
       });
     } catch (error) {
       console.error('Get users for assignment error:', error);
