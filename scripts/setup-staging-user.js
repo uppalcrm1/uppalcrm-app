@@ -19,12 +19,16 @@ async function setupStagingUser() {
     // Enable UUID extension
     await pool.query('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"');
 
-    // Create organizations table
+    // Drop and recreate organizations table to fix schema
+    await pool.query('DROP TABLE IF EXISTS organizations CASCADE');
+
+    // Create organizations table with correct schema
     await pool.query(`
-      CREATE TABLE IF NOT EXISTS organizations (
+      CREATE TABLE organizations (
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
         name VARCHAR(255) NOT NULL,
         slug VARCHAR(100) UNIQUE NOT NULL,
+        is_active BOOLEAN DEFAULT true,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       )
