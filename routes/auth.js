@@ -125,11 +125,9 @@ router.post('/login',
   async (req, res) => {
     try {
       const { email, password } = req.body;
-      console.log('🔍 Login attempt for:', email);
 
       // Authenticate user globally (no organization context needed)
       const user = await User.authenticate(email, password);
-      console.log('🔍 Authentication result:', user ? 'SUCCESS' : 'FAILED');
 
       if (!user) {
         return res.status(401).json({
@@ -141,7 +139,6 @@ router.post('/login',
       // Get user's organization
       const Organization = require('../models/Organization');
       const organization = await Organization.findById(user.organization_id);
-      console.log('🔍 Organization lookup:', organization ? 'SUCCESS' : 'FAILED');
 
       if (!organization) {
         return res.status(500).json({
@@ -151,9 +148,7 @@ router.post('/login',
       }
 
       // Generate token
-      console.log('🔍 Generating token...');
       const tokenData = await user.generateToken(req.ip, req.get('User-Agent'));
-      console.log('🔍 Token generation:', tokenData ? 'SUCCESS' : 'FAILED');
 
       res.json({
         message: 'Login successful',
@@ -163,16 +158,10 @@ router.post('/login',
         organization: organization.toJSON()
       });
     } catch (error) {
-      console.error('💥 Login error details:', {
-        message: error.message,
-        stack: error.stack,
-        code: error.code,
-        name: error.name
-      });
+      console.error('Login error:', error);
       res.status(500).json({
         error: 'Login failed',
-        message: process.env.NODE_ENV === 'staging' ? error.message : 'Unable to authenticate user',
-        ...(process.env.NODE_ENV === 'staging' && { debug: error.stack })
+        message: 'Unable to authenticate user'
       });
     }
   }

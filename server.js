@@ -25,7 +25,6 @@ const adminRoutes = require('./routes/admin');
 const webhooksRoutes = require('./routes/webhooks');
 const apiKeysRoutes = require('./routes/api-keys');
 const customFieldsRoutes = require('./routes/customFields');
-const stagingSetupRoutes = require('./routes/staging-setup');
 // Public leads routes (simplified for production deployment)
 let publicLeadRoutes;
 try {
@@ -175,9 +174,6 @@ app.use('/api/organizations/current/api-keys', rateLimiters.general, apiKeysRout
 
 // Custom Fields management routes
 app.use('/api/custom-fields', rateLimiters.general, customFieldsRoutes);
-
-// Staging setup route (staging environment only)
-app.use('/api/staging-setup', stagingSetupRoutes);
 
 // Public routes (no authentication required)
 console.log('🔍 DEBUG: publicLeadRoutes type:', typeof publicLeadRoutes, 'value:', !!publicLeadRoutes);
@@ -419,4 +415,4 @@ const startServer = async () => {
   }
 };
 
-startServer();console.log('🧪 Staging environment test');
+startServer();
