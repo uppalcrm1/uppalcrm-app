@@ -21,6 +21,8 @@ services:
         generateValue: true
       - key: JWT_REFRESH_SECRET
         generateValue: true
+      - key: SESSION_SECRET
+        generateValue: true
       - key: JWT_EXPIRES_IN
         value: "1h"
       - key: JWT_REFRESH_EXPIRES_IN
