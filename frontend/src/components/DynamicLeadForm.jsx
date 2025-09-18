@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Save, User, Building, Mail, Phone, Calendar, DollarSign } from 'lucide-react';
+import { customFieldsAPI, leadsAPI } from '../services/api';
 
 const DynamicLeadForm = ({ onSubmit, initialData = {} }) => {
   const [formConfig, setFormConfig] = useState({ customFields: [], defaultFields: [] });
@@ -23,12 +24,7 @@ const DynamicLeadForm = ({ onSubmit, initialData = {} }) => {
 
   const loadFormConfig = async () => {
     try {
-      const response = await fetch('/api/custom-fields/form-config', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      const data = await response.json();
+      const data = await customFieldsAPI.getFormConfig();
       console.log('Form config loaded:', data);
       console.log('System fields from API:', data.systemFields);
       console.log('Potential Value field in systemFields?', data.systemFields?.find(f => f.field_name === 'potentialValue'));
@@ -140,35 +136,10 @@ const DynamicLeadForm = ({ onSubmit, initialData = {} }) => {
         customFields: formData.customFields
       };
 
-      const response = await fetch('/api/leads', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify(submitData)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        if (errorData.details) {
-          const fieldErrors = {};
-          errorData.details.forEach(detail => {
-            // Map validation errors back to form fields
-            const fieldName = detail.toLowerCase().includes('custom') ?
-              `custom_${detail.split(' ')[0].toLowerCase()}` :
-              detail.split(' ')[0].toLowerCase();
-            fieldErrors[fieldName] = detail;
-          });
-          setErrors(fieldErrors);
-        } else {
-          alert('Failed to create lead: ' + errorData.error);
-        }
-        return;
-      }
+      const response = await leadsAPI.createLead(submitData);
 
       if (onSubmit) {
-        onSubmit(submitData);
+        onSubmit(response);
       }
 
       // Reset form
