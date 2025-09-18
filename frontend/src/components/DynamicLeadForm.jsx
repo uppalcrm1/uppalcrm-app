@@ -14,47 +14,54 @@ const DynamicLeadForm = ({ onSubmit, initialData = {} }) => {
   }, []);
 
   useEffect(() => {
-    if (initialData) {
-      setFormData({
+    if (initialData && Object.keys(initialData).length > 0) {
+      console.log('🔧 Setting initial data:', initialData);
+      setFormData(prev => ({
+        ...prev,
         ...initialData,
-        customFields: initialData.custom_fields || {}
-      });
+        customFields: { ...prev.customFields, ...(initialData.custom_fields || {}) }
+      }));
     }
   }, [initialData]);
 
   const loadFormConfig = async () => {
     try {
+      console.log('🔧 Loading form config...');
       const data = await customFieldsAPI.getFormConfig();
-      console.log('Form config loaded:', data);
-      console.log('System fields from API:', data.systemFields);
-      console.log('Potential Value field in systemFields?', data.systemFields?.find(f => f.field_name === 'potentialValue'));
+      console.log('✅ Form config loaded:', data);
+
       setFormConfig(data);
 
       // Initialize form data dynamically based on enabled system fields
       const initialFormData = { customFields: {} };
 
       // Initialize system fields based on what's enabled in the config
-      data.systemFields.forEach(field => {
-        let defaultValue = '';
-        if (field.field_type === 'select') {
-          // Set default values for select fields
-          if (field.field_name === 'status') defaultValue = 'new';
-          else if (field.field_name === 'priority') defaultValue = 'medium';
-        }
-        initialFormData[field.field_name] = defaultValue;
-      });
+      if (data.systemFields && Array.isArray(data.systemFields)) {
+        data.systemFields.forEach(field => {
+          let defaultValue = '';
+          if (field.field_type === 'select') {
+            // Set default values for select fields
+            if (field.field_name === 'status') defaultValue = 'new';
+            else if (field.field_name === 'priority') defaultValue = 'medium';
+          }
+          initialFormData[field.field_name] = defaultValue;
+        });
+      }
 
       // Initialize custom fields
-      data.customFields.forEach(field => {
-        initialFormData.customFields[field.field_name] = '';
-      });
+      if (data.customFields && Array.isArray(data.customFields)) {
+        data.customFields.forEach(field => {
+          initialFormData.customFields[field.field_name] = '';
+        });
+      }
 
-      console.log('Initialized form data for enabled fields:', Object.keys(initialFormData));
-      console.log('Full initial form data:', initialFormData);
-
+      console.log('✅ Initialized form data:', initialFormData);
       setFormData(initialFormData);
+
     } catch (error) {
-      console.error('Error loading form config:', error);
+      console.error('❌ Error loading form config:', error);
+      // Set empty form data on error to prevent infinite loops
+      setFormData({ customFields: {} });
     } finally {
       setLoading(false);
     }
@@ -337,8 +344,14 @@ const DynamicLeadForm = ({ onSubmit, initialData = {} }) => {
     return <div className="flex justify-center p-8">Loading form...</div>;
   }
 
+  // Safety check: don't render if form data is not properly initialized
+  if (!formData || typeof formData !== 'object' || !formData.hasOwnProperty('customFields')) {
+    console.log('⚠️ Form data not initialized properly:', formData);
+    return <div className="flex justify-center p-8">Initializing form...</div>;
+  }
+
   const enabledSystemFields = getEnabledSystemFields();
-  const enabledCustomFields = formConfig.customFields.filter(f => f.is_enabled);
+  const enabledCustomFields = (formConfig.customFields || []).filter(f => f.is_enabled);
 
   return (
     <div className="max-w-4xl mx-auto p-6 bg-gray-50 min-h-screen">
