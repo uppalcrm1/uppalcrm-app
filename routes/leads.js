@@ -476,7 +476,7 @@ router.get('/:id',
  * POST /leads
  * Create new lead with custom fields support
  */
-router.post('/', authenticateToken, async (req, res) => {
+router.post('/', async (req, res) => {
   try {
     console.log('🔍 Creating lead with data:', req.body);
     console.log('🔍 Organization ID:', req.organizationId);
