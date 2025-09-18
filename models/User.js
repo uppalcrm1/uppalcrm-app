@@ -154,46 +154,76 @@ class User {
    * @returns {User|null} User instance if authenticated, null otherwise
    */
   static async authenticate(email, password, organizationId = null) {
+    console.log('🔍 User.authenticate called for:', email);
+
     // Use global email lookup for simplified login - bypass RLS for authentication
     const { pool } = require('../database/connection');
     const client = await pool.connect();
-    
+
     try {
+      console.log('🔍 Database client connected');
+
       // Temporarily disable RLS for authentication lookup
       await client.query('SET LOCAL row_security = off');
-      
+      console.log('🔍 RLS disabled');
+
       const result = await client.query(`
-        SELECT * FROM users 
+        SELECT * FROM users
         WHERE email = $1 AND is_active = true
       `, [email.toLowerCase()]);
+      console.log('🔍 User query result count:', result.rows.length);
 
       if (result.rows.length === 0) {
+        console.log('🔍 No user found with email:', email);
         return null;
       }
 
-      const user = new User(result.rows[0]);
-      const isValid = await bcrypt.compare(password, result.rows[0].password_hash);
+      const userData = result.rows[0];
+      console.log('🔍 User found:', { id: userData.id, email: userData.email, has_password_hash: !!userData.password_hash });
+
+      const user = new User(userData);
+      const isValid = await bcrypt.compare(password, userData.password_hash);
+      console.log('🔍 Password validation:', isValid ? 'SUCCESS' : 'FAILED');
 
       if (!isValid) {
         return null;
       }
 
-      // Re-enable RLS and set organization context for the update
-      await client.query('SET LOCAL row_security = on');
-      await client.query('SELECT set_config($1, $2, true)', [
-        'app.current_organization_id',
-        user.organization_id
-      ]);
+      // Simplified approach - skip RLS re-enabling for staging
+      if (process.env.NODE_ENV === 'staging') {
+        // Direct update without RLS
+        await client.query(`
+          UPDATE users SET last_login = NOW() WHERE id = $1
+        `, [user.id]);
+        console.log('🔍 Last login updated (staging mode)');
+      } else {
+        // Re-enable RLS and set organization context for the update
+        await client.query('SET LOCAL row_security = on');
+        await client.query('SELECT set_config($1, $2, true)', [
+          'app.current_organization_id',
+          user.organization_id
+        ]);
 
-      // Update last login
-      await client.query(`
-        UPDATE users SET last_login = NOW() WHERE id = $1
-      `, [user.id]);
+        // Update last login
+        await client.query(`
+          UPDATE users SET last_login = NOW() WHERE id = $1
+        `, [user.id]);
+        console.log('🔍 Last login updated (production mode)');
+      }
 
       user.last_login = new Date();
+      console.log('🔍 Authentication successful for user:', user.id);
       return user;
+    } catch (error) {
+      console.error('💥 User.authenticate error:', {
+        message: error.message,
+        stack: error.stack,
+        code: error.code
+      });
+      throw error;
     } finally {
       client.release();
+      console.log('🔍 Database client released');
     }
   }
 
@@ -237,35 +267,76 @@ class User {
    * @returns {Object} Token data
    */
   async generateToken(ipAddress = null, userAgent = null) {
+    console.log('🔍 generateToken called for user:', this.id);
+
     const payload = {
       userId: this.id,
       organizationId: this.organization_id,
       email: this.email,
       role: this.role
     };
+    console.log('🔍 JWT payload created');
+
+    if (!process.env.JWT_SECRET) {
+      console.error('💥 JWT_SECRET is missing!');
+      throw new Error('JWT_SECRET environment variable is not set');
+    }
 
     const token = jwt.sign(payload, process.env.JWT_SECRET, {
       expiresIn: '24h',
       issuer: 'uppal-crm'
     });
+    console.log('🔍 JWT token generated');
 
     // Store session in database
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + 24);
+    console.log('🔍 Token hash and expiration created');
 
-    await query(`
-      INSERT INTO user_sessions (user_id, organization_id, token_hash, expires_at, ip_address, user_agent)
-      VALUES ($1, $2, $3, $4, $5, $6)
-    `, [
-      this.id,
-      this.organization_id,
-      tokenHash,
-      expiresAt,
-      ipAddress,
-      userAgent
-    ], this.organization_id);
+    try {
+      // Simplified query for staging
+      if (process.env.NODE_ENV === 'staging') {
+        const { pool } = require('../database/connection');
+        const client = await pool.connect();
 
+        try {
+          await client.query('SET LOCAL row_security = off');
+          await client.query(`
+            INSERT INTO user_sessions (user_id, organization_id, token_hash, expires_at, ip_address, user_agent)
+            VALUES ($1, $2, $3, $4, $5, $6)
+          `, [
+            this.id,
+            this.organization_id,
+            tokenHash,
+            expiresAt,
+            ipAddress,
+            userAgent
+          ]);
+          console.log('🔍 Session stored in database (staging mode)');
+        } finally {
+          client.release();
+        }
+      } else {
+        await query(`
+          INSERT INTO user_sessions (user_id, organization_id, token_hash, expires_at, ip_address, user_agent)
+          VALUES ($1, $2, $3, $4, $5, $6)
+        `, [
+          this.id,
+          this.organization_id,
+          tokenHash,
+          expiresAt,
+          ipAddress,
+          userAgent
+        ], this.organization_id);
+        console.log('🔍 Session stored in database (production mode)');
+      }
+    } catch (error) {
+      console.error('💥 Error storing session:', error.message);
+      throw error;
+    }
+
+    console.log('🔍 generateToken completed successfully');
     return {
       token,
       expiresAt,
