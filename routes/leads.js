@@ -190,11 +190,11 @@ const leadSchemas = {
     query: Joi.object({
       page: Joi.number().integer().min(1).default(1),
       limit: Joi.number().integer().min(1).max(100).default(20),
-      status: Joi.string().valid('new', 'contacted', 'qualified', 'proposal', 'negotiation', 'converted', 'lost').optional(),
-      priority: Joi.string().valid('low', 'medium', 'high').optional(),
-      assigned_to: Joi.string().guid({ version: 'uuidv4' }).optional(),
-      source: Joi.string().optional(),
-      search: Joi.string().min(1).max(100).optional(),
+      status: Joi.string().valid('new', 'contacted', 'qualified', 'proposal', 'negotiation', 'converted', 'lost').allow('').optional(),
+      priority: Joi.string().valid('low', 'medium', 'high').allow('').optional(),
+      assigned_to: Joi.string().guid({ version: 'uuidv4' }).allow('').optional(),
+      source: Joi.string().allow('').optional(),
+      search: Joi.string().min(1).max(100).allow('').optional(),
       sort: Joi.string().valid('created_at', 'updated_at', 'first_name', 'last_name', 'company', 'value', 'status').default('created_at'),
       order: Joi.string().valid('asc', 'desc').default('desc')
     })
@@ -235,6 +235,15 @@ router.get('/',
         order = 'desc'
       } = req.query;
 
+      // Convert empty strings to undefined for proper filtering
+      const filters = {
+        status: status && status.trim() !== '' ? status : undefined,
+        priority: priority && priority.trim() !== '' ? priority : undefined,
+        assigned_to: assigned_to && assigned_to.trim() !== '' ? assigned_to : undefined,
+        source: source && source.trim() !== '' ? source : undefined,
+        search: search && search.trim() !== '' ? search : undefined
+      };
+
       const offset = (page - 1) * limit;
 
       // Validate sort column to prevent SQL injection
@@ -249,38 +258,38 @@ router.get('/',
       let queryParams = [req.organizationId];
       let paramIndex = 2;
 
-      if (status) {
+      if (filters.status) {
         whereConditions.push(`status = $${paramIndex}`);
-        queryParams.push(status);
+        queryParams.push(filters.status);
         paramIndex++;
       }
 
-      if (priority) {
+      if (filters.priority) {
         whereConditions.push(`priority = $${paramIndex}`);
-        queryParams.push(priority);
+        queryParams.push(filters.priority);
         paramIndex++;
       }
 
-      if (assigned_to) {
+      if (filters.assigned_to) {
         whereConditions.push(`assigned_to = $${paramIndex}`);
-        queryParams.push(assigned_to);
+        queryParams.push(filters.assigned_to);
         paramIndex++;
       }
 
-      if (source) {
+      if (filters.source) {
         whereConditions.push(`source = $${paramIndex}`);
-        queryParams.push(source);
+        queryParams.push(filters.source);
         paramIndex++;
       }
 
-      if (search) {
+      if (filters.search) {
         whereConditions.push(`(
           first_name ILIKE $${paramIndex} OR
           last_name ILIKE $${paramIndex} OR
           email ILIKE $${paramIndex} OR
           company ILIKE $${paramIndex}
         )`);
-        queryParams.push(`%${search}%`);
+        queryParams.push(`%${filters.search}%`);
         paramIndex++;
       }
 
