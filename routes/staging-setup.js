@@ -18,7 +18,7 @@ router.get('/', async (req, res) => {
       success: true,
       message: 'Staging environment setup complete',
       credentials: {
-        email: 'admin@staging.local',
+        email: 'admin@staging.uppalcrm.com',
         password: 'staging123',
         loginUrl: 'https://uppalcrm-frontend-staging.onrender.com'
       }

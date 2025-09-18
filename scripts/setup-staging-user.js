@@ -69,7 +69,7 @@ async function setupStagingUser() {
     // Check if admin user exists
     const userResult = await pool.query(
       'SELECT id FROM users WHERE email = $1',
-      ['admin@staging.local']
+      ['admin@staging.uppalcrm.com']
     );
 
     if (userResult.rows.length === 0) {
@@ -80,7 +80,7 @@ async function setupStagingUser() {
       await pool.query(`
         INSERT INTO users (organization_id, first_name, last_name, email, password, role)
         VALUES ($1, $2, $3, $4, $5, $6)
-      `, [orgId, 'Admin', 'User', 'admin@staging.local', hashedPassword, 'admin']);
+      `, [orgId, 'Admin', 'User', 'admin@staging.uppalcrm.com', hashedPassword, 'admin']);
 
       console.log('✅ Created staging admin user');
     } else {
@@ -89,7 +89,7 @@ async function setupStagingUser() {
 
     console.log('\n🎉 Staging setup complete!');
     console.log('📋 Login credentials:');
-    console.log('   Email: admin@staging.local');
+    console.log('   Email: admin@staging.uppalcrm.com');
     console.log('   Password: staging123');
     console.log('   URL: https://uppalcrm-frontend-staging.onrender.com');
 
