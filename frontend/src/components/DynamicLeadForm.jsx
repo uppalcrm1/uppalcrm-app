@@ -50,6 +50,7 @@ const DynamicLeadForm = ({ onSubmit, initialData = {} }) => {
       });
 
       console.log('Initialized form data for enabled fields:', Object.keys(initialFormData));
+      console.log('Full initial form data:', initialFormData);
 
       setFormData(initialFormData);
     } catch (error) {
@@ -60,7 +61,7 @@ const DynamicLeadForm = ({ onSubmit, initialData = {} }) => {
   };
 
   const handleInputChange = (fieldName, value, isCustom = false) => {
-    console.log('🔄 Input change:', { fieldName, value, isCustom });
+    console.log('🔄 Input change:', { fieldName, value, isCustom, currentFormData: formData });
 
     if (isCustom) {
       setFormData(prev => {
@@ -248,7 +249,16 @@ const DynamicLeadForm = ({ onSubmit, initialData = {} }) => {
             </label>
             <textarea
               value={fieldValue}
-              onChange={(e) => handleInputChange(fieldName, e.target.value, isCustom)}
+              onChange={(e) => {
+                console.log('🎯 Textarea onChange event:', { fieldName, oldValue: fieldValue, newValue: e.target.value, isCustom });
+                handleInputChange(fieldName, e.target.value, isCustom);
+              }}
+              onInput={(e) => {
+                console.log('🎯 Textarea onInput event:', { fieldName, value: e.target.value, isCustom });
+              }}
+              onKeyDown={(e) => {
+                console.log('🎯 Textarea onKeyDown event:', { fieldName, key: e.key, isCustom });
+              }}
               placeholder={`Enter ${fieldLabel}`}
               rows={4}
               className={baseClasses}
@@ -276,7 +286,16 @@ const DynamicLeadForm = ({ onSubmit, initialData = {} }) => {
               <input
                 type={fieldType}
                 value={fieldValue}
-                onChange={(e) => handleInputChange(fieldName, e.target.value, isCustom)}
+                onChange={(e) => {
+                  console.log('🎯 Input onChange event:', { fieldName, oldValue: fieldValue, newValue: e.target.value, isCustom });
+                  handleInputChange(fieldName, e.target.value, isCustom);
+                }}
+                onInput={(e) => {
+                  console.log('🎯 Input onInput event:', { fieldName, value: e.target.value, isCustom });
+                }}
+                onKeyDown={(e) => {
+                  console.log('🎯 Input onKeyDown event:', { fieldName, key: e.key, isCustom });
+                }}
                 placeholder={`Enter ${fieldLabel}`}
                 className={`${baseClasses} ${icon ? 'pl-10' : ''}`}
               />
