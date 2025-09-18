@@ -2,10 +2,6 @@
 # Deploy from 'staging' branch for testing before production
 
 services:
-  # PostgreSQL Database (Staging)
-  - type: pserv
-    name: uppalcrm-database-staging
-    plan: free
 
   # Backend API Service (Staging)
   - type: web
