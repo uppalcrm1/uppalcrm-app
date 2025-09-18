@@ -1,9 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../database/connection');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, validateOrganizationContext } = require('../middleware/auth');
 const Joi = require('joi');
 const rateLimit = require('express-rate-limit');
+
+// Apply authentication and organization validation to all routes
+router.use(authenticateToken);
+router.use(validateOrganizationContext);
 
 // Add this helper function at the top after imports
 const ensureTablesExist = async () => {
@@ -183,7 +187,7 @@ const updateFieldSchema = Joi.object({
 });
 
 // Debug endpoint to check authentication
-router.get('/debug', authenticateToken, async (req, res) => {
+router.get('/debug', async (req, res) => {
   try {
     const debugInfo = {
       timestamp: new Date().toISOString(),
@@ -225,7 +229,7 @@ router.get('/debug', authenticateToken, async (req, res) => {
 });
 
 // Get all custom fields and configuration
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', async (req, res) => {
   try {
     console.log('🔍 Custom fields GET request debugging:');
     console.log('  - req.user:', req.user ? 'EXISTS' : 'NULL');
@@ -387,7 +391,7 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 // Create new custom field
-router.post('/', authenticateToken, fieldCreationLimit, async (req, res) => {
+router.post('/', fieldCreationLimit, async (req, res) => {
   try {
     const { error, value } = createFieldSchema.validate(req.body);
     if (error) {
@@ -433,7 +437,7 @@ router.post('/', authenticateToken, fieldCreationLimit, async (req, res) => {
 });
 
 // Update custom field
-router.put('/:fieldId', authenticateToken, async (req, res) => {
+router.put('/:fieldId', async (req, res) => {
   try {
     const { error, value } = updateFieldSchema.validate(req.body);
     if (error) {
@@ -480,7 +484,7 @@ router.put('/:fieldId', authenticateToken, async (req, res) => {
 });
 
 // Delete custom field
-router.delete('/:fieldId', authenticateToken, async (req, res) => {
+router.delete('/:fieldId', async (req, res) => {
   try {
     const result = await db.query(`
       DELETE FROM custom_field_definitions
@@ -500,7 +504,7 @@ router.delete('/:fieldId', authenticateToken, async (req, res) => {
 });
 
 // Update default/system field configuration
-router.put('/default/:fieldName', authenticateToken, async (req, res) => {
+router.put('/default/:fieldName', async (req, res) => {
   try {
     console.log('🔧 Updating system field:', req.params.fieldName);
     console.log('🔧 Request body:', req.body);
@@ -620,7 +624,7 @@ router.put('/default/:fieldName', authenticateToken, async (req, res) => {
 });
 
 // Get form configuration for dynamic form rendering (updated version)
-router.get('/form-config', authenticateToken, async (req, res) => {
+router.get('/form-config', async (req, res) => {
   try {
     await ensureTablesExist();
 
