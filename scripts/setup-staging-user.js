@@ -38,7 +38,7 @@ async function setupStagingUser() {
         first_name VARCHAR(100) NOT NULL,
         last_name VARCHAR(100) NOT NULL,
         email VARCHAR(255) UNIQUE NOT NULL,
-        password VARCHAR(255) NOT NULL,
+        password_hash VARCHAR(255) NOT NULL,
         role VARCHAR(50) DEFAULT 'admin',
         is_active BOOLEAN DEFAULT true,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -78,7 +78,7 @@ async function setupStagingUser() {
 
       // Create admin user
       await pool.query(`
-        INSERT INTO users (organization_id, first_name, last_name, email, password, role)
+        INSERT INTO users (organization_id, first_name, last_name, email, password_hash, role)
         VALUES ($1, $2, $3, $4, $5, $6)
       `, [orgId, 'Admin', 'User', 'admin@staging.uppalcrm.com', hashedPassword, 'admin']);
 
