@@ -49,6 +49,20 @@ async function setupStagingUser() {
       )
     `);
 
+    // Create user_sessions table for token management
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS user_sessions (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id UUID NOT NULL REFERENCES users(id),
+        organization_id UUID NOT NULL REFERENCES organizations(id),
+        token_hash VARCHAR(255) NOT NULL,
+        expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        ip_address INET,
+        user_agent TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      )
+    `);
+
     // Check if staging organization exists
     const orgResult = await pool.query(
       'SELECT id FROM organizations WHERE slug = $1',
