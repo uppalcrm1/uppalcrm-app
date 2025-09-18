@@ -16,7 +16,6 @@ const DynamicLeadForm = ({ onSubmit, initialData = {} }) => {
 
   useEffect(() => {
     if (initialData && Object.keys(initialData).length > 0) {
-      console.log('🔧 Setting initial data:', initialData);
       setFormData(prev => ({
         ...prev,
         ...initialData,
@@ -27,19 +26,15 @@ const DynamicLeadForm = ({ onSubmit, initialData = {} }) => {
 
   const loadFormConfig = async () => {
     try {
-      console.log('🔧 Loading form config...');
       const data = await customFieldsAPI.getFormConfig();
-      console.log('✅ Form config loaded:', data);
-
       setFormConfig(data);
 
       // Load available users for assignment
       try {
         const usersData = await usersAPI.getUsersForAssignment();
-        console.log('✅ Users for assignment loaded:', usersData);
         setAvailableUsers(usersData.users || []);
       } catch (usersError) {
-        console.error('❌ Error loading users for assignment:', usersError);
+        console.error('Error loading users for assignment:', usersError);
         setAvailableUsers([]);
       }
 
@@ -66,11 +61,10 @@ const DynamicLeadForm = ({ onSubmit, initialData = {} }) => {
         });
       }
 
-      console.log('✅ Initialized form data:', initialFormData);
       setFormData(initialFormData);
 
     } catch (error) {
-      console.error('❌ Error loading form config:', error);
+      console.error('Error loading form config:', error);
       // Set empty form data on error to prevent infinite loops
       setFormData({ customFields: {} });
     } finally {
@@ -79,29 +73,19 @@ const DynamicLeadForm = ({ onSubmit, initialData = {} }) => {
   };
 
   const handleInputChange = (fieldName, value, isCustom = false) => {
-    console.log('🔄 Input change:', { fieldName, value, isCustom, currentFormData: formData });
-
     if (isCustom) {
-      setFormData(prev => {
-        const updated = {
-          ...prev,
-          customFields: {
-            ...prev.customFields,
-            [fieldName]: value
-          }
-        };
-        console.log('📝 Updated custom field data:', updated);
-        return updated;
-      });
-    } else {
-      setFormData(prev => {
-        const updated = {
-          ...prev,
+      setFormData(prev => ({
+        ...prev,
+        customFields: {
+          ...prev.customFields,
           [fieldName]: value
-        };
-        console.log('📝 Updated system field data:', updated);
-        return updated;
-      });
+        }
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [fieldName]: value
+      }));
     }
 
     // Clear errors when user starts typing
@@ -205,7 +189,6 @@ const DynamicLeadForm = ({ onSubmit, initialData = {} }) => {
     const isRequired = field.is_required;
     const errorKey = isCustom ? `custom_${fieldName}` : fieldName;
 
-    console.log('🔍 Rendering field:', { fieldName, fieldValue, isCustom, formDataKeys: Object.keys(formData) });
 
     const getFieldIcon = (type) => {
       switch(type) {
@@ -297,16 +280,7 @@ const DynamicLeadForm = ({ onSubmit, initialData = {} }) => {
             </label>
             <textarea
               value={fieldValue}
-              onChange={(e) => {
-                console.log('🎯 Textarea onChange event:', { fieldName, oldValue: fieldValue, newValue: e.target.value, isCustom });
-                handleInputChange(fieldName, e.target.value, isCustom);
-              }}
-              onInput={(e) => {
-                console.log('🎯 Textarea onInput event:', { fieldName, value: e.target.value, isCustom });
-              }}
-              onKeyDown={(e) => {
-                console.log('🎯 Textarea onKeyDown event:', { fieldName, key: e.key, isCustom });
-              }}
+              onChange={(e) => handleInputChange(fieldName, e.target.value, isCustom)}
               placeholder={`Enter ${fieldLabel}`}
               rows={4}
               className={baseClasses}
@@ -334,16 +308,7 @@ const DynamicLeadForm = ({ onSubmit, initialData = {} }) => {
               <input
                 type={fieldType}
                 value={fieldValue}
-                onChange={(e) => {
-                  console.log('🎯 Input onChange event:', { fieldName, oldValue: fieldValue, newValue: e.target.value, isCustom });
-                  handleInputChange(fieldName, e.target.value, isCustom);
-                }}
-                onInput={(e) => {
-                  console.log('🎯 Input onInput event:', { fieldName, value: e.target.value, isCustom });
-                }}
-                onKeyDown={(e) => {
-                  console.log('🎯 Input onKeyDown event:', { fieldName, key: e.key, isCustom });
-                }}
+                onChange={(e) => handleInputChange(fieldName, e.target.value, isCustom)}
                 placeholder={`Enter ${fieldLabel}`}
                 className={`${baseClasses} ${icon ? 'pl-10' : ''}`}
               />
@@ -387,7 +352,6 @@ const DynamicLeadForm = ({ onSubmit, initialData = {} }) => {
 
   // Safety check: don't render if form data is not properly initialized
   if (!formData || typeof formData !== 'object' || !formData.hasOwnProperty('customFields')) {
-    console.log('⚠️ Form data not initialized properly:', formData);
     return <div className="flex justify-center p-8">Initializing form...</div>;
   }
 
