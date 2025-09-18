@@ -68,6 +68,64 @@ async function setupStagingUser() {
       )
     `);
 
+    // Create leads table for CRM functionality
+    console.log('📝 Creating leads table...');
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS leads (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+        title VARCHAR(255),
+        company VARCHAR(255),
+        first_name VARCHAR(100),
+        last_name VARCHAR(100),
+        email VARCHAR(255),
+        phone VARCHAR(50),
+        source VARCHAR(100) DEFAULT 'manual',
+        status VARCHAR(50) DEFAULT 'new',
+        priority VARCHAR(20) DEFAULT 'medium',
+        value DECIMAL(10,2) DEFAULT 0,
+        notes TEXT,
+        assigned_to UUID REFERENCES users(id),
+        created_by UUID REFERENCES users(id),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        last_contact_date TIMESTAMP WITH TIME ZONE,
+        next_follow_up TIMESTAMP WITH TIME ZONE
+      )
+    `);
+
+    // Create contacts table for CRM functionality
+    console.log('📝 Creating contacts table...');
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS contacts (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+        first_name VARCHAR(100) NOT NULL,
+        last_name VARCHAR(100) NOT NULL,
+        email VARCHAR(255),
+        phone VARCHAR(50),
+        company VARCHAR(255),
+        position VARCHAR(255),
+        notes TEXT,
+        tags TEXT[],
+        created_by UUID REFERENCES users(id),
+        assigned_to UUID REFERENCES users(id),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        last_contact_date TIMESTAMP WITH TIME ZONE
+      )
+    `);
+
+    // Create indexes for performance
+    console.log('📝 Creating indexes...');
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_leads_organization_id ON leads(organization_id);
+      CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status);
+      CREATE INDEX IF NOT EXISTS idx_leads_assigned_to ON leads(assigned_to);
+      CREATE INDEX IF NOT EXISTS idx_contacts_organization_id ON contacts(organization_id);
+      CREATE INDEX IF NOT EXISTS idx_contacts_email ON contacts(email);
+    `);
+
     // Check if staging organization exists
     const orgResult = await pool.query(
       'SELECT id FROM organizations WHERE slug = $1',
