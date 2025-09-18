@@ -30,9 +30,12 @@ async function setupStagingUser() {
       )
     `);
 
-    // Create users table
+    // Drop and recreate users table to fix schema
+    await pool.query('DROP TABLE IF EXISTS users CASCADE');
+
+    // Create users table with correct schema
     await pool.query(`
-      CREATE TABLE IF NOT EXISTS users (
+      CREATE TABLE users (
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
         organization_id UUID NOT NULL REFERENCES organizations(id),
         first_name VARCHAR(100) NOT NULL,
