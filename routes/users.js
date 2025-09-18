@@ -305,6 +305,56 @@ router.delete('/:id',
 );
 
 /**
+ * GET /users/debug-assignment
+ * Debug endpoint for user assignment issues
+ */
+router.get('/debug-assignment',
+  async (req, res) => {
+    try {
+      const debugInfo = {
+        timestamp: new Date().toISOString(),
+        auth: {
+          userId: req.user?.id,
+          organizationId: req.organizationId,
+          userEmail: req.user?.email
+        },
+        headers: {
+          authorization: req.headers.authorization ? 'Present' : 'Missing',
+          orgSlug: req.headers['x-organization-slug']
+        }
+      };
+
+      if (!req.organizationId) {
+        return res.json({ ...debugInfo, error: 'No organization ID found' });
+      }
+
+      const { query } = require('../database/connection');
+
+      // Test basic query
+      const userCount = await query(`
+        SELECT COUNT(*) as total FROM users WHERE organization_id = $1
+      `, [req.organizationId], req.organizationId);
+
+      const activeUsers = await query(`
+        SELECT COUNT(*) as total FROM users WHERE organization_id = $1 AND is_active = true
+      `, [req.organizationId], req.organizationId);
+
+      debugInfo.database = {
+        totalUsers: userCount.rows[0]?.total,
+        activeUsers: activeUsers.rows[0]?.total
+      };
+
+      res.json(debugInfo);
+    } catch (error) {
+      res.json({
+        error: error.message,
+        stack: error.stack
+      });
+    }
+  }
+);
+
+/**
  * GET /users/for-assignment
  * Get users for lead/contact assignment (simple list)
  */
