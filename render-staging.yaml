@@ -6,9 +6,6 @@ services:
   - type: pserv
     name: uppalcrm-database-staging
     plan: free
-    databaseName: uppalcrm_staging
-    user: uppalcrm_staging_user
-    region: ohio
 
   # Backend API Service (Staging)
   - type: web
