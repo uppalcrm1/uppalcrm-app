@@ -623,8 +623,8 @@ router.put('/default/:fieldName', async (req, res) => {
   }
 });
 
-// TEMP: Test users endpoint in custom fields router
-router.get('/test-users', async (req, res) => {
+// Get users for assignment dropdown
+router.get('/users-for-assignment', async (req, res) => {
   try {
     const { query } = require('../database/connection');
 
@@ -645,8 +645,11 @@ router.get('/test-users', async (req, res) => {
       }))
     });
   } catch (error) {
-    console.error('Test users error:', error);
-    res.status(500).json({ error: error.message });
+    console.error('Error getting users for assignment:', error);
+    res.status(500).json({
+      error: 'Failed to retrieve users',
+      message: 'Unable to get users for assignment'
+    });
   }
 });
 

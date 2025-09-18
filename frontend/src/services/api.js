@@ -155,8 +155,7 @@ export const usersAPI = {
   },
 
   getUsersForAssignment: async () => {
-    // TEMP: Use custom fields test endpoint
-    const response = await api.get('/custom-fields/test-users')
+    const response = await api.get('/custom-fields/users-for-assignment')
     return response.data
   }
 }
