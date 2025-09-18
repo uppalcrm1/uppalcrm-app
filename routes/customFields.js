@@ -623,6 +623,33 @@ router.put('/default/:fieldName', async (req, res) => {
   }
 });
 
+// TEMP: Test users endpoint in custom fields router
+router.get('/test-users', async (req, res) => {
+  try {
+    const { query } = require('../database/connection');
+
+    const users = await query(`
+      SELECT id, first_name, last_name, email,
+             (first_name || ' ' || last_name) as full_name
+      FROM users
+      WHERE organization_id = $1 AND is_active = true
+      ORDER BY first_name ASC, last_name ASC
+    `, [req.organizationId], req.organizationId);
+
+    res.json({
+      users: users.rows.map(user => ({
+        id: user.id,
+        value: user.id,
+        label: user.full_name || `${user.first_name} ${user.last_name}`,
+        email: user.email
+      }))
+    });
+  } catch (error) {
+    console.error('Test users error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get form configuration for dynamic form rendering (updated version)
 router.get('/form-config', async (req, res) => {
   try {
