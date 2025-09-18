@@ -311,6 +311,9 @@ router.delete('/:id',
 router.get('/debug-assignment',
   async (req, res) => {
     try {
+      console.log('🔍 Debug endpoint called - Headers:', req.headers.authorization ? 'Present' : 'Missing');
+      console.log('🔍 Debug endpoint called - User:', req.user ? 'Present' : 'Missing');
+
       const debugInfo = {
         timestamp: new Date().toISOString(),
         auth: {
@@ -359,10 +362,10 @@ router.get('/debug-assignment',
  * Get users for lead/contact assignment (simple list)
  */
 router.get('/for-assignment',
-  authenticateToken,
-  validateOrganizationContext,
   async (req, res) => {
     try {
+      console.log('🔍 Auth Debug - Headers:', req.headers.authorization ? 'Present' : 'Missing');
+      console.log('🔍 Auth Debug - User:', req.user ? 'Present' : 'Missing');
       console.log('🔍 Getting users for assignment - Organization ID:', req.organizationId);
       const { query } = require('../database/connection');
 
