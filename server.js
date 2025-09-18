@@ -415,4 +415,4 @@ const startServer = async () => {
   }
 };
 
-startServer();
+startServer();console.log('🧪 Staging environment test');
