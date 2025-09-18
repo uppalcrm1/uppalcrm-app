@@ -7,7 +7,7 @@ const dbConfig = process.env.DATABASE_URL ? {
   max: 20, // Maximum number of connections in pool
   idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
   connectionTimeoutMillis: 15000, // Increase timeout for cloud connections
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  ssl: (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging') ? { rejectUnauthorized: false } : false,
   // Remove transaction isolation setting for better Render compatibility
   // Render PostgreSQL manages this automatically
 } : {
