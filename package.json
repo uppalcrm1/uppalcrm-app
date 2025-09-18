@@ -10,6 +10,7 @@
     "migrate:production": "node scripts/production-migrate.js",
     "seed": "node scripts/seed.js",
     "generate:secrets": "node scripts/generate-secrets.js",
+    "setup:staging": "node scripts/setup-staging-user.js",
     "check:database": "node scripts/check-database.js",
     "test": "node test/runTests.js",
     "test:contacts": "node test/runTests.js contacts",
