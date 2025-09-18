@@ -51,7 +51,7 @@ const DynamicLeadForm = ({ onSubmit, initialData = {} }) => {
 
       console.log('Initialized form data for enabled fields:', Object.keys(initialFormData));
 
-      setFormData(prev => ({ ...initialFormData, ...prev }));
+      setFormData(initialFormData);
     } catch (error) {
       console.error('Error loading form config:', error);
     } finally {
@@ -60,19 +60,29 @@ const DynamicLeadForm = ({ onSubmit, initialData = {} }) => {
   };
 
   const handleInputChange = (fieldName, value, isCustom = false) => {
+    console.log('🔄 Input change:', { fieldName, value, isCustom });
+
     if (isCustom) {
-      setFormData(prev => ({
-        ...prev,
-        customFields: {
-          ...prev.customFields,
-          [fieldName]: value
-        }
-      }));
+      setFormData(prev => {
+        const updated = {
+          ...prev,
+          customFields: {
+            ...prev.customFields,
+            [fieldName]: value
+          }
+        };
+        console.log('📝 Updated custom field data:', updated);
+        return updated;
+      });
     } else {
-      setFormData(prev => ({
-        ...prev,
-        [fieldName]: value
-      }));
+      setFormData(prev => {
+        const updated = {
+          ...prev,
+          [fieldName]: value
+        };
+        console.log('📝 Updated system field data:', updated);
+        return updated;
+      });
     }
 
     // Clear errors when user starts typing
@@ -170,9 +180,13 @@ const DynamicLeadForm = ({ onSubmit, initialData = {} }) => {
     const fieldName = field.field_name;
     const fieldLabel = field.field_label;
     const fieldType = field.field_type;
-    const fieldValue = isCustom ? formData.customFields[fieldName] || '' : formData[fieldName] || '';
+    const fieldValue = isCustom
+      ? (formData.customFields && formData.customFields[fieldName]) || ''
+      : formData[fieldName] || '';
     const isRequired = field.is_required;
     const errorKey = isCustom ? `custom_${fieldName}` : fieldName;
+
+    console.log('🔍 Rendering field:', { fieldName, fieldValue, isCustom, formDataKeys: Object.keys(formData) });
 
     const getFieldIcon = (type) => {
       switch(type) {
