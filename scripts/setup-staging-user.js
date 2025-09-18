@@ -44,6 +44,7 @@ async function setupStagingUser() {
         password_hash VARCHAR(255) NOT NULL,
         role VARCHAR(50) DEFAULT 'admin',
         is_active BOOLEAN DEFAULT true,
+        last_login TIMESTAMP WITH TIME ZONE,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       )
