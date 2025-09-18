@@ -359,6 +359,8 @@ router.get('/debug-assignment',
  * Get users for lead/contact assignment (simple list)
  */
 router.get('/for-assignment',
+  authenticateToken,
+  validateOrganizationContext,
   async (req, res) => {
     try {
       console.log('🔍 Getting users for assignment - Organization ID:', req.organizationId);
