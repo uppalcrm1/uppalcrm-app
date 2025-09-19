@@ -166,17 +166,17 @@ const leadSchemas = {
   
   updateLead: {
     body: Joi.object({
-      title: Joi.string().max(100).optional(),
-      company: Joi.string().max(255).optional(),
+      title: Joi.string().max(100).allow('').optional(),
+      company: Joi.string().max(255).allow('').optional(),
       first_name: Joi.string().min(1).max(100).optional(),
       last_name: Joi.string().min(1).max(100).optional(),
-      email: Joi.string().email().optional(),
-      phone: Joi.string().max(50).optional(),
-      source: Joi.string().valid('website', 'referral', 'social', 'cold-call', 'email', 'advertisement', 'trade-show', 'other').optional(),
+      email: Joi.string().email().allow('').optional(),
+      phone: Joi.string().max(50).allow('').optional(),
+      source: Joi.string().valid('website', 'referral', 'social', 'cold-call', 'email', 'advertisement', 'trade-show', 'other').allow('').optional(),
       status: Joi.string().valid('new', 'contacted', 'qualified', 'proposal', 'negotiation', 'converted', 'lost').optional(),
       priority: Joi.string().valid('low', 'medium', 'high').optional(),
       value: Joi.number().min(0).optional(),
-      notes: Joi.string().optional(),
+      notes: Joi.string().allow('').optional(),
       assigned_to: Joi.string().guid({ version: 'uuidv4' }).allow(null, '').optional(),
       last_contact_date: Joi.date().iso().allow(null, '').optional(),
       next_follow_up: Joi.date().iso().allow(null, '').optional()
