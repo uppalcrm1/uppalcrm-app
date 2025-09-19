@@ -640,8 +640,6 @@ router.post('/create-lead', async (req, res) => {
       });
     }
 
-    const { query } = require('../database/connection');
-
     console.log('🔍 Creating lead with:', {
       organizationId: req.organizationId,
       userId: req.user.id,
@@ -653,7 +651,7 @@ router.post('/create-lead', async (req, res) => {
     });
 
     // Create the lead
-    const result = await query(`
+    const result = await db.query(`
       INSERT INTO leads
       (organization_id, first_name, last_name, email, phone, company, source,
        status, priority, value, assigned_to, next_follow_up, notes, created_by)
@@ -689,9 +687,7 @@ router.post('/create-lead', async (req, res) => {
 // Get users for assignment dropdown
 router.get('/users-for-assignment', async (req, res) => {
   try {
-    const { query } = require('../database/connection');
-
-    const users = await query(`
+    const users = await db.query(`
       SELECT id, first_name, last_name, email,
              (first_name || ' ' || last_name) as full_name
       FROM users
