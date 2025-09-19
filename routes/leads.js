@@ -207,6 +207,64 @@ const leadSchemas = {
 };
 
 /**
+ * GET /leads/by-status
+ * Get leads grouped by status (for Kanban view)
+ */
+router.get('/by-status', async (req, res) => {
+  console.log('🔍 DEBUG: by-status endpoint hit');
+  console.log('🔍 DEBUG: Query params:', req.query);
+  console.log('🔍 DEBUG: Organization ID:', req.organizationId);
+  console.log('🔍 DEBUG: User ID:', req.userId);
+
+  try {
+    // Ensure value column is detected
+    if (!valueColumnName) {
+      await detectValueColumn();
+    }
+
+    console.log('Getting leads by status for organization:', req.organizationId);
+    console.log('Value column being used:', valueColumnName);
+
+    const leads = await db.query(`
+      SELECT id, first_name, last_name, email, phone, company, source, status,
+             priority, ${valueColumnName}, assigned_to, next_follow_up, notes,
+             created_at, updated_at
+      FROM leads
+      WHERE organization_id = $1
+      ORDER BY created_at DESC
+    `, [req.organizationId]);
+
+    // Group leads by status
+    const leadsByStatus = {};
+    const statuses = ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'converted', 'lost'];
+
+    // Initialize empty arrays for each status
+    statuses.forEach(status => {
+      leadsByStatus[status] = [];
+    });
+
+    // Group leads by their status
+    leads.rows.forEach(lead => {
+      if (leadsByStatus[lead.status]) {
+        leadsByStatus[lead.status].push(lead);
+      }
+    });
+
+    res.json({ leadsByStatus });
+  } catch (error) {
+    console.error('❌ Get leads by status error:', error);
+    console.error('❌ Error stack:', error.stack);
+    console.error('❌ Error message:', error.message);
+    console.error('❌ Organization ID during error:', req.organizationId);
+    res.status(500).json({
+      error: 'Failed to retrieve leads by status',
+      message: 'Unable to get leads grouped by status',
+      details: error.message
+    });
+  }
+});
+
+/**
  * GET /leads
  * Get all leads with filtering and pagination
  */
@@ -649,6 +707,219 @@ router.delete('/:id',
     }
   }
 );
+
+/**
+ * PATCH /leads/:id/status
+ * Update lead status (for Kanban drag-and-drop)
+ */
+router.patch('/:id/status',
+  validateUuidParam,
+  async (req, res) => {
+    try {
+      const { status } = req.body;
+
+      // Validate status
+      const validStatuses = ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'converted', 'lost'];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({
+          error: 'Invalid status',
+          message: 'Status must be one of: ' + validStatuses.join(', ')
+        });
+      }
+
+      const lead = await Lead.update(req.params.id, { status }, req.organizationId);
+
+      if (!lead) {
+        return res.status(404).json({
+          error: 'Lead not found',
+          message: 'Lead does not exist in this organization'
+        });
+      }
+
+      res.json({
+        message: 'Lead status updated successfully',
+        lead: lead.toJSON()
+      });
+    } catch (error) {
+      console.error('Update lead status error:', error);
+      res.status(500).json({
+        error: 'Status update failed',
+        message: 'Unable to update lead status'
+      });
+    }
+  }
+);
+
+
+/**
+ * PATCH /leads/bulk
+ * Bulk update multiple leads
+ */
+router.patch('/bulk', async (req, res) => {
+  try {
+    const { leadIds, updates } = req.body;
+
+    if (!Array.isArray(leadIds) || leadIds.length === 0) {
+      return res.status(400).json({
+        error: 'Invalid lead IDs',
+        message: 'leadIds must be a non-empty array'
+      });
+    }
+
+    if (!updates || Object.keys(updates).length === 0) {
+      return res.status(400).json({
+        error: 'No updates provided',
+        message: 'updates object cannot be empty'
+      });
+    }
+
+    const updatedLeads = [];
+    const errors = [];
+
+    for (const leadId of leadIds) {
+      try {
+        const lead = await Lead.update(leadId, updates, req.organizationId);
+        if (lead) {
+          updatedLeads.push(lead.toJSON());
+        } else {
+          errors.push({ leadId, error: 'Lead not found' });
+        }
+      } catch (error) {
+        errors.push({ leadId, error: error.message });
+      }
+    }
+
+    res.json({
+      message: `Bulk update completed. ${updatedLeads.length} leads updated.`,
+      updatedLeads,
+      errors: errors.length > 0 ? errors : undefined
+    });
+  } catch (error) {
+    console.error('Bulk update error:', error);
+    res.status(500).json({
+      error: 'Bulk update failed',
+      message: 'Unable to update leads'
+    });
+  }
+});
+
+/**
+ * GET /leads/export
+ * Export leads data as CSV
+ */
+router.get('/export', async (req, res) => {
+  try {
+    const { leadIds, ...filters } = req.query;
+
+    let whereConditions = ['organization_id = $1'];
+    let queryParams = [req.organizationId];
+    let paramIndex = 2;
+
+    // If specific lead IDs are provided
+    if (leadIds) {
+      const ids = Array.isArray(leadIds) ? leadIds : leadIds.split(',');
+      whereConditions.push(`id = ANY($${paramIndex})`);
+      queryParams.push(ids);
+      paramIndex++;
+    }
+
+    // Add other filters
+    if (filters.status) {
+      whereConditions.push(`status = $${paramIndex}`);
+      queryParams.push(filters.status);
+      paramIndex++;
+    }
+
+    if (filters.priority) {
+      whereConditions.push(`priority = $${paramIndex}`);
+      queryParams.push(filters.priority);
+      paramIndex++;
+    }
+
+    if (filters.assigned_to && filters.assigned_to !== 'unassigned') {
+      whereConditions.push(`assigned_to = $${paramIndex}`);
+      queryParams.push(filters.assigned_to);
+      paramIndex++;
+    } else if (filters.assigned_to === 'unassigned') {
+      whereConditions.push('assigned_to IS NULL');
+    }
+
+    const whereClause = whereConditions.join(' AND ');
+
+    const leads = await db.query(`
+      SELECT l.*, u.first_name as assigned_first_name, u.last_name as assigned_last_name
+      FROM leads l
+      LEFT JOIN users u ON l.assigned_to = u.id AND u.organization_id = l.organization_id
+      WHERE ${whereClause}
+      ORDER BY l.created_at DESC
+    `, queryParams);
+
+    // Generate CSV
+    const csvHeaders = [
+      'ID', 'First Name', 'Last Name', 'Email', 'Phone', 'Company', 'Source',
+      'Status', 'Priority', 'Value', 'Assigned To', 'Notes', 'Created At', 'Updated At'
+    ];
+
+    const csvRows = leads.rows.map(lead => [
+      lead.id,
+      lead.first_name || '',
+      lead.last_name || '',
+      lead.email || '',
+      lead.phone || '',
+      lead.company || '',
+      lead.source || '',
+      lead.status || '',
+      lead.priority || '',
+      lead.value || '',
+      lead.assigned_first_name && lead.assigned_last_name
+        ? `${lead.assigned_first_name} ${lead.assigned_last_name}`
+        : '',
+      lead.notes || '',
+      lead.created_at,
+      lead.updated_at
+    ]);
+
+    const csvContent = [csvHeaders, ...csvRows]
+      .map(row => row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="leads.csv"');
+    res.send(csvContent);
+  } catch (error) {
+    console.error('Export leads error:', error);
+    res.status(500).json({
+      error: 'Export failed',
+      message: 'Unable to export leads'
+    });
+  }
+});
+
+/**
+ * GET /lead-statuses
+ * Get available lead statuses
+ */
+router.get('/lead-statuses', async (req, res) => {
+  try {
+    const statuses = [
+      { value: 'new', label: 'New', color: 'blue' },
+      { value: 'contacted', label: 'Contacted', color: 'yellow' },
+      { value: 'qualified', label: 'Qualified', color: 'purple' },
+      { value: 'proposal', label: 'Proposal', color: 'indigo' },
+      { value: 'negotiation', label: 'Negotiation', color: 'pink' },
+      { value: 'converted', label: 'Converted', color: 'green' },
+      { value: 'lost', label: 'Lost', color: 'red' }
+    ];
+
+    res.json({ statuses });
+  } catch (error) {
+    console.error('Get lead statuses error:', error);
+    res.status(500).json({
+      error: 'Failed to get statuses',
+      message: 'Unable to retrieve lead statuses'
+    });
+  }
+});
 
 /**
  * GET /leads/form-config

@@ -189,35 +189,64 @@ export const leadsAPI = {
     const response = await api.get('/leads', { params })
     return response.data
   },
-  
+
   getLead: async (id) => {
     const response = await api.get(`/leads/${id}`)
     return response.data
   },
-  
+
   createLead: async (leadData) => {
     // Use custom-fields router as workaround for authentication issues
     const response = await api.post('/custom-fields/create-lead', leadData)
     return response.data
   },
-  
+
   updateLead: async (id, leadData) => {
     const response = await api.put(`/leads/${id}`, leadData)
     return response.data
   },
-  
+
   deleteLead: async (id) => {
     const response = await api.delete(`/leads/${id}`)
     return response.data
   },
-  
+
   assignLead: async (leadId, userId) => {
     const response = await api.put(`/leads/${leadId}/assign`, { assignedTo: userId })
     return response.data
   },
-  
+
   getStats: async () => {
     const response = await api.get('/leads/stats')
+    return response.data
+  },
+
+  // New functions for Kanban and List views
+  updateLeadStatus: async (leadId, newStatus) => {
+    const response = await api.patch(`/leads/${leadId}/status`, { status: newStatus })
+    return response.data
+  },
+
+  getLeadsByStatus: async (params = {}) => {
+    const response = await api.get('/leads/by-status', { params })
+    return response.data
+  },
+
+  bulkUpdateLeads: async (leadIds, updates) => {
+    const response = await api.patch('/leads/bulk', { leadIds, updates })
+    return response.data
+  },
+
+  exportLeads: async (filters = {}) => {
+    const response = await api.get('/leads/export', {
+      params: filters,
+      responseType: 'blob' // For file download
+    })
+    return response.data
+  },
+
+  getLeadStatuses: async () => {
+    const response = await api.get('/lead-statuses')
     return response.data
   }
 }
