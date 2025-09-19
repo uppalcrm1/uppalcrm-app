@@ -361,6 +361,10 @@ class Lead {
       if (field === 'value') {
         return parseFloat(updates[field]) || 0;
       }
+      // Convert empty strings to null for UUID and date fields
+      if ((field === 'assigned_to' || field === 'next_follow_up' || field === 'last_contact_date') && updates[field] === '') {
+        return null;
+      }
       return updates[field];
     })];
 
