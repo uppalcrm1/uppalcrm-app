@@ -177,9 +177,9 @@ const leadSchemas = {
       priority: Joi.string().valid('low', 'medium', 'high').optional(),
       value: Joi.number().min(0).optional(),
       notes: Joi.string().optional(),
-      assigned_to: Joi.string().guid({ version: 'uuidv4' }).allow(null).optional(),
-      last_contact_date: Joi.date().iso().optional(),
-      next_follow_up: Joi.date().iso().allow(null).optional()
+      assigned_to: Joi.string().guid({ version: 'uuidv4' }).allow(null, '').optional(),
+      last_contact_date: Joi.date().iso().allow(null, '').optional(),
+      next_follow_up: Joi.date().iso().allow(null, '').optional()
     }),
     params: Joi.object({
       id: Joi.string().guid({ version: 'uuidv4' }).required()
