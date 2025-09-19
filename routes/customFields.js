@@ -642,6 +642,16 @@ router.post('/create-lead', async (req, res) => {
 
     const { query } = require('../database/connection');
 
+    console.log('🔍 Creating lead with:', {
+      organizationId: req.organizationId,
+      userId: req.user.id,
+      firstName, lastName, email, phone, company, source,
+      status: status || 'new',
+      priority: priority || 'medium',
+      potentialValue: potentialValue || 0,
+      assignedTo, nextFollowUp, notes
+    });
+
     // Create the lead
     const result = await query(`
       INSERT INTO leads
@@ -662,9 +672,16 @@ router.post('/create-lead', async (req, res) => {
     });
   } catch (error) {
     console.error('Error creating lead:', error);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      detail: error.detail,
+      stack: error.stack
+    });
     res.status(500).json({
       error: 'Failed to create lead',
-      message: error.message
+      message: error.message,
+      details: error.detail || error.code
     });
   }
 });
