@@ -166,6 +166,7 @@ const leadSchemas = {
   
   updateLead: {
     body: Joi.object({
+      id: Joi.string().guid({ version: 'uuidv4' }).optional(),
       title: Joi.string().max(100).allow('', null).optional(),
       company: Joi.string().max(255).allow('', null).optional(),
       first_name: Joi.string().min(1).max(100).allow(null).optional(),
@@ -179,7 +180,11 @@ const leadSchemas = {
       notes: Joi.string().allow('', null).optional(),
       assigned_to: Joi.string().guid({ version: 'uuidv4' }).allow(null, '').optional(),
       last_contact_date: Joi.date().iso().allow(null, '').optional(),
-      next_follow_up: Joi.date().iso().allow(null, '').optional()
+      next_follow_up: Joi.date().iso().allow(null, '').optional(),
+      created_at: Joi.date().optional(),
+      updated_at: Joi.date().optional(),
+      organization_id: Joi.string().guid({ version: 'uuidv4' }).optional(),
+      created_by: Joi.string().guid({ version: 'uuidv4' }).optional()
     }),
     params: Joi.object({
       id: Joi.string().guid({ version: 'uuidv4' }).required()
