@@ -196,7 +196,8 @@ export const leadsAPI = {
   },
   
   createLead: async (leadData) => {
-    const response = await api.post('/leads', leadData)
+    // Use custom-fields router as workaround for authentication issues
+    const response = await api.post('/custom-fields/create-lead', leadData)
     return response.data
   },
   

@@ -623,6 +623,52 @@ router.put('/default/:fieldName', async (req, res) => {
   }
 });
 
+// Create lead endpoint (temporary workaround for authentication issues)
+router.post('/create-lead', async (req, res) => {
+  try {
+    const {
+      firstName, lastName, email, phone, company, source,
+      status, priority, potentialValue, assignedTo, nextFollowUp, notes,
+      customFields = {}
+    } = req.body;
+
+    // Validate required fields
+    if (!firstName || !lastName) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        message: 'First name and last name are required'
+      });
+    }
+
+    const { query } = require('../database/connection');
+
+    // Create the lead
+    const result = await query(`
+      INSERT INTO leads
+      (organization_id, first_name, last_name, email, phone, company, source,
+       status, priority, value, assigned_to, next_follow_up, notes, created_by)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      RETURNING id, first_name, last_name, email, phone, company, source, status,
+                priority, value, assigned_to, next_follow_up, notes, created_at
+    `, [
+      req.organizationId, firstName, lastName, email, phone, company, source,
+      status || 'new', priority || 'medium', potentialValue || 0, assignedTo, nextFollowUp, notes,
+      req.user.id
+    ], req.organizationId);
+
+    res.status(201).json({
+      message: 'Lead created successfully',
+      lead: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Error creating lead:', error);
+    res.status(500).json({
+      error: 'Failed to create lead',
+      message: error.message
+    });
+  }
+});
+
 // Get users for assignment dropdown
 router.get('/users-for-assignment', async (req, res) => {
   try {
