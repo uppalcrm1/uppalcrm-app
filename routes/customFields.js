@@ -659,8 +659,9 @@ router.post('/create-lead', async (req, res) => {
       RETURNING id, first_name, last_name, email, phone, company, source, status,
                 priority, value, assigned_to, next_follow_up, notes, created_at
     `, [
-      req.organizationId, firstName, lastName, email, phone, company, source,
-      status || 'new', priority || 'medium', potentialValue || 0, assignedTo, nextFollowUp, notes,
+      req.organizationId, firstName, lastName, email || null, phone || null, company || null, source || null,
+      status || 'new', priority || 'medium', potentialValue || 0,
+      assignedTo || null, nextFollowUp || null, notes || null,
       req.user.id
     ], req.organizationId);
 
