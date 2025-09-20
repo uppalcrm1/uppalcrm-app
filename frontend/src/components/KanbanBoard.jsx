@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   DndContext,
   DragOverlay,
@@ -34,6 +35,7 @@ import { format } from 'date-fns'
 
 // Sortable Lead Card Component
 const SortableLeadCard = ({ lead, users, onEdit, onDelete }) => {
+  const navigate = useNavigate()
   const {
     attributes,
     listeners,
@@ -80,9 +82,12 @@ const LeadCard = ({ lead, users, onEdit, onDelete }) => {
     <div className="relative">
       {/* Header */}
       <div className="flex justify-between items-start mb-3">
-        <h3 className="font-semibold text-gray-900 text-sm leading-tight">
+        <button
+          onClick={() => navigate(`/leads/${lead.id}`)}
+          className="font-semibold text-blue-600 hover:text-blue-900 hover:underline text-sm leading-tight text-left"
+        >
           {lead.first_name} {lead.last_name}
-        </h3>
+        </button>
 
         <div className="relative">
           <button

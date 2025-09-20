@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   ChevronDown,
   ChevronUp,
@@ -31,6 +32,7 @@ const LeadListTable = ({
   statuses,
   loading
 }) => {
+  const navigate = useNavigate()
   const [sortConfig, setSortConfig] = useState({ key: 'created_at', direction: 'desc' })
   const [selectedLeads, setSelectedLeads] = useState([])
   const [showBulkActions, setShowBulkActions] = useState(false)
@@ -298,9 +300,12 @@ const LeadListTable = ({
                   {/* Name */}
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div>
-                      <div className="text-sm font-medium text-gray-900">
+                      <button
+                        onClick={() => navigate(`/leads/${lead.id}`)}
+                        className="text-sm font-medium text-blue-600 hover:text-blue-900 hover:underline cursor-pointer text-left"
+                      >
                         {lead.first_name} {lead.last_name}
-                      </div>
+                      </button>
                       {lead.title && (
                         <div className="text-sm text-gray-500">{lead.title}</div>
                       )}
