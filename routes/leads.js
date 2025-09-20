@@ -945,7 +945,7 @@ const leadController = require('../controllers/leadController');
 router.get('/:id/detail',
   authenticateToken,
   validateOrganizationContext,
-  validateUuidParam('id'),
+  validateUuidParam,
   leadController.getLeadDetail
 );
 
@@ -956,7 +956,7 @@ router.get('/:id/detail',
 router.get('/:id/activities',
   authenticateToken,
   validateOrganizationContext,
-  validateUuidParam('id'),
+  validateUuidParam,
   leadController.getLeadActivities
 );
 
@@ -967,7 +967,7 @@ router.get('/:id/activities',
 router.post('/:id/activities',
   authenticateToken,
   validateOrganizationContext,
-  validateUuidParam('id'),
+  validateUuidParam,
   validate(Joi.object({
     interaction_type: Joi.string().valid('email', 'call', 'meeting', 'note', 'task').required(),
     subject: Joi.string().max(255).required(),
@@ -989,7 +989,7 @@ router.post('/:id/activities',
 router.get('/:id/history',
   authenticateToken,
   validateOrganizationContext,
-  validateUuidParam('id'),
+  validateUuidParam,
   leadController.getLeadHistory
 );
 
@@ -1000,7 +1000,7 @@ router.get('/:id/history',
 router.put('/:id/status',
   authenticateToken,
   validateOrganizationContext,
-  validateUuidParam('id'),
+  validateUuidParam,
   validate(Joi.object({
     status: Joi.string().required(),
     reason: Joi.string().max(500)
@@ -1015,7 +1015,7 @@ router.put('/:id/status',
 router.post('/:id/follow',
   authenticateToken,
   validateOrganizationContext,
-  validateUuidParam('id'),
+  validateUuidParam,
   leadController.toggleFollowLead
 );
 
@@ -1026,7 +1026,7 @@ router.post('/:id/follow',
 router.get('/:id/duplicates',
   authenticateToken,
   validateOrganizationContext,
-  validateUuidParam('id'),
+  validateUuidParam,
   leadController.getLeadDuplicates
 );
 
@@ -1037,7 +1037,7 @@ router.get('/:id/duplicates',
 router.post('/:id/detect-duplicates',
   authenticateToken,
   validateOrganizationContext,
-  validateUuidParam('id'),
+  validateUuidParam,
   leadController.detectDuplicates
 );
 
@@ -1048,7 +1048,7 @@ router.post('/:id/detect-duplicates',
 router.get('/:id/status-progression',
   authenticateToken,
   validateOrganizationContext,
-  validateUuidParam('id'),
+  validateUuidParam,
   leadController.getLeadStatusProgression
 );
 
