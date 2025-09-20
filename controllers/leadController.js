@@ -8,29 +8,19 @@ class LeadController {
       const { id } = req.params;
       const { organization_id, id: user_id } = req.user;
 
-      // Get lead details with owner information
-      const leadQuery = `
+      // Start with basic lead query
+      let leadQuery = `
         SELECT
           l.*,
           u.first_name as owner_first_name,
           u.last_name as owner_last_name,
-          u.email as owner_email,
-          ls.name as source_name,
-          lst.name as status_name,
-          lst.color as status_color,
-          lst.description as status_description,
-          lf.id as is_following,
-          get_lead_activity_summary(l.id) as activity_summary,
-          calculate_lead_stage_duration(l.id, l.status) as time_in_current_stage
+          u.email as owner_email
         FROM leads l
         LEFT JOIN users u ON l.assigned_to = u.id
-        LEFT JOIN lead_sources ls ON l.lead_source = ls.id
-        LEFT JOIN lead_statuses lst ON l.status = lst.id
-        LEFT JOIN lead_followers lf ON l.id = lf.lead_id AND lf.user_id = $2
-        WHERE l.id = $1 AND l.organization_id = $3
+        WHERE l.id = $1 AND l.organization_id = $2
       `;
 
-      const leadResult = await db.query(leadQuery, [id, user_id, organization_id]);
+      const leadResult = await db.query(leadQuery, [id, organization_id]);
 
       if (leadResult.rows.length === 0) {
         return res.status(404).json({ message: 'Lead not found' });
@@ -38,42 +28,54 @@ class LeadController {
 
       const lead = leadResult.rows[0];
 
-      // Get recent activities count by type
-      const activityStatsQuery = `
-        SELECT
-          interaction_type,
-          COUNT(*) as count,
-          MAX(created_at) as latest_activity
-        FROM lead_interactions
-        WHERE lead_id = $1
-        GROUP BY interaction_type
-        ORDER BY latest_activity DESC
-      `;
+      // Initialize response data with defaults
+      let activityStats = [];
+      let duplicates = [];
 
-      const activityStats = await db.query(activityStatsQuery, [id]);
+      // Try to get activity stats if table exists
+      try {
+        const activityStatsQuery = `
+          SELECT
+            interaction_type,
+            COUNT(*) as count,
+            MAX(created_at) as latest_activity
+          FROM lead_interactions
+          WHERE lead_id = $1
+          GROUP BY interaction_type
+          ORDER BY latest_activity DESC
+        `;
+        const activityResult = await db.query(activityStatsQuery, [id]);
+        activityStats = activityResult.rows;
+      } catch (activityError) {
+        console.log('Activity stats not available (table may not exist):', activityError.message);
+      }
 
-      // Get potential duplicates
-      const duplicatesQuery = `
-        SELECT
-          ld.*,
-          l2.first_name,
-          l2.last_name,
-          l2.email,
-          l2.company,
-          l2.phone
-        FROM lead_duplicates ld
-        JOIN leads l2 ON ld.duplicate_lead_id = l2.id
-        WHERE ld.lead_id = $1 AND ld.status = 'detected'
-        ORDER BY ld.similarity_score DESC
-        LIMIT 5
-      `;
-
-      const duplicates = await db.query(duplicatesQuery, [id]);
+      // Try to get duplicates if table exists
+      try {
+        const duplicatesQuery = `
+          SELECT
+            ld.*,
+            l2.first_name,
+            l2.last_name,
+            l2.email,
+            l2.company,
+            l2.phone
+          FROM lead_duplicates ld
+          JOIN leads l2 ON ld.duplicate_lead_id = l2.id
+          WHERE ld.lead_id = $1 AND ld.status = 'detected'
+          ORDER BY ld.similarity_score DESC
+          LIMIT 5
+        `;
+        const duplicatesResult = await db.query(duplicatesQuery, [id]);
+        duplicates = duplicatesResult.rows;
+      } catch (duplicatesError) {
+        console.log('Duplicates not available (table may not exist):', duplicatesError.message);
+      }
 
       res.json({
         lead,
-        activityStats: activityStats.rows,
-        duplicates: duplicates.rows
+        activityStats,
+        duplicates
       });
     } catch (error) {
       console.error('Error fetching lead detail:', error);
@@ -94,72 +96,97 @@ class LeadController {
         end_date
       } = req.query;
 
-      const offset = (page - 1) * limit;
-      let whereConditions = ['li.lead_id = $1'];
-      let queryParams = [id];
-      let paramCount = 1;
+      // Check if lead exists first
+      const leadCheck = await db.query(
+        'SELECT id FROM leads WHERE id = $1 AND organization_id = $2',
+        [id, organization_id]
+      );
 
-      // Add type filter
-      if (type) {
-        paramCount++;
-        whereConditions.push(`li.interaction_type = $${paramCount}`);
-        queryParams.push(type);
+      if (leadCheck.rows.length === 0) {
+        return res.status(404).json({ message: 'Lead not found' });
       }
 
-      // Add date range filter
-      if (start_date) {
-        paramCount++;
-        whereConditions.push(`li.created_at >= $${paramCount}`);
-        queryParams.push(start_date);
-      }
+      // Try to get activities if table exists, otherwise return empty
+      try {
+        const offset = (page - 1) * limit;
+        let whereConditions = ['li.lead_id = $1'];
+        let queryParams = [id];
+        let paramCount = 1;
 
-      if (end_date) {
-        paramCount++;
-        whereConditions.push(`li.created_at <= $${paramCount}`);
-        queryParams.push(end_date);
-      }
-
-      const whereClause = whereConditions.join(' AND ');
-
-      // Get activities with user information
-      const activitiesQuery = `
-        SELECT
-          li.*,
-          u.first_name as created_by_first_name,
-          u.last_name as created_by_last_name,
-          u.email as created_by_email
-        FROM lead_interactions li
-        LEFT JOIN users u ON li.created_by = u.id
-        WHERE ${whereClause}
-        ORDER BY li.created_at DESC
-        LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}
-      `;
-
-      queryParams.push(limit, offset);
-
-      // Get total count
-      const countQuery = `
-        SELECT COUNT(*) as total
-        FROM lead_interactions li
-        WHERE ${whereClause}
-      `;
-
-      const [activitiesResult, countResult] = await Promise.all([
-        db.query(activitiesQuery, queryParams),
-        db.query(countQuery, queryParams.slice(0, -2))
-      ]);
-
-      const total = parseInt(countResult.rows[0].total);
-
-      res.json({
-        activities: activitiesResult.rows,
-        pagination: {
-          page: parseInt(page),
-          limit: parseInt(limit),
-          total,
-          pages: Math.ceil(total / limit)
+        // Add type filter
+        if (type) {
+          paramCount++;
+          whereConditions.push(`li.interaction_type = $${paramCount}`);
+          queryParams.push(type);
         }
-      });
+
+        // Add date range filter
+        if (start_date) {
+          paramCount++;
+          whereConditions.push(`li.created_at >= $${paramCount}`);
+          queryParams.push(start_date);
+        }
+
+        if (end_date) {
+          paramCount++;
+          whereConditions.push(`li.created_at <= $${paramCount}`);
+          queryParams.push(end_date);
+        }
+
+        const whereClause = whereConditions.join(' AND ');
+
+        // Get activities with user information
+        const activitiesQuery = `
+          SELECT
+            li.*,
+            u.first_name as created_by_first_name,
+            u.last_name as created_by_last_name,
+            u.email as created_by_email
+          FROM lead_interactions li
+          LEFT JOIN users u ON li.created_by = u.id
+          WHERE ${whereClause}
+          ORDER BY li.created_at DESC
+          LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}
+        `;
+
+        queryParams.push(limit, offset);
+
+        // Get total count
+        const countQuery = `
+          SELECT COUNT(*) as total
+          FROM lead_interactions li
+          WHERE ${whereClause}
+        `;
+
+        const [activitiesResult, countResult] = await Promise.all([
+          db.query(activitiesQuery, queryParams),
+          db.query(countQuery, queryParams.slice(0, -2))
+        ]);
+
+        const total = parseInt(countResult.rows[0].total);
+
+        res.json({
+          activities: activitiesResult.rows,
+          pagination: {
+            page: parseInt(page),
+            limit: parseInt(limit),
+            total,
+            pages: Math.ceil(total / limit)
+          }
+        });
+      } catch (interactionsError) {
+        console.log('Lead interactions table not available:', interactionsError.message);
+        // Return empty activities if table doesn't exist
+        res.json({
+          activities: [],
+          pagination: {
+            page: parseInt(page),
+            limit: parseInt(limit),
+            total: 0,
+            pages: 0
+          }
+        });
+      }
     } catch (error) {
       console.error('Error fetching lead activities:', error);
       res.status(500).json({ message: 'Internal server error' });
