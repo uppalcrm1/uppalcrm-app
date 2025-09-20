@@ -29,7 +29,7 @@ const navigation = [
   { name: 'Leads', href: '/leads', icon: Users },
   { name: 'Add New Lead', href: '/leads/new', icon: Plus },
   { name: 'Contacts', href: '/contacts', icon: UserPlus },
-  { name: 'Licenses', href: '/licenses', icon: CreditCard },
+  { name: 'Accounts', href: '/accounts', icon: CreditCard },
   { name: 'Team', href: '/team', icon: UserCheck },
   {
     name: 'Integrations',

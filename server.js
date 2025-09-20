@@ -26,8 +26,9 @@ const webhooksRoutes = require('./routes/webhooks');
 const apiKeysRoutes = require('./routes/api-keys');
 const customFieldsRoutes = require('./routes/customFields');
 
-// License Management Routes (temporarily disabled until schema is applied)
-const licenseRoutes = require('./routes/licenses');
+// Account Management Routes
+const accountRoutes = require('./routes/accounts');
+const licenseRoutes = require('./routes/licenses'); // Legacy support
 const deviceRoutes = require('./routes/devices');
 const softwareEditionRoutes = require('./routes/softwareEditions');
 const downloadRoutes = require('./routes/downloads');
@@ -175,7 +176,9 @@ app.use('/api/super-admin', rateLimiters.general, superAdminRoutes);
 app.use('/api/notify-admin', rateLimiters.general, notifyAdminRoutes);
 app.use('/api/admin', rateLimiters.general, adminRoutes);
 
-// License Management API routes (temporarily disabled until schema is applied)
+// Account Management API routes
+app.use('/api/accounts', rateLimiters.general, accountRoutes);
+// Legacy License Management API routes (for backward compatibility)
 app.use('/api/licenses', rateLimiters.general, licenseRoutes);
 app.use('/api/devices', rateLimiters.general, deviceRoutes);
 app.use('/api/software-editions', rateLimiters.general, softwareEditionRoutes);

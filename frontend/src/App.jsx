@@ -14,7 +14,7 @@ import ZapierIntegrationPage from './pages/settings/ZapierIntegrationPage'
 import SuperAdminApp from './components/SuperAdminApp'
 import FieldManager from './components/FieldManager'
 import DynamicLeadForm from './components/DynamicLeadForm'
-import LicenseManagement from './pages/LicenseManagement'
+import AccountManagement from './pages/AccountManagement'
 import ImportLeads from './pages/ImportLeads'
 import ImportContacts from './pages/ImportContacts'
 import LeadDetail from './pages/LeadDetail'
@@ -84,7 +84,8 @@ function App() {
         <Route path="leads/new" element={<DynamicLeadForm />} />
         <Route path="leads/import" element={<ImportLeads />} />
         <Route path="contacts/import" element={<ImportContacts />} />
-        <Route path="licenses" element={<LicenseManagement />} />
+        <Route path="accounts" element={<AccountManagement />} />
+        <Route path="licenses" element={<AccountManagement />} />
       </Route>
 
       {/* Catch all route */}
