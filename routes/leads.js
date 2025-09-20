@@ -935,4 +935,121 @@ router.get('/form-config', authenticateToken, async (req, res) => {
   }
 });
 
+// Import lead controller for detailed functionality
+const leadController = require('../controllers/leadController');
+
+/**
+ * GET /leads/:id/detail
+ * Get detailed lead with activities and history
+ */
+router.get('/:id/detail',
+  authenticateToken,
+  validateOrganizationContext,
+  validateUuidParam('id'),
+  leadController.getLeadDetail
+);
+
+/**
+ * GET /leads/:id/activities
+ * Get lead activity timeline
+ */
+router.get('/:id/activities',
+  authenticateToken,
+  validateOrganizationContext,
+  validateUuidParam('id'),
+  leadController.getLeadActivities
+);
+
+/**
+ * POST /leads/:id/activities
+ * Add new activity to lead
+ */
+router.post('/:id/activities',
+  authenticateToken,
+  validateOrganizationContext,
+  validateUuidParam('id'),
+  validate(Joi.object({
+    interaction_type: Joi.string().valid('email', 'call', 'meeting', 'note', 'task').required(),
+    subject: Joi.string().max(255).required(),
+    description: Joi.string().allow(''),
+    outcome: Joi.string().max(100),
+    duration: Joi.number().integer().min(0),
+    scheduled_at: Joi.date().iso(),
+    participants: Joi.array().items(Joi.string()),
+    priority: Joi.string().valid('low', 'medium', 'high').default('medium'),
+    activity_metadata: Joi.object()
+  })),
+  leadController.addActivity
+);
+
+/**
+ * GET /leads/:id/history
+ * Get lead change history
+ */
+router.get('/:id/history',
+  authenticateToken,
+  validateOrganizationContext,
+  validateUuidParam('id'),
+  leadController.getLeadHistory
+);
+
+/**
+ * PUT /leads/:id/status
+ * Update lead status (for progress bar)
+ */
+router.put('/:id/status',
+  authenticateToken,
+  validateOrganizationContext,
+  validateUuidParam('id'),
+  validate(Joi.object({
+    status: Joi.string().required(),
+    reason: Joi.string().max(500)
+  })),
+  leadController.updateLeadStatus
+);
+
+/**
+ * POST /leads/:id/follow
+ * Follow/unfollow lead
+ */
+router.post('/:id/follow',
+  authenticateToken,
+  validateOrganizationContext,
+  validateUuidParam('id'),
+  leadController.toggleFollowLead
+);
+
+/**
+ * GET /leads/:id/duplicates
+ * Get potential duplicates for a lead
+ */
+router.get('/:id/duplicates',
+  authenticateToken,
+  validateOrganizationContext,
+  validateUuidParam('id'),
+  leadController.getLeadDuplicates
+);
+
+/**
+ * POST /leads/:id/detect-duplicates
+ * Detect and store potential duplicates
+ */
+router.post('/:id/detect-duplicates',
+  authenticateToken,
+  validateOrganizationContext,
+  validateUuidParam('id'),
+  leadController.detectDuplicates
+);
+
+/**
+ * GET /leads/:id/status-progression
+ * Get lead status progression data
+ */
+router.get('/:id/status-progression',
+  authenticateToken,
+  validateOrganizationContext,
+  validateUuidParam('id'),
+  leadController.getLeadStatusProgression
+);
+
 module.exports = router;

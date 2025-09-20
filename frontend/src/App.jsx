@@ -17,6 +17,7 @@ import DynamicLeadForm from './components/DynamicLeadForm'
 import LicenseManagement from './pages/LicenseManagement'
 import ImportLeads from './pages/ImportLeads'
 import ImportContacts from './pages/ImportContacts'
+import LeadDetail from './pages/LeadDetail'
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuth()
@@ -74,6 +75,7 @@ function App() {
         <Route index element={<Navigate to="/dashboard" />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="leads" element={<Leads />} />
+        <Route path="leads/:id" element={<LeadDetail />} />
         <Route path="contacts" element={<Contacts />} />
         <Route path="team" element={<TeamPage />} />
         <Route path="settings" element={<SettingsPage />} />
