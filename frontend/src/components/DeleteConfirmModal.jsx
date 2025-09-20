@@ -1,16 +1,30 @@
 import React from 'react';
 import { AlertTriangle, X } from 'lucide-react';
 
-const DeleteConfirmModal = ({ isOpen, onClose, onConfirm, organizationName, loading }) => {
+const DeleteConfirmModal = ({
+  isOpen,
+  onClose,
+  onConfirm,
+  title = "Confirm Deletion",
+  message,
+  confirmButtonText = "Delete",
+  isDestructive = false,
+  loading,
+  // Legacy props for backward compatibility
+  organizationName
+}) => {
   if (!isOpen) return null;
+
+  // Determine if this is organization deletion (legacy) or generic deletion
+  const isOrganizationDeletion = organizationName && !message;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center">
-            <AlertTriangle className="w-6 h-6 text-red-500 mr-2" />
-            <h3 className="text-lg font-semibold text-gray-900">Confirm Deletion</h3>
+            <AlertTriangle className={`w-6 h-6 mr-2 ${isDestructive ? 'text-red-500' : 'text-orange-500'}`} />
+            <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
           </div>
           <button
             onClick={onClose}
@@ -20,25 +34,35 @@ const DeleteConfirmModal = ({ isOpen, onClose, onConfirm, organizationName, load
             <X className="w-5 h-5" />
           </button>
         </div>
-        
+
         <div className="mb-6">
-          <p className="text-gray-700 mb-3">
-            Are you sure you want to permanently delete the organization:
-          </p>
-          <p className="font-semibold text-gray-900 bg-gray-100 p-2 rounded">
-            "{organizationName}"
-          </p>
-          <p className="text-red-600 text-sm mt-3 font-medium">
-            ⚠️ This action cannot be undone and will delete:
-          </p>
-          <ul className="text-sm text-gray-600 mt-2 ml-4 list-disc">
-            <li>All organization users and admin accounts</li>
-            <li>All contacts and customer data</li>
-            <li>All organization settings and preferences</li>
-            <li>All related notes and history</li>
-          </ul>
+          {isOrganizationDeletion ? (
+            // Legacy organization deletion content
+            <>
+              <p className="text-gray-700 mb-3">
+                Are you sure you want to permanently delete the organization:
+              </p>
+              <p className="font-semibold text-gray-900 bg-gray-100 p-2 rounded">
+                "{organizationName}"
+              </p>
+              <p className="text-red-600 text-sm mt-3 font-medium">
+                ⚠️ This action cannot be undone and will delete:
+              </p>
+              <ul className="text-sm text-gray-600 mt-2 ml-4 list-disc">
+                <li>All organization users and admin accounts</li>
+                <li>All contacts and customer data</li>
+                <li>All organization settings and preferences</li>
+                <li>All related notes and history</li>
+              </ul>
+            </>
+          ) : (
+            // Generic deletion content
+            <div className="text-gray-700">
+              {message}
+            </div>
+          )}
         </div>
-        
+
         <div className="flex space-x-3">
           <button
             onClick={onClose}
@@ -50,7 +74,11 @@ const DeleteConfirmModal = ({ isOpen, onClose, onConfirm, organizationName, load
           <button
             onClick={onConfirm}
             disabled={loading}
-            className="flex-1 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 transition-colors"
+            className={`flex-1 px-4 py-2 text-white rounded-md transition-colors disabled:opacity-50 ${
+              isDestructive
+                ? 'bg-red-600 hover:bg-red-700'
+                : 'bg-orange-600 hover:bg-orange-700'
+            }`}
           >
             {loading ? (
               <div className="flex items-center justify-center">
@@ -58,7 +86,7 @@ const DeleteConfirmModal = ({ isOpen, onClose, onConfirm, organizationName, load
                 Deleting...
               </div>
             ) : (
-              'Delete Organization'
+              confirmButtonText
             )}
           </button>
         </div>
