@@ -25,6 +25,15 @@ const adminRoutes = require('./routes/admin');
 const webhooksRoutes = require('./routes/webhooks');
 const apiKeysRoutes = require('./routes/api-keys');
 const customFieldsRoutes = require('./routes/customFields');
+
+// License Management Routes (temporarily disabled until schema is applied)
+const licenseRoutes = require('./routes/licenses');
+const deviceRoutes = require('./routes/devices');
+const softwareEditionRoutes = require('./routes/softwareEditions');
+const downloadRoutes = require('./routes/downloads');
+
+// Import Routes
+const importRoutes = require('./routes/import');
 // Public leads routes (simplified for production deployment)
 let publicLeadRoutes;
 try {
@@ -165,6 +174,15 @@ app.use('/api/trials', rateLimiters.general, trialRoutes);
 app.use('/api/super-admin', rateLimiters.general, superAdminRoutes);
 app.use('/api/notify-admin', rateLimiters.general, notifyAdminRoutes);
 app.use('/api/admin', rateLimiters.general, adminRoutes);
+
+// License Management API routes (temporarily disabled until schema is applied)
+app.use('/api/licenses', rateLimiters.general, licenseRoutes);
+app.use('/api/devices', rateLimiters.general, deviceRoutes);
+app.use('/api/software-editions', rateLimiters.general, softwareEditionRoutes);
+app.use('/api/downloads', rateLimiters.general, downloadRoutes);
+
+// Import API routes
+app.use('/api/import', rateLimiters.general, importRoutes);
 
 // Webhook routes (external integrations - use webhook-specific rate limiting)
 app.use('/api/webhooks', rateLimiters.webhook, webhooksRoutes);

@@ -978,4 +978,285 @@ router.post('/activations/record',
   }
 );
 
+/**
+ * Contact Interaction endpoints
+ */
+
+// Contact interaction validation schemas
+const interactionSchemas = {
+  createInteraction: {
+    body: Joi.object({
+      contact_id: Joi.string().guid({ version: 'uuidv4' }).required(),
+      interaction_type: Joi.string().valid('email', 'call', 'meeting', 'note', 'support_ticket').required(),
+      direction: Joi.string().valid('inbound', 'outbound').required(),
+      subject: Joi.string().max(500).optional(),
+      content: Joi.string().optional(),
+      duration_minutes: Joi.number().integer().min(0).optional(),
+      email_message_id: Joi.string().max(500).optional()
+    })
+  },
+
+  updateInteraction: {
+    body: Joi.object({
+      interaction_type: Joi.string().valid('email', 'call', 'meeting', 'note', 'support_ticket').optional(),
+      direction: Joi.string().valid('inbound', 'outbound').optional(),
+      subject: Joi.string().max(500).optional(),
+      content: Joi.string().optional(),
+      duration_minutes: Joi.number().integer().min(0).optional(),
+      email_message_id: Joi.string().max(500).optional()
+    }),
+    params: Joi.object({
+      id: Joi.string().guid({ version: 'uuidv4' }).required(),
+      interactionId: Joi.string().guid({ version: 'uuidv4' }).required()
+    })
+  },
+
+  listInteractions: {
+    query: Joi.object({
+      page: Joi.number().integer().min(1).default(1),
+      limit: Joi.number().integer().min(1).max(100).default(50),
+      interaction_type: Joi.string().valid('email', 'call', 'meeting', 'note', 'support_ticket').optional(),
+      direction: Joi.string().valid('inbound', 'outbound').optional(),
+      sort: Joi.string().valid('created_at', 'interaction_type', 'direction').default('created_at'),
+      order: Joi.string().valid('asc', 'desc').default('desc')
+    }),
+    params: Joi.object({
+      id: Joi.string().guid({ version: 'uuidv4' }).required()
+    })
+  }
+};
+
+/**
+ * POST /contacts/:id/interactions
+ * Create new interaction for contact
+ */
+router.post('/:id/interactions',
+  validateUuidParam,
+  validate(interactionSchemas.createInteraction),
+  async (req, res) => {
+    try {
+      // Ensure contact exists
+      const contact = await Contact.findById(req.params.id, req.organizationId);
+      if (!contact) {
+        return res.status(404).json({
+          error: 'Contact not found',
+          message: 'Contact does not exist in this organization'
+        });
+      }
+
+      // Ensure contact_id matches URL parameter
+      const interactionData = {
+        ...req.body,
+        contact_id: req.params.id
+      };
+
+      const interaction = await Contact.createInteraction(
+        interactionData,
+        req.organizationId,
+        req.user.id
+      );
+
+      res.status(201).json({
+        message: 'Interaction created successfully',
+        interaction: interaction
+      });
+    } catch (error) {
+      console.error('Create interaction error:', error);
+      res.status(500).json({
+        error: 'Interaction creation failed',
+        message: 'Unable to create interaction'
+      });
+    }
+  }
+);
+
+/**
+ * GET /contacts/:id/interactions
+ * Get interactions for specific contact
+ */
+router.get('/:id/interactions',
+  validateUuidParam,
+  validate(interactionSchemas.listInteractions),
+  async (req, res) => {
+    try {
+      const {
+        page = 1,
+        limit = 50,
+        interaction_type,
+        direction,
+        sort = 'created_at',
+        order = 'desc'
+      } = req.query;
+
+      const offset = (page - 1) * limit;
+
+      const interactions = await Contact.getInteractions(req.params.id, req.organizationId, {
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        interaction_type,
+        direction,
+        sort,
+        order
+      });
+
+      // Get total count for pagination
+      const totalQuery = await require('../database/connection').query(`
+        SELECT COUNT(*) as total
+        FROM contact_interactions
+        WHERE contact_id = $1 AND organization_id = $2
+        ${interaction_type ? 'AND interaction_type = $3' : ''}
+        ${direction ? (interaction_type ? 'AND direction = $4' : 'AND direction = $3') : ''}
+      `, [
+        req.params.id,
+        req.organizationId,
+        ...(interaction_type ? [interaction_type] : []),
+        ...(direction ? [direction] : [])
+      ], req.organizationId);
+
+      const total = parseInt(totalQuery.rows[0].total);
+      const pages = Math.ceil(total / limit);
+
+      res.json({
+        interactions: interactions,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total: total,
+          pages: pages,
+          hasNext: page < pages,
+          hasPrev: page > 1
+        }
+      });
+    } catch (error) {
+      console.error('Get contact interactions error:', error);
+      res.status(500).json({
+        error: 'Failed to retrieve interactions',
+        message: 'Unable to get contact interactions'
+      });
+    }
+  }
+);
+
+/**
+ * GET /contacts/:id/interactions/stats
+ * Get interaction statistics for contact
+ */
+router.get('/:id/interactions/stats',
+  validateUuidParam,
+  async (req, res) => {
+    try {
+      const stats = await Contact.getInteractionStats(req.params.id, req.organizationId);
+
+      res.json({
+        stats: stats
+      });
+    } catch (error) {
+      console.error('Get interaction stats error:', error);
+      res.status(500).json({
+        error: 'Failed to retrieve interaction statistics',
+        message: 'Unable to get interaction stats'
+      });
+    }
+  }
+);
+
+/**
+ * PUT /contacts/:id/interactions/:interactionId
+ * Update contact interaction
+ */
+router.put('/:id/interactions/:interactionId',
+  validate(interactionSchemas.updateInteraction),
+  async (req, res) => {
+    try {
+      const interaction = await Contact.updateInteraction(
+        req.params.interactionId,
+        req.body,
+        req.organizationId
+      );
+
+      if (!interaction) {
+        return res.status(404).json({
+          error: 'Interaction not found',
+          message: 'Interaction does not exist in this organization'
+        });
+      }
+
+      res.json({
+        message: 'Interaction updated successfully',
+        interaction: interaction
+      });
+    } catch (error) {
+      console.error('Update interaction error:', error);
+      res.status(500).json({
+        error: 'Interaction update failed',
+        message: 'Unable to update interaction'
+      });
+    }
+  }
+);
+
+/**
+ * DELETE /contacts/:id/interactions/:interactionId
+ * Delete contact interaction
+ */
+router.delete('/:id/interactions/:interactionId',
+  validateUuidParam,
+  async (req, res) => {
+    try {
+      const success = await Contact.deleteInteraction(req.params.interactionId, req.organizationId);
+
+      if (!success) {
+        return res.status(404).json({
+          error: 'Interaction not found',
+          message: 'Interaction does not exist in this organization'
+        });
+      }
+
+      res.json({
+        message: 'Interaction deleted successfully'
+      });
+    } catch (error) {
+      console.error('Delete interaction error:', error);
+      res.status(500).json({
+        error: 'Interaction deletion failed',
+        message: 'Unable to delete interaction'
+      });
+    }
+  }
+);
+
+/**
+ * GET /contacts/interactions/recent
+ * Get recent interactions across all contacts
+ */
+router.get('/interactions/recent',
+  async (req, res) => {
+    try {
+      const {
+        limit = 20,
+        offset = 0,
+        interaction_type,
+        days = 30
+      } = req.query;
+
+      const interactions = await Contact.getRecentInteractions(req.organizationId, {
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        interaction_type,
+        days: parseInt(days)
+      });
+
+      res.json({
+        interactions: interactions
+      });
+    } catch (error) {
+      console.error('Get recent interactions error:', error);
+      res.status(500).json({
+        error: 'Failed to retrieve recent interactions',
+        message: 'Unable to get recent interactions'
+      });
+    }
+  }
+);
+
 module.exports = router;

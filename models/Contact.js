@@ -1094,6 +1094,253 @@ class Contact {
   }
 
   /**
+   * Create contact interaction
+   * @param {Object} interactionData - Interaction data
+   * @param {string} organizationId - Organization ID
+   * @param {string} createdBy - ID of user creating this interaction
+   * @returns {Object} Created interaction
+   */
+  static async createInteraction(interactionData, organizationId, createdBy) {
+    const {
+      contact_id,
+      interaction_type, // email, call, meeting, note, support_ticket
+      direction, // inbound, outbound
+      subject,
+      content,
+      duration_minutes,
+      email_message_id
+    } = interactionData;
+
+    const result = await query(`
+      INSERT INTO contact_interactions (
+        contact_id, organization_id, interaction_type, direction,
+        subject, content, duration_minutes, email_message_id, created_by
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      RETURNING *
+    `, [
+      contact_id, organizationId, interaction_type, direction,
+      subject, content, duration_minutes, email_message_id, createdBy
+    ], organizationId);
+
+    // Update last contact date for the contact
+    await query(`
+      UPDATE contacts
+      SET last_contact_date = NOW(), updated_at = NOW()
+      WHERE id = $1 AND organization_id = $2
+    `, [contact_id, organizationId], organizationId);
+
+    return result.rows[0];
+  }
+
+  /**
+   * Get contact interactions
+   * @param {string} contactId - Contact ID
+   * @param {string} organizationId - Organization ID
+   * @param {Object} options - Query options
+   * @returns {Array} Contact interactions
+   */
+  static async getInteractions(contactId, organizationId, options = {}) {
+    const {
+      limit = 50,
+      offset = 0,
+      interaction_type,
+      direction,
+      sort = 'created_at',
+      order = 'desc'
+    } = options;
+
+    let whereClause = 'WHERE ci.contact_id = $1 AND ci.organization_id = $2';
+    const params = [contactId, organizationId];
+    let paramCount = 2;
+
+    if (interaction_type) {
+      paramCount++;
+      whereClause += ` AND ci.interaction_type = $${paramCount}`;
+      params.push(interaction_type);
+    }
+
+    if (direction) {
+      paramCount++;
+      whereClause += ` AND ci.direction = $${paramCount}`;
+      params.push(direction);
+    }
+
+    const result = await query(`
+      SELECT
+        ci.*,
+        u.first_name as created_by_first_name,
+        u.last_name as created_by_last_name,
+        u.email as created_by_email
+      FROM contact_interactions ci
+      LEFT JOIN users u ON ci.created_by = u.id
+      ${whereClause}
+      ORDER BY ci.${sort} ${order}
+      LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}
+    `, [...params, limit, offset], organizationId);
+
+    return result.rows.map(row => ({
+      ...row,
+      created_by_user: row.created_by_first_name ? {
+        id: row.created_by,
+        first_name: row.created_by_first_name,
+        last_name: row.created_by_last_name,
+        full_name: `${row.created_by_first_name} ${row.created_by_last_name}`.trim(),
+        email: row.created_by_email
+      } : null
+    }));
+  }
+
+  /**
+   * Get interaction statistics for a contact
+   * @param {string} contactId - Contact ID
+   * @param {string} organizationId - Organization ID
+   * @returns {Object} Interaction statistics
+   */
+  static async getInteractionStats(contactId, organizationId) {
+    const result = await query(`
+      SELECT
+        COUNT(*) as total_interactions,
+        COUNT(CASE WHEN interaction_type = 'email' THEN 1 END) as emails,
+        COUNT(CASE WHEN interaction_type = 'call' THEN 1 END) as calls,
+        COUNT(CASE WHEN interaction_type = 'meeting' THEN 1 END) as meetings,
+        COUNT(CASE WHEN interaction_type = 'note' THEN 1 END) as notes,
+        COUNT(CASE WHEN interaction_type = 'support_ticket' THEN 1 END) as support_tickets,
+        COUNT(CASE WHEN direction = 'inbound' THEN 1 END) as inbound,
+        COUNT(CASE WHEN direction = 'outbound' THEN 1 END) as outbound,
+        MAX(created_at) as last_interaction_date,
+        AVG(CASE WHEN interaction_type = 'call' AND duration_minutes IS NOT NULL
+                 THEN duration_minutes END) as avg_call_duration
+      FROM contact_interactions
+      WHERE contact_id = $1 AND organization_id = $2
+    `, [contactId, organizationId], organizationId);
+
+    const stats = result.rows[0];
+    return {
+      total_interactions: parseInt(stats.total_interactions) || 0,
+      emails: parseInt(stats.emails) || 0,
+      calls: parseInt(stats.calls) || 0,
+      meetings: parseInt(stats.meetings) || 0,
+      notes: parseInt(stats.notes) || 0,
+      support_tickets: parseInt(stats.support_tickets) || 0,
+      inbound: parseInt(stats.inbound) || 0,
+      outbound: parseInt(stats.outbound) || 0,
+      last_interaction_date: stats.last_interaction_date,
+      avg_call_duration: parseFloat(stats.avg_call_duration) || 0
+    };
+  }
+
+  /**
+   * Update contact interaction
+   * @param {string} interactionId - Interaction ID
+   * @param {Object} updateData - Data to update
+   * @param {string} organizationId - Organization ID
+   * @returns {Object} Updated interaction
+   */
+  static async updateInteraction(interactionId, updateData, organizationId) {
+    const {
+      interaction_type,
+      direction,
+      subject,
+      content,
+      duration_minutes,
+      email_message_id
+    } = updateData;
+
+    const result = await query(`
+      UPDATE contact_interactions
+      SET
+        interaction_type = COALESCE($1, interaction_type),
+        direction = COALESCE($2, direction),
+        subject = COALESCE($3, subject),
+        content = COALESCE($4, content),
+        duration_minutes = COALESCE($5, duration_minutes),
+        email_message_id = COALESCE($6, email_message_id),
+        updated_at = NOW()
+      WHERE id = $7 AND organization_id = $8
+      RETURNING *
+    `, [
+      interaction_type, direction, subject, content,
+      duration_minutes, email_message_id, interactionId, organizationId
+    ], organizationId);
+
+    return result.rows[0];
+  }
+
+  /**
+   * Delete contact interaction
+   * @param {string} interactionId - Interaction ID
+   * @param {string} organizationId - Organization ID
+   * @returns {boolean} Success status
+   */
+  static async deleteInteraction(interactionId, organizationId) {
+    const result = await query(`
+      DELETE FROM contact_interactions
+      WHERE id = $1 AND organization_id = $2
+    `, [interactionId, organizationId], organizationId);
+
+    return result.rowCount > 0;
+  }
+
+  /**
+   * Get recent interactions across all contacts
+   * @param {string} organizationId - Organization ID
+   * @param {Object} options - Query options
+   * @returns {Array} Recent interactions
+   */
+  static async getRecentInteractions(organizationId, options = {}) {
+    const {
+      limit = 20,
+      offset = 0,
+      interaction_type,
+      days = 30
+    } = options;
+
+    let whereClause = `WHERE ci.organization_id = $1
+                      AND ci.created_at >= NOW() - INTERVAL '${days} days'`;
+    const params = [organizationId];
+    let paramCount = 1;
+
+    if (interaction_type) {
+      paramCount++;
+      whereClause += ` AND ci.interaction_type = $${paramCount}`;
+      params.push(interaction_type);
+    }
+
+    const result = await query(`
+      SELECT
+        ci.*,
+        c.first_name as contact_first_name,
+        c.last_name as contact_last_name,
+        c.company as contact_company,
+        u.first_name as created_by_first_name,
+        u.last_name as created_by_last_name
+      FROM contact_interactions ci
+      JOIN contacts c ON ci.contact_id = c.id
+      LEFT JOIN users u ON ci.created_by = u.id
+      ${whereClause}
+      ORDER BY ci.created_at DESC
+      LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}
+    `, [...params, limit, offset], organizationId);
+
+    return result.rows.map(row => ({
+      ...row,
+      contact: {
+        id: row.contact_id,
+        first_name: row.contact_first_name,
+        last_name: row.contact_last_name,
+        full_name: `${row.contact_first_name} ${row.contact_last_name}`.trim(),
+        company: row.contact_company
+      },
+      created_by_user: row.created_by_first_name ? {
+        id: row.created_by,
+        first_name: row.created_by_first_name,
+        last_name: row.created_by_last_name,
+        full_name: `${row.created_by_first_name} ${row.created_by_last_name}`.trim()
+      } : null
+    }));
+  }
+
+  /**
    * Get full name of contact
    * @returns {string} Full name
    */

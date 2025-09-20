@@ -1,7 +1,7 @@
 const express = require('express');
 const User = require('../models/User');
 const Organization = require('../models/Organization');
-const { checkLicenseLimit } = require('../controllers/licenseController');
+// const { checkLicenseLimit } = require('../controllers/licenseController');
 const { 
   validateCreateUser, 
   validateUpdateUser, 
@@ -134,7 +134,7 @@ router.get('/:id',
 router.post('/',
   requireAdmin,
   validateCreateUser,
-  checkLicenseLimit,
+  // checkLicenseLimit,
   async (req, res) => {
     try {
       const user = await User.create(req.body, req.organizationId, req.user.id);

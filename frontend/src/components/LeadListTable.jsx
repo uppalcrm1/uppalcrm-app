@@ -18,6 +18,7 @@ import {
   Filter
 } from 'lucide-react'
 import { format } from 'date-fns'
+import LeadConversionButton from './LeadConversionButton'
 
 const LeadListTable = ({
   leads,
@@ -397,6 +398,13 @@ const LeadListTable = ({
                   {/* Actions */}
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex items-center gap-2">
+                      <LeadConversionButton
+                        lead={lead}
+                        variant="icon"
+                        onSuccess={() => {
+                          // Refresh data will be handled by the component's query invalidation
+                        }}
+                      />
                       <button
                         onClick={() => onEditLead(lead)}
                         className="text-blue-600 hover:text-blue-900"

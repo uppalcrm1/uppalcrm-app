@@ -1,4 +1,4 @@
-const pool = require('../database/connection');
+const pool = require('../config/database');
 const { v4: uuidv4 } = require('uuid');
 const crypto = require('crypto');
 
@@ -812,18 +812,6 @@ class LicenseController {
           scheduledDate
         ]);
       }
-    }
-  }
-
-  // Middleware to check if organization has reached license limit
-  async checkLicenseLimit(req, res, next) {
-    try {
-      // For now, we'll allow unlimited users
-      // This can be updated later to check organization license limits
-      return next();
-    } catch (error) {
-      console.error('Error checking license limit:', error);
-      return next(); // Allow the request to continue even if check fails
     }
   }
 }

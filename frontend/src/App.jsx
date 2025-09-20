@@ -14,6 +14,9 @@ import ZapierIntegrationPage from './pages/settings/ZapierIntegrationPage'
 import SuperAdminApp from './components/SuperAdminApp'
 import FieldManager from './components/FieldManager'
 import DynamicLeadForm from './components/DynamicLeadForm'
+import LicenseManagement from './pages/LicenseManagement'
+import ImportLeads from './pages/ImportLeads'
+import ImportContacts from './pages/ImportContacts'
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuth()
@@ -77,6 +80,9 @@ function App() {
         <Route path="integrations/zapier" element={<ZapierIntegrationPage />} />
         <Route path="admin/fields" element={<FieldManager />} />
         <Route path="leads/new" element={<DynamicLeadForm />} />
+        <Route path="leads/import" element={<ImportLeads />} />
+        <Route path="contacts/import" element={<ImportContacts />} />
+        <Route path="licenses" element={<LicenseManagement />} />
       </Route>
 
       {/* Catch all route */}

@@ -19,6 +19,8 @@ import {
   Puzzle,
   Plus,
   Sliders,
+  CreditCard,
+  Download,
 } from 'lucide-react'
 import LoadingSpinner from './LoadingSpinner'
 
@@ -27,6 +29,7 @@ const navigation = [
   { name: 'Leads', href: '/leads', icon: Users },
   { name: 'Add New Lead', href: '/leads/new', icon: Plus },
   { name: 'Contacts', href: '/contacts', icon: UserPlus },
+  { name: 'Licenses', href: '/licenses', icon: CreditCard },
   { name: 'Team', href: '/team', icon: UserCheck },
   {
     name: 'Integrations',
@@ -34,6 +37,15 @@ const navigation = [
     hasSubmenu: true,
     children: [
       { name: 'Zapier', href: '/integrations/zapier', icon: Zap },
+    ]
+  },
+  {
+    name: 'Import',
+    icon: Download,
+    hasSubmenu: true,
+    children: [
+      { name: 'Import Leads', href: '/leads/import', icon: Users },
+      { name: 'Import Contacts', href: '/contacts/import', icon: UserPlus },
     ]
   },
   { name: 'Field Configuration', href: '/admin/fields', icon: Sliders },

@@ -25,6 +25,7 @@ import AccountManagement from './AccountManagement'
 import DeviceRegistration from './DeviceRegistration'
 import LicenseManagement from './LicenseManagement'
 import TrialManagement from './TrialManagement'
+import ContactInteractions from './ContactInteractions'
 
 const ContactDetail = ({ contact, onBack, onEdit, onDelete }) => {
   const [activeTab, setActiveTab] = useState('overview')
@@ -245,7 +246,7 @@ const ContactDetail = ({ contact, onBack, onEdit, onDelete }) => {
           )}
           
           {activeTab === 'activity' && (
-            <ContactActivity contactId={contactInfo.id} />
+            <ContactInteractions contactId={contactInfo.id} />
           )}
         </div>
       </div>

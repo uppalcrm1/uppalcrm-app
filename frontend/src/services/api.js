@@ -360,9 +360,43 @@ export const contactsAPI = {
     const response = await api.post('/contacts/downloads/record', downloadData)
     return response.data
   },
-  
+
   recordActivation: async (activationData) => {
     const response = await api.post('/contacts/activations/record', activationData)
+    return response.data
+  },
+
+  // Contact Interactions
+  getInteractions: async (contactId, params = {}) => {
+    const response = await api.get(`/contacts/${contactId}/interactions`, { params })
+    return response.data
+  },
+
+  createInteraction: async (contactId, interactionData) => {
+    const response = await api.post(`/contacts/${contactId}/interactions`, {
+      ...interactionData,
+      contact_id: contactId
+    })
+    return response.data
+  },
+
+  updateInteraction: async (contactId, interactionId, interactionData) => {
+    const response = await api.put(`/contacts/${contactId}/interactions/${interactionId}`, interactionData)
+    return response.data
+  },
+
+  deleteInteraction: async (contactId, interactionId) => {
+    const response = await api.delete(`/contacts/${contactId}/interactions/${interactionId}`)
+    return response.data
+  },
+
+  getInteractionStats: async (contactId) => {
+    const response = await api.get(`/contacts/${contactId}/interactions/stats`)
+    return response.data
+  },
+
+  getRecentInteractions: async (params = {}) => {
+    const response = await api.get('/contacts/interactions/recent', { params })
     return response.data
   }
 }

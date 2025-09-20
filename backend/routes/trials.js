@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const trialController = require('../controllers/trialController');
-const { authenticateToken } = require('../middleware/auth');
+const authMiddleware = require('../middleware/authMiddleware');
 
 // Apply authentication middleware to all routes
-router.use(authenticateToken);
+router.use(authMiddleware);
 
 // Trial Management Routes
 

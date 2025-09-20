@@ -1,8 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { Save, User, Building, Mail, Phone, Calendar, DollarSign } from 'lucide-react';
+import { Save, User, Building, Mail, Phone, Calendar, DollarSign, X } from 'lucide-react';
 import { customFieldsAPI, leadsAPI, usersAPI } from '../services/api';
 
-const DynamicLeadForm = ({ onSubmit, initialData = {} }) => {
+const DynamicLeadForm = ({
+  isOpen,
+  onClose,
+  onSuccess,
+  mode = 'create',
+  leadData = {},
+  onSubmit,
+  initialData = {}
+}) => {
+  // Use leadData if provided, otherwise fallback to initialData
+  const actualInitialData = leadData && Object.keys(leadData).length > 0 ? leadData : initialData;
   const [formConfig, setFormConfig] = useState({ customFields: [], defaultFields: [] });
   const [formData, setFormData] = useState({});
   const [loading, setLoading] = useState(true);
@@ -15,14 +25,27 @@ const DynamicLeadForm = ({ onSubmit, initialData = {} }) => {
   }, []);
 
   useEffect(() => {
-    if (initialData && Object.keys(initialData).length > 0) {
+    if (actualInitialData && Object.keys(actualInitialData).length > 0 && !loading) {
+      // Only set the data if form config is loaded (loading is false)
+
+      // Map API field names to form field names
+      const mappedData = {
+        ...actualInitialData,
+        // Map snake_case to camelCase for form fields
+        firstName: actualInitialData.first_name || actualInitialData.firstName || '',
+        lastName: actualInitialData.last_name || actualInitialData.lastName || '',
+        potentialValue: actualInitialData.potential_value || actualInitialData.potentialValue || 0,
+        assignedTo: actualInitialData.assigned_to || actualInitialData.assignedTo || '',
+        nextFollowUp: actualInitialData.next_follow_up || actualInitialData.nextFollowUp || '',
+      };
+
       setFormData(prev => ({
         ...prev,
-        ...initialData,
-        customFields: { ...prev.customFields, ...(initialData.custom_fields || {}) }
+        ...mappedData,
+        customFields: { ...prev.customFields, ...(actualInitialData.custom_fields || {}) }
       }));
     }
-  }, [initialData]);
+  }, [actualInitialData, loading]);
 
   const loadFormConfig = async () => {
     try {
@@ -39,29 +62,40 @@ const DynamicLeadForm = ({ onSubmit, initialData = {} }) => {
       }
 
       // Initialize form data dynamically based on enabled system fields
-      const initialFormData = { customFields: {} };
+      // But only if we don't have existing data to preserve
+      const shouldInitializeWithDefaults = !actualInitialData || Object.keys(actualInitialData).length === 0;
 
-      // Initialize system fields based on what's enabled in the config
-      if (data.systemFields && Array.isArray(data.systemFields)) {
-        data.systemFields.forEach(field => {
-          let defaultValue = '';
-          if (field.field_type === 'select') {
-            // Set default values for select fields
-            if (field.field_name === 'status') defaultValue = 'new';
-            else if (field.field_name === 'priority') defaultValue = 'medium';
-          }
-          initialFormData[field.field_name] = defaultValue;
-        });
+      if (shouldInitializeWithDefaults) {
+        const initialFormData = { customFields: {} };
+
+        // Initialize system fields based on what's enabled in the config
+        if (data.systemFields && Array.isArray(data.systemFields)) {
+          data.systemFields.forEach(field => {
+            let defaultValue = '';
+            if (field.field_type === 'select') {
+              // Set default values for select fields
+              if (field.field_name === 'status') defaultValue = 'new';
+              else if (field.field_name === 'priority') defaultValue = 'medium';
+            }
+            initialFormData[field.field_name] = defaultValue;
+          });
+        }
+
+        // Initialize custom fields
+        if (data.customFields && Array.isArray(data.customFields)) {
+          data.customFields.forEach(field => {
+            initialFormData.customFields[field.field_name] = '';
+          });
+        }
+
+        setFormData(initialFormData);
+      } else {
+        // We have existing data, just ensure customFields exists
+        setFormData(prev => ({
+          ...prev,
+          customFields: prev.customFields || {}
+        }));
       }
-
-      // Initialize custom fields
-      if (data.customFields && Array.isArray(data.customFields)) {
-        data.customFields.forEach(field => {
-          initialFormData.customFields[field.field_name] = '';
-        });
-      }
-
-      setFormData(initialFormData);
 
     } catch (error) {
       console.error('Error loading form config:', error);
@@ -144,14 +178,38 @@ const DynamicLeadForm = ({ onSubmit, initialData = {} }) => {
 
     setSubmitting(true);
     try {
+      // Map form field names back to API field names
       const submitData = {
         ...formData,
+        // Map camelCase back to snake_case for API
+        first_name: formData.firstName || formData.first_name,
+        last_name: formData.lastName || formData.last_name,
+        potential_value: formData.potentialValue || formData.potential_value || 0,
+        assigned_to: formData.assignedTo || formData.assigned_to,
+        next_follow_up: formData.nextFollowUp || formData.next_follow_up,
         customFields: formData.customFields
       };
 
-      const response = await leadsAPI.createLead(submitData);
+      // Remove the camelCase versions to avoid sending both
+      delete submitData.firstName;
+      delete submitData.lastName;
+      delete submitData.potentialValue;
+      delete submitData.assignedTo;
+      delete submitData.nextFollowUp;
 
-      if (onSubmit) {
+      let response;
+      if (mode === 'edit' && actualInitialData?.id) {
+        // Update existing lead
+        response = await leadsAPI.updateLead(actualInitialData.id, submitData);
+      } else {
+        // Create new lead
+        response = await leadsAPI.createLead(submitData);
+      }
+
+      // Call onSuccess if provided, otherwise onSubmit for backward compatibility
+      if (onSuccess) {
+        onSuccess(response);
+      } else if (onSubmit) {
         onSubmit(response);
       }
 
@@ -358,12 +416,31 @@ const DynamicLeadForm = ({ onSubmit, initialData = {} }) => {
   const enabledSystemFields = getEnabledSystemFields();
   const enabledCustomFields = (formConfig.customFields || []).filter(f => f.is_enabled);
 
-  return (
-    <div className="max-w-4xl mx-auto p-6 bg-gray-50 min-h-screen">
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+  // Determine if this should be rendered as a modal
+  const isModalMode = isOpen !== undefined;
+
+  const formContent = (
+    <div className={isModalMode ? "" : "max-w-4xl mx-auto p-6 bg-gray-50 min-h-screen"}>
+      <div className={`bg-white rounded-lg shadow-sm border border-gray-200 ${isModalMode ? "" : ""}`}>
         <div className="border-b border-gray-200 p-6">
-          <h1 className="text-2xl font-semibold text-gray-900">Add New Lead</h1>
-          <p className="mt-1 text-gray-600">Create a new lead in your CRM system</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-semibold text-gray-900">
+                {mode === 'edit' ? 'Edit Lead' : 'Add New Lead'}
+              </h1>
+              <p className="mt-1 text-gray-600">
+                {mode === 'edit' ? 'Update lead information' : 'Create a new lead in your CRM system'}
+              </p>
+            </div>
+            {isModalMode && onClose && (
+              <button
+                onClick={onClose}
+                className="text-gray-400 hover:text-gray-600 p-1"
+              >
+                <X size={20} />
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="p-6">
@@ -383,7 +460,7 @@ const DynamicLeadForm = ({ onSubmit, initialData = {} }) => {
               className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Save className="w-4 h-4" />
-              {submitting ? 'Saving...' : 'Save Lead'}
+              {submitting ? 'Saving...' : (mode === 'edit' ? 'Update Lead' : 'Save Lead')}
             </button>
           </div>
         </div>
@@ -421,6 +498,25 @@ const DynamicLeadForm = ({ onSubmit, initialData = {} }) => {
       )}
     </div>
   );
+
+  // Return with modal wrapper if in modal mode
+  if (isModalMode && isOpen) {
+    return (
+      <div className="fixed inset-0 z-50 overflow-y-auto">
+        <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+          <div className="fixed inset-0 transition-opacity" onClick={onClose}>
+            <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+          </div>
+          <div className="inline-block w-full max-w-4xl px-6 py-6 my-8 text-left align-middle transition-all transform bg-white shadow-xl rounded-lg">
+            {formContent}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Return regular form if not in modal mode or modal is closed
+  return formContent;
 };
 
 export default DynamicLeadForm;

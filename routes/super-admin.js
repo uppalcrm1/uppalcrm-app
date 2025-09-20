@@ -2,7 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { query, transaction } = require('../database/connection');
-const { getLicenseInfo, updateLicenses, getAllOrganizationsLicenses } = require('../controllers/licenseController');
+// const { getLicenseInfo, updateLicenses, getAllOrganizationsLicenses } = require('../controllers/licenseController');
 const router = express.Router();
 
 // Debug endpoint to test if routes are loading
@@ -1297,13 +1297,13 @@ router.get('/debug/organization/:name', authenticateSuperAdmin, async (req, res)
 // ===============================
 
 // Get all organizations with license information
-router.get('/organizations/licenses', authenticateSuperAdmin, getAllOrganizationsLicenses);
+// router.get('/organizations/licenses', authenticateSuperAdmin, getAllOrganizationsLicenses);
 
 // Get detailed license info for specific organization
-router.get('/organizations/:organizationId/license-info', authenticateSuperAdmin, getLicenseInfo);
+// router.get('/organizations/:organizationId/license-info', authenticateSuperAdmin, getLicenseInfo);
 
 // Update licenses for organization
-router.put('/organizations/:organizationId/licenses', authenticateSuperAdmin, updateLicenses);
+// router.put('/organizations/:organizationId/licenses', authenticateSuperAdmin, updateLicenses);
 
 // Public endpoint to check current license values (debug)
 router.get('/public-check-license-values', async (req, res) => {
