@@ -1,4 +1,4 @@
-const db = require('../config/database');
+const { query } = require('../database/connection');
 const { v4: uuidv4 } = require('uuid');
 
 class SubscriptionController {
@@ -28,7 +28,7 @@ class SubscriptionController {
         WHERE os.organization_id = $1
       `;
 
-      const result = await db.query(query, [organizationId]);
+      const result = await query(query, [organizationId]);
 
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'No subscription found for organization' });
@@ -61,7 +61,7 @@ class SubscriptionController {
   async getCurrentUsage(organizationId) {
     try {
       const query = `SELECT * FROM get_current_usage($1)`;
-      const result = await db.query(query, [organizationId]);
+      const result = await query(query, [organizationId]);
       return result.rows[0];
     } catch (error) {
       console.error('Error getting current usage:', error);
@@ -80,7 +80,7 @@ class SubscriptionController {
       }
 
       const query = `SELECT check_usage_limits($1, $2, $3) as can_add`;
-      const result = await db.query(query, [organizationId, usage_type, additional_count]);
+      const result = await query(query, [organizationId, usage_type, additional_count]);
 
       const canAdd = result.rows[0].can_add;
 
@@ -102,7 +102,7 @@ class SubscriptionController {
       const { feature_key } = req.params;
 
       const query = `SELECT has_feature_access($1, $2) as has_access`;
-      const result = await db.query(query, [organizationId, feature_key]);
+      const result = await query(query, [organizationId, feature_key]);
 
       const hasAccess = result.rows[0].has_access;
 
@@ -144,7 +144,7 @@ class SubscriptionController {
       `;
 
       const isAdmin = req.user.role === 'admin' || req.user.role === 'super_admin';
-      const result = await db.query(query, [isAdmin]);
+      const result = await query(query, [isAdmin]);
 
       res.json(result.rows);
     } catch (error) {
@@ -169,7 +169,7 @@ class SubscriptionController {
 
       // Get the plan details
       const planQuery = `SELECT * FROM subscription_plans WHERE id = $1 AND is_active = true`;
-      const planResult = await db.query(planQuery, [subscription_plan_id]);
+      const planResult = await query(planQuery, [subscription_plan_id]);
 
       if (planResult.rows.length === 0) {
         return res.status(404).json({ error: 'Subscription plan not found or inactive' });
@@ -194,7 +194,7 @@ class SubscriptionController {
 
       // Check if subscription already exists
       const existingQuery = `SELECT id FROM organization_subscriptions WHERE organization_id = $1`;
-      const existingResult = await db.query(existingQuery, [organizationId]);
+      const existingResult = await query(existingQuery, [organizationId]);
 
       let subscriptionId;
       let isUpdate = false;
@@ -218,7 +218,7 @@ class SubscriptionController {
           RETURNING *
         `;
 
-        await db.query(updateQuery, [
+        await query(updateQuery, [
           subscription_plan_id,
           billing_cycle,
           currentPrice,
@@ -238,7 +238,7 @@ class SubscriptionController {
           RETURNING *
         `;
 
-        await db.query(insertQuery, [
+        await query(insertQuery, [
           subscriptionId,
           organizationId,
           subscription_plan_id,
@@ -289,7 +289,7 @@ class SubscriptionController {
         RETURNING *
       `;
 
-      const result = await db.query(updateQuery, [organizationId, reason, cancel_at_period_end]);
+      const result = await query(updateQuery, [organizationId, reason, cancel_at_period_end]);
 
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'No subscription found for organization' });
@@ -329,7 +329,7 @@ class SubscriptionController {
 
       // Get subscription
       const subQuery = `SELECT id FROM organization_subscriptions WHERE organization_id = $1`;
-      const subResult = await db.query(subQuery, [organizationId]);
+      const subResult = await query(subQuery, [organizationId]);
 
       if (subResult.rows.length === 0) {
         return res.status(404).json({ error: 'No subscription found for organization' });
@@ -363,7 +363,7 @@ class SubscriptionController {
         RETURNING *
       `;
 
-      const result = await db.query(upsertQuery, [
+      const result = await query(upsertQuery, [
         organizationId,
         subscriptionId,
         period_start,
@@ -396,7 +396,7 @@ class SubscriptionController {
         LIMIT $2
       `;
 
-      const result = await db.query(query, [organizationId, limit]);
+      const result = await query(query, [organizationId, limit]);
 
       res.json(result.rows);
     } catch (error) {
@@ -414,7 +414,7 @@ class SubscriptionController {
         ) VALUES ($1, $2, $3, $4, $5)
       `;
 
-      await db.query(insertQuery, [
+      await query(insertQuery, [
         organizationId,
         subscriptionId,
         eventType,
@@ -445,7 +445,7 @@ class SubscriptionController {
         LIMIT $2
       `;
 
-      const result = await db.query(query, [organizationId, limit]);
+      const result = await query(query, [organizationId, limit]);
 
       res.json(result.rows);
     } catch (error) {
@@ -472,7 +472,7 @@ class SubscriptionController {
         WHERE os.organization_id = $1 AND os.status IN ('trial', 'active')
       `;
 
-      const subResult = await db.query(subQuery, [organizationId]);
+      const subResult = await query(subQuery, [organizationId]);
 
       if (subResult.rows.length === 0) {
         return res.status(404).json({ error: 'No active subscription found' });
