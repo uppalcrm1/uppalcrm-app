@@ -1,4 +1,4 @@
-const db = require('../config/database');
+const { query } = require('../database/connection');
 
 // Middleware to check if organization has access to a feature
 const requireFeature = (featureKey) => {
@@ -8,7 +8,7 @@ const requireFeature = (featureKey) => {
 
       // Check if organization has access to the feature
       const query = `SELECT has_feature_access($1, $2) as has_access`;
-      const result = await db.query(query, [organizationId, featureKey]);
+      const result = await query(query, [organizationId, featureKey]);
 
       const hasAccess = result.rows[0].has_access;
 
@@ -38,7 +38,7 @@ const checkUsageLimit = (resourceType) => {
 
       // Check if organization can add more resources
       const query = `SELECT check_usage_limits($1, $2, $3) as can_add`;
-      const result = await db.query(query, [organizationId, resourceType, additionalCount]);
+      const result = await query(query, [organizationId, resourceType, additionalCount]);
 
       const canAdd = result.rows[0].can_add;
 
@@ -56,7 +56,7 @@ const checkUsageLimit = (resourceType) => {
           WHERE os.organization_id = $1 AND os.status IN ('trial', 'active')
         `;
 
-        const limitsResult = await db.query(limitsQuery, [organizationId]);
+        const limitsResult = await query(limitsQuery, [organizationId]);
         const limits = limitsResult.rows[0];
 
         let currentLimit;
@@ -103,7 +103,7 @@ const requireActiveSubscription = async (req, res, next) => {
       WHERE organization_id = $1
     `;
 
-    const result = await db.query(query, [organizationId]);
+    const result = await query(query, [organizationId]);
 
     if (result.rows.length === 0) {
       return res.status(403).json({
@@ -169,7 +169,7 @@ const trackApiUsage = async (req, res, next) => {
     // Note: You'll need to create the api_usage_tracking table if you want to implement this
     // For now, we'll just proceed without error
     try {
-      await db.query(trackingQuery, [organizationId, endpoint, method, req.user.id]);
+      await query(trackingQuery, [organizationId, endpoint, method, req.user.id]);
     } catch (dbError) {
       // Table might not exist yet - continue without tracking
       console.log('API usage tracking table not found - skipping tracking');
@@ -205,7 +205,7 @@ const addSubscriptionContext = async (req, res, next) => {
       WHERE os.organization_id = $1
     `;
 
-    const result = await db.query(query, [organizationId]);
+    const result = await query(query, [organizationId]);
 
     if (result.rows.length > 0) {
       req.subscription = result.rows[0];
@@ -241,7 +241,7 @@ const checkBulkOperationLimits = (resourceType, maxCount = 100) => {
 
       // Check if organization has enough capacity for the bulk operation
       const query = `SELECT check_usage_limits($1, $2, $3) as can_add`;
-      const result = await db.query(query, [organizationId, resourceType, itemCount]);
+      const result = await query(query, [organizationId, resourceType, itemCount]);
 
       const canAdd = result.rows[0].can_add;
 
