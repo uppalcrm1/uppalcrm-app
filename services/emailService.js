@@ -744,6 +744,210 @@ This email was sent to ${memberEmail} because you were invited to join ${organiz
 © 2024 UppalCRM. All rights reserved.
     `;
   }
+
+  /**
+   * Send trial expiration warning email
+   */
+  async sendTrialExpirationWarning(organizationData, daysLeft) {
+    if (!this.isAvailable()) {
+      console.log('📧 Email service not available, skipping trial expiration warning');
+      return false;
+    }
+
+    try {
+      const subject = `⚠️ Your ${organizationData.organization_name} trial expires in ${daysLeft} days`;
+      const html = this.generateTrialExpirationHTML(organizationData, daysLeft);
+      const text = this.generateTrialExpirationText(organizationData, daysLeft);
+
+      const mailOptions = {
+        from: `${process.env.FROM_NAME || 'UppalCRM Team'} <${process.env.FROM_EMAIL}>`,
+        to: organizationData.admin_email,
+        subject,
+        html,
+        text
+      };
+
+      const result = await this.transporter.sendMail(mailOptions);
+      console.log('✅ Trial expiration warning sent to:', organizationData.admin_email);
+      return { success: true, messageId: result.messageId };
+    } catch (error) {
+      console.error('❌ Failed to send trial expiration warning:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Generate trial expiration warning HTML
+   */
+  generateTrialExpirationHTML(organizationData, daysLeft) {
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Trial Expiration Warning</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background: #f4f4f4; }
+        .container { max-width: 600px; margin: 20px auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; }
+        .header h1 { margin: 0; font-size: 28px; }
+        .content { padding: 30px; }
+        .warning-box { background: #fff3cd; border-left: 4px solid #ffc107; padding: 20px; margin: 20px 0; border-radius: 5px; }
+        .warning-box h3 { margin-top: 0; color: #856404; }
+        .cta-button { display: inline-block; background: #007bff; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; font-weight: bold; }
+        .features-list { background: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0; }
+        .footer { text-align: center; color: #666; font-size: 12px; padding: 20px; background: #f8f9fa; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚠️ Trial Expiring Soon</h1>
+        </div>
+
+        <div class="content">
+            <p>Hello ${organizationData.admin_first_name || 'there'},</p>
+
+            <div class="warning-box">
+                <h3>Your ${organizationData.organization_name} trial expires in ${daysLeft} days!</h3>
+                <p>Don't lose access to your CRM data and features. Upgrade now to continue without interruption.</p>
+            </div>
+
+            <p>Your trial has been helping you manage your customer relationships effectively. To keep your momentum going, upgrade to a paid plan before your trial expires.</p>
+
+            <div class="features-list">
+                <h4>🚫 What happens when your trial expires?</h4>
+                <ul>
+                    <li>Your account will be moved to a 7-day grace period</li>
+                    <li>Access to advanced features will be limited</li>
+                    <li>After the grace period, your account will be suspended</li>
+                    <li>You may lose access to your valuable CRM data</li>
+                </ul>
+            </div>
+
+            <div style="text-align: center;">
+                <a href="${process.env.APP_URL || 'http://localhost:3003'}/subscription" class="cta-button">
+                    🚀 Upgrade Now & Save Your Data
+                </a>
+            </div>
+
+            <p>Choose from our flexible plans starting at just $29/month. All plans include:</p>
+            <ul>
+                <li>✅ Unlimited contacts and leads</li>
+                <li>✅ Advanced reporting and analytics</li>
+                <li>✅ Email integration and automation</li>
+                <li>✅ Priority customer support</li>
+                <li>✅ Data export and backup features</li>
+            </ul>
+
+            <p>Questions? Our support team is here to help you choose the right plan for your business.</p>
+
+            <p>Best regards,<br><strong>The UppalCRM Team</strong></p>
+        </div>
+
+        <div class="footer">
+            <p>© 2024 UppalCRM. All rights reserved.</p>
+            <p>You're receiving this email because your trial is expiring soon.</p>
+        </div>
+    </div>
+</body>
+</html>`;
+  }
+
+  /**
+   * Generate trial expiration warning text
+   */
+  generateTrialExpirationText(organizationData, daysLeft) {
+    return `
+Hello ${organizationData.admin_first_name || 'there'},
+
+Your ${organizationData.organization_name} trial expires in ${daysLeft} days!
+
+Don't lose access to your CRM data and features. Upgrade now to continue without interruption.
+
+What happens when your trial expires?
+- Your account will be moved to a 7-day grace period
+- Access to advanced features will be limited
+- After the grace period, your account will be suspended
+- You may lose access to your valuable CRM data
+
+Choose from our flexible plans starting at just $29/month.
+
+All plans include:
+✅ Unlimited contacts and leads
+✅ Advanced reporting and analytics
+✅ Email integration and automation
+✅ Priority customer support
+✅ Data export and backup features
+
+Upgrade now: ${process.env.APP_URL || 'http://localhost:3003'}/subscription
+
+Questions? Our support team is here to help you choose the right plan for your business.
+
+Best regards,
+The UppalCRM Team
+
+© 2024 UppalCRM. All rights reserved.
+You're receiving this email because your trial is expiring soon.
+`;
+  }
+
+  /**
+   * Send notifications for expiring trials
+   */
+  async sendTrialExpirationNotifications() {
+    const { query } = require('../database/connection');
+    console.log('📧 Checking for trials that need expiration notifications...');
+
+    try {
+      // Find trials expiring in 3 days, 1 day
+      const expiringTrials = await query(`
+        SELECT
+          os.id,
+          os.organization_id,
+          os.trial_ends_at,
+          o.name as organization_name,
+          u.email as admin_email,
+          u.first_name as admin_first_name,
+          u.last_name as admin_last_name,
+          CASE
+            WHEN os.trial_ends_at > NOW() THEN EXTRACT(days FROM os.trial_ends_at - NOW())::int
+            ELSE 0
+          END as days_left
+        FROM organization_subscriptions os
+        JOIN organizations o ON o.id = os.organization_id
+        LEFT JOIN users u ON u.organization_id = os.organization_id
+          AND u.role = 'admin'
+          AND u.is_active = true
+        WHERE os.status = 'trial'
+        AND (
+          os.trial_ends_at BETWEEN NOW() + INTERVAL '2 days' AND NOW() + INTERVAL '4 days' OR  -- 3 days warning
+          os.trial_ends_at BETWEEN NOW() AND NOW() + INTERVAL '2 days'  -- 1 day warning
+        )
+        AND u.email IS NOT NULL
+      `);
+
+      console.log(`Found ${expiringTrials.rows.length} trials requiring notifications`);
+
+      let sentCount = 0;
+      for (const trial of expiringTrials.rows) {
+        try {
+          const result = await this.sendTrialExpirationWarning(trial, trial.days_left);
+          if (result.success) {
+            sentCount++;
+            console.log(`✅ Sent expiration warning to ${trial.admin_email} (${trial.days_left} days left)`);
+          }
+        } catch (error) {
+          console.error(`❌ Failed to send notification to ${trial.admin_email}:`, error.message);
+        }
+      }
+
+      return sentCount;
+    } catch (error) {
+      console.error('❌ Failed to send trial expiration notifications:', error);
+      throw error;
+    }
+  }
 }
 
 // Export singleton instance

@@ -25,6 +25,10 @@ const adminRoutes = require('./routes/admin');
 const webhooksRoutes = require('./routes/webhooks');
 const apiKeysRoutes = require('./routes/api-keys');
 const customFieldsRoutes = require('./routes/customFields');
+const subscriptionRoutes = require('./routes/subscription');
+
+// Import scheduled jobs
+const scheduledJobs = require('./services/scheduledJobs');
 
 // Account Management Routes
 const accountRoutes = require('./routes/accounts');
@@ -195,6 +199,9 @@ app.use('/api/organizations/current/api-keys', rateLimiters.general, apiKeysRout
 
 // Custom Fields management routes
 app.use('/api/custom-fields', rateLimiters.general, customFieldsRoutes);
+
+// Subscription management routes
+app.use('/api/subscription', rateLimiters.general, subscriptionRoutes);
 
 // Public routes (no authentication required)
 console.log('🔍 DEBUG: publicLeadRoutes type:', typeof publicLeadRoutes, 'value:', !!publicLeadRoutes);
@@ -429,6 +436,14 @@ const startServer = async () => {
       console.log(`🌐 Marketing Site: http://localhost:${PORT}`);
       console.log(`🔒 Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`👑 Super Admin: http://localhost:${PORT}/super-admin`);
+
+      // Start scheduled billing jobs
+      try {
+        scheduledJobs.start();
+        console.log('✅ Billing automation jobs started successfully');
+      } catch (error) {
+        console.error('❌ Failed to start billing jobs:', error.message);
+      }
     });
   } catch (error) {
     console.error('Failed to start server:', error);

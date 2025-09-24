@@ -15,6 +15,7 @@ import SuperAdminApp from './components/SuperAdminApp'
 import FieldManager from './components/FieldManager'
 import DynamicLeadForm from './components/DynamicLeadForm'
 import AccountManagement from './pages/AccountManagement'
+import SubscriptionManagement from './pages/SubscriptionManagement'
 import ImportLeads from './pages/ImportLeads'
 import ImportContacts from './pages/ImportContacts'
 import LeadDetail from './pages/LeadDetail'
@@ -85,6 +86,7 @@ function App() {
         <Route path="leads/import" element={<ImportLeads />} />
         <Route path="contacts/import" element={<ImportContacts />} />
         <Route path="accounts" element={<AccountManagement />} />
+        <Route path="subscription" element={<SubscriptionManagement />} />
         <Route path="licenses" element={<AccountManagement />} />
       </Route>
 

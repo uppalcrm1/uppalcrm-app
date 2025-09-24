@@ -68,6 +68,15 @@ class Organization {
 
       const { organization_id, user_id } = result.rows[0];
 
+      // Initialize trial subscription for new organization
+      try {
+        await Organization.initializeTrialSubscription(organization_id);
+        console.log(`Trial subscription initialized for organization ${organization_id}`);
+      } catch (subscriptionError) {
+        console.error('Failed to initialize trial subscription:', subscriptionError);
+        // Don't fail organization creation if subscription initialization fails
+      }
+
       // Return the created organization and admin user
       const org = await Organization.findById(organization_id);
       return {
@@ -187,13 +196,24 @@ class Organization {
   }
 
   /**
-   * Check if organization can add more users based on purchased licenses
+   * Check if organization can add more users (Enhanced with subscription system)
    * @param {string} organizationId - Organization ID
    * @returns {boolean} Whether more users can be added
    */
   static async canAddUsers(organizationId) {
+    // First try the new subscription system
+    try {
+      const subscriptionResult = await query(`SELECT check_usage_limits($1, 'users', 1) as can_add`, [organizationId]);
+      if (subscriptionResult.rows.length > 0) {
+        return subscriptionResult.rows[0].can_add;
+      }
+    } catch (error) {
+      console.log('New subscription system not available, using legacy method');
+    }
+
+    // Fallback to legacy method
     const result = await query(`
-      SELECT 
+      SELECT
         COUNT(u.id) as user_count,
         COALESCE(ol.quantity, o.purchased_licenses, 5) as purchased_licenses
       FROM organizations o
@@ -209,6 +229,131 @@ class Organization {
 
     const { user_count, purchased_licenses } = result.rows[0];
     return parseInt(user_count) < parseInt(purchased_licenses);
+  }
+
+  /**
+   * Get organization subscription details
+   * @param {string} organizationId - The organization ID
+   * @returns {Object|null} Subscription details or null if not found
+   */
+  static async getSubscription(organizationId) {
+    try {
+      const result = await query(`
+        SELECT
+          os.*,
+          sp.name as plan_name,
+          sp.display_name as plan_display_name,
+          sp.description as plan_description,
+          sp.monthly_price,
+          sp.yearly_price,
+          sp.max_users,
+          sp.max_contacts,
+          sp.max_leads,
+          sp.max_storage_gb,
+          sp.max_api_calls_per_month,
+          sp.max_custom_fields,
+          sp.features,
+          sp.trial_days
+        FROM organization_subscriptions os
+        JOIN subscription_plans sp ON sp.id = os.subscription_plan_id
+        WHERE os.organization_id = $1
+      `, [organizationId]);
+
+      return result.rows.length > 0 ? result.rows[0] : null;
+    } catch (error) {
+      console.error('Error fetching organization subscription:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Check if organization has access to a specific feature
+   * @param {string} organizationId - The organization ID
+   * @param {string} featureKey - The feature key to check
+   * @returns {boolean} Whether the organization has access to the feature
+   */
+  static async hasFeatureAccess(organizationId, featureKey) {
+    try {
+      const result = await query(`SELECT has_feature_access($1, $2) as has_access`, [organizationId, featureKey]);
+      return result.rows.length > 0 ? result.rows[0].has_access : false;
+    } catch (error) {
+      console.error('Error checking feature access:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Check usage limits for a specific resource type
+   * @param {string} organizationId - The organization ID
+   * @param {string} resourceType - The resource type (users, contacts, leads, custom_fields)
+   * @param {number} additionalCount - How many additional resources to check for
+   * @returns {boolean} Whether the organization can add the requested resources
+   */
+  static async checkUsageLimits(organizationId, resourceType, additionalCount = 1) {
+    try {
+      const result = await query(`SELECT check_usage_limits($1, $2, $3) as can_add`, [organizationId, resourceType, additionalCount]);
+      return result.rows.length > 0 ? result.rows[0].can_add : false;
+    } catch (error) {
+      console.error('Error checking usage limits:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get current usage statistics for organization
+   * @param {string} organizationId - The organization ID
+   * @returns {Object|null} Usage statistics or null if not available
+   */
+  static async getCurrentUsage(organizationId) {
+    try {
+      const result = await query(`SELECT * FROM get_current_usage($1)`, [organizationId]);
+      return result.rows.length > 0 ? result.rows[0] : null;
+    } catch (error) {
+      console.error('Error getting current usage:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Initialize trial subscription for new organization
+   * @param {string} organizationId - The organization ID
+   * @returns {boolean} Whether the trial was initialized successfully
+   */
+  static async initializeTrialSubscription(organizationId) {
+    try {
+      // Get the trial plan
+      const trialPlanResult = await query(`SELECT id FROM subscription_plans WHERE name = 'trial' AND is_active = true`);
+
+      if (trialPlanResult.rows.length === 0) {
+        console.error('Trial plan not found');
+        return false;
+      }
+
+      const trialPlanId = trialPlanResult.rows[0].id;
+      const subscriptionId = uuidv4();
+      const now = new Date();
+      const trialEnd = new Date(now.getTime() + (14 * 24 * 60 * 60 * 1000)); // 14 days trial
+
+      // Create trial subscription
+      await query(`
+        INSERT INTO organization_subscriptions (
+          id, organization_id, subscription_plan_id, status, billing_cycle,
+          current_price, trial_start, trial_end, current_period_start, current_period_end
+        ) VALUES ($1, $2, $3, 'trial', 'monthly', 0, $4, $5, $4, $5)
+      `, [subscriptionId, organizationId, trialPlanId, now, trialEnd]);
+
+      // Log the subscription event
+      await query(`
+        INSERT INTO subscription_events (
+          organization_id, subscription_id, event_type, description
+        ) VALUES ($1, $2, 'trial_started', 'Trial subscription initialized for new organization')
+      `, [organizationId, subscriptionId]);
+
+      return true;
+    } catch (error) {
+      console.error('Error initializing trial subscription:', error);
+      return false;
+    }
   }
 
   /**
