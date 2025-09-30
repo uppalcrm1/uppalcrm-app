@@ -12,6 +12,7 @@ import TeamPage from './pages/TeamPage'
 import SettingsPage from './pages/SettingsPage'
 import ZapierIntegrationPage from './pages/settings/ZapierIntegrationPage'
 import SuperAdminApp from './components/SuperAdminApp'
+import SuperAdminDashboard from './pages/SuperAdminDashboard'
 import FieldManager from './components/FieldManager'
 import DynamicLeadForm from './components/DynamicLeadForm'
 import AccountManagement from './pages/AccountManagement'
@@ -63,6 +64,7 @@ function App() {
 
       {/* Super Admin Route */}
       <Route path="/super-admin" element={<SuperAdminApp />} />
+      <Route path="/super-admin-dashboard" element={<SuperAdminDashboard />} />
 
       {/* Protected Routes */}
       <Route
