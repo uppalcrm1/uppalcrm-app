@@ -11,7 +11,10 @@ const SuperAdminDashboard = () => {
     password: 'SuperAdmin123!'
   });
 
-  const API_BASE = 'https://uppalcrm-api.onrender.com/api/super-admin';
+  // Use local backend if available, otherwise production
+  const API_BASE = window.location.hostname === 'localhost'
+    ? 'http://localhost:3004/api/super-admin'
+    : 'https://uppalcrm-api.onrender.com/api/super-admin';
 
   const handleLogin = async (e) => {
     e.preventDefault();
