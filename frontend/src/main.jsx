@@ -6,6 +6,7 @@ import { Toaster } from 'react-hot-toast'
 import App from './App'
 import './index.css'
 import { AuthProvider } from './contexts/AuthContext'
+import { SuperAdminProvider } from './contexts/SuperAdminContext'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -21,20 +22,22 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <BrowserRouter>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <App />
-          <Toaster 
-            position="top-right"
-            toastOptions={{
-              duration: 4000,
-              style: {
-                background: '#fff',
-                color: '#374151',
-                borderRadius: '8px',
-                border: '1px solid #e5e7eb',
-                boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
-              },
-            }}
-          />
+          <SuperAdminProvider>
+            <App />
+            <Toaster
+              position="top-right"
+              toastOptions={{
+                duration: 4000,
+                style: {
+                  background: '#fff',
+                  color: '#374151',
+                  borderRadius: '8px',
+                  border: '1px solid #e5e7eb',
+                  boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                },
+              }}
+            />
+          </SuperAdminProvider>
         </AuthProvider>
       </QueryClientProvider>
     </BrowserRouter>

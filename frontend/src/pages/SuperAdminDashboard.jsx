@@ -1,257 +1,289 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+import { useSuperAdminDashboard, useSuperAdminStats } from '../contexts/SuperAdminContext';
+import {
+  Users,
+  Building2,
+  UserPlus,
+  TrendingUp,
+  Clock,
+  CheckCircle,
+  AlertCircle,
+  XCircle,
+  ArrowUpRight,
+  ArrowDownRight,
+  Loader2
+} from 'lucide-react';
 
-const SuperAdminDashboard = () => {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [authToken, setAuthToken] = useState(null);
-  const [organizations, setOrganizations] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [loginCredentials, setLoginCredentials] = useState({
-    email: 'admin@uppalcrm.com',
-    password: 'SuperAdmin123!'
-  });
+function StatCard({ title, value, icon: Icon, change, changeType, loading }) {
+  return (
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-medium text-gray-600">{title}</p>
+          <p className="text-2xl font-bold text-gray-900 mt-2">
+            {loading ? (
+              <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+            ) : (
+              value
+            )}
+          </p>
+          {change && (
+            <div className={`flex items-center mt-2 text-sm ${
+              changeType === 'positive' ? 'text-green-600' : 'text-red-600'
+            }`}>
+              {changeType === 'positive' ? (
+                <ArrowUpRight className="h-4 w-4 mr-1" />
+              ) : (
+                <ArrowDownRight className="h-4 w-4 mr-1" />
+              )}
+              {change}
+            </div>
+          )}
+        </div>
+        <div className={`p-3 rounded-full ${
+          changeType === 'positive' ? 'bg-green-50' : 'bg-blue-50'
+        }`}>
+          <Icon className={`h-6 w-6 ${
+            changeType === 'positive' ? 'text-green-600' : 'text-blue-600'
+          }`} />
+        </div>
+      </div>
+    </div>
+  );
+}
 
-  // Use local backend if available, otherwise production
-  const API_BASE = window.location.hostname === 'localhost'
-    ? 'http://localhost:3004/api/super-admin'
-    : 'https://uppalcrm-api.onrender.com/api/super-admin';
-
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-
-    try {
-      const response = await fetch(`${API_BASE}/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(loginCredentials),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setAuthToken(data.token);
-        setIsLoggedIn(true);
-        await loadOrganizations(data.token);
-      } else {
-        setError(data.error || 'Login failed');
-      }
-    } catch (error) {
-      setError('Connection error: ' + error.message);
+function RecentSignupCard({ signup }) {
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'pending':
+        return 'bg-yellow-50 text-yellow-700 border-yellow-200';
+      case 'contacted':
+        return 'bg-blue-50 text-blue-700 border-blue-200';
+      case 'qualified':
+        return 'bg-purple-50 text-purple-700 border-purple-200';
+      case 'converted':
+        return 'bg-green-50 text-green-700 border-green-200';
+      case 'rejected':
+        return 'bg-red-50 text-red-700 border-red-200';
+      default:
+        return 'bg-gray-50 text-gray-700 border-gray-200';
     }
-
-    setLoading(false);
-  };
-
-  const loadOrganizations = async (token) => {
-    try {
-      const response = await fetch(`${API_BASE}/organizations`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setOrganizations(data.organizations || []);
-      } else {
-        throw new Error('Failed to load organizations');
-      }
-    } catch (error) {
-      setError('Failed to load organizations: ' + error.message);
-    }
-  };
-
-  const handleLogout = () => {
-    setIsLoggedIn(false);
-    setAuthToken(null);
-    setOrganizations([]);
-    setError('');
-  };
-
-  const getStatusBadge = (isActive, trialStatus) => {
-    let className = 'px-3 py-1 rounded-full text-xs font-semibold ';
-    let text = '';
-
-    if (!isActive) {
-      className += 'bg-red-100 text-red-800';
-      text = 'Inactive';
-    } else if (trialStatus === 'active') {
-      className += 'bg-yellow-100 text-yellow-800';
-      text = 'Trial';
-    } else {
-      className += 'bg-green-100 text-green-800';
-      text = 'Active';
-    }
-
-    return <span className={className}>{text}</span>;
   };
 
   const formatDate = (dateString) => {
-    if (!dateString) return 'Unknown';
-    return new Date(dateString).toLocaleDateString();
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
-  const calculateStats = () => {
-    const totalOrgs = organizations.length;
-    const activeOrgs = organizations.filter(org => org.is_active).length;
-    const trialOrgs = organizations.filter(org => org.trial_status === 'active').length;
-    const totalUsers = organizations.reduce((sum, org) => sum + (org.active_user_count || 0), 0);
+  return (
+    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+      <div className="flex items-center space-x-3">
+        <div className="h-10 w-10 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-full flex items-center justify-center">
+          <span className="text-sm font-medium text-white">
+            {signup.full_name?.charAt(0) || 'U'}
+          </span>
+        </div>
+        <div>
+          <p className="text-sm font-medium text-gray-900">{signup.full_name}</p>
+          <p className="text-xs text-gray-500">{signup.company}</p>
+        </div>
+      </div>
+      <div className="flex items-center space-x-3">
+        <span className={`px-2 py-1 text-xs font-medium rounded-full border ${getStatusColor(signup.status)}`}>
+          {signup.status}
+        </span>
+        <span className="text-xs text-gray-500">{formatDate(signup.created_at)}</span>
+      </div>
+    </div>
+  );
+}
 
-    return { totalOrgs, activeOrgs, trialOrgs, totalUsers };
-  };
+export default function SuperAdminDashboard() {
+  const { data: dashboardData, isLoading: dashboardLoading, error: dashboardError } = useSuperAdminDashboard();
+  const { data: statsData, isLoading: statsLoading, error: statsError } = useSuperAdminStats();
 
-  if (!isLoggedIn) {
+  const isLoading = dashboardLoading || statsLoading;
+  const error = dashboardError || statsError;
+
+  if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-800 mb-2">🚀 Super Admin</h1>
-            <p className="text-gray-600">Multi-Tenant CRM Dashboard</p>
-          </div>
-
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4">
-              ❌ {error}
-            </div>
-          )}
-
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Email</label>
-              <input
-                type="email"
-                value={loginCredentials.email}
-                onChange={(e) => setLoginCredentials({...loginCredentials, email: e.target.value})}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Password</label>
-              <input
-                type="password"
-                value={loginCredentials.password}
-                onChange={(e) => setLoginCredentials({...loginCredentials, password: e.target.value})}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                required
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-indigo-600 hover:to-purple-700 transition-all duration-200 transform hover:scale-105 disabled:opacity-50"
-            >
-              {loading ? 'Logging in...' : 'Login to Dashboard'}
-            </button>
-          </form>
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Failed to Load Dashboard</h3>
+          <p className="text-gray-600">{error.message}</p>
         </div>
       </div>
     );
   }
 
-  const stats = calculateStats();
+  const trialStats = dashboardData?.trial_stats || {};
+  const orgStats = dashboardData?.organization_stats || {};
+  const recentSignups = dashboardData?.recent_signups || [];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-bold">📊 Super Admin Dashboard</h1>
-              <p className="text-indigo-100 mt-1">Multi-Tenant CRM Management</p>
+    <div className="space-y-6">
+      {/* Welcome Header */}
+      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl text-white p-6">
+        <h2 className="text-2xl font-bold mb-2">Welcome to Super Admin Dashboard</h2>
+        <p className="text-indigo-100">
+          Monitor and manage all platform activities, trial signups, and organization conversions.
+        </p>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StatCard
+          title="Total Signups"
+          value={trialStats.total_signups || 0}
+          icon={UserPlus}
+          change="+12% from last month"
+          changeType="positive"
+          loading={isLoading}
+        />
+        <StatCard
+          title="Active Organizations"
+          value={orgStats.active || 0}
+          icon={Building2}
+          change="+8% from last month"
+          changeType="positive"
+          loading={isLoading}
+        />
+        <StatCard
+          title="Trial Conversions"
+          value={trialStats.total_conversions || 0}
+          icon={TrendingUp}
+          change={`${trialStats.conversion_rate || 0}% conversion rate`}
+          changeType="positive"
+          loading={isLoading}
+        />
+        <StatCard
+          title="Pending Reviews"
+          value={trialStats.pending_signups || 0}
+          icon={Clock}
+          loading={isLoading}
+        />
+      </div>
+
+      {/* Status Overview */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Trial Status Breakdown */}
+        <div className="lg:col-span-2 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Trial Status Overview</h3>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className="text-center">
+              <div className="h-12 w-12 bg-yellow-50 rounded-lg flex items-center justify-center mx-auto mb-2">
+                <Clock className="h-6 w-6 text-yellow-600" />
+              </div>
+              <p className="text-2xl font-bold text-gray-900">
+                {isLoading ? '...' : (trialStats.pending_signups || 0)}
+              </p>
+              <p className="text-sm text-gray-600">Pending</p>
             </div>
-            <button
-              onClick={handleLogout}
-              className="bg-red-500 hover:bg-red-600 px-4 py-2 rounded-lg font-semibold transition-colors"
-            >
-              Logout
-            </button>
+            <div className="text-center">
+              <div className="h-12 w-12 bg-blue-50 rounded-lg flex items-center justify-center mx-auto mb-2">
+                <Users className="h-6 w-6 text-blue-600" />
+              </div>
+              <p className="text-2xl font-bold text-gray-900">
+                {isLoading ? '...' : (trialStats.contacted_signups || 0)}
+              </p>
+              <p className="text-sm text-gray-600">Contacted</p>
+            </div>
+            <div className="text-center">
+              <div className="h-12 w-12 bg-green-50 rounded-lg flex items-center justify-center mx-auto mb-2">
+                <CheckCircle className="h-6 w-6 text-green-600" />
+              </div>
+              <p className="text-2xl font-bold text-gray-900">
+                {isLoading ? '...' : (trialStats.converted_signups || 0)}
+              </p>
+              <p className="text-sm text-gray-600">Converted</p>
+            </div>
+            <div className="text-center">
+              <div className="h-12 w-12 bg-red-50 rounded-lg flex items-center justify-center mx-auto mb-2">
+                <XCircle className="h-6 w-6 text-red-600" />
+              </div>
+              <p className="text-2xl font-bold text-gray-900">
+                {isLoading ? '...' : (trialStats.rejected_signups || 0)}
+              </p>
+              <p className="text-sm text-gray-600">Rejected</p>
+            </div>
+            <div className="text-center">
+              <div className="h-12 w-12 bg-purple-50 rounded-lg flex items-center justify-center mx-auto mb-2">
+                <TrendingUp className="h-6 w-6 text-purple-600" />
+              </div>
+              <p className="text-2xl font-bold text-gray-900">
+                {isLoading ? '...' : `${trialStats.conversion_rate || 0}%`}
+              </p>
+              <p className="text-sm text-gray-600">Rate</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Stats */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Stats</h3>
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-600">Last 7 days</span>
+              <span className="text-sm font-medium text-gray-900">
+                {isLoading ? '...' : (trialStats.signups_last_7_days || 0)} signups
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-600">Last 30 days</span>
+              <span className="text-sm font-medium text-gray-900">
+                {isLoading ? '...' : (trialStats.signups_last_30_days || 0)} signups
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-600">Trial Organizations</span>
+              <span className="text-sm font-medium text-gray-900">
+                {isLoading ? '...' : (orgStats.trial || 0)}
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-600">Paid Organizations</span>
+              <span className="text-sm font-medium text-gray-900">
+                {isLoading ? '...' : (orgStats.paid || 0)}
+              </span>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-indigo-500">
-            <div className="text-3xl font-bold text-indigo-600">{stats.totalOrgs}</div>
-            <div className="text-gray-600 font-semibold">Total Organizations</div>
-          </div>
-          <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-green-500">
-            <div className="text-3xl font-bold text-green-600">{stats.activeOrgs}</div>
-            <div className="text-gray-600 font-semibold">Active Organizations</div>
-          </div>
-          <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-yellow-500">
-            <div className="text-3xl font-bold text-yellow-600">{stats.trialOrgs}</div>
-            <div className="text-gray-600 font-semibold">Active Trials</div>
-          </div>
-          <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-purple-500">
-            <div className="text-3xl font-bold text-purple-600">{stats.totalUsers}</div>
-            <div className="text-gray-600 font-semibold">Total Users</div>
-          </div>
+      {/* Recent Signups */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-semibold text-gray-900">Recent Trial Signups</h3>
+          <button
+            onClick={() => window.location.href = '/super-admin/signups'}
+            className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+          >
+            View All →
+          </button>
         </div>
 
-        {/* Organizations List */}
-        <div className="bg-white rounded-xl shadow-lg">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-xl font-bold text-gray-800">🏢 All Organizations</h2>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
           </div>
-          <div className="p-6">
-            {organizations.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                No organizations found
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {organizations.map((org) => (
-                  <div key={org.id} className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
-                    <div className="flex justify-between items-start mb-4">
-                      <h3 className="text-lg font-bold text-gray-800">
-                        {org.organization_name || org.name}
-                      </h3>
-                      {getStatusBadge(org.is_active, org.trial_status)}
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
-                      <div>
-                        <span className="font-semibold text-gray-600">Domain:</span>
-                        <span className="ml-2 text-gray-800">{org.domain || 'Not set'}</span>
-                      </div>
-                      <div>
-                        <span className="font-semibold text-gray-600">Plan:</span>
-                        <span className="ml-2 text-gray-800">{org.subscription_plan || 'None'}</span>
-                      </div>
-                      <div>
-                        <span className="font-semibold text-gray-600">Users:</span>
-                        <span className="ml-2 text-gray-800">{org.active_user_count || 0}</span>
-                      </div>
-                      <div>
-                        <span className="font-semibold text-gray-600">Admin:</span>
-                        <span className="ml-2 text-gray-800">{org.admin_email || 'Not set'}</span>
-                      </div>
-                      <div>
-                        <span className="font-semibold text-gray-600">Created:</span>
-                        <span className="ml-2 text-gray-800">{formatDate(org.created_at)}</span>
-                      </div>
-                      <div>
-                        <span className="font-semibold text-gray-600">Trial Status:</span>
-                        <span className="ml-2 text-gray-800">{org.trial_status || 'None'}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+        ) : recentSignups.length > 0 ? (
+          <div className="space-y-3">
+            {recentSignups.slice(0, 5).map((signup) => (
+              <RecentSignupCard key={signup.id} signup={signup} />
+            ))}
           </div>
-        </div>
+        ) : (
+          <div className="text-center py-8">
+            <UserPlus className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+            <p className="text-gray-500">No recent signups</p>
+          </div>
+        )}
       </div>
     </div>
   );
-};
-
-export default SuperAdminDashboard;
+}

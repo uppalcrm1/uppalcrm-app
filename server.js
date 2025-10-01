@@ -26,6 +26,7 @@ const webhooksRoutes = require('./routes/webhooks');
 const apiKeysRoutes = require('./routes/api-keys');
 const customFieldsRoutes = require('./routes/customFields');
 const subscriptionRoutes = require('./routes/subscription');
+const platformAdminRoutes = require('./routes/platformAdmin');
 
 // Import scheduled jobs
 const scheduledJobs = require('./services/scheduledJobs');
@@ -179,6 +180,7 @@ app.use('/api/trials', rateLimiters.general, trialRoutes);
 app.use('/api/super-admin', rateLimiters.general, superAdminRoutes);
 app.use('/api/notify-admin', rateLimiters.general, notifyAdminRoutes);
 app.use('/api/admin', rateLimiters.general, adminRoutes);
+app.use('/api/platform', rateLimiters.general, platformAdminRoutes);
 
 // Account Management API routes
 app.use('/api/accounts', rateLimiters.general, accountRoutes);

@@ -1,6 +1,7 @@
 import React from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
+import { useSuperAdmin } from './contexts/SuperAdminContext'
 import LoadingSpinner from './components/LoadingSpinner'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
@@ -11,8 +12,11 @@ import Contacts from './pages/Contacts'
 import TeamPage from './pages/TeamPage'
 import SettingsPage from './pages/SettingsPage'
 import ZapierIntegrationPage from './pages/settings/ZapierIntegrationPage'
-import SuperAdminApp from './components/SuperAdminApp'
 import SuperAdminDashboard from './pages/SuperAdminDashboard'
+import SuperAdminSignups from './pages/SuperAdminSignups'
+import SuperAdminAnalytics from './pages/SuperAdminAnalytics'
+import SuperAdminLogin from './pages/SuperAdminLogin'
+import SuperAdminLayout from './components/SuperAdminLayout'
 import FieldManager from './components/FieldManager'
 import DynamicLeadForm from './components/DynamicLeadForm'
 import AccountManagement from './pages/AccountManagement'
@@ -62,9 +66,14 @@ function App() {
         }
       />
 
-      {/* Super Admin Route */}
-      <Route path="/super-admin" element={<SuperAdminApp />} />
-      <Route path="/super-admin-dashboard" element={<SuperAdminDashboard />} />
+      {/* Super Admin Routes */}
+      <Route path="/super-admin/login" element={<SuperAdminLogin />} />
+      <Route path="/super-admin" element={<SuperAdminLayout />}>
+        <Route index element={<Navigate to="/super-admin/dashboard" />} />
+        <Route path="dashboard" element={<SuperAdminDashboard />} />
+        <Route path="signups" element={<SuperAdminSignups />} />
+        <Route path="analytics" element={<SuperAdminAnalytics />} />
+      </Route>
 
       {/* Protected Routes */}
       <Route
