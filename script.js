@@ -334,7 +334,7 @@ async function simulateTrialSignup(data) {
         console.log('Sending trial signup request:', trialSignupData);
 
         // Make API call to trial signup endpoint
-        const response = await fetch('https://uppalcrm-api.onrender.com/api/public/trial-signup', {
+        const response = await fetch('https://uppalcrm-api.onrender.com/api/platform/trial-signup', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
