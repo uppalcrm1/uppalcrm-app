@@ -452,11 +452,24 @@ class Organization {
       // Start transaction to delete all related data
       await query('BEGIN');
 
-      // Delete in order: child records first, then organization
-      await query('DELETE FROM custom_fields WHERE organization_id = $1', [id]);
-      await query('DELETE FROM contacts WHERE organization_id = $1', [id]);
-      await query('DELETE FROM leads WHERE organization_id = $1', [id]);
+      console.log(`🗑️  Deleting all data for organization: ${id}`);
+
+      // Delete users first (this will cascade to user_sessions, etc.)
       await query('DELETE FROM users WHERE organization_id = $1', [id]);
+
+      // Delete leads and related data
+      await query('DELETE FROM leads WHERE organization_id = $1', [id]);
+
+      // Delete contacts and related data
+      await query('DELETE FROM contacts WHERE organization_id = $1', [id]);
+
+      // Delete organization-specific tables
+      await query('DELETE FROM custom_field_definitions WHERE organization_id = $1', [id]);
+      await query('DELETE FROM field_configurations WHERE organization_id = $1', [id]);
+      await query('DELETE FROM organization_subscriptions WHERE organization_id = $1', [id]);
+      await query('DELETE FROM organization_licenses WHERE organization_id = $1', [id]);
+
+      console.log(`✅ Deleted all related records for organization: ${id}`);
 
       // Finally delete the organization
       const result = await query(
@@ -469,11 +482,14 @@ class Organization {
         throw new Error('Organization not found');
       }
 
+      console.log(`✅ Organization deleted successfully`);
+
       await query('COMMIT');
       return true;
     } catch (error) {
       await query('ROLLBACK');
-      console.error('Error deleting organization:', error);
+      console.error('❌ Error deleting organization:', error);
+      console.error('Error code:', error.code, 'Message:', error.message);
       throw error;
     }
   }
