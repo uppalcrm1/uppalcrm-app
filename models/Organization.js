@@ -454,42 +454,47 @@ class Organization {
 
       console.log(`🗑️  Deleting all data for organization: ${id}`);
 
+      // Helper function to safely delete from table (ignores if table doesn't exist)
+      const safeDelete = async (tableName, whereClause = 'organization_id') => {
+        try {
+          const result = await query(`DELETE FROM ${tableName} WHERE ${whereClause} = $1`, [id]);
+          if (result.rowCount > 0) {
+            console.log(`  ✓ Deleted ${result.rowCount} rows from ${tableName}`);
+          }
+        } catch (err) {
+          // Table doesn't exist or column doesn't exist - skip it
+          if (err.code === '42P01' || err.code === '42703') {
+            console.log(`  ⊘ Skipped ${tableName} (doesn't exist)`);
+          } else {
+            throw err; // Re-throw other errors
+          }
+        }
+      };
+
       // Delete child records in correct order to avoid FK violations
+      await safeDelete('user_sessions');
+      await safeDelete('users');
+      await safeDelete('leads');
+      await safeDelete('contact_interactions');
+      await safeDelete('contact_custom_fields');
+      await safeDelete('contacts');
+      await safeDelete('default_field_configurations');
+      await safeDelete('system_field_configurations');
+      await safeDelete('custom_field_definitions');
+      await safeDelete('field_configurations');
+      await safeDelete('subscription_usage');
+      await safeDelete('subscription_invoices');
+      await safeDelete('subscription_events');
+      await safeDelete('organization_subscriptions');
+      await safeDelete('organization_usage');
+      await safeDelete('organization_licenses');
 
-      // User sessions first
-      await query('DELETE FROM user_sessions WHERE organization_id = $1', [id]);
-
-      // Users (includes all user data)
-      await query('DELETE FROM users WHERE organization_id = $1', [id]);
-
-      // Leads and related data
-      await query('DELETE FROM leads WHERE organization_id = $1', [id]);
-
-      // Contact interactions and custom fields
-      await query('DELETE FROM contact_interactions WHERE organization_id = $1', [id]);
-      await query('DELETE FROM contact_custom_fields WHERE organization_id = $1', [id]);
-
-      // Contacts
-      await query('DELETE FROM contacts WHERE organization_id = $1', [id]);
-
-      // Field configurations
-      await query('DELETE FROM default_field_configurations WHERE organization_id = $1', [id]);
-      await query('DELETE FROM system_field_configurations WHERE organization_id = $1', [id]);
-      await query('DELETE FROM custom_field_definitions WHERE organization_id = $1', [id]);
-      await query('DELETE FROM field_configurations WHERE organization_id = $1', [id]);
-
-      // Subscription related
-      await query('DELETE FROM subscription_usage WHERE organization_id = $1', [id]);
-      await query('DELETE FROM subscription_invoices WHERE organization_id = $1', [id]);
-      await query('DELETE FROM subscription_events WHERE organization_id = $1', [id]);
-      await query('DELETE FROM organization_subscriptions WHERE organization_id = $1', [id]);
-
-      // Other org data
-      await query('DELETE FROM organization_usage WHERE organization_id = $1', [id]);
-      await query('DELETE FROM organization_licenses WHERE organization_id = $1', [id]);
-
-      // Update trial signups that reference this org (set to NULL instead of delete)
-      await query('UPDATE trial_signups SET converted_organization_id = NULL WHERE converted_organization_id = $1', [id]);
+      // Update trial signups (set to NULL instead of delete)
+      try {
+        await query('UPDATE trial_signups SET converted_organization_id = NULL WHERE converted_organization_id = $1', [id]);
+      } catch (err) {
+        if (err.code !== '42P01' && err.code !== '42703') throw err;
+      }
 
       console.log(`✅ Deleted all related records for organization: ${id}`);
 
