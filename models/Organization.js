@@ -443,6 +443,42 @@ class Organization {
   }
 
   /**
+   * Delete organization and all related data
+   * @param {string} id - Organization ID
+   * @returns {boolean} True if deleted successfully
+   */
+  static async delete(id) {
+    try {
+      // Start transaction to delete all related data
+      await query('BEGIN');
+
+      // Delete in order: child records first, then organization
+      await query('DELETE FROM custom_fields WHERE organization_id = $1', [id]);
+      await query('DELETE FROM contacts WHERE organization_id = $1', [id]);
+      await query('DELETE FROM leads WHERE organization_id = $1', [id]);
+      await query('DELETE FROM users WHERE organization_id = $1', [id]);
+
+      // Finally delete the organization
+      const result = await query(
+        'DELETE FROM organizations WHERE id = $1 RETURNING *',
+        [id]
+      );
+
+      if (result.rows.length === 0) {
+        await query('ROLLBACK');
+        throw new Error('Organization not found');
+      }
+
+      await query('COMMIT');
+      return true;
+    } catch (error) {
+      await query('ROLLBACK');
+      console.error('Error deleting organization:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Convert to JSON representation
    * @returns {Object} JSON representation
    */

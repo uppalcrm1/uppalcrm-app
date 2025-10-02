@@ -5,6 +5,7 @@ import {
   Shield,
   LayoutDashboard,
   Users,
+  Building2,
   BarChart3,
   LogOut,
   Bell,
@@ -21,6 +22,11 @@ const navigation = [
     name: 'Trial Signups',
     href: '/super-admin/signups',
     icon: Users,
+  },
+  {
+    name: 'Organizations',
+    href: '/super-admin/organizations',
+    icon: Building2,
   },
   {
     name: 'Analytics',

@@ -295,3 +295,20 @@ export function useDeleteSignup() {
     },
   });
 }
+
+export function useDeleteOrganization() {
+  const { apiCall } = useSuperAdmin();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id) =>
+      apiCall(`/organizations/${id}`, {
+        method: 'DELETE',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['superAdminOrganizations'] });
+      queryClient.invalidateQueries({ queryKey: ['superAdminDashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['superAdminStats'] });
+    },
+  });
+}

@@ -611,4 +611,74 @@ router.put('/password', platformAuth, async (req, res) => {
   }
 });
 
+// ============================================
+// ORGANIZATION MANAGEMENT ROUTES
+// ============================================
+
+// GET /api/platform/organizations - Get all organizations
+router.get('/organizations', platformAuth, async (req, res) => {
+  try {
+    const organizations = await Organization.getAll();
+
+    res.json({
+      organizations: organizations.map(org => ({
+        id: org.id,
+        name: org.name,
+        slug: org.slug,
+        domain: org.domain,
+        subscription_plan: org.subscription_plan || org.plan_name,
+        max_users: org.max_users,
+        is_active: org.is_active,
+        created_at: org.created_at,
+        updated_at: org.updated_at,
+        user_count: parseInt(org.user_count) || 0,
+        active_user_count: parseInt(org.active_user_count) || 0,
+        subscription_status: org.subscription_status,
+        trial_status: org.trial_status,
+        trial_end: org.trial_end
+      })),
+      total: organizations.length
+    });
+
+  } catch (error) {
+    console.error('Error fetching organizations:', error);
+    res.status(500).json({
+      error: 'Internal server error'
+    });
+  }
+});
+
+// DELETE /api/platform/organizations/:id - Delete organization
+router.delete('/organizations/:id', platformAuth, async (req, res) => {
+  try {
+    const organizationId = req.params.id;
+
+    // Check if organization exists
+    const organization = await Organization.findById(organizationId);
+    if (!organization) {
+      return res.status(404).json({
+        error: 'Organization not found'
+      });
+    }
+
+    // Delete the organization and all related data
+    await Organization.delete(organizationId);
+
+    res.json({
+      message: 'Organization deleted successfully',
+      deleted: {
+        id: organizationId,
+        name: organization.name,
+        slug: organization.slug
+      }
+    });
+
+  } catch (error) {
+    console.error('Error deleting organization:', error);
+    res.status(500).json({
+      error: 'Internal server error'
+    });
+  }
+});
+
 module.exports = router;
