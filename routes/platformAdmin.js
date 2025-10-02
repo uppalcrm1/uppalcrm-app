@@ -62,6 +62,22 @@ router.post('/trial-signup', async (req, res) => {
       utm_content
     });
 
+    // Send confirmation email to customer
+    const emailService = require('../services/emailService');
+    await emailService.initialize();
+
+    try {
+      await emailService.sendTrialConfirmation({
+        customerName: trialSignup.fullName,
+        customerEmail: trialSignup.email,
+        company: trialSignup.company
+      });
+      console.log(`✅ Trial confirmation email sent to ${trialSignup.email}`);
+    } catch (emailError) {
+      console.error('❌ Failed to send trial confirmation email:', emailError);
+      // Don't fail the signup if email fails - just log the error
+    }
+
     res.status(201).json({
       message: 'Trial signup created successfully',
       signup: {

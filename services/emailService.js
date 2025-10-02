@@ -88,6 +88,174 @@ class EmailService {
    * @param {string} options.organizationSlug - Organization slug
    */
   /**
+   * Send trial confirmation email to customer
+   * @param {Object} options - Email options
+   * @param {string} options.customerName - Customer's full name
+   * @param {string} options.customerEmail - Customer's email address
+   * @param {string} options.company - Company name
+   */
+  async sendTrialConfirmation({ customerName, customerEmail, company }) {
+    if (!this.isAvailable()) {
+      console.log('📧 Email service not available, skipping trial confirmation email');
+      return null;
+    }
+
+    const subject = `Welcome to UppalCRM - Your Trial Request is Being Reviewed`;
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; background: #f5f5f5; }
+          .container { background: #ffffff; margin: 20px; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+          .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px 30px; text-align: center; }
+          .header h1 { margin: 0; font-size: 28px; }
+          .header p { margin: 10px 0 0 0; opacity: 0.9; }
+          .content { padding: 30px; }
+          .highlight-box { background: #f0f7ff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #667eea; }
+          .steps { background: #f8f9ff; padding: 20px; border-radius: 8px; margin: 20px 0; }
+          .steps ol { margin: 10px 0; padding-left: 20px; }
+          .steps li { margin: 10px 0; }
+          .footer { background: #f7f7f7; padding: 20px; text-align: center; font-size: 12px; color: #666; }
+          .info-row { margin: 10px 0; }
+          .label { font-weight: bold; color: #667eea; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>🎉 Thank You for Your Interest!</h1>
+            <p>Your trial request has been received</p>
+          </div>
+
+          <div class="content">
+            <p>Hello ${customerName},</p>
+
+            <p>Thank you for your interest in UppalCRM! We've successfully received your trial request and are excited to help transform the way you manage customer relationships.</p>
+
+            <div class="highlight-box">
+              <h3 style="margin-top: 0; color: #667eea;">✅ Request Confirmed</h3>
+              <div class="info-row"><span class="label">Email:</span> ${customerEmail}</div>
+              <div class="info-row"><span class="label">Company:</span> ${company}</div>
+              <div class="info-row"><span class="label">Submitted:</span> ${new Date().toLocaleString()}</div>
+            </div>
+
+            <div class="steps">
+              <h3 style="margin-top: 0; color: #667eea;">What Happens Next?</h3>
+              <ol>
+                <li><strong>Review (within 24 hours):</strong> Our team will review your trial request</li>
+                <li><strong>Account Setup:</strong> We'll create your personalized CRM account</li>
+                <li><strong>Credentials Email:</strong> You'll receive your login credentials via email</li>
+                <li><strong>14-Day Trial:</strong> Start exploring all UppalCRM features for free</li>
+              </ol>
+            </div>
+
+            <p><strong>💡 In the meantime:</strong></p>
+            <ul>
+              <li>Check your inbox (and spam folder) for our welcome email with login credentials</li>
+              <li>Think about your CRM goals and what you'd like to achieve</li>
+              <li>Prepare any existing customer data you'd like to import</li>
+            </ul>
+
+            <p><strong>Why UppalCRM?</strong></p>
+            <ul>
+              <li>✨ Intuitive and easy-to-use interface</li>
+              <li>📊 Powerful contact and lead management</li>
+              <li>🔄 Seamless workflow automation</li>
+              <li>📈 Advanced analytics and reporting</li>
+              <li>🤝 Excellent customer support</li>
+            </ul>
+
+            <p>Questions? Just reply to this email - we're here to help!</p>
+
+            <p>Best regards,<br>
+            <strong>The UppalCRM Team</strong><br>
+            <a href="mailto:support@uppalcrm.com" style="color: #667eea;">support@uppalcrm.com</a></p>
+          </div>
+
+          <div class="footer">
+            <p><strong>UppalCRM</strong> - Transform Your Customer Relationships</p>
+            <p>© ${new Date().getFullYear()} UppalCRM. All rights reserved.</p>
+            <p style="margin-top: 10px;">
+              This email was sent to ${customerEmail} because you requested a trial at uppalcrm.com
+            </p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const textContent = `
+Welcome to UppalCRM - Your Trial Request is Being Reviewed
+
+Hello ${customerName},
+
+Thank you for your interest in UppalCRM! We've successfully received your trial request and are excited to help transform the way you manage customer relationships.
+
+✅ REQUEST CONFIRMED
+Email: ${customerEmail}
+Company: ${company}
+Submitted: ${new Date().toLocaleString()}
+
+WHAT HAPPENS NEXT?
+
+1. Review (within 24 hours): Our team will review your trial request
+2. Account Setup: We'll create your personalized CRM account
+3. Credentials Email: You'll receive your login credentials via email
+4. 14-Day Trial: Start exploring all UppalCRM features for free
+
+💡 IN THE MEANTIME:
+- Check your inbox (and spam folder) for our welcome email with login credentials
+- Think about your CRM goals and what you'd like to achieve
+- Prepare any existing customer data you'd like to import
+
+WHY UPPALCRM?
+✨ Intuitive and easy-to-use interface
+📊 Powerful contact and lead management
+🔄 Seamless workflow automation
+📈 Advanced analytics and reporting
+🤝 Excellent customer support
+
+Questions? Just reply to this email - we're here to help!
+
+Best regards,
+The UppalCRM Team
+support@uppalcrm.com
+
+---
+UppalCRM - Transform Your Customer Relationships
+© ${new Date().getFullYear()} UppalCRM. All rights reserved.
+
+This email was sent to ${customerEmail} because you requested a trial at uppalcrm.com
+    `;
+
+    try {
+      const mailOptions = {
+        from: {
+          name: process.env.FROM_NAME || 'UppalCRM',
+          address: process.env.FROM_EMAIL || process.env.SMTP_USER
+        },
+        to: customerEmail,
+        subject: subject,
+        text: textContent,
+        html: htmlContent,
+        headers: {
+          'X-Entity-Ref-ID': `trial-confirmation-${Date.now()}`,
+          'X-Priority': '3'
+        }
+      };
+
+      const result = await this.transporter.sendMail(mailOptions);
+      console.log(`✅ Trial confirmation sent to ${customerEmail}:`, result.messageId);
+      return result;
+    } catch (error) {
+      console.error('❌ Failed to send trial confirmation:', error);
+      return null;
+    }
+  }
+
+  /**
    * Send admin notification when a new lead signs up
    */
   async sendLeadNotification({ leadName, leadEmail, leadCompany, leadPhone, leadMessage, organizationName, utmSource, utmMedium, utmCampaign }) {
