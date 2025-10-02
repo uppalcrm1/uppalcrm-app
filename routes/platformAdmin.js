@@ -618,7 +618,9 @@ router.put('/password', platformAuth, async (req, res) => {
 // GET /api/platform/organizations - Get all organizations
 router.get('/organizations', platformAuth, async (req, res) => {
   try {
+    console.log('📋 Platform Admin: Fetching all organizations...');
     const organizations = await Organization.getAll();
+    console.log(`✅ Found ${organizations.length} organizations`);
 
     res.json({
       organizations: organizations.map(org => ({
@@ -626,24 +628,23 @@ router.get('/organizations', platformAuth, async (req, res) => {
         name: org.name,
         slug: org.slug,
         domain: org.domain,
-        subscription_plan: org.subscription_plan || org.plan_name,
-        max_users: org.max_users,
+        subscription_plan: org.subscription_plan || 'free',
+        max_users: org.max_users || 10,
         is_active: org.is_active,
         created_at: org.created_at,
         updated_at: org.updated_at,
         user_count: parseInt(org.user_count) || 0,
-        active_user_count: parseInt(org.active_user_count) || 0,
-        subscription_status: org.subscription_status,
-        trial_status: org.trial_status,
-        trial_end: org.trial_end
+        active_user_count: parseInt(org.active_user_count) || 0
       })),
       total: organizations.length
     });
 
   } catch (error) {
-    console.error('Error fetching organizations:', error);
+    console.error('❌ Error fetching organizations:', error);
+    console.error('Error stack:', error.stack);
     res.status(500).json({
-      error: 'Internal server error'
+      error: 'Internal server error',
+      message: error.message
     });
   }
 });

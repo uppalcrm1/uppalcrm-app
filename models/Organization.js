@@ -386,32 +386,32 @@ class Organization {
    * @returns {Array} Array of organizations with stats
    */
   static async getAll() {
-    const result = await query(`
-      SELECT
-        o.id,
-        o.name,
-        o.slug,
-        o.domain,
-        o.subscription_plan,
-        o.max_users,
-        o.is_active,
-        o.created_at,
-        o.updated_at,
-        COUNT(DISTINCT u.id) as user_count,
-        COUNT(DISTINCT CASE WHEN u.is_active THEN u.id END) as active_user_count,
-        'unknown' as subscription_status,
-        'inactive' as trial_status,
-        o.subscription_plan as plan_name,
-        0 as current_price,
-        NULL as trial_end
-      FROM organizations o
-      LEFT JOIN users u ON u.organization_id = o.id
-      GROUP BY o.id, o.name, o.slug, o.domain, o.subscription_plan, o.max_users,
-               o.is_active, o.created_at, o.updated_at
-      ORDER BY o.created_at DESC
-    `);
+    try {
+      const result = await query(`
+        SELECT
+          o.id,
+          o.name,
+          o.slug,
+          o.domain,
+          o.subscription_plan,
+          o.max_users,
+          o.is_active,
+          o.created_at,
+          o.updated_at,
+          COALESCE(COUNT(DISTINCT u.id), 0) as user_count,
+          COALESCE(COUNT(DISTINCT CASE WHEN u.is_active THEN u.id END), 0) as active_user_count
+        FROM organizations o
+        LEFT JOIN users u ON u.organization_id = o.id
+        GROUP BY o.id, o.name, o.slug, o.domain, o.subscription_plan, o.max_users,
+                 o.is_active, o.created_at, o.updated_at
+        ORDER BY o.created_at DESC
+      `);
 
-    return result.rows;
+      return result.rows;
+    } catch (error) {
+      console.error('Error in Organization.getAll():', error);
+      throw error;
+    }
   }
 
   /**
