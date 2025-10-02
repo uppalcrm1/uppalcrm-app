@@ -514,29 +514,25 @@ function initTrialForm() {
                 // Don't fail the signup if email fails
             }
             
-            // Show success message with login details
-            const loginUrl = `https://uppalcrm-frontend.onrender.com/login?org=${result.organizationSlug}`;
+            // Show success message for trial signup
             const successMessage = `
                 <div class="success-details">
-                    <h4>🎉 Account Created Successfully!</h4>
-                    <p><strong>Your CRM is ready to use:</strong></p>
+                    <h4>🎉 Trial Request Submitted Successfully!</h4>
+                    <p><strong>Thank you for your interest in UppalCRM!</strong></p>
                     <div class="login-details">
-                        <p><strong>Login URL:</strong> <a href="${loginUrl}" target="_blank">${loginUrl}</a></p>
                         <p><strong>Email:</strong> ${data.email}</p>
-                        <p><strong>Temporary Password:</strong> <code>${result.temporaryPassword}</code></p>
-                        <p><strong>Organization:</strong> ${data.company}</p>
+                        <p><strong>Company:</strong> ${data.company}</p>
                     </div>
                     <div class="next-steps">
-                        <p><strong>Next Steps:</strong></p>
+                        <p><strong>What happens next?</strong></p>
                         <ol>
-                            <li>Click the login URL above to access your CRM</li>
-                            <li>Use the temporary password to log in</li>
-                            <li>Change your password in the settings</li>
-                            <li>Start adding your leads and team members!</li>
+                            <li>Our team will review your trial request within 24 hours</li>
+                            <li>You'll receive an email with your account credentials</li>
+                            <li>The email will include your personalized login link</li>
+                            <li>You'll have 14 days to explore all UppalCRM features</li>
                         </ol>
                     </div>
-                    <p><em>💡 Bookmark the login URL for easy access later</em></p>
-                    <p><em>📧 We've been notified of your signup and will follow up within 24 hours!</em></p>
+                    <p><em>💡 Check your inbox (and spam folder) for our welcome email!</em></p>
                 </div>
             `;
             showFormSuccess(successMessage);
@@ -731,74 +727,60 @@ async function simulateTrialSignup(data) {
             }
         }
 
-        // Format data according to API requirements
-        const organizationData = {
-            name: data.company,
-            slug: organizationSlug
+        // Format data for trial signup API
+        const trialSignupData = {
+            first_name: data.firstName.trim(),
+            last_name: data.lastName.trim(),
+            email: data.email.toLowerCase().trim(),
+            company: data.company.trim(),
+            website: data.website ? data.website.trim() : null,
+            phone: data.phone ? data.phone.trim() : null,
+            industry: data.industry || null,
+            team_size: data.teamSize || null
         };
-        
-        // Only include domain if it's a valid non-empty string
-        if (domainOnly && domainOnly.trim() !== '') {
-            organizationData.domain = domainOnly;
-        }
-        
-        const requestData = {
-            organization: organizationData,
-            admin: {
-                email: data.email.toLowerCase().trim(),
-                password: temporaryPassword,
-                first_name: data.firstName.trim(),
-                last_name: data.lastName.trim()
-            }
-        };
-        
-        console.log('Sending registration request:', {
-            ...requestData,
-            admin: { ...requestData.admin, password: '[HIDDEN]' }
-        });
-        
-        // Make API call to registration endpoint
-        const response = await fetch('https://uppalcrm-api.onrender.com/api/auth/register', {
+
+        console.log('Sending trial signup request:', trialSignupData);
+
+        // Make API call to trial signup endpoint
+        const response = await fetch('https://uppalcrm-api.onrender.com/api/platform/trial-signup', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json'
             },
-            body: JSON.stringify(requestData)
+            body: JSON.stringify(trialSignupData)
         });
         
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
-            throw new Error(errorData.message || `Registration failed: ${response.status} ${response.statusText}`);
+            throw new Error(errorData.error || errorData.message || `Trial signup failed: ${response.status} ${response.statusText}`);
         }
-        
+
         const responseData = await response.json();
-        
-        // Store temporary password for user notification (in production, this should be sent via email)
-        console.log('Account created successfully!');
-        console.log('Temporary password:', temporaryPassword);
-        console.log('Organization slug:', organizationSlug);
-        
+
+        console.log('Trial signup successful!', responseData);
+
+        // Generate slug for display purposes
+        const organizationSlug = generateSlug(data.company);
+
         return {
             success: true,
-            message: 'Account created successfully',
+            message: 'Trial signup submitted successfully',
             data: responseData,
-            temporaryPassword: temporaryPassword,
+            temporaryPassword: 'Check your email',
             organizationSlug: organizationSlug
         };
-        
+
     } catch (error) {
-        console.error('Registration error:', error);
-        
+        console.error('Trial signup error:', error);
+
         // Handle specific error types
-        if (error.message.includes('slug already exists')) {
-            throw new Error('A company with this name already exists. Please choose a different company name.');
-        } else if (error.message.includes('Email already exists')) {
-            throw new Error('An account with this email already exists.');
+        if (error.message.includes('already signed up') || error.message.includes('already exists')) {
+            throw new Error('This email has already signed up for a trial.');
         } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
             throw new Error('Unable to connect to the server. Please check your internet connection and try again.');
         } else {
-            throw new Error(error.message || 'Failed to create account. Please try again or contact support.');
+            throw new Error(error.message || 'Failed to submit trial signup. Please try again or contact support.');
         }
     }
 }
