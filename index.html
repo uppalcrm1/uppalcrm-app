@@ -543,8 +543,7 @@ function initTrialForm() {
             // Track conversion event
             trackConversion('trial_signup', {
                 ...data,
-                organizationSlug: result.organizationSlug,
-                loginUrl: loginUrl
+                organizationSlug: result.organizationSlug
             });
             
         } catch (error) {
