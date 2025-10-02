@@ -454,20 +454,42 @@ class Organization {
 
       console.log(`🗑️  Deleting all data for organization: ${id}`);
 
-      // Delete users first (this will cascade to user_sessions, etc.)
+      // Delete child records in correct order to avoid FK violations
+
+      // User sessions first
+      await query('DELETE FROM user_sessions WHERE organization_id = $1', [id]);
+
+      // Users (includes all user data)
       await query('DELETE FROM users WHERE organization_id = $1', [id]);
 
-      // Delete leads and related data
+      // Leads and related data
       await query('DELETE FROM leads WHERE organization_id = $1', [id]);
 
-      // Delete contacts and related data
+      // Contact interactions and custom fields
+      await query('DELETE FROM contact_interactions WHERE organization_id = $1', [id]);
+      await query('DELETE FROM contact_custom_fields WHERE organization_id = $1', [id]);
+
+      // Contacts
       await query('DELETE FROM contacts WHERE organization_id = $1', [id]);
 
-      // Delete organization-specific tables
+      // Field configurations
+      await query('DELETE FROM default_field_configurations WHERE organization_id = $1', [id]);
+      await query('DELETE FROM system_field_configurations WHERE organization_id = $1', [id]);
       await query('DELETE FROM custom_field_definitions WHERE organization_id = $1', [id]);
       await query('DELETE FROM field_configurations WHERE organization_id = $1', [id]);
+
+      // Subscription related
+      await query('DELETE FROM subscription_usage WHERE organization_id = $1', [id]);
+      await query('DELETE FROM subscription_invoices WHERE organization_id = $1', [id]);
+      await query('DELETE FROM subscription_events WHERE organization_id = $1', [id]);
       await query('DELETE FROM organization_subscriptions WHERE organization_id = $1', [id]);
+
+      // Other org data
+      await query('DELETE FROM organization_usage WHERE organization_id = $1', [id]);
       await query('DELETE FROM organization_licenses WHERE organization_id = $1', [id]);
+
+      // Update trial signups that reference this org (set to NULL instead of delete)
+      await query('UPDATE trial_signups SET converted_organization_id = NULL WHERE converted_organization_id = $1', [id]);
 
       console.log(`✅ Deleted all related records for organization: ${id}`);
 
