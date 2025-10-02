@@ -278,3 +278,20 @@ export function useConvertSignup() {
     },
   });
 }
+
+export function useDeleteSignup() {
+  const { apiCall } = useSuperAdmin();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id) =>
+      apiCall(`/trial-signups/${id}`, {
+        method: 'DELETE',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['superAdminTrialSignups'] });
+      queryClient.invalidateQueries({ queryKey: ['superAdminDashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['superAdminStats'] });
+    },
+  });
+}

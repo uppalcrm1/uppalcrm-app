@@ -374,6 +374,39 @@ router.put('/trial-signups/:id/notes', platformAuth, async (req, res) => {
   }
 });
 
+// DELETE /api/platform/trial-signups/:id - Delete trial signup
+router.delete('/trial-signups/:id', platformAuth, async (req, res) => {
+  try {
+    const signupId = req.params.id;
+
+    // Check if signup exists
+    const signup = await TrialSignup.findById(signupId);
+    if (!signup) {
+      return res.status(404).json({
+        error: 'Trial signup not found'
+      });
+    }
+
+    // Delete the trial signup
+    await TrialSignup.delete(signupId);
+
+    res.json({
+      message: 'Trial signup deleted successfully',
+      deleted: {
+        id: signupId,
+        email: signup.email,
+        company: signup.company
+      }
+    });
+
+  } catch (error) {
+    console.error('Error deleting trial signup:', error);
+    res.status(500).json({
+      error: 'Internal server error'
+    });
+  }
+});
+
 // POST /api/platform/trial-signups/:id/convert - Convert trial signup to organization
 router.post('/trial-signups/:id/convert', platformAuth, async (req, res) => {
   try {

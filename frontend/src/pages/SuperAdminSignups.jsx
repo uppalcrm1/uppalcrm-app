@@ -1,9 +1,11 @@
 import React, { useState, useMemo } from 'react';
+import toast from 'react-hot-toast';
 import {
   useSuperAdminTrialSignups,
   useUpdateSignupStatus,
   useAddSignupNotes,
-  useConvertSignup
+  useConvertSignup,
+  useDeleteSignup
 } from '../contexts/SuperAdminContext';
 import {
   Search,
@@ -23,7 +25,8 @@ import {
   TrendingUp,
   Loader2,
   ChevronDown,
-  RefreshCw
+  RefreshCw,
+  Trash2
 } from 'lucide-react';
 
 const STATUS_OPTIONS = [
@@ -57,6 +60,7 @@ function SignupCard({ signup, onUpdateStatus, onAddNotes, onConvert }) {
   const [notes, setNotes] = useState('');
   const [showNotesForm, setShowNotesForm] = useState(false);
   const [showConvertForm, setShowConvertForm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [convertData, setConvertData] = useState({
     organization_name: signup.company,
     domain: '',
@@ -66,6 +70,7 @@ function SignupCard({ signup, onUpdateStatus, onAddNotes, onConvert }) {
   const updateStatusMutation = useUpdateSignupStatus();
   const addNotesMutation = useAddSignupNotes();
   const convertMutation = useConvertSignup();
+  const deleteMutation = useDeleteSignup();
 
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -121,6 +126,17 @@ function SignupCard({ signup, onUpdateStatus, onAddNotes, onConvert }) {
     }
   };
 
+  const handleDelete = async () => {
+    try {
+      await deleteMutation.mutateAsync(signup.id);
+      setShowDeleteConfirm(false);
+      toast.success(`Trial signup deleted successfully. ${signup.email} can now resubmit.`);
+    } catch (error) {
+      console.error('Failed to delete signup:', error);
+      toast.error(error.message || 'Failed to delete trial signup');
+    }
+  };
+
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
       {/* Main Card */}
@@ -150,14 +166,23 @@ function SignupCard({ signup, onUpdateStatus, onAddNotes, onConvert }) {
             <button
               onClick={() => setShowDetails(!showDetails)}
               className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              title="View details"
             >
               <Eye className="h-4 w-4" />
             </button>
             <button
               onClick={() => setShowNotesForm(!showNotesForm)}
               className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Add notes"
             >
               <MessageSquare className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              title="Delete signup"
+            >
+              <Trash2 className="h-4 w-4" />
             </button>
           </div>
         </div>
@@ -335,6 +360,64 @@ function SignupCard({ signup, onUpdateStatus, onAddNotes, onConvert }) {
             >
               Cancel
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                <Trash2 className="h-5 w-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Delete Trial Signup</h3>
+                <p className="text-sm text-gray-500">This action cannot be undone</p>
+              </div>
+            </div>
+
+            <div className="mb-6">
+              <p className="text-gray-700 mb-2">
+                Are you sure you want to delete this trial signup?
+              </p>
+              <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                <p className="text-sm font-medium text-gray-900">{signup.full_name}</p>
+                <p className="text-sm text-gray-600">{signup.email}</p>
+                <p className="text-sm text-gray-600">{signup.company}</p>
+              </div>
+              <p className="text-sm text-gray-500 mt-3">
+                This will allow the user to submit a new trial request with the same email address.
+              </p>
+            </div>
+
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={handleDelete}
+                disabled={deleteMutation.isLoading}
+                className="flex-1 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+              >
+                {deleteMutation.isLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete Signup
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={deleteMutation.isLoading}
+                className="flex-1 px-4 py-2 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-100 border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}

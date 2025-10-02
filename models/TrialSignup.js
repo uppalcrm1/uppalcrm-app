@@ -392,6 +392,25 @@ class TrialSignup {
     }
   }
 
+  // Delete trial signup
+  static async delete(id) {
+    try {
+      const result = await query(
+        'DELETE FROM trial_signups WHERE id = $1 RETURNING *',
+        [id]
+      );
+
+      if (result.rows.length === 0) {
+        throw new Error('Trial signup not found');
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error deleting trial signup:', error);
+      throw error;
+    }
+  }
+
   // Get full name
   get fullName() {
     return `${this.first_name} ${this.last_name}`.trim();
