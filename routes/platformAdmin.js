@@ -473,38 +473,6 @@ router.post('/trial-signups/:id/convert', platformAuth, async (req, res) => {
   }
 });
 
-// GET /api/platform/organizations - Get all organizations
-router.get('/organizations', platformAuth, async (req, res) => {
-  try {
-    const organizations = await Organization.getAll();
-
-    const enhancedOrgs = await Promise.all(
-      organizations.map(async (org) => {
-        const User = require('../models/User');
-        const userCount = await User.getCountByOrganization(org.id);
-
-        return {
-          ...org,
-          user_count: userCount,
-          status_display: org.is_active ?
-            (org.subscription_status === 'active' ? 'Paid' :
-             org.trial_status === 'active' ? 'Trial' : 'Active') : 'Inactive'
-        };
-      })
-    );
-
-    res.json({
-      organizations: enhancedOrgs
-    });
-
-  } catch (error) {
-    console.error('Error fetching organizations:', error);
-    res.status(500).json({
-      error: 'Internal server error'
-    });
-  }
-});
-
 // GET /api/platform/stats - Get platform statistics
 router.get('/stats', platformAuth, async (req, res) => {
   try {
