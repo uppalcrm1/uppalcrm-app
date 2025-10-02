@@ -457,16 +457,24 @@ class Organization {
       // Helper function to safely delete from table (ignores if table doesn't exist)
       const safeDelete = async (tableName, whereClause = 'organization_id') => {
         try {
+          console.log(`  🔄 Attempting to delete from ${tableName}...`);
           const result = await query(`DELETE FROM ${tableName} WHERE ${whereClause} = $1`, [id]);
           if (result.rowCount > 0) {
             console.log(`  ✓ Deleted ${result.rowCount} rows from ${tableName}`);
+          } else {
+            console.log(`  ⊘ No rows in ${tableName}`);
           }
         } catch (err) {
           // Table doesn't exist or column doesn't exist - skip it
           if (err.code === '42P01' || err.code === '42703') {
-            console.log(`  ⊘ Skipped ${tableName} (doesn't exist)`);
+            console.log(`  ⊘ Skipped ${tableName} (doesn't exist - code: ${err.code})`);
           } else {
-            console.error(`  ❌ Error deleting from ${tableName}:`, err.message);
+            console.error(`  ❌ Error deleting from ${tableName}:`, {
+              code: err.code,
+              message: err.message,
+              detail: err.detail,
+              constraint: err.constraint
+            });
             throw err; // Re-throw other errors
           }
         }
