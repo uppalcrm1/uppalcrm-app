@@ -619,32 +619,45 @@ router.put('/password', platformAuth, async (req, res) => {
 router.get('/organizations', platformAuth, async (req, res) => {
   try {
     console.log('📋 Platform Admin: Fetching all organizations...');
+
+    // Check if Organization model has getAll method
+    if (typeof Organization.getAll !== 'function') {
+      throw new Error('Organization.getAll is not a function');
+    }
+
     const organizations = await Organization.getAll();
     console.log(`✅ Found ${organizations.length} organizations`);
 
+    const formattedOrgs = organizations.map(org => ({
+      id: org.id,
+      name: org.name,
+      slug: org.slug,
+      domain: org.domain,
+      subscription_plan: org.subscription_plan || 'free',
+      max_users: org.max_users || 10,
+      is_active: org.is_active,
+      created_at: org.created_at,
+      updated_at: org.updated_at,
+      user_count: parseInt(org.user_count) || 0,
+      active_user_count: parseInt(org.active_user_count) || 0
+    }));
+
     res.json({
-      organizations: organizations.map(org => ({
-        id: org.id,
-        name: org.name,
-        slug: org.slug,
-        domain: org.domain,
-        subscription_plan: org.subscription_plan || 'free',
-        max_users: org.max_users || 10,
-        is_active: org.is_active,
-        created_at: org.created_at,
-        updated_at: org.updated_at,
-        user_count: parseInt(org.user_count) || 0,
-        active_user_count: parseInt(org.active_user_count) || 0
-      })),
+      organizations: formattedOrgs,
       total: organizations.length
     });
 
   } catch (error) {
     console.error('❌ Error fetching organizations:', error);
-    console.error('Error stack:', error.stack);
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
     res.status(500).json({
       error: 'Internal server error',
-      message: error.message
+      message: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });
