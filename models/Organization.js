@@ -466,34 +466,39 @@ class Organization {
           if (err.code === '42P01' || err.code === '42703') {
             console.log(`  ⊘ Skipped ${tableName} (doesn't exist)`);
           } else {
+            console.error(`  ❌ Error deleting from ${tableName}:`, err.message);
             throw err; // Re-throw other errors
           }
         }
       };
 
       // Delete child records in correct order to avoid FK violations
+      // Order: deepest dependencies first
       await safeDelete('user_sessions');
-      await safeDelete('users');
-      await safeDelete('leads');
-      await safeDelete('contact_interactions');
       await safeDelete('contact_custom_fields');
+      await safeDelete('contact_interactions');
       await safeDelete('contacts');
-      await safeDelete('default_field_configurations');
-      await safeDelete('system_field_configurations');
-      await safeDelete('custom_field_definitions');
-      await safeDelete('field_configurations');
+      await safeDelete('leads');
+      await safeDelete('users');
       await safeDelete('subscription_usage');
       await safeDelete('subscription_invoices');
       await safeDelete('subscription_events');
       await safeDelete('organization_subscriptions');
       await safeDelete('organization_usage');
       await safeDelete('organization_licenses');
+      await safeDelete('default_field_configurations');
+      await safeDelete('system_field_configurations');
+      await safeDelete('custom_field_definitions');
+      await safeDelete('field_configurations');
 
       // Update trial signups (set to NULL instead of delete)
       try {
         await query('UPDATE trial_signups SET converted_organization_id = NULL WHERE converted_organization_id = $1', [id]);
       } catch (err) {
-        if (err.code !== '42P01' && err.code !== '42703') throw err;
+        if (err.code !== '42P01' && err.code !== '42703') {
+          console.error('  ❌ Error updating trial_signups:', err.message);
+          throw err;
+        }
       }
 
       console.log(`✅ Deleted all related records for organization: ${id}`);
@@ -514,7 +519,11 @@ class Organization {
       await query('COMMIT');
       return true;
     } catch (error) {
-      await query('ROLLBACK');
+      try {
+        await query('ROLLBACK');
+      } catch (rollbackError) {
+        console.error('❌ Error during ROLLBACK:', rollbackError.message);
+      }
       console.error('❌ Error deleting organization:', error);
       console.error('Error code:', error.code, 'Message:', error.message);
       throw error;
