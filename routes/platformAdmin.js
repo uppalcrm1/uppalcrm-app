@@ -634,17 +634,24 @@ router.get('/organizations', platformAuth, async (req, res) => {
 router.delete('/organizations/:id', platformAuth, async (req, res) => {
   try {
     const organizationId = req.params.id;
+    console.log(`🗑️  Attempting to delete organization: ${organizationId}`);
 
     // Check if organization exists
     const organization = await Organization.findById(organizationId);
     if (!organization) {
+      console.log(`❌ Organization not found: ${organizationId}`);
       return res.status(404).json({
         error: 'Organization not found'
       });
     }
 
+    console.log(`✅ Found organization: ${organization.name} (${organization.slug})`);
+    console.log(`🔄 Starting cascade delete...`);
+
     // Delete the organization and all related data
     await Organization.delete(organizationId);
+
+    console.log(`✅ Organization deleted successfully: ${organization.name}`);
 
     res.json({
       message: 'Organization deleted successfully',
@@ -656,9 +663,17 @@ router.delete('/organizations/:id', platformAuth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error deleting organization:', error);
+    console.error('❌ Error deleting organization:', error);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      detail: error.detail,
+      stack: error.stack
+    });
     res.status(500).json({
-      error: 'Internal server error'
+      error: 'Internal server error',
+      message: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.detail : undefined
     });
   }
 });
