@@ -399,22 +399,15 @@ class Organization {
         o.updated_at,
         COUNT(DISTINCT u.id) as user_count,
         COUNT(DISTINCT CASE WHEN u.is_active THEN u.id END) as active_user_count,
-        os.status as subscription_status,
-        CASE
-          WHEN os.status = 'trial' THEN 'active'
-          WHEN os.status = 'active' THEN 'inactive'
-          ELSE 'inactive'
-        END as trial_status,
-        sp.display_name as plan_name,
-        os.current_price,
-        os.trial_end
+        'unknown' as subscription_status,
+        'inactive' as trial_status,
+        o.subscription_plan as plan_name,
+        0 as current_price,
+        NULL as trial_end
       FROM organizations o
       LEFT JOIN users u ON u.organization_id = o.id
-      LEFT JOIN organization_subscriptions os ON os.organization_id = o.id
-      LEFT JOIN subscription_plans sp ON sp.id = os.subscription_plan_id
       GROUP BY o.id, o.name, o.slug, o.domain, o.subscription_plan, o.max_users,
-               o.is_active, o.created_at, o.updated_at, os.status, sp.display_name,
-               os.current_price, os.trial_end
+               o.is_active, o.created_at, o.updated_at
       ORDER BY o.created_at DESC
     `);
 
