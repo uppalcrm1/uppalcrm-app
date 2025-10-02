@@ -382,13 +382,53 @@ class Organization {
   }
 
   /**
+   * Get all organizations with basic stats (for platform admin use)
+   * @returns {Array} Array of organizations with stats
+   */
+  static async getAll() {
+    const result = await query(`
+      SELECT
+        o.id,
+        o.name,
+        o.slug,
+        o.domain,
+        o.subscription_plan,
+        o.max_users,
+        o.is_active,
+        o.created_at,
+        o.updated_at,
+        COUNT(DISTINCT u.id) as user_count,
+        COUNT(DISTINCT CASE WHEN u.is_active THEN u.id END) as active_user_count,
+        os.status as subscription_status,
+        CASE
+          WHEN os.status = 'trial' THEN 'active'
+          WHEN os.status = 'active' THEN 'inactive'
+          ELSE 'inactive'
+        END as trial_status,
+        sp.display_name as plan_name,
+        os.current_price,
+        os.trial_end
+      FROM organizations o
+      LEFT JOIN users u ON u.organization_id = o.id
+      LEFT JOIN organization_subscriptions os ON os.organization_id = o.id
+      LEFT JOIN subscription_plans sp ON sp.id = os.subscription_plan_id
+      GROUP BY o.id, o.name, o.slug, o.domain, o.subscription_plan, o.max_users,
+               o.is_active, o.created_at, o.updated_at, os.status, sp.display_name,
+               os.current_price, os.trial_end
+      ORDER BY o.created_at DESC
+    `);
+
+    return result.rows;
+  }
+
+  /**
    * Get organization statistics
    * @param {string} organizationId - Organization ID
    * @returns {Object} Organization statistics
    */
   static async getStats(organizationId) {
     const result = await query(`
-      SELECT 
+      SELECT
         o.name,
         o.subscription_plan,
         o.max_users,
