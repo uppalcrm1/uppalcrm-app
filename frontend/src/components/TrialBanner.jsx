@@ -17,6 +17,7 @@ export default function TrialBanner() {
   const fetchTrialInfo = async () => {
     try {
       const token = localStorage.getItem('token');
+      console.log('🔍 TrialBanner: Fetching trial info from:', `${API_BASE_URL}/organizations/current/trial-info`);
       const response = await fetch(`${API_BASE_URL}/organizations/current/trial-info`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -24,12 +25,18 @@ export default function TrialBanner() {
         }
       });
 
+      console.log('📡 TrialBanner: Response status:', response.status);
+
       if (response.ok) {
         const data = await response.json();
+        console.log('✅ TrialBanner: Trial info received:', data);
         setTrialInfo(data);
+      } else {
+        const errorData = await response.json();
+        console.error('❌ TrialBanner: Error response:', errorData);
       }
     } catch (error) {
-      console.error('Failed to fetch trial info:', error);
+      console.error('❌ TrialBanner: Failed to fetch trial info:', error);
     } finally {
       setIsLoading(false);
     }
