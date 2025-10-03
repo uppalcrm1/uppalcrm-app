@@ -1,6 +1,6 @@
 {
   "name": "uppal-crm-frontend",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "UppalCRM Frontend Dashboard",
   "private": true,
   "scripts": {
