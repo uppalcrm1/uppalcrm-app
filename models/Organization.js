@@ -14,6 +14,10 @@ class Organization {
     this.created_at = data.created_at;
     this.updated_at = data.updated_at;
     this.is_active = data.is_active !== false;
+    // Trial management fields
+    this.is_trial = data.is_trial || false;
+    this.trial_status = data.trial_status;
+    this.trial_expires_at = data.trial_expires_at;
   }
 
   /**
