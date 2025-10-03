@@ -450,13 +450,10 @@ class Organization {
   static async delete(id) {
     let transactionStarted = false;
     try {
-      // Start transaction to delete all related data
       console.log(`🗑️  Starting deletion for organization: ${id}`);
-      await query('BEGIN');
-      transactionStarted = true;
-      console.log(`✅ Transaction started`);
 
       // Helper function to safely delete from table (ignores if table doesn't exist)
+      // NOTE: Must handle "table doesn't exist" errors WITHOUT aborting transaction
       const safeDelete = async (tableName, whereClause = 'organization_id') => {
         try {
           console.log(`  🔄 Attempting to delete from ${tableName}...`);
@@ -466,16 +463,20 @@ class Organization {
           } else {
             console.log(`  ⊘ No rows in ${tableName}`);
           }
+          return true;
         } catch (err) {
           // Table doesn't exist or column doesn't exist - skip it
           if (err.code === '42P01' || err.code === '42703') {
             console.log(`  ⊘ Skipped ${tableName} (doesn't exist - code: ${err.code})`);
-          } else if (err.code === '25P02') {
-            // Transaction already aborted - this is a cascading error
-            console.error(`  ⚠️  Transaction already aborted when trying to delete from ${tableName}`);
-            throw err;
+            // IMPORTANT: If in transaction, rollback and restart
+            if (transactionStarted) {
+              console.log(`  🔄 Rollback and restart transaction due to schema error...`);
+              await query('ROLLBACK');
+              await query('BEGIN');
+            }
+            return false; // Table doesn't exist, skip it
           } else {
-            console.error(`  ❌ FIRST ERROR deleting from ${tableName}:`, {
+            console.error(`  ❌ ERROR deleting from ${tableName}:`, {
               code: err.code,
               message: err.message,
               detail: err.detail,
@@ -487,6 +488,11 @@ class Organization {
           }
         }
       };
+
+      // Start transaction to delete all related data
+      await query('BEGIN');
+      transactionStarted = true;
+      console.log(`✅ Transaction started`);
 
       // Delete child records in correct order to avoid FK violations
       // Order: deepest dependencies first
