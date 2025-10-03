@@ -7,7 +7,8 @@ import {
   useConvertSignup,
   useDeleteSignup,
   useExtendTrial,
-  useArchiveTrial
+  useArchiveTrial,
+  useConvertToPaid
 } from '../contexts/SuperAdminContext';
 import {
   Search,
@@ -75,6 +76,7 @@ function SignupCard({ signup, onUpdateStatus, onAddNotes, onConvert }) {
   const deleteMutation = useDeleteSignup();
   const extendTrialMutation = useExtendTrial();
   const archiveTrialMutation = useArchiveTrial();
+  const convertToPaidMutation = useConvertToPaid();
 
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -238,6 +240,24 @@ function SignupCard({ signup, onUpdateStatus, onAddNotes, onConvert }) {
                 )}
               </div>
               <div className="flex items-center space-x-2">
+                <button
+                  onClick={async () => {
+                    if (!signup.organization_id) {
+                      toast.error('Organization ID not found');
+                      return;
+                    }
+                    try {
+                      await convertToPaidMutation.mutateAsync(signup.organization_id);
+                      toast.success('Converted to paid account!');
+                    } catch (error) {
+                      toast.error('Failed to convert to paid');
+                    }
+                  }}
+                  disabled={convertToPaidMutation.isPending}
+                  className="px-3 py-1 text-xs font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                >
+                  {convertToPaidMutation.isPending ? 'Converting...' : 'Convert to Paid'}
+                </button>
                 {signup.can_extend && !signup.is_expired && (
                   <button
                     onClick={async () => {

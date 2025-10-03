@@ -4,7 +4,8 @@ import {
   useSuperAdminOrganizations,
   useDeleteOrganization,
   useExtendTrial,
-  useFixTrialData
+  useFixTrialData,
+  useConvertToPaid
 } from '../contexts/SuperAdminContext';
 import {
   Search,
@@ -18,13 +19,16 @@ import {
   AlertTriangle,
   Clock,
   Filter,
-  ArrowUp
+  ArrowUp,
+  CheckCircle
 } from 'lucide-react';
 
 function OrganizationCard({ organization }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showConvertConfirm, setShowConvertConfirm] = useState(false);
   const deleteMutation = useDeleteOrganization();
   const extendTrialMutation = useExtendTrial();
+  const convertToPaidMutation = useConvertToPaid();
 
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -53,6 +57,17 @@ function OrganizationCard({ organization }) {
       toast.error('Trial extension requires trial signup ID. Use Trial Signups page instead.');
     } catch (error) {
       toast.error('Failed to extend trial');
+    }
+  };
+
+  const handleConvertToPaid = async () => {
+    try {
+      await convertToPaidMutation.mutateAsync(organization.id);
+      setShowConvertConfirm(false);
+      toast.success(`"${organization.name}" successfully converted to paid!`);
+    } catch (error) {
+      console.error('Failed to convert to paid:', error);
+      toast.error(error.message || 'Failed to convert to paid');
     }
   };
 
@@ -124,12 +139,20 @@ function OrganizationCard({ organization }) {
                 <span className="text-gray-500 ml-2">({formatDate(organization.trial_expires_at)})</span>
               </div>
             </div>
-            <button
-              onClick={() => toast.info('Use Trial Signups page to extend trials')}
-              className="px-3 py-1 text-xs font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-            >
-              View in Trials
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowConvertConfirm(true)}
+                className="px-3 py-1 text-xs font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              >
+                Convert to Paid
+              </button>
+              <button
+                onClick={() => toast.info('Use Trial Signups page to extend trials')}
+                className="px-3 py-1 text-xs font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+              >
+                View in Trials
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -164,6 +187,63 @@ function OrganizationCard({ organization }) {
       </div>
 
       {/* Delete Confirmation Modal */}
+      {showConvertConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Convert to Paid Account</h3>
+                <p className="text-sm text-gray-500">Mark this organization as paid</p>
+              </div>
+            </div>
+
+            <div className="mb-6">
+              <p className="text-gray-700 mb-3">
+                Mark this organization as paid? This will:
+              </p>
+              <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 mb-3">
+                <p className="text-sm font-medium text-gray-900">{organization.name}</p>
+                <p className="text-sm text-gray-600">Slug: {organization.slug}</p>
+                <p className="text-sm text-gray-600">Plan: {organization.subscription_plan?.toUpperCase() || 'STARTER'}</p>
+              </div>
+              <ul className="text-sm text-green-600 space-y-1">
+                <li>✓ Remove trial restrictions</li>
+                <li>✓ Set status to "Converted"</li>
+                <li>✓ Send confirmation email to admin</li>
+                <li>✓ Grant full access to all features</li>
+              </ul>
+            </div>
+
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={handleConvertToPaid}
+                disabled={convertToPaidMutation.isPending}
+                className="flex-1 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+              >
+                {convertToPaidMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Converting...
+                  </>
+                ) : (
+                  'Convert to Paid'
+                )}
+              </button>
+              <button
+                onClick={() => setShowConvertConfirm(false)}
+                disabled={convertToPaidMutation.isPending}
+                className="flex-1 px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">

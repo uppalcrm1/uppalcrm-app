@@ -746,6 +746,40 @@ router.put('/password', platformAuth, async (req, res) => {
 // ORGANIZATION MANAGEMENT ROUTES
 // ============================================
 
+// POST /api/platform/fix-trial-data - Quick fix to add trial data to existing orgs
+router.post('/fix-trial-data', platformAuth, async (req, res) => {
+  try {
+    console.log('🔧 Fixing trial data for existing organizations...');
+
+    // Mark all current organizations as active trials expiring in 30 days
+    const { query: dbQuery } = require('../database/connection');
+    const result = await dbQuery(`
+      UPDATE organizations
+      SET
+        is_trial = true,
+        trial_status = 'active',
+        trial_expires_at = NOW() + INTERVAL '30 days'
+      WHERE is_trial IS NULL OR is_trial = false
+      RETURNING id, name, trial_expires_at
+    `);
+
+    console.log(`✅ Updated ${result.rows.length} organizations`);
+
+    res.json({
+      message: 'Trial data updated successfully',
+      updated_count: result.rows.length,
+      organizations: result.rows
+    });
+
+  } catch (error) {
+    console.error('❌ Error fixing trial data:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error.message
+    });
+  }
+});
+
 // GET /api/platform/organizations - Get all organizations
 router.get('/organizations', platformAuth, async (req, res) => {
   try {
@@ -867,6 +901,132 @@ router.delete('/organizations/:id', platformAuth, async (req, res) => {
       error: 'Internal server error',
       message: error.message,
       details: process.env.NODE_ENV === 'development' ? error.detail : undefined
+    });
+  }
+});
+
+// POST /api/platform/organizations/:id/convert-to-paid - Convert trial to paid
+router.post('/organizations/:id/convert-to-paid', platformAuth, async (req, res) => {
+  try {
+    const organizationId = req.params.id;
+    console.log(`💰 Converting trial to paid: ${organizationId}`);
+
+    // Get organization details
+    const org = await Organization.findById(organizationId);
+    if (!org) {
+      return res.status(404).json({
+        error: 'Organization not found'
+      });
+    }
+
+    console.log(`📋 Organization: ${org.name}, Trial: ${org.is_trial}, Status: ${org.trial_status}`);
+
+    // Update organization to paid status
+    const orgResult = await dbQuery(`
+      UPDATE organizations
+      SET
+        is_trial = false,
+        trial_status = 'converted',
+        updated_at = NOW()
+      WHERE id = $1
+      RETURNING id, name, is_trial, trial_status, subscription_plan
+    `, [organizationId]);
+
+    if (orgResult.rows.length === 0) {
+      throw new Error('Failed to update organization');
+    }
+
+    console.log(`✅ Organization updated to paid status`);
+
+    // Update linked trial signup if exists
+    const trialSignupResult = await dbQuery(`
+      UPDATE trial_signups
+      SET
+        status = 'converted',
+        converted_at = NOW()
+      WHERE organization_id = $1 AND status != 'converted'
+      RETURNING id, email, company
+    `, [organizationId]);
+
+    if (trialSignupResult.rows.length > 0) {
+      console.log(`✅ Trial signup updated: ${trialSignupResult.rows[0].email}`);
+    }
+
+    // Get admin user email for notification
+    const adminResult = await dbQuery(`
+      SELECT email, first_name, last_name
+      FROM users
+      WHERE organization_id = $1 AND role = 'admin' AND is_active = true
+      LIMIT 1
+    `, [organizationId]);
+
+    // Send confirmation email
+    if (adminResult.rows.length > 0) {
+      const admin = adminResult.rows[0];
+      const emailService = require('../services/emailService');
+
+      try {
+        await emailService.sendEmail({
+          to: admin.email,
+          subject: 'Your Trial Has Been Converted to a Paid Account',
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #4F46E5;">Welcome to Your Paid Account!</h2>
+              <p>Hi ${admin.first_name},</p>
+              <p>Great news! Your trial account for <strong>${org.name}</strong> has been successfully converted to a paid account.</p>
+
+              <div style="background-color: #F3F4F6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <h3 style="margin-top: 0; color: #059669;">What's Next?</h3>
+                <ul style="line-height: 1.6;">
+                  <li>Your account now has full access to all features</li>
+                  <li>No trial restrictions or limitations</li>
+                  <li>Continue managing your leads, contacts, and accounts</li>
+                  <li>Access to priority support</li>
+                </ul>
+              </div>
+
+              <p>Thank you for choosing our platform. We're excited to support your business growth!</p>
+
+              <p style="margin-top: 30px;">
+                <a href="${process.env.FRONTEND_URL || 'https://uppalcrm.com'}/dashboard"
+                   style="background-color: #4F46E5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                  Go to Dashboard
+                </a>
+              </p>
+
+              <hr style="border: none; border-top: 1px solid #E5E7EB; margin: 30px 0;">
+
+              <p style="color: #6B7280; font-size: 14px;">
+                Need help? Contact our support team at support@uppalcrm.com
+              </p>
+            </div>
+          `
+        });
+        console.log(`✅ Confirmation email sent to ${admin.email}`);
+      } catch (emailError) {
+        console.error('⚠️  Failed to send confirmation email:', emailError);
+        // Don't fail the conversion if email fails
+      }
+    }
+
+    const updatedOrg = orgResult.rows[0];
+    res.json({
+      message: 'Organization successfully converted to paid',
+      organization: {
+        id: updatedOrg.id,
+        name: updatedOrg.name,
+        is_trial: updatedOrg.is_trial,
+        trial_status: updatedOrg.trial_status,
+        subscription_plan: updatedOrg.subscription_plan
+      },
+      trial_signup: trialSignupResult.rows[0] || null
+    });
+
+  } catch (error) {
+    console.error('❌ Error converting trial to paid:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error.message
     });
   }
 });

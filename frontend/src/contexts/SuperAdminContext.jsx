@@ -374,3 +374,21 @@ export function useFixTrialData() {
     },
   });
 }
+
+export function useConvertToPaid() {
+  const { apiCall } = useSuperAdmin();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (organizationId) =>
+      apiCall(`/organizations/${organizationId}/convert-to-paid`, {
+        method: 'POST',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['superAdminOrganizations'] });
+      queryClient.invalidateQueries({ queryKey: ['superAdminDashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['superAdminStats'] });
+      queryClient.invalidateQueries({ queryKey: ['superAdminTrialSignups'] });
+    },
+  });
+}
