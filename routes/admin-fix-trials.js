@@ -12,6 +12,13 @@ router.post('/fix-trial-data', platformAuth, async (req, res) => {
   try {
     console.log('🔧 Fixing trial data for existing organizations...');
 
+    // First, check current state
+    const checkResult = await query(`
+      SELECT id, name, is_trial, trial_status, trial_expires_at
+      FROM organizations
+    `);
+    console.log('📊 Current org state:', checkResult.rows);
+
     // Mark all current organizations as active trials expiring in 30 days
     const result = await query(`
       UPDATE organizations
@@ -19,8 +26,12 @@ router.post('/fix-trial-data', platformAuth, async (req, res) => {
         is_trial = true,
         trial_status = 'active',
         trial_expires_at = NOW() + INTERVAL '30 days'
-      WHERE is_trial IS NULL OR is_trial = false
-      RETURNING id, name, trial_expires_at
+      WHERE trial_status IS NULL
+         OR trial_status != 'active'
+         OR trial_expires_at IS NULL
+         OR is_trial IS NULL
+         OR is_trial = false
+      RETURNING id, name, is_trial, trial_status, trial_expires_at
     `);
 
     console.log(`✅ Updated ${result.rows.length} organizations`);
@@ -28,7 +39,8 @@ router.post('/fix-trial-data', platformAuth, async (req, res) => {
     res.json({
       message: 'Trial data updated successfully',
       updated_count: result.rows.length,
-      organizations: result.rows
+      organizations: result.rows,
+      before_state: checkResult.rows
     });
 
   } catch (error) {
