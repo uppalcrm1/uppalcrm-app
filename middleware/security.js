@@ -8,7 +8,7 @@ const createRateLimiters = (envConfig = {}) => {
   // General API rate limiting
   const generalLimiter = rateLimit({
     windowMs: envConfig.rateLimitWindowMs || 15 * 60 * 1000, // 15 minutes
-    max: envConfig.rateLimitMax || 100, // requests per window
+    max: envConfig.rateLimitMax || 300, // Increased from 100 to 300 requests per window
     message: {
       error: 'Too many requests',
       message: 'Please try again later'

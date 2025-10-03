@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import {
   useSuperAdminOrganizations,
-  useDeleteOrganization
+  useDeleteOrganization,
+  useExtendTrial
 } from '../contexts/SuperAdminContext';
 import {
   Search,
@@ -13,12 +14,16 @@ import {
   Loader2,
   Trash2,
   RefreshCw,
-  AlertTriangle
+  AlertTriangle,
+  Clock,
+  Filter,
+  ArrowUp
 } from 'lucide-react';
 
 function OrganizationCard({ organization }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const deleteMutation = useDeleteOrganization();
+  const extendTrialMutation = useExtendTrial();
 
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -39,6 +44,17 @@ function OrganizationCard({ organization }) {
     }
   };
 
+  const handleExtendTrial = async () => {
+    // Find the trial signup for this organization
+    try {
+      // We'll need to pass the trial signup ID, not org ID
+      // For now, show a message - will need to enhance the API
+      toast.error('Trial extension requires trial signup ID. Use Trial Signups page instead.');
+    } catch (error) {
+      toast.error('Failed to extend trial');
+    }
+  };
+
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
       <div className="flex items-start justify-between mb-4">
@@ -47,7 +63,18 @@ function OrganizationCard({ organization }) {
             <Building2 className="h-6 w-6 text-indigo-600" />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">{organization.name}</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-gray-900">{organization.name}</h3>
+              {organization.is_trial ? (
+                <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800 border border-yellow-200">
+                  TRIAL
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-purple-100 text-purple-800 border border-purple-200">
+                  {organization.subscription_plan?.toUpperCase() || 'FREE'}
+                </span>
+              )}
+            </div>
             <p className="text-sm text-gray-500">/{organization.slug}</p>
             {organization.domain && (
               <div className="flex items-center space-x-1 mt-1">
@@ -66,6 +93,45 @@ function OrganizationCard({ organization }) {
           <Trash2 className="h-4 w-4" />
         </button>
       </div>
+
+      {/* Trial Expiry Info */}
+      {organization.is_trial && organization.trial_expires_at && (
+        <div className={`mb-4 p-3 rounded-lg border ${
+          organization.urgency_color === 'gray' ? 'bg-gray-50 border-gray-200' :
+          organization.urgency_color === 'red' ? 'bg-red-50 border-red-200' :
+          organization.urgency_color === 'yellow' ? 'bg-yellow-50 border-yellow-200' :
+          'bg-green-50 border-green-200'
+        }`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <Clock className={`h-4 w-4 ${
+                organization.urgency_color === 'gray' ? 'text-gray-500' :
+                organization.urgency_color === 'red' ? 'text-red-600' :
+                organization.urgency_color === 'yellow' ? 'text-yellow-600' :
+                'text-green-600'
+              }`} />
+              <div className="text-sm">
+                <span className="font-medium text-gray-700">Trial expires: </span>
+                <span className={`font-semibold ${
+                  organization.urgency_color === 'gray' ? 'text-gray-700' :
+                  organization.urgency_color === 'red' ? 'text-red-700' :
+                  organization.urgency_color === 'yellow' ? 'text-yellow-700' :
+                  'text-green-700'
+                }`}>
+                  {organization.days_remaining === 0 ? 'Expired' : `${organization.days_remaining} days remaining`}
+                </span>
+                <span className="text-gray-500 ml-2">({formatDate(organization.trial_expires_at)})</span>
+              </div>
+            </div>
+            <button
+              onClick={() => toast.info('Use Trial Signups page to extend trials')}
+              className="px-3 py-1 text-xs font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+            >
+              View in Trials
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="flex items-center space-x-2 text-sm text-gray-600">
@@ -86,8 +152,12 @@ function OrganizationCard({ organization }) {
           </span>
         </div>
         <div>
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-            {organization.subscription_plan || 'Free'}
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+            organization.trial_status === 'expired' ? 'bg-gray-100 text-gray-800' :
+            organization.trial_status === 'active' ? 'bg-blue-100 text-blue-800' :
+            'bg-purple-100 text-purple-800'
+          }`}>
+            {organization.trial_status || 'Active'}
           </span>
         </div>
       </div>
@@ -158,21 +228,42 @@ function OrganizationCard({ organization }) {
 
 export default function SuperAdminOrganizations() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState('all'); // all, trial, paid, expired
   const { data, isLoading, error, refetch } = useSuperAdminOrganizations();
 
   const organizations = data?.organizations || [];
 
-  // Filter organizations based on search
-  const filteredOrganizations = organizations.filter(org =>
-    org.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    org.slug.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (org.domain && org.domain.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  // Filter organizations based on search and type
+  const filteredOrganizations = useMemo(() => {
+    let filtered = organizations;
+
+    // Apply type filter
+    if (filterType === 'trial') {
+      filtered = filtered.filter(org => org.is_trial && org.trial_status === 'active');
+    } else if (filterType === 'paid') {
+      filtered = filtered.filter(org => !org.is_trial || org.trial_status === 'converted');
+    } else if (filterType === 'expired') {
+      filtered = filtered.filter(org => org.is_trial && org.trial_status === 'expired');
+    }
+
+    // Apply search filter
+    if (searchTerm) {
+      filtered = filtered.filter(org =>
+        org.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        org.slug.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (org.domain && org.domain.toLowerCase().includes(searchTerm.toLowerCase()))
+      );
+    }
+
+    return filtered;
+  }, [organizations, searchTerm, filterType]);
 
   const stats = {
     total: organizations.length,
+    trial: organizations.filter(org => org.is_trial && org.trial_status === 'active').length,
+    paid: organizations.filter(org => !org.is_trial || org.trial_status === 'converted').length,
+    expired: organizations.filter(org => org.is_trial && org.trial_status === 'expired').length,
     active: organizations.filter(org => org.is_active).length,
-    inactive: organizations.filter(org => !org.is_active).length,
     totalUsers: organizations.reduce((sum, org) => sum + (org.user_count || 0), 0)
   };
 
@@ -201,55 +292,57 @@ export default function SuperAdminOrganizations() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600">Total Organizations</p>
               <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
             </div>
-            <Building2 className="h-8 w-8 text-indigo-600" />
+            <Building2 className="h-8 w-8 text-gray-400" />
           </div>
         </div>
-
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Active</p>
-              <p className="text-2xl font-bold text-green-600">{stats.active}</p>
+              <p className="text-sm text-gray-600">Active Trials</p>
+              <p className="text-2xl font-bold text-yellow-600">{stats.trial}</p>
             </div>
-            <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
-              <div className="h-3 w-3 rounded-full bg-green-600"></div>
-            </div>
+            <Clock className="h-8 w-8 text-yellow-400" />
           </div>
         </div>
-
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Inactive</p>
-              <p className="text-2xl font-bold text-red-600">{stats.inactive}</p>
+              <p className="text-sm text-gray-600">Paid Organizations</p>
+              <p className="text-2xl font-bold text-purple-600">{stats.paid}</p>
             </div>
-            <div className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center">
-              <div className="h-3 w-3 rounded-full bg-red-600"></div>
-            </div>
+            <ArrowUp className="h-8 w-8 text-purple-400" />
           </div>
         </div>
-
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600">Expired Trials</p>
+              <p className="text-2xl font-bold text-gray-600">{stats.expired}</p>
+            </div>
+            <AlertTriangle className="h-8 w-8 text-gray-400" />
+          </div>
+        </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600">Total Users</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.totalUsers}</p>
+              <p className="text-2xl font-bold text-indigo-600">{stats.totalUsers}</p>
             </div>
-            <Users className="h-8 w-8 text-indigo-600" />
+            <Users className="h-8 w-8 text-indigo-400" />
           </div>
         </div>
       </div>
 
       {/* Search and Filters */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input
@@ -260,14 +353,49 @@ export default function SuperAdminOrganizations() {
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             />
           </div>
-          <button
-            onClick={() => refetch()}
-            className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center space-x-2"
-          >
-            <RefreshCw className="h-4 w-4" />
-            <span>Refresh</span>
-          </button>
+
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <select
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value)}
+                className="pl-10 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white appearance-none cursor-pointer"
+              >
+                <option value="all">All Organizations</option>
+                <option value="trial">Trial Only ({stats.trial})</option>
+                <option value="paid">Paid Only ({stats.paid})</option>
+                <option value="expired">Expired Trials ({stats.expired})</option>
+              </select>
+            </div>
+
+            <button
+              onClick={() => refetch()}
+              className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center space-x-2"
+            >
+              <RefreshCw className="h-4 w-4" />
+              <span>Refresh</span>
+            </button>
+          </div>
         </div>
+
+        {/* Active Filter Indicator */}
+        {filterType !== 'all' && (
+          <div className="mt-3 flex items-center gap-2">
+            <span className="text-sm text-gray-600">Showing:</span>
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-indigo-100 text-indigo-800">
+              {filterType === 'trial' && `Active Trials (${filteredOrganizations.length})`}
+              {filterType === 'paid' && `Paid Organizations (${filteredOrganizations.length})`}
+              {filterType === 'expired' && `Expired Trials (${filteredOrganizations.length})`}
+            </span>
+            <button
+              onClick={() => setFilterType('all')}
+              className="text-sm text-indigo-600 hover:text-indigo-800"
+            >
+              Clear filter
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Organizations List */}

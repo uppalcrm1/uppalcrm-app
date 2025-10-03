@@ -9,7 +9,11 @@
       "Bash(node:*)",
       "Bash(git commit:*)",
       "Bash(git push:*)",
-      "WebFetch(domain:uppalcrm-api.onrender.com)"
+      "WebFetch(domain:uppalcrm-api.onrender.com)",
+      "Bash(npm run logs:*)",
+      "Bash(for i in {1..3})",
+      "Bash(do echo \"Attempt $i:\")",
+      "Bash(done)"
     ],
     "deny": [],
     "ask": []

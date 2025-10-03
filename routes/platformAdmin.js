@@ -759,19 +759,49 @@ router.get('/organizations', platformAuth, async (req, res) => {
     const organizations = await Organization.getAll();
     console.log(`✅ Found ${organizations.length} organizations`);
 
-    const formattedOrgs = organizations.map(org => ({
-      id: org.id,
-      name: org.name,
-      slug: org.slug,
-      domain: org.domain,
-      subscription_plan: org.subscription_plan || 'free',
-      max_users: org.max_users || 10,
-      is_active: org.is_active,
-      created_at: org.created_at,
-      updated_at: org.updated_at,
-      user_count: parseInt(org.user_count) || 0,
-      active_user_count: parseInt(org.active_user_count) || 0
-    }));
+    const formattedOrgs = organizations.map(org => {
+      // Calculate days remaining for trials
+      let daysRemaining = null;
+      let urgencyColor = null;
+
+      if (org.is_trial && org.trial_expires_at) {
+        const now = new Date();
+        const expiresAt = new Date(org.trial_expires_at);
+        const diffTime = expiresAt - now;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        daysRemaining = Math.max(0, diffDays);
+
+        // Set urgency color
+        if (daysRemaining === 0 || expiresAt < now) {
+          urgencyColor = 'gray';
+        } else if (daysRemaining <= 7) {
+          urgencyColor = 'red';
+        } else if (daysRemaining <= 15) {
+          urgencyColor = 'yellow';
+        } else {
+          urgencyColor = 'green';
+        }
+      }
+
+      return {
+        id: org.id,
+        name: org.name,
+        slug: org.slug,
+        domain: org.domain,
+        subscription_plan: org.subscription_plan || 'free',
+        max_users: org.max_users || 10,
+        is_active: org.is_active,
+        is_trial: org.is_trial || false,
+        trial_status: org.trial_status,
+        trial_expires_at: org.trial_expires_at,
+        days_remaining: daysRemaining,
+        urgency_color: urgencyColor,
+        created_at: org.created_at,
+        updated_at: org.updated_at,
+        user_count: parseInt(org.user_count) || 0,
+        active_user_count: parseInt(org.active_user_count) || 0
+      };
+    });
 
     res.json({
       organizations: formattedOrgs,

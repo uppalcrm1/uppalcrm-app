@@ -278,7 +278,7 @@
     </div>
 
     <script>
-        const API_BASE = 'https://uppalcrm-api.onrender.com/api/super-admin';
+        const API_BASE = 'https://uppalcrm-api.onrender.com/api/platform';
         let authToken = null;
 
         // Login functionality
@@ -295,7 +295,7 @@
             messageDiv.innerHTML = '';
 
             try {
-                const response = await fetch(`${API_BASE}/login`, {
+                const response = await fetch(`${API_BASE}/auth/login`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
