@@ -302,7 +302,13 @@ export default function SuperAdminOrganizations() {
                 console.log('📤 Calling fixTrialDataMutation...');
                 const result = await fixTrialDataMutation.mutateAsync();
                 console.log('✅ Success:', result);
-                toast.success('Trial data populated successfully!');
+                console.log('📊 Before state:', result.before_state);
+                console.log('📊 Updated orgs:', result.organizations);
+                if (result.updated_count === 0) {
+                  toast.error('No organizations were updated. Check console for current state.');
+                } else {
+                  toast.success(`Updated ${result.updated_count} organizations!`);
+                }
               } catch (error) {
                 console.error('❌ Error:', error);
                 toast.error(error.message || 'Failed to fix trial data');
