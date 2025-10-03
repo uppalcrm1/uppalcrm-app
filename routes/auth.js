@@ -312,7 +312,7 @@ router.post('/refresh',
  * Request password reset email
  */
 router.post('/forgot-password',
-  rateLimiters.login, // Reuse login rate limiter
+  rateLimiters.passwordReset,
   async (req, res) => {
     try {
       const { email } = req.body;
@@ -389,7 +389,7 @@ router.post('/forgot-password',
  * Reset password with token
  */
 router.post('/reset-password/:token',
-  rateLimiters.login,
+  rateLimiters.passwordReset,
   async (req, res) => {
     try {
       const { token } = req.params;
