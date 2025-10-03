@@ -307,4 +307,149 @@ router.post('/refresh',
   }
 );
 
+/**
+ * POST /auth/forgot-password
+ * Request password reset email
+ */
+router.post('/forgot-password',
+  rateLimiters.login, // Reuse login rate limiter
+  async (req, res) => {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        return res.status(400).json({
+          error: 'Email is required'
+        });
+      }
+
+      // Find user by email globally (no org context needed)
+      const user = await User.findByEmailGlobal(email.toLowerCase());
+
+      // Always return success to prevent email enumeration
+      if (!user) {
+        console.log(`Password reset requested for non-existent email: ${email}`);
+        return res.json({
+          message: 'If an account with that email exists, a password reset link has been sent.'
+        });
+      }
+
+      // Generate reset token
+      const crypto = require('crypto');
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      const resetTokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
+      const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour
+
+      // Store reset token in database
+      const { query } = require('../database/connection');
+      await query(`
+        UPDATE users
+        SET reset_token_hash = $1,
+            reset_token_expiry = $2,
+            updated_at = NOW()
+        WHERE id = $3
+      `, [resetTokenHash, resetTokenExpiry, user.id]);
+
+      // Get organization for email
+      const organization = await Organization.findById(user.organization_id);
+
+      // Send reset email
+      const resetUrl = `${process.env.FRONTEND_URL || 'https://uppalcrm-frontend.onrender.com'}/reset-password/${resetToken}`;
+
+      try {
+        await emailService.sendPasswordResetEmail({
+          email: user.email,
+          name: user.name || `${user.first_name} ${user.last_name}`,
+          resetToken,
+          resetUrl,
+          organizationName: organization?.name || 'UppalCRM'
+        });
+
+        console.log(`✅ Password reset email sent to ${user.email}`);
+      } catch (emailError) {
+        console.error('Failed to send password reset email:', emailError);
+        // Don't fail the request if email fails
+      }
+
+      res.json({
+        message: 'If an account with that email exists, a password reset link has been sent.'
+      });
+
+    } catch (error) {
+      console.error('Forgot password error:', error);
+      res.status(500).json({
+        error: 'Failed to process password reset request'
+      });
+    }
+  }
+);
+
+/**
+ * POST /auth/reset-password/:token
+ * Reset password with token
+ */
+router.post('/reset-password/:token',
+  rateLimiters.login,
+  async (req, res) => {
+    try {
+      const { token } = req.params;
+      const { password } = req.body;
+
+      if (!password || password.length < 8) {
+        return res.status(400).json({
+          error: 'Password must be at least 8 characters long'
+        });
+      }
+
+      // Hash the token to match database
+      const crypto = require('crypto');
+      const resetTokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+      // Find user with valid reset token
+      const { query } = require('../database/connection');
+      const result = await query(`
+        SELECT * FROM users
+        WHERE reset_token_hash = $1
+        AND reset_token_expiry > NOW()
+        AND is_active = true
+      `, [resetTokenHash]);
+
+      if (result.rows.length === 0) {
+        return res.status(400).json({
+          error: 'Invalid or expired reset token'
+        });
+      }
+
+      const user = new User(result.rows[0]);
+
+      // Hash new password
+      const bcrypt = require('bcryptjs');
+      const passwordHash = await bcrypt.hash(password, parseInt(process.env.BCRYPT_ROUNDS) || 12);
+
+      // Update password and clear reset token
+      await query(`
+        UPDATE users
+        SET password_hash = $1,
+            reset_token_hash = NULL,
+            reset_token_expiry = NULL,
+            failed_login_attempts = 0,
+            updated_at = NOW()
+        WHERE id = $2
+      `, [passwordHash, user.id]);
+
+      console.log(`✅ Password reset successful for user: ${user.email}`);
+
+      res.json({
+        message: 'Password has been reset successfully. You can now login with your new password.'
+      });
+
+    } catch (error) {
+      console.error('Reset password error:', error);
+      res.status(500).json({
+        error: 'Failed to reset password'
+      });
+    }
+  }
+);
+
 module.exports = router;
