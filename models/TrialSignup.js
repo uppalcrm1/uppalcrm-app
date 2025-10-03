@@ -20,6 +20,9 @@ class TrialSignup {
     this.notes = data.notes;
     this.converted_organization_id = data.converted_organization_id;
     this.converted_at = data.converted_at;
+    this.organization_slug = data.organization_slug;
+    this.generated_password = data.generated_password;
+    this.credentials_sent_at = data.credentials_sent_at;
     this.created_at = data.created_at;
     this.updated_at = data.updated_at;
   }

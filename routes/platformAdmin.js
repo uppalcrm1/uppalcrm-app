@@ -45,11 +45,56 @@ router.post('/trial-signup', async (req, res) => {
       });
     }
 
-    // Create new trial signup
-    const trialSignup = await TrialSignup.create({
+    // Generate secure password and unique slug
+    const { generateSecurePassword, generateSlug, generateUniqueSlug } = require('../utils/passwordGenerator');
+    const generatedPassword = generateSecurePassword(16);
+    const baseSlug = generateSlug(company);
+
+    // Ensure slug is unique
+    const organizationSlug = await generateUniqueSlug(baseSlug, async (slug) => {
+      const existing = await Organization.findBySlug(slug);
+      return existing !== null;
+    });
+
+    console.log(`🆕 Creating organization for trial signup: ${email}`);
+    console.log(`   Company: ${company}`);
+    console.log(`   Slug: ${organizationSlug}`);
+
+    // Create organization
+    const organization = await Organization.create({
+      name: company,
+      slug: organizationSlug,
+      domain: website
+    });
+
+    console.log(`✅ Organization created: ${organization.id}`);
+
+    // Create admin user for the organization
+    const User = require('../models/User');
+    const user = await User.create({
+      email,
+      password: generatedPassword,
       first_name,
       last_name,
-      email,
+      role: 'admin'
+    }, organization.id);
+
+    console.log(`✅ Admin user created: ${user.id}`);
+
+    // Create trial signup record with credentials
+    const { query: dbQuery } = require('../database/connection');
+    const result = await dbQuery(`
+      INSERT INTO trial_signups (
+        first_name, last_name, email, company, website, phone,
+        industry, team_size, utm_source, utm_campaign, utm_medium,
+        utm_term, utm_content, status, converted_organization_id,
+        organization_slug, generated_password, converted_at, credentials_sent_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW(), NOW())
+      RETURNING *
+    `, [
+      first_name,
+      last_name,
+      email.toLowerCase(),
       company,
       website,
       phone,
@@ -59,40 +104,53 @@ router.post('/trial-signup', async (req, res) => {
       utm_campaign,
       utm_medium,
       utm_term,
-      utm_content
-    });
+      utm_content,
+      'converted', // Status is now 'converted' since org is created
+      organization.id,
+      organizationSlug,
+      generatedPassword
+    ]);
 
-    // Send confirmation email to customer
+    const trialSignup = new TrialSignup(result.rows[0]);
+    console.log(`✅ Trial signup record created: ${trialSignup.id}`);
+
+    // Send credentials email to customer
     const emailService = require('../services/emailService');
     await emailService.initialize();
 
     try {
-      await emailService.sendTrialConfirmation({
+      await emailService.sendTrialCredentials({
         customerName: trialSignup.fullName,
         customerEmail: trialSignup.email,
-        company: trialSignup.company
+        company: trialSignup.company,
+        loginUrl: 'https://uppalcrm-frontend.onrender.com/login',
+        username: email,
+        password: generatedPassword,
+        organizationSlug
       });
-      console.log(`✅ Trial confirmation email sent to ${trialSignup.email}`);
+      console.log(`✅ Trial credentials email sent to ${trialSignup.email}`);
     } catch (emailError) {
-      console.error('❌ Failed to send trial confirmation email:', emailError);
-      // Don't fail the signup if email fails - just log the error
+      console.error('❌ Failed to send trial credentials email:', emailError);
+      // Don't fail the signup if email fails - credentials are still accessible via super admin
     }
 
     res.status(201).json({
-      message: 'Trial signup created successfully',
+      message: 'Trial signup created successfully. Login credentials have been sent to your email.',
       signup: {
         id: trialSignup.id,
         full_name: trialSignup.fullName,
         email: trialSignup.email,
         company: trialSignup.company,
+        organization_slug: organizationSlug,
         status: trialSignup.status
       }
     });
 
   } catch (error) {
-    console.error('Error creating trial signup:', error);
+    console.error('❌ Error creating trial signup:', error);
     res.status(500).json({
-      error: 'Internal server error'
+      error: 'Internal server error',
+      message: error.message
     });
   }
 });

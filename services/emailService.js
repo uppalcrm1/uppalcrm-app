@@ -256,6 +256,231 @@ This email was sent to ${customerEmail} because you requested a trial at uppalcr
   }
 
   /**
+   * Send trial credentials email to customer with instant login access
+   * @param {Object} options - Email options
+   * @param {string} options.customerName - Customer's full name
+   * @param {string} options.customerEmail - Customer's email address
+   * @param {string} options.company - Company name
+   * @param {string} options.loginUrl - Login URL
+   * @param {string} options.username - Username (email)
+   * @param {string} options.password - Generated password
+   * @param {string} options.organizationSlug - Organization slug
+   */
+  async sendTrialCredentials({ customerName, customerEmail, company, loginUrl, username, password, organizationSlug }) {
+    if (!this.isAvailable()) {
+      console.log('📧 Email service not available, skipping trial credentials email');
+      return null;
+    }
+
+    const subject = `🎉 Your ${company} CRM is Ready! Login credentials inside`;
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; background: #f5f5f5; }
+          .container { background: #ffffff; margin: 20px; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+          .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px 30px; text-align: center; }
+          .header h1 { margin: 0; font-size: 28px; }
+          .header p { margin: 10px 0 0 0; opacity: 0.9; }
+          .content { padding: 30px; }
+          .credentials-box { background: #f0f7ff; padding: 25px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #667eea; }
+          .credentials-box h3 { margin-top: 0; color: #667eea; }
+          .credential-row { margin: 15px 0; padding: 12px; background: white; border-radius: 5px; }
+          .credential-label { font-weight: bold; color: #555; display: block; margin-bottom: 5px; font-size: 13px; }
+          .credential-value { font-family: 'Courier New', monospace; font-size: 16px; color: #1a202c; word-break: break-all; background: #f8f9fa; padding: 8px 12px; border-radius: 4px; }
+          .cta-button { display: inline-block; background: #667eea; color: white !important; padding: 15px 40px; text-decoration: none; border-radius: 5px; margin: 20px 0; font-weight: bold; font-size: 16px; }
+          .cta-button:hover { background: #5568d3; }
+          .warning-box { background: #fff3cd; border-left: 4px solid #ffc107; padding: 20px; margin: 20px 0; border-radius: 5px; }
+          .warning-box h4 { margin-top: 0; color: #856404; }
+          .steps { background: #f8f9ff; padding: 20px; border-radius: 8px; margin: 20px 0; }
+          .steps ol { margin: 10px 0; padding-left: 20px; }
+          .steps li { margin: 10px 0; }
+          .footer { background: #f7f7f7; padding: 20px; text-align: center; font-size: 12px; color: #666; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>🎉 Welcome to UppalCRM!</h1>
+            <p>Your CRM account is ready to use</p>
+          </div>
+
+          <div class="content">
+            <p>Hello ${customerName},</p>
+
+            <p>Great news! Your <strong>${company}</strong> CRM account has been automatically created and is ready to use right now. No waiting required!</p>
+
+            <div class="credentials-box">
+              <h3>🔑 Your Login Credentials</h3>
+              <p style="margin-bottom: 15px; color: #555;">Save these details in a secure place:</p>
+
+              <div class="credential-row">
+                <span class="credential-label">Login URL</span>
+                <div class="credential-value">${loginUrl}</div>
+              </div>
+
+              <div class="credential-row">
+                <span class="credential-label">Username (Email)</span>
+                <div class="credential-value">${username}</div>
+              </div>
+
+              <div class="credential-row">
+                <span class="credential-label">Password</span>
+                <div class="credential-value">${password}</div>
+              </div>
+
+              <div class="credential-row">
+                <span class="credential-label">Organization</span>
+                <div class="credential-value">${organizationSlug}</div>
+              </div>
+            </div>
+
+            <div style="text-align: center;">
+              <a href="${loginUrl}" class="cta-button">
+                🚀 Login to Your CRM Now
+              </a>
+            </div>
+
+            <div class="warning-box">
+              <h4>🔐 Important Security Notice</h4>
+              <p style="margin: 0;">For your security, please change your password immediately after your first login. Go to Settings → Account → Change Password.</p>
+            </div>
+
+            <div class="steps">
+              <h3 style="margin-top: 0; color: #667eea;">Quick Start Guide</h3>
+              <ol>
+                <li><strong>Login:</strong> Click the button above or visit the login URL</li>
+                <li><strong>Change Password:</strong> Update to a password you'll remember</li>
+                <li><strong>Complete Profile:</strong> Add your company details</li>
+                <li><strong>Import Data:</strong> Upload your existing contacts/leads (optional)</li>
+                <li><strong>Invite Team:</strong> Add team members to collaborate</li>
+                <li><strong>Explore:</strong> Start managing your customer relationships!</li>
+              </ol>
+            </div>
+
+            <p><strong>💡 Pro Tips:</strong></p>
+            <ul>
+              <li>Bookmark your login URL for quick access</li>
+              <li>Set up custom fields for your specific business needs</li>
+              <li>Enable email notifications to stay updated</li>
+              <li>Check out our Help Center for video tutorials</li>
+            </ul>
+
+            <p><strong>📊 What You Get:</strong></p>
+            <ul>
+              <li>✨ Unlimited contacts and leads</li>
+              <li>📈 Advanced analytics dashboard</li>
+              <li>🔄 Workflow automation</li>
+              <li>📧 Email integration</li>
+              <li>👥 Team collaboration tools</li>
+              <li>📱 Mobile-responsive interface</li>
+              <li>🛟 Priority customer support</li>
+            </ul>
+
+            <p>Need help getting started? Just reply to this email - our team is here to help you succeed!</p>
+
+            <p>Welcome aboard!<br>
+            <strong>The UppalCRM Team</strong><br>
+            <a href="mailto:support@uppalcrm.com" style="color: #667eea;">support@uppalcrm.com</a></p>
+          </div>
+
+          <div class="footer">
+            <p><strong>UppalCRM</strong> - Transform Your Customer Relationships</p>
+            <p>© ${new Date().getFullYear()} UppalCRM. All rights reserved.</p>
+            <p style="margin-top: 10px;">
+              This email was sent to ${customerEmail} with your CRM login credentials.<br>
+              If you didn't sign up for UppalCRM, please ignore this email.
+            </p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const textContent = `
+🎉 Welcome to UppalCRM - Your CRM is Ready!
+
+Hello ${customerName},
+
+Great news! Your ${company} CRM account has been automatically created and is ready to use right now. No waiting required!
+
+🔑 YOUR LOGIN CREDENTIALS
+Save these details in a secure place:
+
+Login URL: ${loginUrl}
+Username: ${username}
+Password: ${password}
+Organization: ${organizationSlug}
+
+🔐 IMPORTANT SECURITY NOTICE
+For your security, please change your password immediately after your first login.
+Go to Settings → Account → Change Password.
+
+QUICK START GUIDE
+1. Login: Visit ${loginUrl}
+2. Change Password: Update to a password you'll remember
+3. Complete Profile: Add your company details
+4. Import Data: Upload your existing contacts/leads (optional)
+5. Invite Team: Add team members to collaborate
+6. Explore: Start managing your customer relationships!
+
+💡 PRO TIPS
+- Bookmark your login URL for quick access
+- Set up custom fields for your specific business needs
+- Enable email notifications to stay updated
+- Check out our Help Center for video tutorials
+
+📊 WHAT YOU GET
+✨ Unlimited contacts and leads
+📈 Advanced analytics dashboard
+🔄 Workflow automation
+📧 Email integration
+👥 Team collaboration tools
+📱 Mobile-responsive interface
+🛟 Priority customer support
+
+Need help getting started? Just reply to this email - our team is here to help you succeed!
+
+Welcome aboard!
+The UppalCRM Team
+support@uppalcrm.com
+
+---
+UppalCRM - Transform Your Customer Relationships
+© ${new Date().getFullYear()} UppalCRM. All rights reserved.
+
+This email was sent to ${customerEmail} with your CRM login credentials.
+If you didn't sign up for UppalCRM, please ignore this email.
+    `;
+
+    try {
+      const mailOptions = {
+        from: {
+          name: process.env.FROM_NAME || 'UppalCRM',
+          address: process.env.FROM_EMAIL || process.env.SMTP_USER
+        },
+        to: customerEmail,
+        subject: subject,
+        text: textContent,
+        html: htmlContent,
+        headers: {
+          'X-Entity-Ref-ID': `trial-credentials-${Date.now()}`,
+          'X-Priority': '2' // High priority - contains login credentials
+        }
+      };
+
+      const result = await this.transporter.sendMail(mailOptions);
+      console.log(`✅ Trial credentials sent to ${customerEmail}:`, result.messageId);
+      return result;
+    } catch (error) {
+      console.error('❌ Failed to send trial credentials:', error);
+      return null;
+    }
+  }
+
+  /**
    * Send admin notification when a new lead signs up
    */
   async sendLeadNotification({ leadName, leadEmail, leadCompany, leadPhone, leadMessage, organizationName, utmSource, utmMedium, utmCampaign }) {
