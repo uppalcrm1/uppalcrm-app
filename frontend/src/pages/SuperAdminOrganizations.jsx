@@ -287,7 +287,7 @@ export default function SuperAdminOrganizations() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Organizations</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Organizations <span className="text-xs text-green-600 font-normal">(v1.0.2)</span></h1>
         <p className="text-gray-600">Manage all organizations in the platform</p>
       </div>
 
