@@ -297,10 +297,14 @@ export default function SuperAdminOrganizations() {
         {stats.trial === 0 && stats.total > 0 && (
           <button
             onClick={async () => {
+              console.log('🔧 Fix Trial Data button clicked');
               try {
-                await fixTrialDataMutation.mutateAsync();
+                console.log('📤 Calling fixTrialDataMutation...');
+                const result = await fixTrialDataMutation.mutateAsync();
+                console.log('✅ Success:', result);
                 toast.success('Trial data populated successfully!');
               } catch (error) {
+                console.error('❌ Error:', error);
                 toast.error(error.message || 'Failed to fix trial data');
               }
             }}
