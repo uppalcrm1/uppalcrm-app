@@ -184,7 +184,9 @@ export function useSuperAdminDashboard() {
   return useQuery({
     queryKey: ['superAdminDashboard'],
     queryFn: () => apiCall('/dashboard'),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 10 * 60 * 1000, // 10 minutes
+    refetchOnWindowFocus: false, // Don't refetch on window focus
+    refetchOnMount: false, // Don't refetch on component mount if data exists
   });
 }
 
@@ -201,7 +203,9 @@ export function useSuperAdminTrialSignups(filters = {}) {
   return useQuery({
     queryKey: ['superAdminTrialSignups', filters],
     queryFn: () => apiCall(endpoint),
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 10 * 60 * 1000, // 10 minutes
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
   });
 }
 
@@ -211,7 +215,9 @@ export function useSuperAdminStats() {
   return useQuery({
     queryKey: ['superAdminStats'],
     queryFn: () => apiCall('/stats'),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 10 * 60 * 1000, // 10 minutes
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
   });
 }
 
@@ -221,7 +227,9 @@ export function useSuperAdminOrganizations() {
   return useQuery({
     queryKey: ['superAdminOrganizations'],
     queryFn: () => apiCall('/organizations'),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 10 * 60 * 1000, // 10 minutes
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
   });
 }
 

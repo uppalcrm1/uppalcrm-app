@@ -60,26 +60,23 @@ router.post('/trial-signup', async (req, res) => {
     console.log(`   Company: ${company}`);
     console.log(`   Slug: ${organizationSlug}`);
 
-    // Create organization
-    const organization = await Organization.create({
-      name: company,
-      slug: organizationSlug,
-      domain: website
-    });
+    // Create organization and admin user together
+    const { organization, admin_user_id } = await Organization.create(
+      {
+        name: company,
+        slug: organizationSlug,
+        domain: website
+      },
+      {
+        email,
+        password: generatedPassword,
+        first_name,
+        last_name
+      }
+    );
 
     console.log(`✅ Organization created: ${organization.id}`);
-
-    // Create admin user for the organization
-    const User = require('../models/User');
-    const user = await User.create({
-      email,
-      password: generatedPassword,
-      first_name,
-      last_name,
-      role: 'admin'
-    }, organization.id);
-
-    console.log(`✅ Admin user created: ${user.id}`);
+    console.log(`✅ Admin user created: ${admin_user_id}`);
 
     // Create trial signup record with credentials
     const { query: dbQuery } = require('../database/connection');
