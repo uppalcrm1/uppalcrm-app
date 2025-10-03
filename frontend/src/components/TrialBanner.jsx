@@ -16,12 +16,17 @@ export default function TrialBanner() {
 
   const fetchTrialInfo = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('token') || localStorage.getItem('authToken');
+      const orgSlug = localStorage.getItem('organizationSlug');
       console.log('🔍 TrialBanner: Fetching trial info from:', `${API_BASE_URL}/organizations/current/trial-info`);
+      console.log('🔍 TrialBanner: Using token:', token ? 'present' : 'missing');
+      console.log('🔍 TrialBanner: Using org slug:', orgSlug);
+
       const response = await fetch(`${API_BASE_URL}/organizations/current/trial-info`, {
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'X-Organization-Slug': orgSlug
         }
       });
 
