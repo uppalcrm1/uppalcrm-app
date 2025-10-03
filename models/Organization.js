@@ -400,6 +400,9 @@ class Organization {
           o.subscription_plan,
           o.max_users,
           o.is_active,
+          o.is_trial,
+          o.trial_status,
+          o.trial_expires_at,
           o.created_at,
           o.updated_at,
           COALESCE(COUNT(DISTINCT u.id), 0) as user_count,
@@ -407,7 +410,8 @@ class Organization {
         FROM organizations o
         LEFT JOIN users u ON u.organization_id = o.id
         GROUP BY o.id, o.name, o.slug, o.domain, o.subscription_plan, o.max_users,
-                 o.is_active, o.created_at, o.updated_at
+                 o.is_active, o.is_trial, o.trial_status, o.trial_expires_at,
+                 o.created_at, o.updated_at
         ORDER BY o.created_at DESC
       `);
 
