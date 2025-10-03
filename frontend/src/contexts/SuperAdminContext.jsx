@@ -357,3 +357,20 @@ export function useArchiveTrial() {
     },
   });
 }
+
+export function useFixTrialData() {
+  const { apiCall } = useSuperAdmin();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () =>
+      apiCall('/admin/fix-trial-data', {
+        method: 'POST',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['superAdminOrganizations'] });
+      queryClient.invalidateQueries({ queryKey: ['superAdminDashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['superAdminStats'] });
+    },
+  });
+}

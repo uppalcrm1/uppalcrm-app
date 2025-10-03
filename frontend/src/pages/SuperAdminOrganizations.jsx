@@ -3,7 +3,8 @@ import toast from 'react-hot-toast';
 import {
   useSuperAdminOrganizations,
   useDeleteOrganization,
-  useExtendTrial
+  useExtendTrial,
+  useFixTrialData
 } from '../contexts/SuperAdminContext';
 import {
   Search,
@@ -230,6 +231,7 @@ export default function SuperAdminOrganizations() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all'); // all, trial, paid, expired
   const { data, isLoading, error, refetch } = useSuperAdminOrganizations();
+  const fixTrialDataMutation = useFixTrialData();
 
   const organizations = data?.organizations || [];
 
@@ -286,9 +288,38 @@ export default function SuperAdminOrganizations() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Organizations <span className="text-xs text-green-600 font-normal">(v1.0.2)</span></h1>
-        <p className="text-gray-600">Manage all organizations in the platform</p>
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Organizations <span className="text-xs text-green-600 font-normal">(v1.0.2)</span></h1>
+          <p className="text-gray-600">Manage all organizations in the platform</p>
+        </div>
+
+        {stats.trial === 0 && stats.total > 0 && (
+          <button
+            onClick={async () => {
+              try {
+                await fixTrialDataMutation.mutateAsync();
+                toast.success('Trial data populated successfully!');
+              } catch (error) {
+                toast.error(error.message || 'Failed to fix trial data');
+              }
+            }}
+            disabled={fixTrialDataMutation.isPending}
+            className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {fixTrialDataMutation.isPending ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Fixing...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="h-4 w-4" />
+                Fix Trial Data
+              </>
+            )}
+          </button>
+        )}
       </div>
 
       {/* Stats */}
