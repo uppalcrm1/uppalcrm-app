@@ -8,6 +8,8 @@ export default function TrialBanner() {
   const [isDismissed, setIsDismissed] = useState(false);
   const navigate = useNavigate();
 
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3004/api';
+
   useEffect(() => {
     fetchTrialInfo();
   }, []);
@@ -15,7 +17,7 @@ export default function TrialBanner() {
   const fetchTrialInfo = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/organizations/current/trial-info', {
+      const response = await fetch(`${API_BASE_URL}/organizations/current/trial-info`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'

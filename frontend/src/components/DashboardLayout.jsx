@@ -23,6 +23,7 @@ import {
   Download,
 } from 'lucide-react'
 import LoadingSpinner from './LoadingSpinner'
+import TrialBanner from './TrialBanner'
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -295,6 +296,9 @@ const DashboardLayout = () => {
             </div>
           </div>
         </header>
+
+        {/* Trial Banner */}
+        <TrialBanner />
 
         {/* Page Content */}
         <main className="flex-1">
