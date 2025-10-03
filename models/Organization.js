@@ -448,11 +448,13 @@ class Organization {
    * @returns {boolean} True if deleted successfully
    */
   static async delete(id) {
+    let transactionStarted = false;
     try {
       // Start transaction to delete all related data
+      console.log(`🗑️  Starting deletion for organization: ${id}`);
       await query('BEGIN');
-
-      console.log(`🗑️  Deleting all data for organization: ${id}`);
+      transactionStarted = true;
+      console.log(`✅ Transaction started`);
 
       // Helper function to safely delete from table (ignores if table doesn't exist)
       const safeDelete = async (tableName, whereClause = 'organization_id') => {
@@ -468,12 +470,18 @@ class Organization {
           // Table doesn't exist or column doesn't exist - skip it
           if (err.code === '42P01' || err.code === '42703') {
             console.log(`  ⊘ Skipped ${tableName} (doesn't exist - code: ${err.code})`);
+          } else if (err.code === '25P02') {
+            // Transaction already aborted - this is a cascading error
+            console.error(`  ⚠️  Transaction already aborted when trying to delete from ${tableName}`);
+            throw err;
           } else {
-            console.error(`  ❌ Error deleting from ${tableName}:`, {
+            console.error(`  ❌ FIRST ERROR deleting from ${tableName}:`, {
               code: err.code,
               message: err.message,
               detail: err.detail,
-              constraint: err.constraint
+              constraint: err.constraint,
+              table: err.table,
+              column: err.column
             });
             throw err; // Re-throw other errors
           }
@@ -525,15 +533,25 @@ class Organization {
       console.log(`✅ Organization deleted successfully`);
 
       await query('COMMIT');
+      console.log(`✅ Transaction committed`);
       return true;
     } catch (error) {
-      try {
-        await query('ROLLBACK');
-      } catch (rollbackError) {
-        console.error('❌ Error during ROLLBACK:', rollbackError.message);
+      if (transactionStarted) {
+        try {
+          console.log('🔄 Rolling back transaction...');
+          await query('ROLLBACK');
+          console.log('✅ Transaction rolled back');
+        } catch (rollbackError) {
+          console.error('❌ Error during ROLLBACK:', rollbackError.message);
+        }
       }
-      console.error('❌ Error deleting organization:', error);
-      console.error('Error code:', error.code, 'Message:', error.message);
+      console.error('❌ FINAL Error deleting organization:', {
+        code: error.code,
+        message: error.message,
+        detail: error.detail,
+        constraint: error.constraint,
+        stack: error.stack?.split('\n').slice(0, 3).join('\n')
+      });
       throw error;
     }
   }
