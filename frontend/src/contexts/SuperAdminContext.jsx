@@ -320,3 +320,40 @@ export function useDeleteOrganization() {
     },
   });
 }
+
+// Trial management mutation hooks
+export function useExtendTrial() {
+  const { apiCall } = useSuperAdmin();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, extension_days = 30 }) =>
+      apiCall(`/trial-signups/${id}/extend`, {
+        method: 'PUT',
+        body: JSON.stringify({ extension_days }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['superAdminTrialSignups'] });
+      queryClient.invalidateQueries({ queryKey: ['superAdminDashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['superAdminStats'] });
+    },
+  });
+}
+
+export function useArchiveTrial() {
+  const { apiCall } = useSuperAdmin();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id) =>
+      apiCall(`/trial-signups/${id}/archive`, {
+        method: 'POST',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['superAdminTrialSignups'] });
+      queryClient.invalidateQueries({ queryKey: ['superAdminDashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['superAdminStats'] });
+      queryClient.invalidateQueries({ queryKey: ['superAdminOrganizations'] });
+    },
+  });
+}

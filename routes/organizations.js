@@ -26,7 +26,7 @@ router.get('/current',
   async (req, res) => {
     try {
       const organization = await Organization.findById(req.organizationId);
-      
+
       if (!organization) {
         return res.status(404).json({
           error: 'Organization not found',
@@ -42,6 +42,57 @@ router.get('/current',
       res.status(500).json({
         error: 'Failed to retrieve organization',
         message: 'Unable to get organization information'
+      });
+    }
+  }
+);
+
+/**
+ * GET /organizations/current/trial-info
+ * Get trial information for current organization
+ */
+router.get('/current/trial-info',
+  async (req, res) => {
+    try {
+      const { query } = require('../database/connection');
+
+      const result = await query(`
+        SELECT
+          o.is_trial,
+          o.trial_status,
+          o.trial_expires_at,
+          GREATEST(0, EXTRACT(DAY FROM (o.trial_expires_at - NOW()))::INTEGER) as days_remaining,
+          CASE
+            WHEN o.trial_expires_at IS NULL THEN null
+            WHEN o.trial_expires_at > NOW() + INTERVAL '15 days' THEN 'green'
+            WHEN o.trial_expires_at > NOW() + INTERVAL '7 days' THEN 'yellow'
+            ELSE 'red'
+          END as urgency_color
+        FROM organizations o
+        WHERE o.id = $1
+      `, [req.organizationId]);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({
+          error: 'Organization not found'
+        });
+      }
+
+      const trialInfo = result.rows[0];
+
+      res.json({
+        is_trial: trialInfo.is_trial,
+        trial_status: trialInfo.trial_status,
+        trial_expires_at: trialInfo.trial_expires_at,
+        days_remaining: trialInfo.days_remaining,
+        urgency_color: trialInfo.urgency_color,
+        show_banner: trialInfo.is_trial && trialInfo.trial_status === 'active'
+      });
+    } catch (error) {
+      console.error('Get trial info error:', error);
+      res.status(500).json({
+        error: 'Failed to retrieve trial information',
+        message: 'Unable to get trial information'
       });
     }
   }

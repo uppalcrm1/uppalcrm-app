@@ -23,8 +23,40 @@ class TrialSignup {
     this.organization_slug = data.organization_slug;
     this.generated_password = data.generated_password;
     this.credentials_sent_at = data.credentials_sent_at;
+    this.trial_start_date = data.trial_start_date;
+    this.trial_end_date = data.trial_end_date;
+    this.trial_extended = data.trial_extended;
+    this.trial_extension_date = data.trial_extension_date;
+    this.trial_extension_count = data.trial_extension_count || 0;
     this.created_at = data.created_at;
     this.updated_at = data.updated_at;
+  }
+
+  // Trial management getters
+  get daysRemaining() {
+    if (!this.trial_end_date) return null;
+    const now = new Date();
+    const endDate = new Date(this.trial_end_date);
+    const diffTime = endDate - now;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return Math.max(0, diffDays);
+  }
+
+  get isExpired() {
+    if (!this.trial_end_date) return false;
+    return new Date(this.trial_end_date) < new Date();
+  }
+
+  get trialUrgencyColor() {
+    const days = this.daysRemaining;
+    if (days === null) return null;
+    if (days > 15) return 'green';
+    if (days > 7) return 'yellow';
+    return 'red';
+  }
+
+  get canExtend() {
+    return this.trial_extension_count < 2; // Limit to 2 extensions
   }
 
   // Static methods for database operations

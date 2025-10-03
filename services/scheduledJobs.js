@@ -87,7 +87,20 @@ class ScheduledJobs {
       timezone: "America/New_York"
     });
 
-    // Job 6: Health check and monitoring (runs every 30 minutes)
+    // Job 6: Trial expiration archival (runs every day at 4:00 AM)
+    const trialArchival = cron.schedule('0 4 * * *', async () => {
+      console.log('\n🗄️  Archiving expired trials...');
+      try {
+        await this.archiveExpiredTrials();
+      } catch (error) {
+        console.error('❌ Trial archival job failed:', error);
+      }
+    }, {
+      scheduled: false,
+      timezone: "America/New_York"
+    });
+
+    // Job 7: Health check and monitoring (runs every 30 minutes)
     const healthCheck = cron.schedule('*/30 * * * *', async () => {
       try {
         await this.performHealthCheck();
@@ -105,6 +118,7 @@ class ScheduledJobs {
     this.jobs.set('monthlyInvoicing', monthlyInvoicing);
     this.jobs.set('gracePeriodCleanup', gracePeriodCleanup);
     this.jobs.set('autoRenewals', autoRenewals);
+    this.jobs.set('trialArchival', trialArchival);
     this.jobs.set('healthCheck', healthCheck);
 
     // Start all jobs
@@ -179,6 +193,9 @@ class ScheduledJobs {
       case 'autoRenewals':
         await billingService.processAutomaticRenewals();
         break;
+      case 'trialArchival':
+        await this.archiveExpiredTrials();
+        break;
       case 'healthCheck':
         await this.performHealthCheck();
         break;
@@ -187,6 +204,57 @@ class ScheduledJobs {
     }
 
     console.log(`✅ Completed manual run of job: ${jobName}`);
+  }
+
+  /**
+   * Archive expired trials
+   */
+  async archiveExpiredTrials() {
+    const { query } = require('../database/connection');
+
+    try {
+      console.log('🔍 Looking for expired trials to archive...');
+
+      // Find all expired trials
+      const expiredTrials = await query(`
+        SELECT ts.id, ts.email, ts.company, ts.trial_end_date
+        FROM trial_signups ts
+        WHERE ts.trial_end_date < NOW()
+          AND ts.status = 'converted'
+        ORDER BY ts.trial_end_date ASC
+      `);
+
+      if (expiredTrials.rows.length === 0) {
+        console.log('✅ No expired trials found');
+        return;
+      }
+
+      console.log(`📦 Found ${expiredTrials.rows.length} expired trials to archive`);
+
+      let archivedCount = 0;
+      let errorCount = 0;
+
+      for (const trial of expiredTrials.rows) {
+        try {
+          await query('SELECT archive_expired_trial($1)', [trial.id]);
+          console.log(`   ✅ Archived trial: ${trial.company} (${trial.email})`);
+          archivedCount++;
+        } catch (error) {
+          console.error(`   ❌ Failed to archive trial ${trial.id}:`, error.message);
+          errorCount++;
+        }
+      }
+
+      console.log(`\n📊 Trial Archival Summary:`);
+      console.log(`   ✅ Successfully archived: ${archivedCount}`);
+      if (errorCount > 0) {
+        console.log(`   ❌ Failed to archive: ${errorCount}`);
+      }
+
+    } catch (error) {
+      console.error('❌ Error in trial archival process:', error);
+      throw error;
+    }
   }
 
   /**
@@ -249,6 +317,7 @@ class ScheduledJobs {
     console.log('   🧾 Monthly Invoicing: 1st of every month at 1:00 AM');
     console.log('   🧹 Grace Period Cleanup: Every day at 3:00 AM');
     console.log('   🔄 Auto Renewals: Every hour from 9 AM to 6 PM');
+    console.log('   🗄️  Trial Archival: Every day at 4:00 AM');
     console.log('   ❤️  Health Check: Every 30 minutes');
     console.log('   🌐 Timezone: America/New_York\n');
   }

@@ -78,15 +78,32 @@ router.post('/trial-signup', async (req, res) => {
     console.log(`✅ Organization created: ${organization.id}`);
     console.log(`✅ Admin user created: ${admin_user_id}`);
 
-    // Create trial signup record with credentials
+    // Set trial dates (30 days from now)
     const { query: dbQuery } = require('../database/connection');
+    const trialStartDate = new Date();
+    const trialEndDate = new Date(trialStartDate.getTime() + (30 * 24 * 60 * 60 * 1000));
+
+    await dbQuery(`
+      UPDATE organizations
+      SET
+        is_trial = true,
+        trial_status = 'active',
+        trial_expires_at = $1
+      WHERE id = $2
+    `, [trialEndDate, organization.id]);
+
+    console.log(`✅ Trial period set: expires ${trialEndDate.toISOString()}`);
+
+    // Create trial signup record with credentials and trial dates
+
     const result = await dbQuery(`
       INSERT INTO trial_signups (
         first_name, last_name, email, company, website, phone,
         industry, team_size, utm_source, utm_campaign, utm_medium,
         utm_term, utm_content, status, converted_organization_id,
-        organization_slug, generated_password, converted_at, credentials_sent_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW(), NOW())
+        organization_slug, generated_password, converted_at, credentials_sent_at,
+        trial_start_date, trial_end_date
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW(), NOW(), $18, $19)
       RETURNING *
     `, [
       first_name,
@@ -105,7 +122,9 @@ router.post('/trial-signup', async (req, res) => {
       'converted', // Status is now 'converted' since org is created
       organization.id,
       organizationSlug,
-      generatedPassword
+      generatedPassword,
+      trialStartDate,
+      trialEndDate
     ]);
 
     const trialSignup = new TrialSignup(result.rows[0]);
@@ -308,6 +327,14 @@ router.get('/trial-signups', platformAuth, async (req, res) => {
         notes: signup.notes,
         converted_organization_id: signup.converted_organization_id,
         converted_at: signup.converted_at,
+        trial_start_date: signup.trial_start_date,
+        trial_end_date: signup.trial_end_date,
+        trial_extended: signup.trial_extended,
+        trial_extension_count: signup.trial_extension_count,
+        days_remaining: signup.daysRemaining,
+        is_expired: signup.isExpired,
+        trial_urgency_color: signup.trialUrgencyColor,
+        can_extend: signup.canExtend,
         created_at: signup.created_at,
         is_recent: signup.isRecent,
         status_color: signup.statusColor
@@ -425,6 +452,87 @@ router.put('/trial-signups/:id/notes', platformAuth, async (req, res) => {
     console.error('Error adding notes to trial signup:', error);
     res.status(500).json({
       error: 'Internal server error'
+    });
+  }
+});
+
+// PUT /api/platform/trial-signups/:id/extend - Extend trial period
+router.put('/trial-signups/:id/extend', platformAuth, async (req, res) => {
+  try {
+    const { extension_days = 30 } = req.body;
+    const signupId = req.params.id;
+
+    // Check if signup exists
+    const signup = await TrialSignup.findById(signupId);
+    if (!signup) {
+      return res.status(404).json({
+        error: 'Trial signup not found'
+      });
+    }
+
+    // Use the database function to extend trial
+    const { query: dbQuery } = require('../database/connection');
+    const result = await dbQuery(
+      'SELECT * FROM extend_trial($1, $2)',
+      [signupId, extension_days]
+    );
+
+    if (result.rows.length === 0) {
+      throw new Error('Failed to extend trial');
+    }
+
+    const { new_end_date, total_extensions } = result.rows[0];
+
+    res.json({
+      message: `Trial extended by ${extension_days} days`,
+      trial: {
+        id: signupId,
+        new_end_date,
+        total_extensions,
+        extension_days
+      }
+    });
+
+  } catch (error) {
+    console.error('Error extending trial:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error.message
+    });
+  }
+});
+
+// POST /api/platform/trial-signups/:id/archive - Archive expired trial
+router.post('/trial-signups/:id/archive', platformAuth, async (req, res) => {
+  try {
+    const signupId = req.params.id;
+
+    // Check if signup exists
+    const signup = await TrialSignup.findById(signupId);
+    if (!signup) {
+      return res.status(404).json({
+        error: 'Trial signup not found'
+      });
+    }
+
+    // Use the database function to archive trial
+    const { query: dbQuery } = require('../database/connection');
+    await dbQuery('SELECT archive_expired_trial($1)', [signupId]);
+
+    res.json({
+      message: 'Trial archived successfully',
+      archived: {
+        id: signupId,
+        email: signup.email,
+        company: signup.company
+      }
+    });
+
+  } catch (error) {
+    console.error('Error archiving trial:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error.message
     });
   }
 });

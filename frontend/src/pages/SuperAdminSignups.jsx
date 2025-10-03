@@ -5,7 +5,9 @@ import {
   useUpdateSignupStatus,
   useAddSignupNotes,
   useConvertSignup,
-  useDeleteSignup
+  useDeleteSignup,
+  useExtendTrial,
+  useArchiveTrial
 } from '../contexts/SuperAdminContext';
 import {
   Search,
@@ -71,6 +73,8 @@ function SignupCard({ signup, onUpdateStatus, onAddNotes, onConvert }) {
   const addNotesMutation = useAddSignupNotes();
   const convertMutation = useConvertSignup();
   const deleteMutation = useDeleteSignup();
+  const extendTrialMutation = useExtendTrial();
+  const archiveTrialMutation = useArchiveTrial();
 
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -204,6 +208,72 @@ function SignupCard({ signup, onUpdateStatus, onAddNotes, onConvert }) {
             <span>{formatDate(signup.created_at)}</span>
           </div>
         </div>
+
+        {/* Trial Info (if converted) */}
+        {signup.status === 'converted' && signup.trial_end_date && (
+          <div className={`mb-4 p-3 rounded-lg border ${
+            signup.trial_urgency_color === 'red' ? 'bg-red-50 border-red-200' :
+            signup.trial_urgency_color === 'yellow' ? 'bg-yellow-50 border-yellow-200' :
+            'bg-green-50 border-green-200'
+          }`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="text-sm">
+                  <span className="font-medium text-gray-700">Trial: </span>
+                  <span className={`font-semibold ${
+                    signup.trial_urgency_color === 'red' ? 'text-red-700' :
+                    signup.trial_urgency_color === 'yellow' ? 'text-yellow-700' :
+                    'text-green-700'
+                  }`}>
+                    {signup.is_expired ? 'Expired' : `${signup.days_remaining} days remaining`}
+                  </span>
+                </div>
+                <div className="text-xs text-gray-500">
+                  Ends: {formatDate(signup.trial_end_date)}
+                </div>
+                {signup.trial_extended && (
+                  <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                    Extended {signup.trial_extension_count}x
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center space-x-2">
+                {signup.can_extend && !signup.is_expired && (
+                  <button
+                    onClick={async () => {
+                      try {
+                        await extendTrialMutation.mutateAsync({ id: signup.id });
+                        toast.success('Trial extended by 30 days');
+                      } catch (error) {
+                        toast.error('Failed to extend trial');
+                      }
+                    }}
+                    disabled={extendTrialMutation.isPending}
+                    className="px-3 py-1 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                  >
+                    {extendTrialMutation.isPending ? 'Extending...' : 'Extend +30 Days'}
+                  </button>
+                )}
+                {signup.is_expired && (
+                  <button
+                    onClick={async () => {
+                      try {
+                        await archiveTrialMutation.mutateAsync(signup.id);
+                        toast.success('Trial archived');
+                      } catch (error) {
+                        toast.error('Failed to archive trial');
+                      }
+                    }}
+                    disabled={archiveTrialMutation.isPending}
+                    className="px-3 py-1 text-xs font-medium bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50"
+                  >
+                    {archiveTrialMutation.isPending ? 'Archiving...' : 'Archive'}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Actions */}
         <div className="flex items-center justify-between">
