@@ -908,6 +908,7 @@ router.delete('/organizations/:id', platformAuth, async (req, res) => {
 // POST /api/platform/organizations/:id/convert-to-paid - Convert trial to paid
 router.post('/organizations/:id/convert-to-paid', platformAuth, async (req, res) => {
   try {
+    const { query: dbQuery } = require('../database/connection');
     const organizationId = req.params.id;
     console.log(`💰 Converting trial to paid: ${organizationId}`);
 
