@@ -136,19 +136,93 @@ router.post('/',
   validateCreateUser,
   // checkLicenseLimit,
   async (req, res) => {
+    const { query: dbQuery } = require('../database/connection');
+
     try {
+      // Start transaction
+      await dbQuery('BEGIN');
+
+      // Get current org state
+      const orgResult = await dbQuery(`
+        SELECT id, max_users,
+          (SELECT COUNT(*) FROM users WHERE organization_id = $1 AND is_active = true) as current_user_count
+        FROM organizations
+        WHERE id = $1
+      `, [req.organizationId]);
+
+      const org = orgResult.rows[0];
+      const currentUserCount = parseInt(org.current_user_count);
+      const currentMaxUsers = org.max_users;
+
+      console.log(`📊 User creation check: ${currentUserCount} active users, max_users: ${currentMaxUsers}`);
+
+      // Check if we need to auto-increment max_users
+      let newMaxUsers = currentMaxUsers;
+      if (currentUserCount >= currentMaxUsers) {
+        // Auto-increment max_users to accommodate new user
+        newMaxUsers = currentUserCount + 1;
+
+        console.log(`🔄 Auto-incrementing max_users: ${currentMaxUsers} → ${newMaxUsers}`);
+
+        await dbQuery(`
+          UPDATE organizations
+          SET max_users = $1, updated_at = NOW()
+          WHERE id = $2
+        `, [newMaxUsers, req.organizationId]);
+
+        // Update subscription price if exists
+        const pricePerUser = 15;
+        const newMonthlyPrice = newMaxUsers * pricePerUser;
+
+        await dbQuery(`
+          UPDATE organization_subscriptions
+          SET updated_at = NOW()
+          WHERE organization_id = $1
+        `, [req.organizationId]).catch(() => {
+          console.log('No subscription record to update');
+        });
+
+        console.log(`💰 Updated pricing: ${currentMaxUsers} users × $${pricePerUser} = $${currentMaxUsers * pricePerUser} → ${newMaxUsers} users × $${pricePerUser} = $${newMonthlyPrice}`);
+      }
+
+      // Create the user
       const user = await User.create(req.body, req.organizationId, req.user.id);
+
+      // Verify final state
+      const verifyResult = await dbQuery(`
+        SELECT
+          max_users,
+          (SELECT COUNT(*) FROM users WHERE organization_id = $1 AND is_active = true) as actual_user_count
+        FROM organizations
+        WHERE id = $1
+      `, [req.organizationId]);
+
+      const finalState = verifyResult.rows[0];
+      const actualUsers = parseInt(finalState.actual_user_count);
+      const finalMaxUsers = finalState.max_users;
+
+      if (actualUsers > finalMaxUsers) {
+        throw new Error(`Data sync error: ${actualUsers} users but max_users is ${finalMaxUsers}`);
+      }
+
+      console.log(`✅ Verification passed: ${actualUsers} users <= ${finalMaxUsers} max_users`);
+
+      await dbQuery('COMMIT');
 
       res.status(201).json({
         message: 'User created successfully',
         user: user.toJSON(),
         license_info: {
-          remaining_seats: req.licenseInfo.available_seats - 1
+          max_users: finalMaxUsers,
+          current_users: actualUsers,
+          remaining_seats: finalMaxUsers - actualUsers,
+          auto_incremented: newMaxUsers > currentMaxUsers
         }
       });
     } catch (error) {
-      console.error('Create user error:', error);
-      
+      await dbQuery('ROLLBACK');
+      console.error('❌ Create user error:', error);
+
       if (error.message.includes('already exists')) {
         return res.status(409).json({
           error: 'User creation failed',
@@ -165,7 +239,7 @@ router.post('/',
 
       res.status(500).json({
         error: 'User creation failed',
-        message: 'Unable to create user'
+        message: error.message || 'Unable to create user'
       });
     }
   }
@@ -271,6 +345,8 @@ router.delete('/:id',
   validateUuidParam,
   requireAdmin,
   async (req, res) => {
+    const { query: dbQuery } = require('../database/connection');
+
     try {
       const targetUserId = req.params.id;
 
@@ -283,7 +359,7 @@ router.delete('/:id',
       }
 
       const success = await User.deactivate(targetUserId, req.organizationId);
-      
+
       if (!success) {
         return res.status(404).json({
           error: 'User not found',
@@ -291,8 +367,34 @@ router.delete('/:id',
         });
       }
 
+      // Verify consistency after deactivation
+      const verifyResult = await dbQuery(`
+        SELECT
+          max_users,
+          (SELECT COUNT(*) FROM users WHERE organization_id = $1 AND is_active = true) as actual_user_count
+        FROM organizations
+        WHERE id = $1
+      `, [req.organizationId]);
+
+      const state = verifyResult.rows[0];
+      const actualUsers = parseInt(state.actual_user_count);
+      const maxUsers = state.max_users;
+
+      console.log(`📊 After user deactivation: ${actualUsers} active users, max_users: ${maxUsers}`);
+
+      if (actualUsers > maxUsers) {
+        console.error(`⚠️  DATA SYNC WARNING: ${actualUsers} users but max_users is ${maxUsers}`);
+      } else {
+        console.log(`✅ Verification passed: ${actualUsers} users <= ${maxUsers} max_users`);
+      }
+
       res.json({
-        message: 'User deactivated successfully'
+        message: 'User deactivated successfully',
+        license_info: {
+          max_users: maxUsers,
+          current_users: actualUsers,
+          remaining_seats: maxUsers - actualUsers
+        }
       });
     } catch (error) {
       console.error('Deactivate user error:', error);
