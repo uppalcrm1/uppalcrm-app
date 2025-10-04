@@ -924,13 +924,14 @@ router.get('/organizations', platformAuth, async (req, res) => {
 
 // GET /api/platform/organizations/:id - Get detailed organization info
 router.get('/organizations/:id', platformAuth, async (req, res) => {
+  const { query: dbQuery } = require('../database/connection');
+
   try {
     const organizationId = req.params.id;
     console.log(`📋 Fetching detailed info for organization: ${organizationId}`);
 
-    const { query: dbQuery } = require('../database/connection');
-
     // Get organization details with user counts
+    console.log('Step 1: Fetching organization...');
     const orgResult = await dbQuery(`
       SELECT
         o.*,
@@ -943,12 +944,15 @@ router.get('/organizations/:id', platformAuth, async (req, res) => {
     `, [organizationId]);
 
     if (orgResult.rows.length === 0) {
+      console.log('❌ Organization not found');
       return res.status(404).json({ error: 'Organization not found' });
     }
 
     const org = orgResult.rows[0];
+    console.log(`✅ Found organization: ${org.name}`);
 
     // Get contacts and leads counts with error handling
+    console.log('Step 2: Fetching contacts and leads...');
     let contactsCount = 0;
     let leadsCount = 0;
 
@@ -957,8 +961,9 @@ router.get('/organizations/:id', platformAuth, async (req, res) => {
         SELECT COUNT(*) as count FROM contacts WHERE organization_id = $1
       `, [organizationId]);
       contactsCount = parseInt(contactsResult.rows[0].count) || 0;
+      console.log(`✅ Contacts count: ${contactsCount}`);
     } catch (error) {
-      console.log('Contacts table may not exist, setting count to 0');
+      console.log('⚠️ Contacts table may not exist, setting count to 0:', error.message);
     }
 
     try {
@@ -966,19 +971,26 @@ router.get('/organizations/:id', platformAuth, async (req, res) => {
         SELECT COUNT(*) as count FROM leads WHERE organization_id = $1
       `, [organizationId]);
       leadsCount = parseInt(leadsResult.rows[0].count) || 0;
+      console.log(`✅ Leads count: ${leadsCount}`);
     } catch (error) {
-      console.log('Leads table may not exist, setting count to 0');
+      console.log('⚠️ Leads table may not exist, setting count to 0:', error.message);
     }
 
     // Get subscription details if exists
-    const subscriptionResult = await dbQuery(`
-      SELECT * FROM organization_subscriptions
-      WHERE organization_id = $1
-      ORDER BY created_at DESC
-      LIMIT 1
-    `, [organizationId]);
-
-    const subscription = subscriptionResult.rows[0] || null;
+    console.log('Step 3: Fetching subscription...');
+    let subscription = null;
+    try {
+      const subscriptionResult = await dbQuery(`
+        SELECT * FROM organization_subscriptions
+        WHERE organization_id = $1
+        ORDER BY created_at DESC
+        LIMIT 1
+      `, [organizationId]);
+      subscription = subscriptionResult.rows[0] || null;
+      console.log(`✅ Subscription found: ${subscription ? 'yes' : 'no'}`);
+    } catch (error) {
+      console.log('⚠️ Error fetching subscription:', error.message);
+    }
 
     // Calculate pricing
     const pricePerUser = 15;
@@ -1002,14 +1014,17 @@ router.get('/organizations/:id', platformAuth, async (req, res) => {
     }
 
     // Get admin users
+    console.log('Step 4: Fetching admin users...');
     const adminUsers = await dbQuery(`
       SELECT id, email, first_name, last_name, role, created_at, last_login
       FROM users
       WHERE organization_id = $1 AND role = 'admin' AND is_active = true
       ORDER BY created_at ASC
     `, [organizationId]);
+    console.log(`✅ Found ${adminUsers.rows.length} admin users`);
 
-    res.json({
+    console.log('Step 5: Building response...');
+    const response = {
       organization: {
         id: org.id,
         name: org.name,
@@ -1059,13 +1074,18 @@ router.get('/organizations/:id', platformAuth, async (req, res) => {
         created_at: admin.created_at,
         last_login: admin.last_login
       }))
-    });
+    };
+
+    console.log('✅ Successfully built response, sending...');
+    res.json(response);
 
   } catch (error) {
     console.error('❌ Error fetching organization details:', error);
+    console.error('Error stack:', error.stack);
     res.status(500).json({
       error: 'Internal server error',
-      message: error.message
+      message: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });
