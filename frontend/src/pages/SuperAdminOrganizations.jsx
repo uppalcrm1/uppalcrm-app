@@ -315,10 +315,45 @@ function OrganizationCard({ organization }) {
 export default function SuperAdminOrganizations() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all'); // all, trial, paid, expired
+  const [syncingLicenses, setSyncingLicenses] = useState(false);
   const { data, isLoading, error, refetch } = useSuperAdminOrganizations();
   const fixTrialDataMutation = useFixTrialData();
 
   const organizations = data?.organizations || [];
+
+  const handleSyncLicenses = async () => {
+    setSyncingLicenses(true);
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3004/api';
+      const token = localStorage.getItem('superAdminToken');
+
+      const response = await fetch(`${API_BASE_URL}/platform/sync-max-users`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        toast.success(data.message);
+        if (data.details && data.details.length > 0) {
+          console.log('🔄 Synced organizations:', data.details);
+        }
+        // Refresh the organizations list
+        refetch();
+      } else {
+        toast.error(data.message || 'Failed to sync licenses');
+      }
+    } catch (error) {
+      console.error('Error syncing licenses:', error);
+      toast.error('Failed to sync licenses');
+    } finally {
+      setSyncingLicenses(false);
+    }
+  };
 
   // Filter organizations based on search and type
   const filteredOrganizations = useMemo(() => {
@@ -501,6 +536,15 @@ export default function SuperAdminOrganizations() {
             >
               <RefreshCw className="h-4 w-4" />
               <span>Refresh</span>
+            </button>
+
+            <button
+              onClick={handleSyncLicenses}
+              disabled={syncingLicenses}
+              className="px-4 py-2 text-white bg-indigo-600 border border-indigo-600 rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400 disabled:cursor-not-allowed flex items-center space-x-2"
+            >
+              <RefreshCw className={`h-4 w-4 ${syncingLicenses ? 'animate-spin' : ''}`} />
+              <span>{syncingLicenses ? 'Syncing...' : 'Sync Licenses'}</span>
             </button>
           </div>
         </div>
