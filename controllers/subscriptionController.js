@@ -55,67 +55,26 @@ class SubscriptionController {
         });
       }
 
-      // If organization is paid, check for subscription record
-      const subQuery = `
-        SELECT
-          os.*,
-          sp.name as plan_name,
-          sp.display_name as plan_display_name,
-          sp.description as plan_description,
-          sp.monthly_price,
-          sp.yearly_price,
-          sp.max_users,
-          sp.max_contacts,
-          sp.max_leads,
-          sp.max_storage_gb,
-          sp.max_api_calls_per_month,
-          sp.max_custom_fields,
-          sp.features,
-          sp.trial_days
-        FROM organization_subscriptions os
-        JOIN subscription_plans sp ON sp.id = os.subscription_plan_id
-        WHERE os.organization_id = $1
-      `;
-
-      const result = await dbQuery(subQuery, [organizationId]);
-
-      if (result.rows.length === 0) {
-        // Paid org but no subscription record - return basic info
-        const usage = await this.getCurrentUsage(organizationId);
-
-        return res.json({
-          subscription: {
-            status: 'active',
-            plan_name: org.subscription_plan || 'starter',
-            plan_display_name: (org.subscription_plan || 'starter').charAt(0).toUpperCase() + (org.subscription_plan || 'starter').slice(1),
-            max_users: org.max_users,
-            is_trial: false
-          },
-          usage,
-          limits: {
-            users: org.max_users,
-            contacts: null,
-            leads: null,
-            storage_gb: null,
-            api_calls_per_month: null,
-            custom_fields: null
-          }
-        });
-      }
-
-      const subscription = result.rows[0];
+      // If organization is paid/converted, return basic info
+      // (We don't use organization_subscriptions table for manual conversions)
       const usage = await this.getCurrentUsage(organizationId);
 
-      res.json({
-        subscription,
+      return res.json({
+        subscription: {
+          status: 'active',
+          plan_name: org.subscription_plan || 'starter',
+          plan_display_name: (org.subscription_plan || 'starter').charAt(0).toUpperCase() + (org.subscription_plan || 'starter').slice(1),
+          max_users: org.max_users,
+          is_trial: false
+        },
         usage,
         limits: {
-          users: subscription.max_users,
-          contacts: subscription.max_contacts,
-          leads: subscription.max_leads,
-          storage_gb: subscription.max_storage_gb,
-          api_calls_per_month: subscription.max_api_calls_per_month,
-          custom_fields: subscription.max_custom_fields
+          users: org.max_users,
+          contacts: null,
+          leads: null,
+          storage_gb: null,
+          api_calls_per_month: null,
+          custom_fields: null
         }
       });
     } catch (error) {
