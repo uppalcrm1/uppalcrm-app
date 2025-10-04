@@ -6,8 +6,57 @@ class SubscriptionController {
   async getOrganizationSubscription(req, res) {
     try {
       const organizationId = req.user.organization_id;
+      const { query: dbQuery } = require('../database/connection');
 
-      const query = `
+      // First, check if organization is on trial
+      const orgResult = await dbQuery(`
+        SELECT
+          id,
+          name,
+          subscription_plan,
+          is_trial,
+          trial_status,
+          trial_expires_at,
+          max_users,
+          EXTRACT(DAY FROM (trial_expires_at - NOW()))::INTEGER as days_remaining
+        FROM organizations
+        WHERE id = $1
+      `, [organizationId]);
+
+      if (orgResult.rows.length === 0) {
+        return res.status(404).json({ error: 'Organization not found' });
+      }
+
+      const org = orgResult.rows[0];
+
+      // If organization is on trial
+      if (org.is_trial && org.trial_status === 'active') {
+        const usage = await this.getCurrentUsage(organizationId);
+
+        return res.json({
+          subscription: {
+            status: 'trial',
+            plan_name: org.subscription_plan || 'starter',
+            plan_display_name: (org.subscription_plan || 'starter').charAt(0).toUpperCase() + (org.subscription_plan || 'starter').slice(1),
+            trial_ends_at: org.trial_expires_at,
+            days_remaining: Math.max(0, org.days_remaining || 0),
+            max_users: org.max_users,
+            is_trial: true
+          },
+          usage,
+          limits: {
+            users: org.max_users,
+            contacts: null, // Unlimited for trial
+            leads: null,
+            storage_gb: null,
+            api_calls_per_month: null,
+            custom_fields: null
+          }
+        });
+      }
+
+      // If organization is paid, check for subscription record
+      const subQuery = `
         SELECT
           os.*,
           sp.name as plan_name,
@@ -28,15 +77,33 @@ class SubscriptionController {
         WHERE os.organization_id = $1
       `;
 
-      const result = await query(query, [organizationId]);
+      const result = await dbQuery(subQuery, [organizationId]);
 
       if (result.rows.length === 0) {
-        return res.status(404).json({ error: 'No subscription found for organization' });
+        // Paid org but no subscription record - return basic info
+        const usage = await this.getCurrentUsage(organizationId);
+
+        return res.json({
+          subscription: {
+            status: 'active',
+            plan_name: org.subscription_plan || 'starter',
+            plan_display_name: (org.subscription_plan || 'starter').charAt(0).toUpperCase() + (org.subscription_plan || 'starter').slice(1),
+            max_users: org.max_users,
+            is_trial: false
+          },
+          usage,
+          limits: {
+            users: org.max_users,
+            contacts: null,
+            leads: null,
+            storage_gb: null,
+            api_calls_per_month: null,
+            custom_fields: null
+          }
+        });
       }
 
       const subscription = result.rows[0];
-
-      // Get current usage
       const usage = await this.getCurrentUsage(organizationId);
 
       res.json({
