@@ -8,13 +8,19 @@ import {
   Zap,
   AlertTriangle,
   DollarSign,
-  CheckCircle
+  CheckCircle,
+  Plus,
+  Minus
 } from 'lucide-react';
 
 const SubscriptionManagement = () => {
   const [subscription, setSubscription] = useState(null);
   const [usage, setUsage] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showLicenseModal, setShowLicenseModal] = useState(false);
+  const [licenseAction, setLicenseAction] = useState(null); // 'add' or 'remove'
+  const [licenseQuantity, setLicenseQuantity] = useState(1);
+  const [processingLicense, setProcessingLicense] = useState(false);
 
   useEffect(() => {
     fetchSubscriptionData();
@@ -50,6 +56,44 @@ const SubscriptionManagement = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleLicenseChange = async () => {
+    if (!licenseAction || licenseQuantity < 1) return;
+
+    setProcessingLicense(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/organizations/current/licenses`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          action: licenseAction,
+          quantity: licenseQuantity
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        alert(`✅ ${data.message}\n\nNew monthly cost: $${data.pricing.new_monthly_cost}`);
+        setShowLicenseModal(false);
+        setLicenseQuantity(1);
+        fetchSubscriptionData(); // Refresh data
+      } else {
+        alert(`❌ ${data.error}\n${data.message}`);
+      }
+    } catch (error) {
+      console.error('Error updating licenses:', error);
+      alert('Failed to update licenses. Please try again.');
+    } finally {
+      setProcessingLicense(false);
+    }
+  };
+
+  const openLicenseModal = (action) => {
+    setLicenseAction(action);
+    setLicenseQuantity(1);
+    setShowLicenseModal(true);
   };
 
   const getUsagePercentage = (current, limit) => {
@@ -263,6 +307,169 @@ const SubscriptionManagement = () => {
             )}
           </div>
         </div>
+
+        {/* Manage Licenses Section - Only for paid subscriptions */}
+        {!isTrial && subscription && (
+          <div className="bg-white rounded-lg shadow-sm border mb-8">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-medium text-gray-900 flex items-center">
+                <Users className="w-5 h-5 mr-2" />
+                Manage Licenses
+              </h2>
+            </div>
+            <div className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Current Licenses */}
+                <div className="bg-gray-50 p-6 rounded-lg">
+                  <h3 className="text-sm font-medium text-gray-700 mb-4">Current Licenses</h3>
+                  <div className="flex items-baseline space-x-2 mb-2">
+                    <span className="text-4xl font-bold text-gray-900">{subscription.max_users}</span>
+                    <span className="text-gray-600">users</span>
+                  </div>
+                  <div className="mt-4 space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">In use:</span>
+                      <span className="font-semibold">{usage?.users_count || 0} users</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Available:</span>
+                      <span className="font-semibold text-green-600">
+                        {(subscription.max_users || 0) - (usage?.users_count || 0)} seats
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* License Actions */}
+                <div className="space-y-4">
+                  <div>
+                    <button
+                      onClick={() => openLicenseModal('add')}
+                      className="w-full flex items-center justify-center space-x-2 bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      <Plus className="w-5 h-5" />
+                      <span>Add Licenses</span>
+                    </button>
+                    <p className="text-xs text-gray-500 mt-2 text-center">
+                      Add more users to your subscription
+                    </p>
+                  </div>
+
+                  {((subscription.max_users || 0) - (usage?.users_count || 0)) > 0 && (
+                    <div>
+                      <button
+                        onClick={() => openLicenseModal('remove')}
+                        className="w-full flex items-center justify-center space-x-2 bg-gray-200 text-gray-700 px-4 py-3 rounded-lg hover:bg-gray-300 transition-colors"
+                      >
+                        <Minus className="w-5 h-5" />
+                        <span>Remove Licenses</span>
+                      </button>
+                      <p className="text-xs text-gray-500 mt-2 text-center">
+                        Remove unused licenses
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Pricing Info */}
+              <div className="mt-6 bg-blue-50 p-4 rounded-lg">
+                <p className="text-sm text-gray-700">
+                  <strong>How it works:</strong> Adding licenses = +$15/month per user.
+                  Removing licenses = -$15/month per user. Changes take effect immediately.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* License Change Modal */}
+        {showLicenseModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                {licenseAction === 'add' ? 'Add' : 'Remove'} Licenses
+              </h3>
+
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Number of licenses to {licenseAction}:
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={licenseQuantity}
+                  onChange={(e) => setLicenseQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              {/* Price Preview */}
+              <div className="bg-gray-50 p-4 rounded-lg mb-6">
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Current licenses:</span>
+                    <span className="font-semibold">{subscription.max_users} users</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">{licenseAction === 'add' ? 'Adding' : 'Removing'}:</span>
+                    <span className="font-semibold">
+                      {licenseAction === 'add' ? '+' : '-'}{licenseQuantity} users
+                    </span>
+                  </div>
+                  <div className="flex justify-between pt-2 border-t border-gray-200">
+                    <span className="font-semibold">New licenses:</span>
+                    <span className="font-bold text-blue-600">
+                      {licenseAction === 'add'
+                        ? subscription.max_users + licenseQuantity
+                        : subscription.max_users - licenseQuantity} users
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-blue-50 p-4 rounded-lg mb-6">
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-700">Current cost:</span>
+                    <span className="font-semibold">${subscription.monthly_price || (subscription.max_users * 15)}/month</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-700">Change:</span>
+                    <span className={`font-semibold ${licenseAction === 'add' ? 'text-red-600' : 'text-green-600'}`}>
+                      {licenseAction === 'add' ? '+' : '-'}${licenseQuantity * 15}/month
+                    </span>
+                  </div>
+                  <div className="flex justify-between pt-2 border-t border-blue-200">
+                    <span className="font-bold">New monthly cost:</span>
+                    <span className="font-bold text-blue-600">
+                      ${licenseAction === 'add'
+                        ? (subscription.monthly_price || (subscription.max_users * 15)) + (licenseQuantity * 15)
+                        : (subscription.monthly_price || (subscription.max_users * 15)) - (licenseQuantity * 15)}/month
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => setShowLicenseModal(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                  disabled={processingLicense}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleLicenseChange}
+                  disabled={processingLicense}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {processingLicense ? 'Processing...' : 'Confirm'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Usage Overview */}
         {usage && (

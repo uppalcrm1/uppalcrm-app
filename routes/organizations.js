@@ -574,6 +574,226 @@ router.put('/current/settings',
 );
 
 /**
+ * PUT /organizations/current/licenses
+ * Manage organization licenses (add/remove seats) - Admin only
+ */
+router.put('/current/licenses',
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const { action, quantity } = req.body;
+      const { query: dbQuery } = require('../database/connection');
+
+      // Validate input
+      if (!action || !['add', 'remove'].includes(action)) {
+        return res.status(400).json({
+          error: 'Invalid action',
+          message: 'Action must be "add" or "remove"'
+        });
+      }
+
+      if (!quantity || quantity < 1 || !Number.isInteger(quantity)) {
+        return res.status(400).json({
+          error: 'Invalid quantity',
+          message: 'Quantity must be a positive integer'
+        });
+      }
+
+      console.log(`🎫 License ${action}: ${quantity} seats for organization ${req.organizationId}`);
+
+      // Get current organization state
+      const orgResult = await dbQuery(`
+        SELECT id, name, max_users, is_trial, trial_status
+        FROM organizations
+        WHERE id = $1
+      `, [req.organizationId]);
+
+      if (orgResult.rows.length === 0) {
+        return res.status(404).json({
+          error: 'Organization not found'
+        });
+      }
+
+      const org = orgResult.rows[0];
+
+      // Get current active user count
+      const userCountResult = await dbQuery(`
+        SELECT COUNT(*) as active_users
+        FROM users
+        WHERE organization_id = $1 AND is_active = true
+      `, [req.organizationId]);
+
+      const currentUsers = parseInt(userCountResult.rows[0].active_users);
+      const currentMaxUsers = org.max_users;
+      let newMaxUsers;
+
+      if (action === 'add') {
+        newMaxUsers = currentMaxUsers + quantity;
+      } else {
+        // Remove licenses
+        newMaxUsers = currentMaxUsers - quantity;
+
+        // Validate: can't remove licenses if users are occupying them
+        if (newMaxUsers < currentUsers) {
+          return res.status(400).json({
+            error: 'Cannot remove licenses',
+            message: `You have ${currentUsers} active users. Cannot reduce licenses below current usage.`,
+            details: {
+              current_users: currentUsers,
+              current_max: currentMaxUsers,
+              requested_new_max: newMaxUsers
+            }
+          });
+        }
+
+        // Minimum 1 license
+        if (newMaxUsers < 1) {
+          return res.status(400).json({
+            error: 'Invalid license count',
+            message: 'Organization must have at least 1 license'
+          });
+        }
+      }
+
+      // Calculate pricing
+      const pricePerUser = 15;
+      const oldMonthlyPrice = currentMaxUsers * pricePerUser;
+      const newMonthlyPrice = newMaxUsers * pricePerUser;
+      const priceDifference = newMonthlyPrice - oldMonthlyPrice;
+
+      // Update organization max_users
+      await dbQuery(`
+        UPDATE organizations
+        SET max_users = $1, updated_at = NOW()
+        WHERE id = $2
+      `, [newMaxUsers, req.organizationId]);
+
+      console.log(`✅ Updated max_users: ${currentMaxUsers} → ${newMaxUsers}`);
+
+      // Update subscription record if exists
+      await dbQuery(`
+        UPDATE organization_subscriptions
+        SET updated_at = NOW()
+        WHERE organization_id = $1
+      `, [req.organizationId]).catch(() => {
+        console.log('No subscription record to update');
+      });
+
+      // Get admin user for email notification
+      const adminResult = await dbQuery(`
+        SELECT email, first_name, last_name
+        FROM users
+        WHERE organization_id = $1 AND role = 'admin' AND is_active = true
+        LIMIT 1
+      `, [req.organizationId]);
+
+      // Send email notification
+      if (adminResult.rows.length > 0) {
+        const admin = adminResult.rows[0];
+        const emailService = require('../services/emailService');
+
+        try {
+          await emailService.sendEmail({
+            to: admin.email,
+            subject: `License ${action === 'add' ? 'Added' : 'Removed'} - Subscription Updated`,
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #4F46E5;">Subscription Updated</h2>
+                <p>Hi ${admin.first_name},</p>
+                <p>Your subscription for <strong>${org.name}</strong> has been updated.</p>
+
+                <div style="background-color: #F3F4F6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                  <h3 style="margin-top: 0; color: #059669;">License Change</h3>
+                  <table style="width: 100%; border-collapse: collapse;">
+                    <tr>
+                      <td style="padding: 8px 0; border-bottom: 1px solid #E5E7EB;">Previous Licenses:</td>
+                      <td style="padding: 8px 0; border-bottom: 1px solid #E5E7EB; text-align: right; font-weight: bold;">${currentMaxUsers} users</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px 0; border-bottom: 1px solid #E5E7EB;">${action === 'add' ? 'Added' : 'Removed'}:</td>
+                      <td style="padding: 8px 0; border-bottom: 1px solid #E5E7EB; text-align: right; font-weight: bold;">${action === 'add' ? '+' : '-'}${quantity} users</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 12px 0; font-weight: bold;">New Licenses:</td>
+                      <td style="padding: 12px 0; text-align: right; font-weight: bold; color: #059669;">${newMaxUsers} users</td>
+                    </tr>
+                  </table>
+                </div>
+
+                <div style="background-color: #EFF6FF; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                  <h3 style="margin-top: 0; color: #3B82F6;">Pricing Update</h3>
+                  <table style="width: 100%; border-collapse: collapse;">
+                    <tr>
+                      <td style="padding: 8px 0; border-bottom: 1px solid #DBEAFE;">Previous Monthly Cost:</td>
+                      <td style="padding: 8px 0; border-bottom: 1px solid #DBEAFE; text-align: right;">$${oldMonthlyPrice}/month</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px 0; border-bottom: 1px solid #DBEAFE;">New Monthly Cost:</td>
+                      <td style="padding: 8px 0; border-bottom: 1px solid #DBEAFE; text-align: right; font-weight: bold;">$${newMonthlyPrice}/month</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 12px 0; font-weight: bold;">Difference:</td>
+                      <td style="padding: 12px 0; text-align: right; font-weight: bold; color: ${priceDifference > 0 ? '#DC2626' : '#059669'};">
+                        ${priceDifference > 0 ? '+' : ''}$${priceDifference}/month
+                      </td>
+                    </tr>
+                  </table>
+                  <p style="font-size: 14px; color: #6B7280; margin-top: 12px;">
+                    Price calculation: ${newMaxUsers} users × $${pricePerUser}/user = $${newMonthlyPrice}/month
+                  </p>
+                </div>
+
+                <p style="margin-top: 30px;">
+                  <a href="${process.env.FRONTEND_URL || 'https://uppalcrm.com'}/subscription"
+                     style="background-color: #4F46E5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                    View Subscription Details
+                  </a>
+                </p>
+
+                <hr style="border: none; border-top: 1px solid #E5E7EB; margin: 30px 0;">
+
+                <p style="color: #6B7280; font-size: 14px;">
+                  Questions? Contact our support team at support@uppalcrm.com
+                </p>
+              </div>
+            `
+          });
+          console.log(`✅ License change notification sent to ${admin.email}`);
+        } catch (emailError) {
+          console.error('⚠️  Failed to send license change notification:', emailError);
+          // Don't fail the request if email fails
+        }
+      }
+
+      res.json({
+        message: `Successfully ${action === 'add' ? 'added' : 'removed'} ${quantity} license(s)`,
+        licenses: {
+          previous_max_users: currentMaxUsers,
+          new_max_users: newMaxUsers,
+          current_active_users: currentUsers,
+          available_seats: newMaxUsers - currentUsers
+        },
+        pricing: {
+          price_per_user: pricePerUser,
+          previous_monthly_cost: oldMonthlyPrice,
+          new_monthly_cost: newMonthlyPrice,
+          monthly_difference: priceDifference
+        }
+      });
+
+    } catch (error) {
+      console.error('❌ Error managing licenses:', error);
+      console.error('Error details:', error.stack);
+      res.status(500).json({
+        error: 'License management failed',
+        message: 'Unable to update licenses',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+);
+
+/**
  * DELETE /organizations/current
  * Deactivate organization (admin only) - Use with extreme caution
  */
@@ -591,7 +811,7 @@ router.delete('/current',
       }
 
       const success = await Organization.deactivate(req.organizationId);
-      
+
       if (!success) {
         return res.status(404).json({
           error: 'Organization not found',
