@@ -36,7 +36,15 @@ class SubscriptionController {
       // If organization is on trial
       if (org.is_trial && org.trial_status === 'active') {
         console.log('📊 Returning trial subscription data');
-        const usage = await this.getCurrentUsage(organizationId);
+
+        // Get usage directly
+        const usageResult = await dbQuery(`
+          SELECT
+            (SELECT COUNT(*) FROM users WHERE organization_id = $1 AND is_active = true) as users_count,
+            (SELECT COUNT(*) FROM contacts WHERE organization_id = $1) as contacts_count,
+            (SELECT COUNT(*) FROM leads WHERE organization_id = $1) as leads_count
+        `, [organizationId]);
+        const usage = usageResult.rows[0] || { users_count: 0, contacts_count: 0, leads_count: 0 };
 
         return res.json({
           subscription: {
@@ -63,7 +71,15 @@ class SubscriptionController {
       // If organization is paid/converted, return basic info
       // (We don't use organization_subscriptions table for manual conversions)
       console.log('📊 Returning paid/converted subscription data');
-      const usage = await this.getCurrentUsage(organizationId);
+
+      // Get usage directly
+      const usageResult = await dbQuery(`
+        SELECT
+          (SELECT COUNT(*) FROM users WHERE organization_id = $1 AND is_active = true) as users_count,
+          (SELECT COUNT(*) FROM contacts WHERE organization_id = $1) as contacts_count,
+          (SELECT COUNT(*) FROM leads WHERE organization_id = $1) as leads_count
+      `, [organizationId]);
+      const usage = usageResult.rows[0] || { users_count: 0, contacts_count: 0, leads_count: 0 };
       console.log('📊 Usage data:', usage);
 
       return res.json({
