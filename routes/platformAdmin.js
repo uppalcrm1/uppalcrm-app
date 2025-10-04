@@ -818,8 +818,12 @@ router.get('/organizations', platformAuth, async (req, res) => {
       throw new Error('Organization.getAll is not a function');
     }
 
-    const organizations = await Organization.getAll();
-    console.log(`✅ Found ${organizations.length} organizations`);
+    const allOrganizations = await Organization.getAll();
+    console.log(`✅ Found ${allOrganizations.length} total organizations`);
+
+    // Filter to only show paid organizations (is_trial = false)
+    const organizations = allOrganizations.filter(org => org.is_trial === false);
+    console.log(`📊 Showing ${organizations.length} paid organizations (filtered out ${allOrganizations.length - organizations.length} trial orgs)`);
 
     const formattedOrgs = organizations.map(org => {
       // Calculate days remaining for trials

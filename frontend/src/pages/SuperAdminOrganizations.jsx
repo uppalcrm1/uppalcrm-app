@@ -314,7 +314,6 @@ function OrganizationCard({ organization }) {
 
 export default function SuperAdminOrganizations() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState('all'); // all, trial, paid, expired
   const [syncingLicenses, setSyncingLicenses] = useState(false);
   const { data, isLoading, error, refetch } = useSuperAdminOrganizations();
   const fixTrialDataMutation = useFixTrialData();
@@ -355,18 +354,9 @@ export default function SuperAdminOrganizations() {
     }
   };
 
-  // Filter organizations based on search and type
+  // Filter organizations based on search only (backend already filters to paid orgs only)
   const filteredOrganizations = useMemo(() => {
     let filtered = organizations;
-
-    // Apply type filter
-    if (filterType === 'trial') {
-      filtered = filtered.filter(org => org.is_trial && org.trial_status === 'active');
-    } else if (filterType === 'paid') {
-      filtered = filtered.filter(org => !org.is_trial || org.trial_status === 'converted');
-    } else if (filterType === 'expired') {
-      filtered = filtered.filter(org => org.is_trial && org.trial_status === 'expired');
-    }
 
     // Apply search filter
     if (searchTerm) {
@@ -378,7 +368,7 @@ export default function SuperAdminOrganizations() {
     }
 
     return filtered;
-  }, [organizations, searchTerm, filterType]);
+  }, [organizations, searchTerm]);
 
   const stats = {
     total: organizations.length,
@@ -410,8 +400,8 @@ export default function SuperAdminOrganizations() {
       {/* Header */}
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Organizations <span className="text-xs text-green-600 font-normal">(v1.0.2)</span></h1>
-          <p className="text-gray-600">Manage all organizations in the platform</p>
+          <h1 className="text-2xl font-bold text-gray-900">Paid Organizations <span className="text-xs text-green-600 font-normal">(v1.0.2)</span></h1>
+          <p className="text-gray-600">Organizations that have upgraded from trial to paid subscriptions</p>
         </div>
 
         {stats.trial === 0 && stats.total > 0 && (
@@ -453,11 +443,11 @@ export default function SuperAdminOrganizations() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Total Organizations</p>
+              <p className="text-sm text-gray-600">Total Paid Organizations</p>
               <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
             </div>
             <Building2 className="h-8 w-8 text-gray-400" />
@@ -466,28 +456,10 @@ export default function SuperAdminOrganizations() {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Active Trials</p>
-              <p className="text-2xl font-bold text-yellow-600">{stats.trial}</p>
+              <p className="text-sm text-gray-600">Active Paid Orgs</p>
+              <p className="text-2xl font-bold text-green-600">{stats.active}</p>
             </div>
-            <Clock className="h-8 w-8 text-yellow-400" />
-          </div>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Paid Organizations</p>
-              <p className="text-2xl font-bold text-purple-600">{stats.paid}</p>
-            </div>
-            <ArrowUp className="h-8 w-8 text-purple-400" />
-          </div>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Expired Trials</p>
-              <p className="text-2xl font-bold text-gray-600">{stats.expired}</p>
-            </div>
-            <AlertTriangle className="h-8 w-8 text-gray-400" />
+            <ArrowUp className="h-8 w-8 text-green-400" />
           </div>
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
@@ -516,20 +488,6 @@ export default function SuperAdminOrganizations() {
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="relative">
-              <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <select
-                value={filterType}
-                onChange={(e) => setFilterType(e.target.value)}
-                className="pl-10 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white appearance-none cursor-pointer"
-              >
-                <option value="all">All Organizations</option>
-                <option value="trial">Trial Only ({stats.trial})</option>
-                <option value="paid">Paid Only ({stats.paid})</option>
-                <option value="expired">Expired Trials ({stats.expired})</option>
-              </select>
-            </div>
-
             <button
               onClick={() => refetch()}
               className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center space-x-2"
@@ -548,24 +506,6 @@ export default function SuperAdminOrganizations() {
             </button>
           </div>
         </div>
-
-        {/* Active Filter Indicator */}
-        {filterType !== 'all' && (
-          <div className="mt-3 flex items-center gap-2">
-            <span className="text-sm text-gray-600">Showing:</span>
-            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-indigo-100 text-indigo-800">
-              {filterType === 'trial' && `Active Trials (${filteredOrganizations.length})`}
-              {filterType === 'paid' && `Paid Organizations (${filteredOrganizations.length})`}
-              {filterType === 'expired' && `Expired Trials (${filteredOrganizations.length})`}
-            </span>
-            <button
-              onClick={() => setFilterType('all')}
-              className="text-sm text-indigo-600 hover:text-indigo-800"
-            >
-              Clear filter
-            </button>
-          </div>
-        )}
       </div>
 
       {/* Organizations List */}
@@ -574,7 +514,10 @@ export default function SuperAdminOrganizations() {
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
             <Building2 className="h-12 w-12 text-gray-400 mx-auto mb-3" />
             <p className="text-gray-600">
-              {searchTerm ? 'No organizations match your search' : 'No organizations found'}
+              {searchTerm ? 'No paid organizations match your search' : 'No paid organizations yet'}
+            </p>
+            <p className="text-sm text-gray-500 mt-2">
+              Trial organizations appear in the Trial Signups tab until upgraded to paid
             </p>
           </div>
         ) : (
