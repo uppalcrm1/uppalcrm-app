@@ -154,10 +154,10 @@ export default function SuperAdminDashboard() {
           loading={isLoading}
         />
         <StatCard
-          title="Trial Conversions"
+          title="Trial Signups Provisioned"
           value={trialStats.total_conversions || 0}
           icon={TrendingUp}
-          change={`${trialStats.conversion_rate || 0}% conversion rate`}
+          change={`${trialStats.conversion_rate || 0}% provision rate`}
           changeType="positive"
           loading={isLoading}
         />
@@ -200,7 +200,7 @@ export default function SuperAdminDashboard() {
               <p className="text-2xl font-bold text-gray-900">
                 {isLoading ? '...' : (trialStats.converted_signups || 0)}
               </p>
-              <p className="text-sm text-gray-600">Converted</p>
+              <p className="text-sm text-gray-600">Provisioned</p>
             </div>
             <div className="text-center">
               <div className="h-12 w-12 bg-red-50 rounded-lg flex items-center justify-center mx-auto mb-2">

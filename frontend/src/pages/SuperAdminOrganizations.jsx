@@ -149,7 +149,7 @@ function OrganizationCard({ organization }) {
                 onClick={() => setShowConvertConfirm(true)}
                 className="px-3 py-1 text-xs font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
               >
-                Convert to Paid
+                Upgrade to Paid
               </button>
               <button
                 onClick={() => toast.info('Use Trial Signups page to extend trials')}
@@ -165,7 +165,7 @@ function OrganizationCard({ organization }) {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="flex items-center space-x-2 text-sm text-gray-600">
           <Users className="h-4 w-4" />
-          <span>{organization.active_user_count} / {organization.user_count} users</span>
+          <span>{organization.active_user_count} / {organization.max_users} users</span>
         </div>
         <div className="flex items-center space-x-2 text-sm text-gray-600">
           <Calendar className="h-4 w-4" />
@@ -182,11 +182,11 @@ function OrganizationCard({ organization }) {
         </div>
         <div>
           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-            organization.trial_status === 'expired' ? 'bg-gray-100 text-gray-800' :
-            organization.trial_status === 'active' ? 'bg-blue-100 text-blue-800' :
-            'bg-purple-100 text-purple-800'
+            organization.is_trial
+              ? 'bg-yellow-100 text-yellow-800'
+              : 'bg-green-100 text-green-800'
           }`}>
-            {organization.trial_status || 'Active'}
+            {organization.is_trial ? 'TRIAL' : 'PAID'}
           </span>
         </div>
       </div>
@@ -200,23 +200,23 @@ function OrganizationCard({ organization }) {
                 <CheckCircle className="h-5 w-5 text-green-600" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-gray-900">Convert to Paid Account</h3>
+                <h3 className="text-lg font-semibold text-gray-900">Upgrade to Paid Account</h3>
                 <p className="text-sm text-gray-500">Mark this organization as paid</p>
               </div>
             </div>
 
             <div className="mb-6">
               <p className="text-gray-700 mb-3">
-                Mark this organization as paid? This will:
+                Upgrade this trial organization to paid? This will:
               </p>
               <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 mb-3">
                 <p className="text-sm font-medium text-gray-900">{organization.name}</p>
                 <p className="text-sm text-gray-600">Slug: {organization.slug}</p>
-                <p className="text-sm text-gray-600">Plan: {organization.subscription_plan?.toUpperCase() || 'STARTER'}</p>
+                <p className="text-sm text-gray-600">Current: TRIAL → New: PAID</p>
               </div>
               <ul className="text-sm text-green-600 space-y-1">
                 <li>✓ Remove trial restrictions</li>
-                <li>✓ Set status to "Converted"</li>
+                <li>✓ Upgrade to paid subscription</li>
                 <li>✓ Send confirmation email to admin</li>
                 <li>✓ Grant full access to all features</li>
               </ul>
@@ -231,10 +231,10 @@ function OrganizationCard({ organization }) {
                 {convertToPaidMutation.isPending ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Converting...
+                    Upgrading...
                   </>
                 ) : (
-                  'Convert to Paid'
+                  'Upgrade to Paid'
                 )}
               </button>
               <button

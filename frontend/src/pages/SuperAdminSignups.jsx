@@ -36,7 +36,7 @@ const STATUS_OPTIONS = [
   { value: 'pending', label: 'Pending', color: 'yellow' },
   { value: 'contacted', label: 'Contacted', color: 'blue' },
   { value: 'qualified', label: 'Qualified', color: 'purple' },
-  { value: 'converted', label: 'Converted', color: 'green' },
+  { value: 'converted', label: 'Provisioned', color: 'green' },
   { value: 'rejected', label: 'Rejected', color: 'red' },
 ];
 
@@ -211,7 +211,7 @@ function SignupCard({ signup, onUpdateStatus, onAddNotes, onConvert }) {
           </div>
         </div>
 
-        {/* Trial Info (if converted) */}
+        {/* Trial Info (if provisioned) */}
         {signup.status === 'converted' && signup.trial_end_date && (
           <div className={`mb-4 p-3 rounded-lg border ${
             signup.trial_urgency_color === 'red' ? 'bg-red-50 border-red-200' :
@@ -248,9 +248,9 @@ function SignupCard({ signup, onUpdateStatus, onAddNotes, onConvert }) {
                     }
                     try {
                       await convertToPaidMutation.mutateAsync(signup.converted_organization_id);
-                      toast.success('Converted to paid account!');
+                      toast.success('Upgraded to paid account!');
                     } catch (error) {
-                      toast.error('Failed to convert to paid');
+                      toast.error('Failed to upgrade to paid');
                     }
                   }}
                   disabled={convertToPaidMutation.isPending}
@@ -603,7 +603,7 @@ export default function SuperAdminSignups() {
         </div>
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
           <div className="text-2xl font-bold text-green-600">{stats.converted}</div>
-          <div className="text-sm text-gray-600">Converted</div>
+          <div className="text-sm text-gray-600">Provisioned</div>
         </div>
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
           <div className="text-2xl font-bold text-red-600">{stats.rejected}</div>

@@ -274,8 +274,8 @@ router.get('/dashboard', platformAuth, async (req, res) => {
     const orgStats = {
       total: organizations.length,
       active: organizations.filter(org => org.is_active).length,
-      trial: organizations.filter(org => org.trial_status === 'active').length,
-      paid: organizations.filter(org => org.subscription_status === 'active').length
+      trial: organizations.filter(org => org.is_trial === true).length,
+      paid: organizations.filter(org => org.is_trial === false && org.is_active).length
     };
 
     res.json({
@@ -845,12 +845,22 @@ router.get('/organizations', platformAuth, async (req, res) => {
         }
       }
 
+      // Determine subscription_status based on is_trial and trial_status
+      let subscription_status = 'active';
+      if (org.is_trial) {
+        subscription_status = 'trial';
+        if (org.trial_status === 'expired') {
+          subscription_status = 'expired';
+        }
+      }
+
       return {
         id: org.id,
         name: org.name,
         slug: org.slug,
         domain: org.domain,
         subscription_plan: org.subscription_plan || 'free',
+        subscription_status: subscription_status,
         max_users: org.max_users || 10,
         is_active: org.is_active,
         is_trial: org.is_trial || false,
