@@ -242,12 +242,12 @@ function SignupCard({ signup, onUpdateStatus, onAddNotes, onConvert }) {
               <div className="flex items-center space-x-2">
                 <button
                   onClick={async () => {
-                    if (!signup.organization_id) {
-                      toast.error('Organization ID not found');
+                    if (!signup.converted_organization_id) {
+                      toast.error('Organization ID not found - ensure trial is converted to org first');
                       return;
                     }
                     try {
-                      await convertToPaidMutation.mutateAsync(signup.organization_id);
+                      await convertToPaidMutation.mutateAsync(signup.converted_organization_id);
                       toast.success('Converted to paid account!');
                     } catch (error) {
                       toast.error('Failed to convert to paid');
