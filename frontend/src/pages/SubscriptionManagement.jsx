@@ -27,9 +27,12 @@ const SubscriptionManagement = () => {
     fetchAvailablePlans();
   }, []);
 
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3004/api';
+
   const getAuthHeaders = () => ({
-    'Authorization': `Bearer ${localStorage.getItem('token')}`,
-    'Content-Type': 'application/json'
+    'Authorization': `Bearer ${localStorage.getItem('token') || localStorage.getItem('authToken')}`,
+    'Content-Type': 'application/json',
+    'X-Organization-Slug': localStorage.getItem('organizationSlug')
   });
 
   const fetchSubscriptionData = async () => {
@@ -37,7 +40,7 @@ const SubscriptionManagement = () => {
       setLoading(true);
 
       // Fetch subscription details
-      const subResponse = await fetch('/api/subscription', {
+      const subResponse = await fetch(`${API_BASE_URL}/subscription`, {
         headers: getAuthHeaders()
       });
 
@@ -48,7 +51,7 @@ const SubscriptionManagement = () => {
       }
 
       // Fetch billing preview
-      const billingResponse = await fetch('/api/subscription/billing/preview', {
+      const billingResponse = await fetch(`${API_BASE_URL}/subscription/billing/preview`, {
         headers: getAuthHeaders()
       });
 
@@ -65,7 +68,7 @@ const SubscriptionManagement = () => {
 
   const fetchAvailablePlans = async () => {
     try {
-      const response = await fetch('/api/subscription/plans', {
+      const response = await fetch(`${API_BASE_URL}/subscription/plans`, {
         headers: getAuthHeaders()
       });
 
@@ -83,7 +86,7 @@ const SubscriptionManagement = () => {
 
     setUpgrading(true);
     try {
-      const response = await fetch('/api/subscription', {
+      const response = await fetch(`${API_BASE_URL}/subscription`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
