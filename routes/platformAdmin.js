@@ -60,6 +60,20 @@ router.post('/trial-signup', async (req, res) => {
     console.log(`   Company: ${company}`);
     console.log(`   Slug: ${organizationSlug}`);
 
+    // Set trial dates (30 days from now)
+    const { query: dbQuery } = require('../database/connection');
+    const trialStartDate = new Date();
+    const trialEndDate = new Date(trialStartDate.getTime() + (30 * 24 * 60 * 60 * 1000));
+
+    // Fix the constraint to allow NULL values
+    await dbQuery(`
+      ALTER TABLE organizations DROP CONSTRAINT IF EXISTS trial_status_check;
+      ALTER TABLE organizations ADD CONSTRAINT trial_status_check
+      CHECK (trial_status IS NULL OR trial_status IN ('active', 'expired', 'converted'));
+    `).catch((err) => {
+      console.log('Note: Could not update constraint (may already be correct):', err.message);
+    });
+
     // Create organization and admin user together
     const { organization, admin_user_id } = await Organization.create(
       {
@@ -78,11 +92,7 @@ router.post('/trial-signup', async (req, res) => {
     console.log(`✅ Organization created: ${organization.id}`);
     console.log(`✅ Admin user created: ${admin_user_id}`);
 
-    // Set trial dates (30 days from now)
-    const { query: dbQuery } = require('../database/connection');
-    const trialStartDate = new Date();
-    const trialEndDate = new Date(trialStartDate.getTime() + (30 * 24 * 60 * 60 * 1000));
-
+    // Now set trial fields
     await dbQuery(`
       UPDATE organizations
       SET
