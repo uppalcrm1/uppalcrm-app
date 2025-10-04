@@ -275,16 +275,16 @@ const SubscriptionManagement = () => {
                   <div className="flex items-center justify-between mb-2\">
                     <Users className="w-5 h-5 text-blue-600\" />
                     <span className={`text-xs px-2 py-1 rounded-full ${
-                      getUsageStatus(usage.active_users, subscription.max_users) === 'critical' ? 'bg-red-100 text-red-800' :
-                      getUsageStatus(usage.active_users, subscription.max_users) === 'warning' ? 'bg-yellow-100 text-yellow-800' :
+                      getUsageStatus(usage.users_count, subscription.max_users) === 'critical' ? 'bg-red-100 text-red-800' :
+                      getUsageStatus(usage.users_count, subscription.max_users) === 'warning' ? 'bg-yellow-100 text-yellow-800' :
                       'bg-green-100 text-green-800'
                     }`}>
-                      {getUsageStatus(usage.active_users, subscription.max_users) === 'unlimited' ? 'Unlimited' :
-                       `${Math.round(getUsagePercentage(usage.active_users, subscription.max_users))}%`}
+                      {getUsageStatus(usage.users_count, subscription.max_users) === 'unlimited' ? 'Unlimited' :
+                       `${Math.round(getUsagePercentage(usage.users_count, subscription.max_users))}%`}
                     </span>
                   </div>
                   <h3 className="text-sm font-medium text-gray-900\">Active Users</h3>
-                  <p className="text-2xl font-bold text-gray-900\">{usage.active_users}</p>
+                  <p className="text-2xl font-bold text-gray-900\">{usage.users_count || 0}</p>
                   <p className="text-sm text-gray-500\">
                     {subscription.max_users ? `of ${subscription.max_users} limit` : 'Unlimited'}
                   </p>
@@ -292,12 +292,12 @@ const SubscriptionManagement = () => {
                     <div className="mt-2 w-full bg-gray-200 rounded-full h-2\">
                       <div
                         className={`h-2 rounded-full ${
-                          getUsageStatus(usage.active_users, subscription.max_users) === 'critical' ? 'bg-red-500' :
-                          getUsageStatus(usage.active_users, subscription.max_users) === 'warning' ? 'bg-yellow-500' :
+                          getUsageStatus(usage.users_count, subscription.max_users) === 'critical' ? 'bg-red-500' :
+                          getUsageStatus(usage.users_count, subscription.max_users) === 'warning' ? 'bg-yellow-500' :
                           'bg-blue-600'
                         }`}
                         style={{
-                          width: `${getUsagePercentage(usage.active_users, subscription.max_users)}%`
+                          width: `${getUsagePercentage(usage.users_count, subscription.max_users)}%`
                         }}
                       ></div>
                     </div>
@@ -309,16 +309,16 @@ const SubscriptionManagement = () => {
                   <div className="flex items-center justify-between mb-2\">
                     <Database className="w-5 h-5 text-green-600\" />
                     <span className={`text-xs px-2 py-1 rounded-full ${
-                      getUsageStatus(usage.total_contacts, subscription.max_contacts) === 'critical' ? 'bg-red-100 text-red-800' :
-                      getUsageStatus(usage.total_contacts, subscription.max_contacts) === 'warning' ? 'bg-yellow-100 text-yellow-800' :
+                      getUsageStatus(usage.contacts_count, subscription.max_contacts) === 'critical' ? 'bg-red-100 text-red-800' :
+                      getUsageStatus(usage.contacts_count, subscription.max_contacts) === 'warning' ? 'bg-yellow-100 text-yellow-800' :
                       'bg-green-100 text-green-800'
                     }`}>
-                      {getUsageStatus(usage.total_contacts, subscription.max_contacts) === 'unlimited' ? 'Unlimited' :
-                       `${Math.round(getUsagePercentage(usage.total_contacts, subscription.max_contacts))}%`}
+                      {getUsageStatus(usage.contacts_count, subscription.max_contacts) === 'unlimited' ? 'Unlimited' :
+                       `${Math.round(getUsagePercentage(usage.contacts_count, subscription.max_contacts))}%`}
                     </span>
                   </div>
                   <h3 className="text-sm font-medium text-gray-900\">Contacts</h3>
-                  <p className="text-2xl font-bold text-gray-900\">{usage.total_contacts}</p>
+                  <p className="text-2xl font-bold text-gray-900\">{usage.contacts_count || 0}</p>
                   <p className="text-sm text-gray-500\">
                     {subscription.max_contacts ? `of ${subscription.max_contacts} limit` : 'Unlimited'}
                   </p>
@@ -326,12 +326,12 @@ const SubscriptionManagement = () => {
                     <div className="mt-2 w-full bg-gray-200 rounded-full h-2\">
                       <div
                         className={`h-2 rounded-full ${
-                          getUsageStatus(usage.total_contacts, subscription.max_contacts) === 'critical' ? 'bg-red-500' :
-                          getUsageStatus(usage.total_contacts, subscription.max_contacts) === 'warning' ? 'bg-yellow-500' :
+                          getUsageStatus(usage.contacts_count, subscription.max_contacts) === 'critical' ? 'bg-red-500' :
+                          getUsageStatus(usage.contacts_count, subscription.max_contacts) === 'warning' ? 'bg-yellow-500' :
                           'bg-green-600'
                         }`}
                         style={{
-                          width: `${getUsagePercentage(usage.total_contacts, subscription.max_contacts)}%`
+                          width: `${getUsagePercentage(usage.contacts_count, subscription.max_contacts)}%`
                         }}
                       ></div>
                     </div>
@@ -343,16 +343,16 @@ const SubscriptionManagement = () => {
                   <div className="flex items-center justify-between mb-2\">
                     <Zap className="w-5 h-5 text-purple-600\" />
                     <span className={`text-xs px-2 py-1 rounded-full ${
-                      getUsageStatus(usage.total_leads, subscription.max_leads) === 'critical' ? 'bg-red-100 text-red-800' :
-                      getUsageStatus(usage.total_leads, subscription.max_leads) === 'warning' ? 'bg-yellow-100 text-yellow-800' :
+                      getUsageStatus(usage.leads_count, subscription.max_leads) === 'critical' ? 'bg-red-100 text-red-800' :
+                      getUsageStatus(usage.leads_count, subscription.max_leads) === 'warning' ? 'bg-yellow-100 text-yellow-800' :
                       'bg-green-100 text-green-800'
                     }`}>
-                      {getUsageStatus(usage.total_leads, subscription.max_leads) === 'unlimited' ? 'Unlimited' :
-                       `${Math.round(getUsagePercentage(usage.total_leads, subscription.max_leads))}%`}
+                      {getUsageStatus(usage.leads_count, subscription.max_leads) === 'unlimited' ? 'Unlimited' :
+                       `${Math.round(getUsagePercentage(usage.leads_count, subscription.max_leads))}%`}
                     </span>
                   </div>
                   <h3 className="text-sm font-medium text-gray-900\">Leads</h3>
-                  <p className="text-2xl font-bold text-gray-900\">{usage.total_leads}</p>
+                  <p className="text-2xl font-bold text-gray-900\">{usage.leads_count || 0}</p>
                   <p className="text-sm text-gray-500\">
                     {subscription.max_leads ? `of ${subscription.max_leads} limit` : 'Unlimited'}
                   </p>
@@ -360,50 +360,31 @@ const SubscriptionManagement = () => {
                     <div className="mt-2 w-full bg-gray-200 rounded-full h-2\">
                       <div
                         className={`h-2 rounded-full ${
-                          getUsageStatus(usage.total_leads, subscription.max_leads) === 'critical' ? 'bg-red-500' :
-                          getUsageStatus(usage.total_leads, subscription.max_leads) === 'warning' ? 'bg-yellow-500' :
+                          getUsageStatus(usage.leads_count, subscription.max_leads) === 'critical' ? 'bg-red-500' :
+                          getUsageStatus(usage.leads_count, subscription.max_leads) === 'warning' ? 'bg-yellow-500' :
                           'bg-purple-600'
                         }`}
                         style={{
-                          width: `${getUsagePercentage(usage.total_leads, subscription.max_leads)}%`
+                          width: `${getUsagePercentage(usage.leads_count, subscription.max_leads)}%`
                         }}
                       ></div>
                     </div>
                   )}
                 </div>
 
-                {/* Custom Fields */}
+                {/* Storage - Hide custom fields for now since we don't track it */}
                 <div className="bg-gray-50 p-4 rounded-lg\">
                   <div className="flex items-center justify-between mb-2\">
-                    <Settings className="w-5 h-5 text-orange-600\" />
-                    <span className={`text-xs px-2 py-1 rounded-full ${
-                      getUsageStatus(usage.custom_fields_used, subscription.max_custom_fields) === 'critical' ? 'bg-red-100 text-red-800' :
-                      getUsageStatus(usage.custom_fields_used, subscription.max_custom_fields) === 'warning' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-green-100 text-green-800'
-                    }`}>
-                      {getUsageStatus(usage.custom_fields_used, subscription.max_custom_fields) === 'unlimited' ? 'Unlimited' :
-                       `${Math.round(getUsagePercentage(usage.custom_fields_used, subscription.max_custom_fields))}%`}
+                    <Database className="w-5 h-5 text-orange-600\" />
+                    <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-800\">
+                      Unlimited
                     </span>
                   </div>
-                  <h3 className="text-sm font-medium text-gray-900\">Custom Fields</h3>
-                  <p className="text-2xl font-bold text-gray-900\">{usage.custom_fields_used}</p>
+                  <h3 className="text-sm font-medium text-gray-900\">Storage</h3>
+                  <p className="text-2xl font-bold text-gray-900\">-</p>
                   <p className="text-sm text-gray-500\">
-                    {subscription.max_custom_fields ? `of ${subscription.max_custom_fields} limit` : 'Unlimited'}
+                    Unlimited
                   </p>
-                  {subscription.max_custom_fields && (
-                    <div className="mt-2 w-full bg-gray-200 rounded-full h-2\">
-                      <div
-                        className={`h-2 rounded-full ${
-                          getUsageStatus(usage.custom_fields_used, subscription.max_custom_fields) === 'critical' ? 'bg-red-500' :
-                          getUsageStatus(usage.custom_fields_used, subscription.max_custom_fields) === 'warning' ? 'bg-yellow-500' :
-                          'bg-orange-600'
-                        }`}
-                        style={{
-                          width: `${getUsagePercentage(usage.custom_fields_used, subscription.max_custom_fields)}%`
-                        }}
-                      ></div>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
