@@ -65,9 +65,16 @@ router.post('/trial-signup', async (req, res) => {
     const trialStartDate = new Date();
     const trialEndDate = new Date(trialStartDate.getTime() + (30 * 24 * 60 * 60 * 1000));
 
-    // Fix the constraint to allow NULL values
+    // Fix the constraint and default value
     await dbQuery(`
+      -- Drop the old constraint
       ALTER TABLE organizations DROP CONSTRAINT IF EXISTS trial_status_check;
+
+      -- Set default to NULL instead of invalid value
+      ALTER TABLE organizations ALTER COLUMN trial_status DROP DEFAULT;
+      ALTER TABLE organizations ALTER COLUMN trial_status SET DEFAULT NULL;
+
+      -- Add new constraint that allows NULL
       ALTER TABLE organizations ADD CONSTRAINT trial_status_check
       CHECK (trial_status IS NULL OR trial_status IN ('active', 'expired', 'converted'));
     `).catch((err) => {
