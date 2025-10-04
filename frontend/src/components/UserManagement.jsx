@@ -20,7 +20,10 @@ const UserManagementSystem = () => {
   const [editingUser, setEditingUser] = useState(null);
   const [showAuditLog, setShowAuditLog] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-  
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [pendingUser, setPendingUser] = useState(null);
+  const [upgradingLicenses, setUpgradingLicenses] = useState(false);
+
   // Pagination and filtering
   const [page, setPage] = useState(1);
   const [limit] = useState(20);
@@ -159,7 +162,62 @@ const UserManagementSystem = () => {
       toast.error('Please fill in all required fields');
       return;
     }
+
+    // Check if seats are available
+    if (licenseData?.licenseInfo?.availableSeats === 0) {
+      // Show upgrade modal
+      setPendingUser(newUser);
+      setShowUpgradeModal(true);
+      setShowAddUser(false);
+      return;
+    }
+
+    // Proceed with user creation
     createUserMutation.mutate(newUser);
+  };
+
+  const handleUpgradeAndAddUser = async () => {
+    setUpgradingLicenses(true);
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3004/api';
+      const authHeaders = {
+        'Authorization': `Bearer ${localStorage.getItem('token') || localStorage.getItem('authToken')}`,
+        'Content-Type': 'application/json',
+        'X-Organization-Slug': localStorage.getItem('organizationSlug')
+      };
+
+      // Add 1 license
+      const response = await fetch(`${API_BASE_URL}/organizations/current/licenses`, {
+        method: 'PUT',
+        headers: authHeaders,
+        body: JSON.stringify({
+          action: 'add',
+          quantity: 1
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // License added successfully, now create the user
+        toast.success(`License added! New monthly cost: $${data.pricing.new_monthly_cost}`);
+        queryClient.invalidateQueries(['license-info']);
+
+        // Create the user
+        if (pendingUser) {
+          createUserMutation.mutate(pendingUser);
+          setPendingUser(null);
+        }
+        setShowUpgradeModal(false);
+      } else {
+        toast.error(data.message || 'Failed to add license');
+      }
+    } catch (error) {
+      console.error('Error adding license:', error);
+      toast.error('Failed to add license. Please try again.');
+    } finally {
+      setUpgradingLicenses(false);
+    }
   };
 
   const handleUpdateUser = (userId, updates) => {
@@ -787,6 +845,103 @@ const UserManagementSystem = () => {
                     <Mail size={16} />
                   )}
                   {createUserMutation.isPending ? 'Creating...' : 'Add & Send Invite'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Upgrade Required Modal */}
+        {showUpgradeModal && licenseData?.licenseInfo && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-xl max-w-md w-full p-6">
+              <div className="flex items-center mb-4">
+                <AlertCircle className="w-6 h-6 text-orange-600 mr-2" />
+                <h3 className="text-xl font-semibold">License Limit Reached</h3>
+              </div>
+
+              <p className="text-gray-600 mb-4">
+                You've reached your current license limit. To add <strong>{pendingUser?.name || 'this user'}</strong>, you need to purchase an additional license.
+              </p>
+
+              {/* Current vs New Pricing */}
+              <div className="bg-gray-50 p-4 rounded-lg mb-4">
+                <h4 className="font-medium text-gray-900 mb-3">License & Pricing</h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Current licenses:</span>
+                    <span className="font-semibold">{licenseData.licenseInfo.maxUsers} users</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Currently in use:</span>
+                    <span className="font-semibold">{licenseData.licenseInfo.currentUsers} users</span>
+                  </div>
+                  <div className="flex justify-between pt-2 border-t border-gray-200">
+                    <span className="font-semibold text-gray-900">Adding:</span>
+                    <span className="font-bold text-blue-600">+1 license</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-blue-50 p-4 rounded-lg mb-6">
+                <h4 className="font-medium text-blue-900 mb-3">Cost Impact</h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-700">Current cost:</span>
+                    <span className="font-semibold">${licenseData.licenseInfo.maxUsers * 15}/month</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-700">Additional cost:</span>
+                    <span className="font-semibold text-red-600">+$15/month</span>
+                  </div>
+                  <div className="flex justify-between pt-2 border-t border-blue-200">
+                    <span className="font-bold">New monthly cost:</span>
+                    <span className="font-bold text-blue-600">${(licenseData.licenseInfo.maxUsers + 1) * 15}/month</span>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-600 mt-3">
+                  = {licenseData.licenseInfo.maxUsers + 1} users × $15/user
+                </p>
+              </div>
+
+              <div className="bg-green-50 p-4 rounded-lg mb-6">
+                <h4 className="font-medium text-green-900 mb-2">What happens next:</h4>
+                <ul className="text-sm text-green-800 space-y-1">
+                  <li>✓ 1 license will be added to your account</li>
+                  <li>✓ User "{pendingUser?.name}" will be created immediately</li>
+                  <li>✓ Login credentials will be sent to {pendingUser?.email}</li>
+                  <li>✓ New monthly cost takes effect immediately</li>
+                </ul>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowUpgradeModal(false);
+                    setPendingUser(null);
+                    setShowAddUser(true); // Reopen add user modal
+                  }}
+                  className="flex-1 border border-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-50"
+                  disabled={upgradingLicenses}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleUpgradeAndAddUser}
+                  disabled={upgradingLicenses}
+                  className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {upgradingLicenses ? (
+                    <>
+                      <RefreshCw size={16} className="animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle size={16} />
+                      Add License & Create User
+                    </>
+                  )}
                 </button>
               </div>
             </div>

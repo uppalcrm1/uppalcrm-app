@@ -26,6 +26,11 @@ import {
 function OrganizationCard({ organization }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showConvertConfirm, setShowConvertConfirm] = useState(false);
+  const [showLicenseModal, setShowLicenseModal] = useState(false);
+  const [licenseAction, setLicenseAction] = useState('add'); // 'add' or 'remove' or 'set'
+  const [licenseQuantity, setLicenseQuantity] = useState(1);
+  const [newMaxUsers, setNewMaxUsers] = useState(organization.max_users || 5);
+  const [updatingLicenses, setUpdatingLicenses] = useState(false);
   const deleteMutation = useDeleteOrganization();
   const extendTrialMutation = useExtendTrial();
   const convertToPaidMutation = useConvertToPaid();
