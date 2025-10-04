@@ -933,6 +933,94 @@ router.delete('/organizations/:id', platformAuth, async (req, res) => {
   }
 });
 
+// POST /api/platform/sync-max-users - Fix max_users synchronization
+router.post('/sync-max-users', platformAuth, async (req, res) => {
+  try {
+    const { query: dbQuery } = require('../database/connection');
+
+    console.log('🔧 Starting max_users synchronization fix...');
+
+    // Find organizations with mismatched data
+    const mismatchResult = await dbQuery(`
+      SELECT
+        o.id,
+        o.name,
+        o.max_users as current_max_users,
+        COUNT(u.id) FILTER (WHERE u.is_active = true) as actual_user_count
+      FROM organizations o
+      LEFT JOIN users u ON u.organization_id = o.id
+      GROUP BY o.id, o.name, o.max_users
+      HAVING COUNT(u.id) FILTER (WHERE u.is_active = true) > o.max_users
+      ORDER BY o.name
+    `);
+
+    if (mismatchResult.rows.length === 0) {
+      return res.json({
+        message: 'All organizations are already in sync',
+        fixed: 0,
+        details: []
+      });
+    }
+
+    console.log(`⚠️  Found ${mismatchResult.rows.length} organizations with mismatched data`);
+
+    const updates = [];
+    const pricePerUser = 15;
+
+    // Start transaction
+    await dbQuery('BEGIN');
+
+    for (const org of mismatchResult.rows) {
+      const actualUsers = parseInt(org.actual_user_count);
+      const currentMaxUsers = org.current_max_users;
+
+      // Update max_users
+      await dbQuery(`
+        UPDATE organizations
+        SET max_users = $1, updated_at = NOW()
+        WHERE id = $2
+      `, [actualUsers, org.id]);
+
+      // Update subscription if exists
+      await dbQuery(`
+        UPDATE organization_subscriptions
+        SET updated_at = NOW()
+        WHERE organization_id = $1
+      `, [org.id]).catch(() => {});
+
+      console.log(`✅ Fixed ${org.name}: ${currentMaxUsers} → ${actualUsers} users`);
+
+      updates.push({
+        organization_id: org.id,
+        organization_name: org.name,
+        old_max_users: currentMaxUsers,
+        new_max_users: actualUsers,
+        old_price: currentMaxUsers * pricePerUser,
+        new_price: actualUsers * pricePerUser
+      });
+    }
+
+    await dbQuery('COMMIT');
+
+    console.log(`✅ Fixed ${updates.length} organizations`);
+
+    res.json({
+      message: `Successfully synced ${updates.length} organizations`,
+      fixed: updates.length,
+      details: updates
+    });
+
+  } catch (error) {
+    const { query: dbQuery } = require('../database/connection');
+    await dbQuery('ROLLBACK');
+    console.error('❌ Error syncing max_users:', error);
+    res.status(500).json({
+      error: 'Sync failed',
+      message: error.message
+    });
+  }
+});
+
 // POST /api/platform/organizations/:id/convert-to-paid - Convert trial to paid
 router.post('/organizations/:id/convert-to-paid', platformAuth, async (req, res) => {
   try {
