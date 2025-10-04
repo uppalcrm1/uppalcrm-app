@@ -8,6 +8,8 @@ class SubscriptionController {
       const organizationId = req.user.organization_id;
       const { query: dbQuery } = require('../database/connection');
 
+      console.log('📊 Getting subscription for organization:', organizationId);
+
       // First, check if organization is on trial
       const orgResult = await dbQuery(`
         SELECT
@@ -23,6 +25,8 @@ class SubscriptionController {
         WHERE id = $1
       `, [organizationId]);
 
+      console.log('📊 Organization data:', orgResult.rows[0]);
+
       if (orgResult.rows.length === 0) {
         return res.status(404).json({ error: 'Organization not found' });
       }
@@ -31,6 +35,7 @@ class SubscriptionController {
 
       // If organization is on trial
       if (org.is_trial && org.trial_status === 'active') {
+        console.log('📊 Returning trial subscription data');
         const usage = await this.getCurrentUsage(organizationId);
 
         return res.json({
@@ -57,7 +62,9 @@ class SubscriptionController {
 
       // If organization is paid/converted, return basic info
       // (We don't use organization_subscriptions table for manual conversions)
+      console.log('📊 Returning paid/converted subscription data');
       const usage = await this.getCurrentUsage(organizationId);
+      console.log('📊 Usage data:', usage);
 
       return res.json({
         subscription: {
@@ -78,7 +85,8 @@ class SubscriptionController {
         }
       });
     } catch (error) {
-      console.error('Error fetching organization subscription:', error);
+      console.error('❌ Error fetching organization subscription:', error);
+      console.error('❌ Error stack:', error.stack);
       res.status(500).json({ error: 'Failed to fetch subscription details' });
     }
   }
