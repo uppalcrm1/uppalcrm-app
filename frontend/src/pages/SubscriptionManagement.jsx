@@ -39,15 +39,24 @@ const SubscriptionManagement = () => {
     try {
       setLoading(true);
 
+      console.log('🔍 Fetching subscription from:', `${API_BASE_URL}/subscription`);
+      console.log('📋 Headers:', getAuthHeaders());
+
       // Fetch subscription details
       const subResponse = await fetch(`${API_BASE_URL}/subscription`, {
         headers: getAuthHeaders()
       });
 
+      console.log('📡 Response status:', subResponse.status);
+
       if (subResponse.ok) {
         const subData = await subResponse.json();
+        console.log('✅ Subscription data:', subData);
         setSubscription(subData.subscription);
         setUsage(subData.usage);
+      } else {
+        const errorData = await subResponse.json();
+        console.error('❌ Error response:', errorData);
       }
 
       // Fetch billing preview
