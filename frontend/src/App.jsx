@@ -15,6 +15,7 @@ import ZapierIntegrationPage from './pages/settings/ZapierIntegrationPage'
 import SuperAdminDashboard from './pages/SuperAdminDashboard'
 import SuperAdminSignups from './pages/SuperAdminSignups'
 import SuperAdminOrganizations from './pages/SuperAdminOrganizations'
+import SuperAdminOrgDetail from './pages/SuperAdminOrgDetail'
 import SuperAdminAnalytics from './pages/SuperAdminAnalytics'
 import SuperAdminLogin from './pages/SuperAdminLogin'
 import SuperAdminLayout from './components/SuperAdminLayout'
@@ -74,6 +75,7 @@ function App() {
         <Route path="dashboard" element={<SuperAdminDashboard />} />
         <Route path="signups" element={<SuperAdminSignups />} />
         <Route path="organizations" element={<SuperAdminOrganizations />} />
+        <Route path="organizations/:id" element={<SuperAdminOrgDetail />} />
         <Route path="analytics" element={<SuperAdminAnalytics />} />
       </Route>
 

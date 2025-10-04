@@ -922,6 +922,136 @@ router.get('/organizations', platformAuth, async (req, res) => {
   }
 });
 
+// GET /api/platform/organizations/:id - Get detailed organization info
+router.get('/organizations/:id', platformAuth, async (req, res) => {
+  try {
+    const organizationId = req.params.id;
+    console.log(`📋 Fetching detailed info for organization: ${organizationId}`);
+
+    const { query: dbQuery } = require('../database/connection');
+
+    // Get organization details with user counts
+    const orgResult = await dbQuery(`
+      SELECT
+        o.*,
+        COUNT(DISTINCT u.id) as total_users,
+        COUNT(DISTINCT CASE WHEN u.is_active = true THEN u.id END) as active_users,
+        COUNT(DISTINCT c.id) as total_contacts,
+        COUNT(DISTINCT l.id) as total_leads
+      FROM organizations o
+      LEFT JOIN users u ON u.organization_id = o.id
+      LEFT JOIN contacts c ON c.organization_id = o.id
+      LEFT JOIN leads l ON l.organization_id = o.id
+      WHERE o.id = $1
+      GROUP BY o.id
+    `, [organizationId]);
+
+    if (orgResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Organization not found' });
+    }
+
+    const org = orgResult.rows[0];
+
+    // Get subscription details if exists
+    const subscriptionResult = await dbQuery(`
+      SELECT * FROM organization_subscriptions
+      WHERE organization_id = $1
+      ORDER BY created_at DESC
+      LIMIT 1
+    `, [organizationId]);
+
+    const subscription = subscriptionResult.rows[0] || null;
+
+    // Calculate pricing
+    const pricePerUser = 15;
+    const maxUsers = org.max_users || 0;
+    const monthlyPrice = maxUsers * pricePerUser;
+
+    // Get trial info if applicable
+    let trialInfo = null;
+    if (org.is_trial && org.trial_expires_at) {
+      const now = new Date();
+      const expiresAt = new Date(org.trial_expires_at);
+      const diffTime = expiresAt - now;
+      const daysRemaining = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+
+      trialInfo = {
+        expires_at: org.trial_expires_at,
+        days_remaining: daysRemaining,
+        is_expired: expiresAt < now,
+        status: org.trial_status
+      };
+    }
+
+    // Get admin users
+    const adminUsers = await dbQuery(`
+      SELECT id, email, first_name, last_name, role, created_at, last_login
+      FROM users
+      WHERE organization_id = $1 AND role = 'admin' AND is_active = true
+      ORDER BY created_at ASC
+    `, [organizationId]);
+
+    res.json({
+      organization: {
+        id: org.id,
+        name: org.name,
+        slug: org.slug,
+        domain: org.domain,
+        is_active: org.is_active,
+        is_trial: org.is_trial,
+        created_at: org.created_at,
+        updated_at: org.updated_at
+      },
+      subscription: {
+        status: org.is_trial ? 'trial' : 'active',
+        plan: org.subscription_plan || 'per_user',
+        max_users: maxUsers,
+        price_per_user: pricePerUser,
+        monthly_price: monthlyPrice,
+        payment_method: subscription?.payment_method || 'manual',
+        current_period_start: subscription?.current_period_start || null,
+        current_period_end: subscription?.current_period_end || null
+      },
+      trial: trialInfo,
+      usage: {
+        users: {
+          total: parseInt(org.total_users) || 0,
+          active: parseInt(org.active_users) || 0,
+          limit: maxUsers,
+          percentage: maxUsers > 0 ? Math.round((parseInt(org.active_users) / maxUsers) * 100) : 0
+        },
+        contacts: {
+          total: parseInt(org.total_contacts) || 0,
+          limit: null // unlimited
+        },
+        leads: {
+          total: parseInt(org.total_leads) || 0,
+          limit: null // unlimited
+        },
+        storage: {
+          used: 0, // TODO: Implement storage tracking
+          limit: null // unlimited
+        }
+      },
+      admins: adminUsers.rows.map(admin => ({
+        id: admin.id,
+        email: admin.email,
+        name: `${admin.first_name} ${admin.last_name}`,
+        role: admin.role,
+        created_at: admin.created_at,
+        last_login: admin.last_login
+      }))
+    });
+
+  } catch (error) {
+    console.error('❌ Error fetching organization details:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error.message
+    });
+  }
+});
+
 // DELETE /api/platform/organizations/:id - Delete organization
 router.delete('/organizations/:id', platformAuth, async (req, res) => {
   try {

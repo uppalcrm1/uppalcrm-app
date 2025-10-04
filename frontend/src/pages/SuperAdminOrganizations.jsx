@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   useSuperAdminOrganizations,
@@ -20,10 +21,12 @@ import {
   Clock,
   Filter,
   ArrowUp,
-  CheckCircle
+  CheckCircle,
+  Eye
 } from 'lucide-react';
 
 function OrganizationCard({ organization }) {
+  const navigate = useNavigate();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showConvertConfirm, setShowConvertConfirm] = useState(false);
   const [showLicenseModal, setShowLicenseModal] = useState(false);
@@ -106,13 +109,22 @@ function OrganizationCard({ organization }) {
           </div>
         </div>
 
-        <button
-          onClick={() => setShowDeleteConfirm(true)}
-          className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-          title="Delete organization"
-        >
-          <Trash2 className="h-4 w-4" />
-        </button>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => navigate(`/super-admin/organizations/${organization.id}`)}
+            className="p-2 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+            title="View details"
+          >
+            <Eye className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            title="Delete organization"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
       {/* Trial Expiry Info */}
