@@ -338,8 +338,31 @@ router.get('/trial-signups', platformAuth, async (req, res) => {
       TrialSignup.getCount(filters)
     ]);
 
+    // Filter out signups where the organization has already been upgraded to paid
+    // We need to check if converted_organization_id exists and if that org has is_trial = false
+    const { query: dbQuery } = require('../database/connection');
+    const signupsWithOrgStatus = await Promise.all(
+      signups.map(async (signup) => {
+        if (signup.converted_organization_id) {
+          // Check if the org is paid (is_trial = false)
+          const orgResult = await dbQuery(
+            'SELECT is_trial FROM organizations WHERE id = $1',
+            [signup.converted_organization_id]
+          );
+          if (orgResult.rows.length > 0 && orgResult.rows[0].is_trial === false) {
+            // Org is paid, don't include this signup
+            return null;
+          }
+        }
+        return signup;
+      })
+    );
+
+    // Filter out null values (paid orgs)
+    const filteredSignups = signupsWithOrgStatus.filter(s => s !== null);
+
     res.json({
-      signups: signups.map(signup => ({
+      signups: filteredSignups.map(signup => ({
         id: signup.id,
         full_name: signup.fullName,
         email: signup.email,
@@ -370,8 +393,8 @@ router.get('/trial-signups', platformAuth, async (req, res) => {
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
-        total: totalCount,
-        pages: Math.ceil(totalCount / parseInt(limit))
+        total: filteredSignups.length,
+        pages: Math.ceil(filteredSignups.length / parseInt(limit))
       }
     });
 
