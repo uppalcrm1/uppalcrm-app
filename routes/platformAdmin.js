@@ -935,13 +935,9 @@ router.get('/organizations/:id', platformAuth, async (req, res) => {
       SELECT
         o.*,
         COUNT(DISTINCT u.id) as total_users,
-        COUNT(DISTINCT CASE WHEN u.is_active = true THEN u.id END) as active_users,
-        COUNT(DISTINCT c.id) as total_contacts,
-        COUNT(DISTINCT l.id) as total_leads
+        COUNT(DISTINCT CASE WHEN u.is_active = true THEN u.id END) as active_users
       FROM organizations o
       LEFT JOIN users u ON u.organization_id = o.id
-      LEFT JOIN contacts c ON c.organization_id = o.id
-      LEFT JOIN leads l ON l.organization_id = o.id
       WHERE o.id = $1
       GROUP BY o.id
     `, [organizationId]);
@@ -951,6 +947,28 @@ router.get('/organizations/:id', platformAuth, async (req, res) => {
     }
 
     const org = orgResult.rows[0];
+
+    // Get contacts and leads counts with error handling
+    let contactsCount = 0;
+    let leadsCount = 0;
+
+    try {
+      const contactsResult = await dbQuery(`
+        SELECT COUNT(*) as count FROM contacts WHERE organization_id = $1
+      `, [organizationId]);
+      contactsCount = parseInt(contactsResult.rows[0].count) || 0;
+    } catch (error) {
+      console.log('Contacts table may not exist, setting count to 0');
+    }
+
+    try {
+      const leadsResult = await dbQuery(`
+        SELECT COUNT(*) as count FROM leads WHERE organization_id = $1
+      `, [organizationId]);
+      leadsCount = parseInt(leadsResult.rows[0].count) || 0;
+    } catch (error) {
+      console.log('Leads table may not exist, setting count to 0');
+    }
 
     // Get subscription details if exists
     const subscriptionResult = await dbQuery(`
@@ -1021,11 +1039,11 @@ router.get('/organizations/:id', platformAuth, async (req, res) => {
           percentage: maxUsers > 0 ? Math.round((parseInt(org.active_users) / maxUsers) * 100) : 0
         },
         contacts: {
-          total: parseInt(org.total_contacts) || 0,
+          total: contactsCount,
           limit: null // unlimited
         },
         leads: {
-          total: parseInt(org.total_leads) || 0,
+          total: leadsCount,
           limit: null // unlimited
         },
         storage: {
