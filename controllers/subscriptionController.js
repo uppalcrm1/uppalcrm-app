@@ -68,8 +68,7 @@ class SubscriptionController {
         });
       }
 
-      // If organization is paid/converted, return basic info
-      // (We don't use organization_subscriptions table for manual conversions)
+      // If organization is paid/converted, get subscription record
       console.log('📊 Returning paid/converted subscription data');
 
       // Get usage directly
@@ -82,12 +81,39 @@ class SubscriptionController {
       const usage = usageResult.rows[0] || { users_count: 0, contacts_count: 0, leads_count: 0 };
       console.log('📊 Usage data:', usage);
 
+      // Try to get subscription record (for billing dates and price)
+      const subResult = await dbQuery(`
+        SELECT
+          id,
+          status,
+          billing_cycle,
+          price_per_user,
+          current_period_start,
+          current_period_end,
+          payment_method,
+          created_at
+        FROM organization_subscriptions
+        WHERE organization_id = $1
+        ORDER BY created_at DESC
+        LIMIT 1
+      `, [organizationId]).catch(() => ({ rows: [] }));
+
+      const subscription = subResult.rows[0];
+
+      // Calculate pricing: $15 per user per month
+      const pricePerUser = 15;
+      const monthlyPrice = org.max_users * pricePerUser;
+
       return res.json({
         subscription: {
-          status: 'active',
-          plan_name: org.subscription_plan || 'starter',
-          plan_display_name: (org.subscription_plan || 'starter').charAt(0).toUpperCase() + (org.subscription_plan || 'starter').slice(1),
+          status: subscription?.status || 'active',
+          billing_cycle: subscription?.billing_cycle || 'monthly',
+          price_per_user: pricePerUser,
+          monthly_price: monthlyPrice,
           max_users: org.max_users,
+          current_period_start: subscription?.current_period_start,
+          current_period_end: subscription?.current_period_end,
+          payment_method: subscription?.payment_method || 'manual',
           is_trial: false
         },
         usage,

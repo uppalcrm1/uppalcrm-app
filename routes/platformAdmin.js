@@ -967,6 +967,51 @@ router.post('/organizations/:id/convert-to-paid', platformAuth, async (req, res)
 
     console.log(`✅ Organization updated to paid status`);
 
+    // Create subscription record with per-user pricing ($15/user/month)
+    const pricePerUser = 15;
+    const monthlyPrice = org.max_users * pricePerUser;
+    const currentPeriodStart = new Date();
+    const currentPeriodEnd = new Date(currentPeriodStart);
+    currentPeriodEnd.setDate(currentPeriodEnd.getDate() + 30); // 30 days from now
+
+    // Try to create subscription record (table may not exist)
+    const { v4: uuidv4 } = require('uuid');
+    await dbQuery(`
+      INSERT INTO organization_subscriptions (
+        id,
+        organization_id,
+        status,
+        billing_cycle,
+        price_per_user,
+        current_period_start,
+        current_period_end,
+        payment_method,
+        created_at,
+        updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+      ON CONFLICT (organization_id) DO UPDATE SET
+        status = EXCLUDED.status,
+        billing_cycle = EXCLUDED.billing_cycle,
+        price_per_user = EXCLUDED.price_per_user,
+        current_period_start = EXCLUDED.current_period_start,
+        current_period_end = EXCLUDED.current_period_end,
+        payment_method = EXCLUDED.payment_method,
+        updated_at = NOW()
+    `, [
+      uuidv4(),
+      organizationId,
+      'active',
+      'monthly',
+      pricePerUser,
+      currentPeriodStart,
+      currentPeriodEnd,
+      'manual'
+    ]).catch((err) => {
+      console.log('⚠️  Could not create subscription record (table may not exist):', err.message);
+    });
+
+    console.log(`✅ Subscription created: $${monthlyPrice}/month (${org.max_users} users × $${pricePerUser})`);
+
     // Update linked trial signup if exists
     const trialSignupResult = await dbQuery(`
       UPDATE trial_signups

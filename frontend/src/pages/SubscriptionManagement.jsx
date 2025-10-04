@@ -6,25 +6,18 @@ import {
   Users,
   Database,
   Zap,
-  Check,
-  X,
   AlertTriangle,
-  ArrowUpCircle,
-  Settings
+  DollarSign,
+  CheckCircle
 } from 'lucide-react';
 
 const SubscriptionManagement = () => {
   const [subscription, setSubscription] = useState(null);
   const [usage, setUsage] = useState(null);
-  const [plans, setPlans] = useState([]);
-  const [billingPreview, setBillingPreview] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [upgrading, setUpgrading] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState(null);
 
   useEffect(() => {
     fetchSubscriptionData();
-    fetchAvailablePlans();
   }, []);
 
   const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3004/api';
@@ -39,15 +32,9 @@ const SubscriptionManagement = () => {
     try {
       setLoading(true);
 
-      console.log('🔍 Fetching subscription from:', `${API_BASE_URL}/subscription`);
-      console.log('📋 Headers:', getAuthHeaders());
-
-      // Fetch subscription details
       const subResponse = await fetch(`${API_BASE_URL}/subscription`, {
         headers: getAuthHeaders()
       });
-
-      console.log('📡 Response status:', subResponse.status);
 
       if (subResponse.ok) {
         const subData = await subResponse.json();
@@ -58,16 +45,6 @@ const SubscriptionManagement = () => {
         const errorData = await subResponse.json();
         console.error('❌ Error response:', errorData);
       }
-
-      // Fetch billing preview
-      const billingResponse = await fetch(`${API_BASE_URL}/subscription/billing/preview`, {
-        headers: getAuthHeaders()
-      });
-
-      if (billingResponse.ok) {
-        const billingData = await billingResponse.json();
-        setBillingPreview(billingData);
-      }
     } catch (error) {
       console.error('Error fetching subscription data:', error);
     } finally {
@@ -75,54 +52,8 @@ const SubscriptionManagement = () => {
     }
   };
 
-  const fetchAvailablePlans = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/subscription/plans`, {
-        headers: getAuthHeaders()
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setPlans(data);
-      }
-    } catch (error) {
-      console.error('Error fetching plans:', error);
-    }
-  };
-
-  const handlePlanUpgrade = async (planId, billingCycle = 'monthly') => {
-    if (!planId) return;
-
-    setUpgrading(true);
-    try {
-      const response = await fetch(`${API_BASE_URL}/subscription`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          subscription_plan_id: planId,
-          billing_cycle: billingCycle
-        })
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        alert('Subscription updated successfully!');
-        setSelectedPlan(null);
-        fetchSubscriptionData(); // Refresh data
-      } else {
-        alert(`Failed to update subscription: ${data.error}`);
-      }
-    } catch (error) {
-      console.error('Error updating subscription:', error);
-      alert('Failed to update subscription: Network error');
-    } finally {
-      setUpgrading(false);
-    }
-  };
-
   const getUsagePercentage = (current, limit) => {
-    if (!limit) return 0; // Unlimited
+    if (!limit) return 0;
     return Math.min((current / limit) * 100, 100);
   };
 
@@ -134,12 +65,13 @@ const SubscriptionManagement = () => {
     return 'good';
   };
 
-  const formatPrice = (priceInCents) => {
-    return (priceInCents / 100).toFixed(2);
-  };
-
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString();
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
   };
 
   const getStatusBadge = (status) => {
@@ -153,7 +85,7 @@ const SubscriptionManagement = () => {
     const config = statusMap[status] || { color: 'bg-gray-100 text-gray-800', label: status };
 
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${config.color}`}>
+      <span className={`px-3 py-1 rounded-full text-sm font-medium ${config.color}`}>
         {config.label}
       </span>
     );
@@ -172,108 +104,181 @@ const SubscriptionManagement = () => {
 
   if (!subscription) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center\">
-        <div className="text-center max-w-md\">
-          <AlertTriangle className="w-16 h-16 text-yellow-500 mx-auto mb-4\" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2\">No Subscription Found</h2>
-          <p className="text-gray-600 mb-6\">Your organization doesn't have an active subscription.</p>
-          <button
-            onClick={() => fetchAvailablePlans()}
-            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700\"
-          >
-            View Available Plans
-          </button>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md">
+          <AlertTriangle className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">No Subscription Found</h2>
+          <p className="text-gray-600 mb-6">Your organization doesn't have an active subscription.</p>
         </div>
       </div>
     );
   }
 
+  // Check if trial
+  const isTrial = subscription.is_trial || subscription.status === 'trial';
+
   return (
-    <div className="min-h-screen bg-gray-50 p-6\">
-      <div className="max-w-7xl mx-auto\">
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-8\">
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center\">
-            <CreditCard className="w-8 h-8 mr-3 text-blue-600\" />
-            Subscription Management
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 flex items-center">
+            <CreditCard className="w-8 h-8 mr-3 text-blue-600" />
+            Subscription & Billing
           </h1>
-          <p className="text-gray-600 mt-2\">
-            Manage your subscription plan, usage, and billing
+          <p className="text-gray-600 mt-2">
+            Manage your subscription and view usage details
           </p>
         </div>
 
-        {/* Current Subscription Card */}
-        <div className="bg-white rounded-lg shadow-sm border mb-8\">
-          <div className="px-6 py-4 border-b border-gray-200\">
-            <h2 className="text-lg font-medium text-gray-900 flex items-center justify-between\">
-              <span className="flex items-center\">
-                <Settings className="w-5 h-5 mr-2\" />
-                Current Subscription
-              </span>
-              {getStatusBadge(subscription.status)}
-            </h2>
+        {/* Subscription Overview Card */}
+        <div className="bg-white rounded-lg shadow-sm border mb-8">
+          <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+            <h2 className="text-lg font-medium text-gray-900">Subscription Overview</h2>
+            {getStatusBadge(subscription.status)}
           </div>
-          <div className="p-6\">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6\">
-              <div>
-                <h3 className="text-xl font-semibold text-gray-900\">{subscription.plan_display_name}</h3>
-                <p className="text-gray-600 mt-1\">{subscription.plan_description}</p>
-                <div className="mt-4\">
-                  <span className="text-2xl font-bold text-green-600\">
-                    ${formatPrice(subscription.current_price)}
-                  </span>
-                  <span className="text-gray-500 ml-1\">/{subscription.billing_cycle}</span>
+          <div className="p-6">
+            {isTrial ? (
+              /* Trial Display */
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-2xl font-bold text-blue-600">Trial Account</h3>
+                  <p className="text-gray-600 mt-2">You're currently on a free trial period</p>
                 </div>
-              </div>
 
-              <div>
-                <h4 className="font-medium text-gray-900 mb-3\">Billing Period</h4>
-                <div className="space-y-2\">
-                  <div className="flex items-center text-sm\">
-                    <Calendar className="w-4 h-4 mr-2 text-gray-400\" />
-                    <span>Start: {formatDate(subscription.current_period_start)}</span>
-                  </div>
-                  <div className="flex items-center text-sm\">
-                    <Calendar className="w-4 h-4 mr-2 text-gray-400\" />
-                    <span>End: {formatDate(subscription.current_period_end)}</span>
-                  </div>
-                  {subscription.trial_end && subscription.status === 'trial' && (
-                    <div className="flex items-center text-sm text-blue-600\">
-                      <Calendar className="w-4 h-4 mr-2\" />
-                      <span>Trial ends: {formatDate(subscription.trial_end)}</span>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <div className="flex items-center mb-2">
+                      <Calendar className="w-5 h-5 text-blue-600 mr-2" />
+                      <span className="text-sm font-medium text-gray-700">Trial Ends</span>
                     </div>
-                  )}
+                    <p className="text-xl font-bold text-gray-900">
+                      {formatDate(subscription.trial_ends_at)}
+                    </p>
+                    {subscription.days_remaining !== undefined && (
+                      <p className="text-sm text-gray-600 mt-1">
+                        {subscription.days_remaining} days remaining
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <div className="flex items-center mb-2">
+                      <Users className="w-5 h-5 text-blue-600 mr-2" />
+                      <span className="text-sm font-medium text-gray-700">User Limit</span>
+                    </div>
+                    <p className="text-xl font-bold text-gray-900">
+                      {subscription.max_users} users
+                    </p>
+                    <p className="text-sm text-gray-600 mt-1">
+                      included in trial
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <p className="text-sm text-gray-600">
+                    <strong>After trial:</strong> Pricing is simple - just $15 per user per month.
+                    No hidden fees, no plan tiers.
+                  </p>
                 </div>
               </div>
+            ) : (
+              /* Paid Subscription Display */
+              <div className="space-y-6">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="text-2xl font-bold text-green-600">Active Subscription</h3>
+                    <p className="text-gray-600 mt-2">Your account is now active with full access</p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-3xl font-bold text-gray-900">
+                      ${subscription.monthly_price || 0}
+                      <span className="text-lg text-gray-500 font-normal">/month</span>
+                    </div>
+                    <p className="text-sm text-gray-600 mt-1">
+                      {subscription.max_users} users × ${subscription.price_per_user || 15}
+                    </p>
+                  </div>
+                </div>
 
-              <div className="flex items-center justify-end\">
-                <button
-                  onClick={() => setSelectedPlan('upgrade')}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center\"
-                >
-                  <ArrowUpCircle className="w-4 h-4 mr-2\" />
-                  Change Plan
-                </button>
+                {/* Pricing Breakdown */}
+                <div className="bg-gray-50 p-6 rounded-lg">
+                  <h4 className="font-semibold text-gray-900 mb-4 flex items-center">
+                    <DollarSign className="w-5 h-5 mr-2 text-green-600" />
+                    Pricing Breakdown
+                  </h4>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center pb-3 border-b">
+                      <span className="text-gray-600">Price per user</span>
+                      <span className="font-semibold">${subscription.price_per_user || 15}/month</span>
+                    </div>
+                    <div className="flex justify-between items-center pb-3 border-b">
+                      <span className="text-gray-600">Number of users</span>
+                      <span className="font-semibold">{subscription.max_users} users</span>
+                    </div>
+                    <div className="flex justify-between items-center pt-2">
+                      <span className="text-lg font-semibold text-gray-900">Total Monthly Cost</span>
+                      <span className="text-2xl font-bold text-green-600">
+                        ${subscription.monthly_price || (subscription.max_users * 15)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Billing Period */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="bg-white border border-gray-200 p-4 rounded-lg">
+                    <div className="flex items-center mb-2">
+                      <Calendar className="w-5 h-5 text-gray-600 mr-2" />
+                      <span className="text-sm font-medium text-gray-700">Current Period Start</span>
+                    </div>
+                    <p className="text-lg font-semibold text-gray-900">
+                      {formatDate(subscription.current_period_start)}
+                    </p>
+                  </div>
+
+                  <div className="bg-white border border-gray-200 p-4 rounded-lg">
+                    <div className="flex items-center mb-2">
+                      <Calendar className="w-5 h-5 text-gray-600 mr-2" />
+                      <span className="text-sm font-medium text-gray-700">Current Period End</span>
+                    </div>
+                    <p className="text-lg font-semibold text-gray-900">
+                      {formatDate(subscription.current_period_end)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Payment Method */}
+                <div className="bg-blue-50 p-4 rounded-lg flex items-center">
+                  <CheckCircle className="w-5 h-5 text-blue-600 mr-3" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Payment Method</p>
+                    <p className="text-sm text-gray-600">
+                      {subscription.payment_method === 'manual' ? 'Manual Payment (Invoice)' : subscription.payment_method}
+                    </p>
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
 
         {/* Usage Overview */}
         {usage && (
-          <div className="bg-white rounded-lg shadow-sm border mb-8\">
-            <div className="px-6 py-4 border-b border-gray-200\">
-              <h2 className="text-lg font-medium text-gray-900 flex items-center\">
-                <TrendingUp className="w-5 h-5 mr-2\" />
+          <div className="bg-white rounded-lg shadow-sm border mb-8">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-medium text-gray-900 flex items-center">
+                <TrendingUp className="w-5 h-5 mr-2" />
                 Current Usage
               </h2>
             </div>
-            <div className="p-6\">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6\">
+            <div className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {/* Users */}
-                <div className="bg-gray-50 p-4 rounded-lg\">
-                  <div className="flex items-center justify-between mb-2\">
-                    <Users className="w-5 h-5 text-blue-600\" />
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <Users className="w-5 h-5 text-blue-600" />
                     <span className={`text-xs px-2 py-1 rounded-full ${
                       getUsageStatus(usage.users_count, subscription.max_users) === 'critical' ? 'bg-red-100 text-red-800' :
                       getUsageStatus(usage.users_count, subscription.max_users) === 'warning' ? 'bg-yellow-100 text-yellow-800' :
@@ -283,13 +288,13 @@ const SubscriptionManagement = () => {
                        `${Math.round(getUsagePercentage(usage.users_count, subscription.max_users))}%`}
                     </span>
                   </div>
-                  <h3 className="text-sm font-medium text-gray-900\">Active Users</h3>
-                  <p className="text-2xl font-bold text-gray-900\">{usage.users_count || 0}</p>
-                  <p className="text-sm text-gray-500\">
+                  <h3 className="text-sm font-medium text-gray-900">Active Users</h3>
+                  <p className="text-2xl font-bold text-gray-900">{usage.users_count || 0}</p>
+                  <p className="text-sm text-gray-500">
                     {subscription.max_users ? `of ${subscription.max_users} limit` : 'Unlimited'}
                   </p>
                   {subscription.max_users && (
-                    <div className="mt-2 w-full bg-gray-200 rounded-full h-2\">
+                    <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
                       <div
                         className={`h-2 rounded-full ${
                           getUsageStatus(usage.users_count, subscription.max_users) === 'critical' ? 'bg-red-500' :
@@ -305,226 +310,43 @@ const SubscriptionManagement = () => {
                 </div>
 
                 {/* Contacts */}
-                <div className="bg-gray-50 p-4 rounded-lg\">
-                  <div className="flex items-center justify-between mb-2\">
-                    <Database className="w-5 h-5 text-green-600\" />
-                    <span className={`text-xs px-2 py-1 rounded-full ${
-                      getUsageStatus(usage.contacts_count, subscription.max_contacts) === 'critical' ? 'bg-red-100 text-red-800' :
-                      getUsageStatus(usage.contacts_count, subscription.max_contacts) === 'warning' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-green-100 text-green-800'
-                    }`}>
-                      {getUsageStatus(usage.contacts_count, subscription.max_contacts) === 'unlimited' ? 'Unlimited' :
-                       `${Math.round(getUsagePercentage(usage.contacts_count, subscription.max_contacts))}%`}
-                    </span>
-                  </div>
-                  <h3 className="text-sm font-medium text-gray-900\">Contacts</h3>
-                  <p className="text-2xl font-bold text-gray-900\">{usage.contacts_count || 0}</p>
-                  <p className="text-sm text-gray-500\">
-                    {subscription.max_contacts ? `of ${subscription.max_contacts} limit` : 'Unlimited'}
-                  </p>
-                  {subscription.max_contacts && (
-                    <div className="mt-2 w-full bg-gray-200 rounded-full h-2\">
-                      <div
-                        className={`h-2 rounded-full ${
-                          getUsageStatus(usage.contacts_count, subscription.max_contacts) === 'critical' ? 'bg-red-500' :
-                          getUsageStatus(usage.contacts_count, subscription.max_contacts) === 'warning' ? 'bg-yellow-500' :
-                          'bg-green-600'
-                        }`}
-                        style={{
-                          width: `${getUsagePercentage(usage.contacts_count, subscription.max_contacts)}%`
-                        }}
-                      ></div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Leads */}
-                <div className="bg-gray-50 p-4 rounded-lg\">
-                  <div className="flex items-center justify-between mb-2\">
-                    <Zap className="w-5 h-5 text-purple-600\" />
-                    <span className={`text-xs px-2 py-1 rounded-full ${
-                      getUsageStatus(usage.leads_count, subscription.max_leads) === 'critical' ? 'bg-red-100 text-red-800' :
-                      getUsageStatus(usage.leads_count, subscription.max_leads) === 'warning' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-green-100 text-green-800'
-                    }`}>
-                      {getUsageStatus(usage.leads_count, subscription.max_leads) === 'unlimited' ? 'Unlimited' :
-                       `${Math.round(getUsagePercentage(usage.leads_count, subscription.max_leads))}%`}
-                    </span>
-                  </div>
-                  <h3 className="text-sm font-medium text-gray-900\">Leads</h3>
-                  <p className="text-2xl font-bold text-gray-900\">{usage.leads_count || 0}</p>
-                  <p className="text-sm text-gray-500\">
-                    {subscription.max_leads ? `of ${subscription.max_leads} limit` : 'Unlimited'}
-                  </p>
-                  {subscription.max_leads && (
-                    <div className="mt-2 w-full bg-gray-200 rounded-full h-2\">
-                      <div
-                        className={`h-2 rounded-full ${
-                          getUsageStatus(usage.leads_count, subscription.max_leads) === 'critical' ? 'bg-red-500' :
-                          getUsageStatus(usage.leads_count, subscription.max_leads) === 'warning' ? 'bg-yellow-500' :
-                          'bg-purple-600'
-                        }`}
-                        style={{
-                          width: `${getUsagePercentage(usage.leads_count, subscription.max_leads)}%`
-                        }}
-                      ></div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Storage - Hide custom fields for now since we don't track it */}
-                <div className="bg-gray-50 p-4 rounded-lg\">
-                  <div className="flex items-center justify-between mb-2\">
-                    <Database className="w-5 h-5 text-orange-600\" />
-                    <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-800\">
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <Database className="w-5 h-5 text-green-600" />
+                    <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-800">
                       Unlimited
                     </span>
                   </div>
-                  <h3 className="text-sm font-medium text-gray-900\">Storage</h3>
-                  <p className="text-2xl font-bold text-gray-900\">-</p>
-                  <p className="text-sm text-gray-500\">
-                    Unlimited
-                  </p>
+                  <h3 className="text-sm font-medium text-gray-900">Contacts</h3>
+                  <p className="text-2xl font-bold text-gray-900">{usage.contacts_count || 0}</p>
+                  <p className="text-sm text-gray-500">Unlimited</p>
                 </div>
-              </div>
-            </div>
-          </div>
-        )}
 
-        {/* Billing Preview */}
-        {billingPreview && (
-          <div className="bg-white rounded-lg shadow-sm border mb-8\">
-            <div className="px-6 py-4 border-b border-gray-200\">
-              <h2 className="text-lg font-medium text-gray-900 flex items-center\">
-                <CreditCard className="w-5 h-5 mr-2\" />
-                Next Billing Cycle
-              </h2>
-            </div>
-            <div className="p-6\">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6\">
-                <div>
-                  <h3 className="text-sm font-medium text-gray-900 mb-2\">Base Cost</h3>
-                  <p className="text-xl font-semibold text-gray-900\">
-                    ${formatPrice(billingPreview.billing_preview.base_cost)}
-                  </p>
-                </div>
-                <div>
-                  <h3 className="text-sm font-medium text-gray-900 mb-2\">Overage Cost</h3>
-                  <p className="text-xl font-semibold text-gray-900\">
-                    ${formatPrice(billingPreview.billing_preview.overage_cost)}
-                  </p>
-                </div>
-                <div>
-                  <h3 className="text-sm font-medium text-gray-900 mb-2\">Total</h3>
-                  <p className="text-xl font-bold text-green-600\">
-                    ${formatPrice(billingPreview.billing_preview.total_cost)}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Plan Selection Modal */}
-        {selectedPlan && (
-          <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50\">
-            <div className="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto\">
-              <div className="flex justify-between items-center mb-6\">
-                <h3 className="text-lg font-medium text-gray-900\">Choose Your Plan</h3>
-                <button
-                  onClick={() => setSelectedPlan(null)}
-                  className="text-gray-400 hover:text-gray-600\"
-                >
-                  <X className="w-6 h-6\" />
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6\">
-                {plans.map((plan) => (
-                  <div
-                    key={plan.id}
-                    className={`border rounded-lg p-6 ${
-                      plan.name === subscription?.plan_name ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
-                    }`}
-                  >
-                    <div className="text-center mb-4\">
-                      <h4 className="text-xl font-semibold text-gray-900\">{plan.display_name}</h4>
-                      <p className="text-gray-600 text-sm mt-1\">{plan.description}</p>
-                      <div className="mt-4\">
-                        <span className="text-3xl font-bold text-gray-900\">
-                          ${formatPrice(plan.monthly_price)}
-                        </span>
-                        <span className="text-gray-500\">/month</span>
-                      </div>
-                      {plan.yearly_price && (
-                        <div className="mt-1\">
-                          <span className="text-lg font-semibold text-green-600\">
-                            ${formatPrice(plan.yearly_price)}
-                          </span>
-                          <span className="text-gray-500 text-sm\">/year</span>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="space-y-3 mb-6\">
-                      <div className="flex items-center text-sm\">
-                        <Users className="w-4 h-4 mr-2 text-gray-400\" />
-                        <span>{plan.max_users ? `${plan.max_users} users` : 'Unlimited users'}</span>
-                      </div>
-                      <div className="flex items-center text-sm\">
-                        <Database className="w-4 h-4 mr-2 text-gray-400\" />
-                        <span>{plan.max_contacts ? `${plan.max_contacts} contacts` : 'Unlimited contacts'}</span>
-                      </div>
-                      <div className="flex items-center text-sm\">
-                        <Zap className="w-4 h-4 mr-2 text-gray-400\" />
-                        <span>{plan.max_leads ? `${plan.max_leads} leads` : 'Unlimited leads'}</span>
-                      </div>
-                    </div>
-
-                    {plan.features_list && plan.features_list.length > 0 && (
-                      <div className="mb-6\">
-                        <h5 className="font-medium text-gray-900 mb-2\">Features</h5>
-                        <ul className="space-y-1\">
-                          {plan.features_list.map((feature, index) => (
-                            <li key={index} className="flex items-center text-sm\">
-                              {feature.is_included ? (
-                                <Check className="w-4 h-4 mr-2 text-green-500\" />
-                              ) : (
-                                <X className="w-4 h-4 mr-2 text-red-500\" />
-                              )}
-                              <span>{feature.feature_name}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-
-                    {plan.name === subscription?.plan_name ? (
-                      <div className="text-center py-2 px-4 bg-blue-100 text-blue-800 rounded-lg font-medium\">
-                        Current Plan
-                      </div>
-                    ) : (
-                      <div className="space-y-2\">
-                        <button
-                          onClick={() => handlePlanUpgrade(plan.id, 'monthly')}
-                          disabled={upgrading}
-                          className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50\"
-                        >
-                          {upgrading ? 'Updating...' : 'Choose Monthly'}
-                        </button>
-                        {plan.yearly_price && (
-                          <button
-                            onClick={() => handlePlanUpgrade(plan.id, 'yearly')}
-                            disabled={upgrading}
-                            className="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 disabled:opacity-50\"
-                          >
-                            {upgrading ? 'Updating...' : 'Choose Yearly (Save!)'}
-                          </button>
-                        )}
-                      </div>
-                    )}
+                {/* Leads */}
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <Zap className="w-5 h-5 text-purple-600" />
+                    <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-800">
+                      Unlimited
+                    </span>
                   </div>
-                ))}
+                  <h3 className="text-sm font-medium text-gray-900">Leads</h3>
+                  <p className="text-2xl font-bold text-gray-900">{usage.leads_count || 0}</p>
+                  <p className="text-sm text-gray-500">Unlimited</p>
+                </div>
+
+                {/* Storage */}
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <Database className="w-5 h-5 text-orange-600" />
+                    <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-800">
+                      Unlimited
+                    </span>
+                  </div>
+                  <h3 className="text-sm font-medium text-gray-900">Storage</h3>
+                  <p className="text-2xl font-bold text-gray-900">-</p>
+                  <p className="text-sm text-gray-500">Unlimited</p>
+                </div>
               </div>
             </div>
           </div>
