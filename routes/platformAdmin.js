@@ -131,10 +131,10 @@ router.post('/trial-signup', async (req, res) => {
     console.log(`✅ Trial signup record created: ${trialSignup.id}`);
 
     // Send credentials email to customer
-    const emailService = require('../services/emailService');
-    await emailService.initialize();
-
     try {
+      const emailService = require('../services/emailService');
+      await emailService.initialize();
+
       await emailService.sendTrialCredentials({
         customerName: trialSignup.fullName,
         customerEmail: trialSignup.email,
@@ -147,6 +147,10 @@ router.post('/trial-signup', async (req, res) => {
       console.log(`✅ Trial credentials email sent to ${trialSignup.email}`);
     } catch (emailError) {
       console.error('❌ Failed to send trial credentials email:', emailError);
+      console.error('Email error details:', {
+        message: emailError.message,
+        stack: emailError.stack
+      });
       // Don't fail the signup if email fails - credentials are still accessible via super admin
     }
 
@@ -164,9 +168,16 @@ router.post('/trial-signup', async (req, res) => {
 
   } catch (error) {
     console.error('❌ Error creating trial signup:', error);
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      code: error.code,
+      detail: error.detail
+    });
     res.status(500).json({
       error: 'Internal server error',
-      message: error.message
+      message: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });
