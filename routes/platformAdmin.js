@@ -944,8 +944,8 @@ router.post('/organizations/:id/convert-to-paid', platformAuth, async (req, res)
       UPDATE trial_signups
       SET
         status = 'converted',
-        converted_at = NOW()
-      WHERE organization_id = $1 AND status != 'converted'
+        converted_at = COALESCE(converted_at, NOW())
+      WHERE converted_organization_id = $1
       RETURNING id, email, company
     `, [organizationId]);
 
@@ -1025,9 +1025,16 @@ router.post('/organizations/:id/convert-to-paid', platformAuth, async (req, res)
 
   } catch (error) {
     console.error('❌ Error converting trial to paid:', error);
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      code: error.code,
+      detail: error.detail
+    });
     res.status(500).json({
       error: 'Internal server error',
-      message: error.message
+      message: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });
