@@ -241,22 +241,11 @@ function SignupCard({ signup, onUpdateStatus, onAddNotes, onConvert }) {
               </div>
               <div className="flex items-center space-x-2">
                 <button
-                  onClick={async () => {
-                    if (!signup.converted_organization_id) {
-                      toast.error('Organization ID not found - ensure trial is converted to org first');
-                      return;
-                    }
-                    try {
-                      await convertToPaidMutation.mutateAsync(signup.converted_organization_id);
-                      toast.success('Upgraded to paid account!');
-                    } catch (error) {
-                      toast.error('Failed to upgrade to paid');
-                    }
-                  }}
-                  disabled={convertToPaidMutation.isPending}
-                  className="px-3 py-1 text-xs font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                  onClick={() => window.location.href = '/super-admin/organizations'}
+                  className="px-3 py-1 text-xs font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                  title="Go to Organizations tab to manage this trial org"
                 >
-                  {convertToPaidMutation.isPending ? 'Converting...' : 'Convert to Paid'}
+                  → View Organization
                 </button>
                 {signup.can_extend && !signup.is_expired && (
                   <button
