@@ -402,7 +402,11 @@ export default function SuperAdminOrganizations() {
   if (error) {
     return (
       <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-        <p className="text-red-800">Error loading organizations: {error.message}</p>
+        <p className="text-red-800">
+          {error.isAuthError
+            ? 'Session expired. Please log in again.'
+            : `Error loading organizations: ${error.message}`}
+        </p>
       </div>
     );
   }

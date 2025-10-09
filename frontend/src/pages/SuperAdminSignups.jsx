@@ -557,14 +557,20 @@ export default function SuperAdminSignups() {
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <XCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Failed to Load Trial Signups</h3>
-          <p className="text-gray-600 mb-4">{error.message}</p>
-          <button
-            onClick={() => refetch()}
-            className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700"
-          >
-            Retry
-          </button>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">
+            {error.isAuthError ? 'Session Expired' : 'Failed to Load Trial Signups'}
+          </h3>
+          <p className="text-gray-600 mb-4">
+            {error.isAuthError ? 'Your session has expired. Please log in again.' : error.message}
+          </p>
+          {!error.isAuthError && (
+            <button
+              onClick={() => refetch()}
+              className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700"
+            >
+              Retry
+            </button>
+          )}
         </div>
       </div>
     );

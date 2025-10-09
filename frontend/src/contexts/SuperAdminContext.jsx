@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 
 const SuperAdminContext = createContext();
 
@@ -53,6 +54,7 @@ function superAdminReducer(state, action) {
 export function SuperAdminProvider({ children }) {
   const [state, dispatch] = useReducer(superAdminReducer, initialState);
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   // Initialize from localStorage on mount
   useEffect(() => {
@@ -120,14 +122,15 @@ export function SuperAdminProvider({ children }) {
     localStorage.removeItem('superAdminUser');
     queryClient.clear();
     dispatch({ type: 'LOGOUT' });
+    navigate('/super-admin/login');
   };
 
   const clearError = () => {
     dispatch({ type: 'CLEAR_ERROR' });
   };
 
-  // API helper function with authentication
-  const apiCall = async (endpoint, options = {}) => {
+  // API helper function with authentication and retry tracking
+  const apiCall = async (endpoint, options = {}, retryCount = 0) => {
     const url = `${API_BASE_URL}/platform${endpoint}`;
     const token = state.token || localStorage.getItem('superAdminToken');
 
@@ -144,8 +147,11 @@ export function SuperAdminProvider({ children }) {
 
     if (!response.ok) {
       if (response.status === 401) {
+        // On 401, logout and redirect - DO NOT retry
         logout();
-        throw new Error('Session expired. Please login again.');
+        const error = new Error('Session expired. Please log in again.');
+        error.isAuthError = true;
+        throw error;
       }
       const error = await response.json();
       throw new Error(error.error || 'API call failed');
@@ -187,6 +193,16 @@ export function useSuperAdminDashboard() {
     staleTime: 10 * 60 * 1000, // 10 minutes
     refetchOnWindowFocus: false, // Don't refetch on window focus
     refetchOnMount: false, // Don't refetch on component mount if data exists
+    retry: (failureCount, error) => {
+      // Never retry on 401 auth errors
+      if (error?.isAuthError) return false;
+      // Retry max 2 times for other errors
+      return failureCount < 2;
+    },
+    retryDelay: (attemptIndex) => {
+      // Exponential backoff: 1s, 2s, 4s
+      return Math.min(1000 * 2 ** attemptIndex, 4000);
+    },
   });
 }
 
@@ -206,6 +222,16 @@ export function useSuperAdminTrialSignups(filters = {}) {
     staleTime: 10 * 60 * 1000, // 10 minutes
     refetchOnWindowFocus: false,
     refetchOnMount: false,
+    retry: (failureCount, error) => {
+      // Never retry on 401 auth errors
+      if (error?.isAuthError) return false;
+      // Retry max 2 times for other errors
+      return failureCount < 2;
+    },
+    retryDelay: (attemptIndex) => {
+      // Exponential backoff: 1s, 2s, 4s
+      return Math.min(1000 * 2 ** attemptIndex, 4000);
+    },
   });
 }
 
@@ -218,6 +244,16 @@ export function useSuperAdminStats() {
     staleTime: 10 * 60 * 1000, // 10 minutes
     refetchOnWindowFocus: false,
     refetchOnMount: false,
+    retry: (failureCount, error) => {
+      // Never retry on 401 auth errors
+      if (error?.isAuthError) return false;
+      // Retry max 2 times for other errors
+      return failureCount < 2;
+    },
+    retryDelay: (attemptIndex) => {
+      // Exponential backoff: 1s, 2s, 4s
+      return Math.min(1000 * 2 ** attemptIndex, 4000);
+    },
   });
 }
 
@@ -230,6 +266,16 @@ export function useSuperAdminOrganizations() {
     staleTime: 10 * 60 * 1000, // 10 minutes
     refetchOnWindowFocus: false,
     refetchOnMount: false,
+    retry: (failureCount, error) => {
+      // Never retry on 401 auth errors
+      if (error?.isAuthError) return false;
+      // Retry max 2 times for other errors
+      return failureCount < 2;
+    },
+    retryDelay: (attemptIndex) => {
+      // Exponential backoff: 1s, 2s, 4s
+      return Math.min(1000 * 2 ** attemptIndex, 4000);
+    },
   });
 }
 

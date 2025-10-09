@@ -190,8 +190,12 @@ export default function SuperAdminAnalytics() {
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Failed to Load Analytics</h3>
-          <p className="text-gray-600">{error.message}</p>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">
+            {error.isAuthError ? 'Session Expired' : 'Failed to Load Analytics'}
+          </h3>
+          <p className="text-gray-600">
+            {error.isAuthError ? 'Your session has expired. Please log in again.' : error.message}
+          </p>
         </div>
       </div>
     );
