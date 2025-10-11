@@ -323,6 +323,8 @@ class LeadController {
 
   // Update lead status (for progress bar)
   async updateLeadStatus(req, res) {
+    const client = await db.pool.connect();
+
     try {
       const { id } = req.params;
       const { organization_id, id: user_id } = req.user;
@@ -336,10 +338,16 @@ class LeadController {
         reason
       });
 
-      // Set user context for trigger
-      await db.query('SET app.current_user_id = $1', [user_id]);
+      // Use a transaction to handle potential trigger errors
+      await client.query('BEGIN');
 
-      // Update the lead status with organization context
+      // Set user context for trigger
+      await client.query('SET app.current_user_id = $1', [user_id]);
+
+      // Set organization context
+      await client.query('SET app.current_organization_id = $1', [organization_id]);
+
+      // Update the lead status
       const updateQuery = `
         UPDATE leads
         SET status = $1, updated_at = NOW()
@@ -347,21 +355,28 @@ class LeadController {
         RETURNING *
       `;
 
-      const result = await db.query(updateQuery, [status, id, organization_id], organization_id);
+      const result = await client.query(updateQuery, [status, id, organization_id]);
 
       if (result.rows.length === 0) {
+        await client.query('ROLLBACK');
         console.log('❌ Lead not found:', id);
         return res.status(404).json({ message: 'Lead not found' });
       }
 
+      // Commit the transaction
+      await client.query('COMMIT');
       console.log('✅ Lead status updated successfully');
 
-      // Add change reason if provided
+      // Add change reason if provided (outside transaction)
       if (reason) {
-        await db.query(
-          'UPDATE lead_change_history SET change_reason = $1 WHERE lead_id = $2 AND field_name = $3 ORDER BY created_at DESC LIMIT 1',
-          [reason, id, 'status']
-        );
+        try {
+          await db.query(
+            'UPDATE lead_change_history SET change_reason = $1 WHERE lead_id = $2 AND field_name = $3 ORDER BY created_at DESC LIMIT 1',
+            [reason, id, 'status']
+          );
+        } catch (reasonError) {
+          console.log('⚠️  Could not add change reason:', reasonError.message);
+        }
       }
 
       res.json({
@@ -369,19 +384,33 @@ class LeadController {
         lead: result.rows[0]
       });
     } catch (error) {
+      // Rollback on error
+      try {
+        await client.query('ROLLBACK');
+      } catch (rollbackError) {
+        console.error('Rollback error:', rollbackError);
+      }
+
       console.error('❌ Error updating lead status:', error);
       console.error('Error details:', {
         message: error.message,
         code: error.code,
         detail: error.detail,
         hint: error.hint,
+        constraint: error.constraint,
+        table: error.table,
+        column: error.column,
         stack: error.stack
       });
       res.status(500).json({
         message: 'Internal server error',
         error: error.message,
-        details: process.env.NODE_ENV === 'development' ? error.detail : undefined
+        code: error.code,
+        detail: error.detail,
+        hint: error.hint
       });
+    } finally {
+      client.release();
     }
   }
 
