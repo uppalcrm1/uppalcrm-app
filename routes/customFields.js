@@ -626,28 +626,42 @@ router.put('/default/:fieldName', async (req, res) => {
 // Create lead endpoint (temporary workaround for authentication issues)
 router.post('/create-lead', async (req, res) => {
   try {
+    // Support both camelCase and snake_case field names
     const {
       firstName, lastName, email, phone, company, source,
       status, priority, potentialValue, assignedTo, nextFollowUp, notes,
+      first_name, last_name, potential_value, assigned_to, next_follow_up,
       customFields = {}
     } = req.body;
 
+    // Use snake_case if provided, otherwise fall back to camelCase
+    const finalFirstName = first_name || firstName;
+    const finalLastName = last_name || lastName;
+    const finalPotentialValue = potential_value !== undefined ? potential_value : (potentialValue || 0);
+    const finalAssignedTo = assigned_to || assignedTo;
+    const finalNextFollowUp = next_follow_up || nextFollowUp;
+
     // Validate required fields
-    if (!firstName || !lastName) {
+    if (!finalFirstName || !finalLastName) {
       return res.status(400).json({
         error: 'Validation failed',
-        message: 'First name and last name are required'
+        message: 'First name and last name are required',
+        received: req.body
       });
     }
 
     console.log('🔍 Creating lead with:', {
       organizationId: req.organizationId,
       userId: req.user.id,
-      firstName, lastName, email, phone, company, source,
+      firstName: finalFirstName,
+      lastName: finalLastName,
+      email, phone, company, source,
       status: status || 'new',
       priority: priority || 'medium',
-      potentialValue: potentialValue || 0,
-      assignedTo, nextFollowUp, notes
+      potentialValue: finalPotentialValue,
+      assignedTo: finalAssignedTo,
+      nextFollowUp: finalNextFollowUp,
+      notes
     });
 
     // Create the lead
@@ -659,9 +673,9 @@ router.post('/create-lead', async (req, res) => {
       RETURNING id, first_name, last_name, email, phone, company, source, status,
                 priority, value, assigned_to, next_follow_up, notes, created_at
     `, [
-      req.organizationId, firstName, lastName, email || null, phone || null, company || null, source || null,
-      status || 'new', priority || 'medium', potentialValue || 0,
-      assignedTo || null, nextFollowUp || null, notes || null,
+      req.organizationId, finalFirstName, finalLastName, email || null, phone || null, company || null, source || null,
+      status || 'new', priority || 'medium', finalPotentialValue,
+      finalAssignedTo || null, finalNextFollowUp || null, notes || null,
       req.user.id
     ], req.organizationId);
 
