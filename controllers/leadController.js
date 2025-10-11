@@ -328,10 +328,18 @@ class LeadController {
       const { organization_id, id: user_id } = req.user;
       const { status, reason } = req.body;
 
+      console.log('🔍 Updating lead status:', {
+        leadId: id,
+        organizationId: organization_id,
+        userId: user_id,
+        newStatus: status,
+        reason
+      });
+
       // Set user context for trigger
       await db.query('SET app.current_user_id = $1', [user_id]);
 
-      // Update the lead status
+      // Update the lead status with organization context
       const updateQuery = `
         UPDATE leads
         SET status = $1, updated_at = NOW()
@@ -339,11 +347,14 @@ class LeadController {
         RETURNING *
       `;
 
-      const result = await db.query(updateQuery, [status, id, organization_id]);
+      const result = await db.query(updateQuery, [status, id, organization_id], organization_id);
 
       if (result.rows.length === 0) {
+        console.log('❌ Lead not found:', id);
         return res.status(404).json({ message: 'Lead not found' });
       }
+
+      console.log('✅ Lead status updated successfully');
 
       // Add change reason if provided
       if (reason) {
@@ -358,8 +369,19 @@ class LeadController {
         lead: result.rows[0]
       });
     } catch (error) {
-      console.error('Error updating lead status:', error);
-      res.status(500).json({ message: 'Internal server error' });
+      console.error('❌ Error updating lead status:', error);
+      console.error('Error details:', {
+        message: error.message,
+        code: error.code,
+        detail: error.detail,
+        hint: error.hint,
+        stack: error.stack
+      });
+      res.status(500).json({
+        message: 'Internal server error',
+        error: error.message,
+        details: process.env.NODE_ENV === 'development' ? error.detail : undefined
+      });
     }
   }
 
