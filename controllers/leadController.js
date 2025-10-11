@@ -341,11 +341,11 @@ class LeadController {
       // Use a transaction to handle potential trigger errors
       await client.query('BEGIN');
 
-      // Set user context for trigger
-      await client.query('SET app.current_user_id = $1', [user_id]);
+      // Set user context for trigger using set_config
+      await client.query('SELECT set_config($1, $2, true)', ['app.current_user_id', user_id]);
 
-      // Set organization context
-      await client.query('SET app.current_organization_id = $1', [organization_id]);
+      // Set organization context using set_config
+      await client.query('SELECT set_config($1, $2, true)', ['app.current_organization_id', organization_id]);
 
       // Update the lead status
       const updateQuery = `
