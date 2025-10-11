@@ -189,6 +189,55 @@ async function setupSuperAdmin() {
     
     console.log('✅ Trial columns setup complete');
 
+    // Create lead tracking tables if they don't exist
+    console.log('🔧 Creating lead tracking tables...');
+    try {
+      // Lead change history table
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS lead_change_history (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            organization_id UUID NOT NULL,
+            lead_id UUID NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
+            changed_by UUID NOT NULL REFERENCES users(id),
+            field_name VARCHAR(100) NOT NULL,
+            old_value TEXT,
+            new_value TEXT,
+            change_type VARCHAR(50) DEFAULT 'field_update',
+            change_reason TEXT,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        );
+      `);
+
+      // Lead status history table
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS lead_status_history (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            organization_id UUID NOT NULL,
+            lead_id UUID NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
+            from_status VARCHAR(50),
+            to_status VARCHAR(50) NOT NULL,
+            changed_by UUID NOT NULL REFERENCES users(id),
+            change_reason TEXT,
+            duration_in_previous_status INTERVAL,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        );
+      `);
+
+      // Create indexes
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_lead_change_history_lead ON lead_change_history(lead_id, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_lead_change_history_user ON lead_change_history(changed_by);
+        CREATE INDEX IF NOT EXISTS idx_lead_change_history_org ON lead_change_history(organization_id);
+        CREATE INDEX IF NOT EXISTS idx_lead_status_history_lead ON lead_status_history(lead_id, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_lead_status_history_status ON lead_status_history(to_status);
+        CREATE INDEX IF NOT EXISTS idx_lead_status_history_org ON lead_status_history(organization_id);
+      `);
+
+      console.log('✅ Lead tracking tables created');
+    } catch (tableError) {
+      console.log('⚠️  Lead tracking tables setup error:', tableError.message);
+    }
+
     // Fix lead trigger column names
     console.log('🔧 Fixing lead trigger column names...');
     try {
