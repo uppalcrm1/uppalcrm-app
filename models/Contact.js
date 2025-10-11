@@ -378,6 +378,9 @@ class Contact {
    */
   static async convertFromLead(leadId, organizationId, convertedBy, additionalData = {}) {
     return await transaction(async (client) => {
+      // Set user context for triggers
+      await client.query('SET app.current_user_id = $1', [convertedBy]);
+
       const leadResult = await client.query(`
         SELECT * FROM leads WHERE id = $1 AND organization_id = $2
       `, [leadId, organizationId]);
