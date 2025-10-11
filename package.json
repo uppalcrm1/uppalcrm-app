@@ -21,7 +21,8 @@
     "test:contacts-only": "node test/contacts.test.js",
     "test:api-keys-only": "node test/api-keys.test.js",
     "test:webhooks-only": "node test/webhooks.test.js",
-    "migrate:user-management": "node migrations/add-user-management-fields.js"
+    "migrate:user-management": "node migrations/add-user-management-fields.js",
+    "fix:lead-trigger": "node scripts/fix-lead-trigger.js"
   },
   "dependencies": {
     "axios": "^1.11.0",
