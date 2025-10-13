@@ -36,17 +36,16 @@ async function setupSuperAdmin() {
       );
     `);
     
-    if (tableCheck.rows[0].exists) {
-      console.log('✅ Super admin tables already exist');
-      return;
-    }
-    
-    // Create minimal super admin tables without complex dependencies
-    console.log('🔧 Creating super admin tables...');
-    
-    // Create super admin users table
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS super_admin_users (
+    const superAdminExists = tableCheck.rows[0].exists;
+    if (superAdminExists) {
+      console.log('✅ Super admin tables already exist, skipping creation');
+    } else {
+      // Create minimal super admin tables without complex dependencies
+      console.log('🔧 Creating super admin tables...');
+
+      // Create super admin users table
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS super_admin_users (
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
         email VARCHAR(255) UNIQUE NOT NULL,
         password_hash VARCHAR(255) NOT NULL,
@@ -186,10 +185,11 @@ async function setupSuperAdmin() {
         );
       `);
     }
-    
-    console.log('✅ Trial columns setup complete');
 
-    // Create lead tracking tables if they don't exist
+    console.log('✅ Trial columns setup complete');
+    } // End of superAdminExists else block
+
+    // Create lead tracking tables if they don't exist (runs every time)
     console.log('🔧 Creating lead tracking tables...');
     try {
       // Lead change history table
