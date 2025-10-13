@@ -248,6 +248,12 @@ export const leadsAPI = {
   getLeadStatuses: async () => {
     const response = await api.get('/lead-statuses')
     return response.data
+  },
+
+  // Lead conversion to contact
+  convertLead: async (leadId, conversionData) => {
+    const response = await api.post(`/leads/${leadId}/convert`, conversionData)
+    return response.data
   }
 }
 
