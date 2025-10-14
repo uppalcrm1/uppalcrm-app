@@ -88,14 +88,37 @@ const LeadDetail = () => {
 
   const handleConvertToContact = async () => {
     try {
-      // This would integrate with existing contact conversion logic
-      const response = await api.post(`/leads/${id}/convert`)
-      if (response.data.success) {
-        navigate(`/contacts/${response.data.contactId}`)
-      }
+      // Show confirmation dialog
+      const confirmed = window.confirm(
+        'Convert this lead to a contact? This action cannot be undone.'
+      )
+
+      if (!confirmed) return
+
+      // Call the API to convert
+      const response = await api.post(`/leads/${id}/convert`, {
+        relationshipType: 'new_customer'
+      })
+
+      // Show success message
+      alert(`✅ Lead converted successfully!\n\nContact: ${response.data.contact.firstName} ${response.data.contact.lastName}\nEmail: ${response.data.contact.email}`)
+
+      // Refresh the lead data to show updated status
+      setRefreshKey(prev => prev + 1)
+
+      // Navigate to contacts page (or contact detail if it exists)
+      navigate('/contacts')
     } catch (err) {
       console.error('Error converting lead:', err)
-      setError('Failed to convert lead to contact')
+
+      // Show specific error messages
+      if (err.response?.status === 409) {
+        setError('A contact with this email already exists!')
+      } else if (err.response?.status === 400 && err.response?.data?.error === 'Lead already converted') {
+        setError('This lead has already been converted!')
+      } else {
+        setError('Failed to convert lead to contact. Please try again.')
+      }
     }
   }
 
