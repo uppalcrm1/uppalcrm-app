@@ -1052,4 +1052,289 @@ router.get('/:id/status-progression',
   leadController.getLeadStatusProgression
 );
 
+/**
+ * POST /leads/:id/convert
+ * Convert a lead to a contact (and optionally create an account)
+ */
+router.post('/:id/convert',
+  validateUuidParam,
+  validate({
+    body: Joi.object({
+      createAccount: Joi.boolean().default(false),
+      accountDetails: Joi.object({
+        accountName: Joi.string().max(255),
+        edition: Joi.string().max(100),
+        deviceName: Joi.string().max(255),
+        macAddress: Joi.string().max(17),
+        billingCycle: Joi.string().valid('monthly', 'quarterly', 'semi-annual', 'annual'),
+        price: Joi.number().min(0),
+        isTrial: Joi.boolean().default(false)
+      }).optional(),
+      existingContactId: Joi.string().guid({ version: 'uuidv4' }).optional(),
+      relationshipType: Joi.string().valid('new_customer', 'existing_customer', 'additional_device').default('new_customer'),
+      interestType: Joi.string().valid('first_account', 'additional_device', 'upgrade').optional()
+    })
+  }),
+  async (req, res) => {
+    console.log('🔄 Lead conversion started');
+    console.log('Lead ID:', req.params.id);
+    console.log('Organization ID:', req.organizationId);
+    console.log('User ID:', req.userId);
+    console.log('Request body:', req.body);
+
+    const client = await db.pool.connect();
+
+    try {
+      await client.query('BEGIN');
+      console.log('✅ Transaction started');
+
+      await client.query(
+        "SELECT set_config('app.current_organization_id', $1, true)",
+        [req.organizationId]
+      );
+
+      await client.query(
+        "SELECT set_config('app.current_user_id', $1, true)",
+        [req.userId]
+      );
+      console.log('✅ Session variables set');
+
+      // 1. Get the lead
+      console.log('📋 Fetching lead...');
+      const leadResult = await client.query(
+        `SELECT * FROM leads WHERE id = $1 AND organization_id = $2`,
+        [req.params.id, req.organizationId]
+      );
+      console.log('Lead query result:', leadResult.rows.length > 0 ? 'Found' : 'Not found');
+
+      if (leadResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({
+          error: 'Lead not found',
+          message: 'Lead does not exist in this organization'
+        });
+      }
+
+      const lead = leadResult.rows[0];
+
+      if (lead.status === 'converted') {
+        await client.query('ROLLBACK');
+        return res.status(400).json({
+          error: 'Lead already converted',
+          message: 'This lead has already been converted to a contact'
+        });
+      }
+
+      let contact;
+      let isNewContact = true;
+
+      // 2. Check if linking to existing contact or creating new one
+      if (req.body.existingContactId) {
+        const existingContactResult = await client.query(
+          `SELECT * FROM contacts WHERE id = $1 AND organization_id = $2`,
+          [req.body.existingContactId, req.organizationId]
+        );
+
+        if (existingContactResult.rows.length === 0) {
+          await client.query('ROLLBACK');
+          return res.status(404).json({
+            error: 'Contact not found',
+            message: 'The specified contact does not exist'
+          });
+        }
+
+        contact = existingContactResult.rows[0];
+        isNewContact = false;
+
+        await client.query(
+          `INSERT INTO lead_contact_relationships
+           (lead_id, contact_id, relationship_type, interest_type, created_by)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [
+            lead.id,
+            contact.id,
+            req.body.relationshipType || 'existing_customer',
+            req.body.interestType,
+            req.userId
+          ]
+        );
+
+      } else {
+        // 3. Create new contact from lead
+        console.log('📝 Creating new contact from lead...');
+        console.log('Lead data:', {
+          first_name: lead.first_name,
+          last_name: lead.last_name,
+          email: lead.email,
+          phone: lead.phone,
+          company: lead.company
+        });
+
+        try {
+          const contactResult = await client.query(
+            `INSERT INTO contacts (
+              organization_id, first_name, last_name, email, phone,
+              company, title, address_line1, address_line2, city,
+              state, postal_code, country, converted_from_lead_id,
+              source, notes, created_by, contact_type, status
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+            RETURNING *`,
+            [
+              req.organizationId,
+              lead.first_name,
+              lead.last_name,
+              lead.email,
+              lead.phone,
+              lead.company,
+              lead.title,
+              lead.address_line1,
+              lead.address_line2,
+              lead.city,
+              lead.state,
+              lead.postal_code,
+              lead.country,
+              lead.id,
+              lead.source,
+              lead.notes,
+              req.userId,
+              'customer',
+              'active'
+            ]
+          );
+
+          contact = contactResult.rows[0];
+          console.log('✅ Contact created successfully:', contact.id);
+        } catch (insertError) {
+          console.error('❌ Contact INSERT failed:', insertError.message);
+          console.error('❌ Error code:', insertError.code);
+          console.error('❌ Error detail:', insertError.detail);
+          throw insertError;
+        }
+      }
+
+      // 4. Update lead status to converted
+      console.log('📝 Updating lead status to converted...');
+      await client.query(
+        `UPDATE leads
+         SET status = 'converted',
+             converted_date = NOW(),
+             linked_contact_id = $1,
+             relationship_type = $2,
+             interest_type = $3,
+             updated_at = NOW()
+         WHERE id = $4 AND organization_id = $5`,
+        [
+          contact.id,
+          req.body.relationshipType || 'new_customer',
+          req.body.interestType,
+          lead.id,
+          req.organizationId
+        ]
+      );
+      console.log('✅ Lead status updated');
+
+      // 5. Optionally create an account
+      let account = null;
+      if (req.body.createAccount && req.body.accountDetails) {
+        const details = req.body.accountDetails;
+
+        const accountResult = await client.query(
+          `INSERT INTO accounts (
+            organization_id, contact_id, account_name, edition,
+            device_name, mac_address, billing_cycle, price,
+            is_trial, account_type, license_status, created_by
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+          RETURNING *`,
+          [
+            req.organizationId,
+            contact.id,
+            details.accountName || `${contact.first_name} ${contact.last_name}'s Account`,
+            details.edition,
+            details.deviceName,
+            details.macAddress,
+            details.billingCycle,
+            details.price || 0,
+            details.isTrial || false,
+            details.isTrial ? 'trial' : 'active',
+            'pending',
+            req.userId
+          ]
+        );
+
+        account = accountResult.rows[0];
+
+        if (details.isTrial) {
+          const trialStart = new Date();
+          const trialEnd = new Date(trialStart.getTime() + (30 * 24 * 60 * 60 * 1000));
+
+          await client.query(
+            `UPDATE accounts
+             SET trial_start_date = $1, trial_end_date = $2
+             WHERE id = $3`,
+            [trialStart, trialEnd, account.id]
+          );
+        }
+      }
+
+      await client.query('COMMIT');
+      console.log('✅ Transaction committed successfully');
+
+      const response = {
+        message: isNewContact ? 'Lead converted to new contact successfully' : 'Lead linked to existing contact successfully',
+        contact: {
+          id: contact.id,
+          firstName: contact.first_name,
+          lastName: contact.last_name,
+          email: contact.email,
+          phone: contact.phone,
+          company: contact.company,
+          status: contact.status
+        },
+        account: account ? {
+          id: account.id,
+          accountName: account.account_name,
+          edition: account.edition,
+          accountType: account.account_type,
+          isTrial: account.is_trial
+        } : null,
+        isNewContact
+      };
+
+      console.log('📤 Sending response:', response);
+      res.status(200).json(response);
+
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('❌ Lead conversion error:', error);
+      console.error('❌ Error message:', error.message);
+      console.error('❌ Error stack:', error.stack);
+      console.error('❌ Error code:', error.code);
+
+      if (error.message && error.message.includes('duplicate key')) {
+        return res.status(409).json({
+          error: 'Conversion failed',
+          message: 'A contact with this email already exists'
+        });
+      }
+
+      if (error.code === '42P01') {
+        console.error('❌ Table does not exist!');
+        return res.status(500).json({
+          error: 'Database table missing',
+          message: 'The contacts table does not exist. Please run database migrations.',
+          details: error.message
+        });
+      }
+
+      res.status(500).json({
+        error: 'Conversion failed',
+        message: 'Unable to convert lead to contact',
+        details: error.message // Show details to help debug
+      });
+    } finally {
+      client.release();
+    }
+  }
+);
+
 module.exports = router;
