@@ -65,13 +65,13 @@ const contactSchemas = {
     query: Joi.object({
       page: Joi.number().integer().min(1).default(1),
       limit: Joi.number().integer().min(1).max(100).default(20),
-      status: Joi.string().valid('active', 'inactive', 'prospect', 'customer').optional(),
-      type: Joi.string().valid('customer', 'prospect', 'partner', 'vendor').optional(),
-      priority: Joi.string().valid('low', 'medium', 'high').optional(),
-      assigned_to: Joi.string().guid({ version: 'uuidv4' }).optional(),
-      source: Joi.string().optional(),
-      search: Joi.string().min(1).max(100).optional(),
-      sort: Joi.string().valid('created_at', 'updated_at', 'first_name', 'last_name', 'company', 'value', 'status').default('created_at'),
+      status: Joi.string().valid('active', 'inactive', 'prospect', 'customer').allow('').optional(),
+      type: Joi.string().valid('customer', 'prospect', 'partner', 'vendor').allow('').optional(),
+      priority: Joi.string().valid('low', 'medium', 'high').allow('').optional(),
+      assigned_to: Joi.string().guid({ version: 'uuidv4' }).allow('').optional(),
+      source: Joi.string().allow('').optional(),
+      search: Joi.string().min(0).max(100).allow('').optional(),
+      sort: Joi.string().valid('created_at', 'updated_at', 'first_name', 'last_name', 'company', 'status').default('created_at'),
       order: Joi.string().valid('asc', 'desc').default('desc')
     })
   },
