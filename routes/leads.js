@@ -1176,7 +1176,7 @@ router.post('/:id/convert',
               organization_id, first_name, last_name, email, phone,
               company, title, address_line1, address_line2, city,
               state, postal_code, country, converted_from_lead_id,
-              contact_source, notes, created_by, contact_type, contact_status
+              contact_source, notes, created_by, type, contact_status
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
             RETURNING *`,
             [
@@ -1197,7 +1197,7 @@ router.post('/:id/convert',
               lead.source,      // Maps to contact_source (base column)
               lead.notes,
               req.userId,
-              'customer',       // Maps to contact_type (base column)
+              'customer',       // Maps to type (base column)
               'active'          // Maps to contact_status (base column)
             ]
           );
