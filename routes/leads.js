@@ -1060,20 +1060,20 @@ router.post('/:id/convert',
   validateUuidParam,
   validate({
     body: Joi.object({
-      createAccount: Joi.boolean().default(false),
+      createAccount: Joi.boolean().default(false).optional(),
       accountDetails: Joi.object({
-        accountName: Joi.string().max(255),
-        edition: Joi.string().max(100),
-        deviceName: Joi.string().max(255),
-        macAddress: Joi.string().max(17),
-        billingCycle: Joi.string().valid('monthly', 'quarterly', 'semi-annual', 'annual'),
-        price: Joi.number().min(0),
-        isTrial: Joi.boolean().default(false)
+        accountName: Joi.string().max(255).optional(),
+        edition: Joi.string().max(100).optional(),
+        deviceName: Joi.string().max(255).optional(),
+        macAddress: Joi.string().max(17).optional(),
+        billingCycle: Joi.string().valid('monthly', 'quarterly', 'semi-annual', 'annual').optional(),
+        price: Joi.number().min(0).optional(),
+        isTrial: Joi.boolean().default(false).optional()
       }).optional(),
       existingContactId: Joi.string().guid({ version: 'uuidv4' }).optional(),
-      relationshipType: Joi.string().valid('new_customer', 'existing_customer', 'additional_device').default('new_customer'),
+      relationshipType: Joi.string().valid('new_customer', 'existing_customer', 'additional_device').default('new_customer').optional(),
       interestType: Joi.string().valid('first_account', 'additional_device', 'upgrade').optional()
-    })
+    }).unknown(false)
   }),
   async (req, res) => {
     console.log('🔄 Lead conversion started');
