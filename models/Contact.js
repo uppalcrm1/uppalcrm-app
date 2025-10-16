@@ -160,11 +160,11 @@ class Contact {
   static async findByOrganization(organizationId, options = {}) {
     try {
       const tableCheck = await query(`
-        SELECT table_name 
-        FROM information_schema.tables 
+        SELECT table_name
+        FROM information_schema.tables
         WHERE table_schema = 'public' AND table_name = 'contacts'
       `, []);
-      
+
       if (tableCheck.rows.length === 0) {
         throw new Error('Contacts table not found in database. Please run migrations.');
       }
@@ -183,14 +183,11 @@ class Contact {
       } = options;
 
       let query_text = `
-        SELECT c.*, 
-               u.first_name as assigned_first_name, 
-               u.last_name as assigned_last_name
+        SELECT c.*
         FROM contacts c
-        LEFT JOIN users u ON c.assigned_to = u.id AND u.organization_id = c.organization_id
         WHERE c.organization_id = $1
       `;
-      
+
       const params = [organizationId];
       let paramCount = 1;
 
@@ -200,19 +197,21 @@ class Contact {
       }
 
       if (type) {
-        query_text += ` AND c.type = $${++paramCount}`;
+        query_text += ` AND c.contact_type = $${++paramCount}`;
         params.push(type);
       }
 
-      if (priority) {
-        query_text += ` AND c.priority = $${++paramCount}`;
-        params.push(priority);
-      }
+      // Note: priority and assigned_to columns don't exist in the migration schema
+      // Commenting out until schema is updated
+      // if (priority) {
+      //   query_text += ` AND c.priority = $${++paramCount}`;
+      //   params.push(priority);
+      // }
 
-      if (assigned_to) {
-        query_text += ` AND c.assigned_to = $${++paramCount}`;
-        params.push(assigned_to);
-      }
+      // if (assigned_to) {
+      //   query_text += ` AND c.assigned_to = $${++paramCount}`;
+      //   params.push(assigned_to);
+      // }
 
       if (source) {
         query_text += ` AND c.source ILIKE $${++paramCount}`;
@@ -232,28 +231,19 @@ class Contact {
         params.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
       }
 
-      const validSorts = ['created_at', 'updated_at', 'first_name', 'last_name', 'company', 'value', 'status'];
+      // Only include columns that exist in the migration schema
+      const validSorts = ['created_at', 'updated_at', 'first_name', 'last_name', 'company', 'status'];
       const sortField = validSorts.includes(sort) ? sort : 'created_at';
       const sortOrder = order.toLowerCase() === 'asc' ? 'ASC' : 'DESC';
-      
+
       query_text += ` ORDER BY c.${sortField} ${sortOrder}`;
       query_text += ` LIMIT $${++paramCount} OFFSET $${++paramCount}`;
       params.push(limit, offset);
 
       const result = await query(query_text, params, organizationId);
-      
+
       const contacts = result.rows.map(row => {
         const contact = new Contact(row);
-        
-        if (row.assigned_to) {
-          contact.assigned_user = {
-            id: row.assigned_to,
-            first_name: row.assigned_first_name,
-            last_name: row.assigned_last_name,
-            full_name: `${row.assigned_first_name} ${row.assigned_last_name}`
-          };
-        }
-        
         return contact;
       });
 
@@ -266,17 +256,18 @@ class Contact {
         countParams.push(status);
       }
       if (type) {
-        countQuery += ` AND type = $${++countParamCount}`;
+        countQuery += ` AND contact_type = $${++countParamCount}`;
         countParams.push(type);
       }
-      if (priority) {
-        countQuery += ` AND priority = $${++countParamCount}`;
-        countParams.push(priority);
-      }
-      if (assigned_to) {
-        countQuery += ` AND assigned_to = $${++countParamCount}`;
-        countParams.push(assigned_to);
-      }
+      // Note: priority and assigned_to columns don't exist in the migration schema
+      // if (priority) {
+      //   countQuery += ` AND priority = $${++countParamCount}`;
+      //   countParams.push(priority);
+      // }
+      // if (assigned_to) {
+      //   countQuery += ` AND assigned_to = $${++countParamCount}`;
+      //   countParams.push(assigned_to);
+      // }
       if (source) {
         countQuery += ` AND source ILIKE $${++countParamCount}`;
         countParams.push(`%${source}%`);

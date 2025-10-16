@@ -21,7 +21,11 @@
       "Read(//c/Users/uppal/**)",
       "Bash(xargs ls:*)",
       "WebFetch(domain:files.manuscdn.com)",
-      "Bash(npx netlify deploy:*)"
+      "Bash(npx netlify deploy:*)",
+      "Bash(git pull:*)",
+      "Bash(npx netlify:*)",
+      "Bash(git checkout:*)",
+      "Bash(npm run logs:backend:*)"
     ],
     "deny": [],
     "ask": []
