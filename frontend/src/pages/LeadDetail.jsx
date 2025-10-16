@@ -66,10 +66,16 @@ const LeadDetail = () => {
     }
   }
 
-  const handleStatusUpdate = async (newStatus, reason) => {
+  const handleStatusUpdate = async (newStatus, reason, isConversion = false) => {
     try {
-      await api.put(`/leads/${id}/status`, { status: newStatus, reason })
-      setRefreshKey(prev => prev + 1) // Trigger refresh
+      // If converting to contact, use the conversion endpoint
+      if (isConversion && newStatus === 'converted') {
+        await handleConvertToContact()
+      } else {
+        // Otherwise, just update the status
+        await api.put(`/leads/${id}/status`, { status: newStatus, reason })
+        setRefreshKey(prev => prev + 1) // Trigger refresh
+      }
     } catch (err) {
       console.error('Error updating status:', err)
       setError('Failed to update lead status')

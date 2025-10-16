@@ -115,7 +115,12 @@ const LeadProgressBar = ({ currentStatus, onStatusChange, timeInCurrentStage }) 
 
   const handleConfirmStatusChange = () => {
     if (selectedStatus && onStatusChange) {
-      onStatusChange(selectedStatus, `Status changed to ${selectedStatus}`)
+      // Special handling for 'converted' status - this should trigger actual lead conversion
+      if (selectedStatus === 'converted') {
+        onStatusChange('converted', 'Converting lead to contact...', true) // Pass true to indicate conversion
+      } else {
+        onStatusChange(selectedStatus, `Status changed to ${selectedStatus}`)
+      }
     }
     setShowConfirmModal(false)
     setSelectedStatus(null)
