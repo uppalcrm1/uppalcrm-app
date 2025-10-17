@@ -21,6 +21,7 @@ import {
   Sliders,
   CreditCard,
   Download,
+  DollarSign,
 } from 'lucide-react'
 import LoadingSpinner from './LoadingSpinner'
 import TrialBanner from './TrialBanner'
@@ -31,6 +32,7 @@ const navigation = [
   { name: 'Add New Lead', href: '/leads/new', icon: Plus },
   { name: 'Contacts', href: '/contacts', icon: UserPlus },
   { name: 'Accounts', href: '/accounts', icon: CreditCard },
+  { name: 'Billing', href: '/billing', icon: DollarSign },
   { name: 'Subscription', href: '/subscription', icon: CreditCard },
   { name: 'Team', href: '/team', icon: UserCheck },
   {

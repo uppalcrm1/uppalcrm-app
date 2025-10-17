@@ -1,0 +1,276 @@
+import React, { useState } from 'react'
+import {
+  UserCheck,
+  Plus,
+  Search,
+  Mail,
+  Phone,
+  Building2,
+  Calendar,
+  Edit2,
+  Trash2,
+  Eye,
+  Filter
+} from 'lucide-react'
+
+const ContactsPage = () => {
+  const [contacts, setContacts] = useState([])
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [filterStatus, setFilterStatus] = useState('all')
+
+  // Mock data for demonstration
+  const mockContacts = [
+    {
+      id: '1',
+      first_name: 'John',
+      last_name: 'Doe',
+      email: 'john@example.com',
+      phone: '+1 234-567-8900',
+      company: 'Tech Corp',
+      status: 'active',
+      total_accounts: 3,
+      total_spent: 297,
+      created_at: '2024-10-01',
+      last_contact: '2024-10-15'
+    },
+    {
+      id: '2',
+      first_name: 'Jane',
+      last_name: 'Smith',
+      email: 'jane@example.com',
+      phone: '+1 234-567-8901',
+      company: 'Design Studio',
+      status: 'active',
+      total_accounts: 2,
+      total_spent: 198,
+      created_at: '2024-09-15',
+      last_contact: '2024-10-10'
+    }
+  ]
+
+  const displayContacts = contacts.length > 0 ? contacts : mockContacts
+
+  const getStatusBadge = (status) => {
+    const badges = {
+      active: 'badge badge-success',
+      inactive: 'badge badge-gray',
+      trial: 'badge badge-warning'
+    }
+    return badges[status] || 'badge badge-gray'
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Contacts</h1>
+          <p className="text-gray-600 mt-1">Manage your customer contacts</p>
+        </div>
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="btn btn-primary btn-md"
+        >
+          <Plus size={16} className="mr-2" />
+          Add Contact
+        </button>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="card">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600 mb-1">Total Contacts</p>
+              <p className="text-2xl font-bold text-gray-900">{displayContacts.length}</p>
+            </div>
+            <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center">
+              <UserCheck className="text-primary-600" size={24} />
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600 mb-1">Active Contacts</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {displayContacts.filter(c => c.status === 'active').length}
+              </p>
+            </div>
+            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+              <UserCheck className="text-green-600" size={24} />
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600 mb-1">Total Accounts</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {displayContacts.reduce((sum, c) => sum + c.total_accounts, 0)}
+              </p>
+            </div>
+            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+              <Building2 className="text-blue-600" size={24} />
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600 mb-1">Total Revenue</p>
+              <p className="text-2xl font-bold text-gray-900">
+                ${displayContacts.reduce((sum, c) => sum + c.total_spent, 0)}
+              </p>
+            </div>
+            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+              <span className="text-purple-600 text-xl font-bold">$</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Search and Filters */}
+      <div className="card">
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex-1 relative">
+            <Search size={16} className="absolute left-3 top-3 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search contacts by name, email, or company..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="input pl-10"
+            />
+          </div>
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="input w-full sm:w-48"
+          >
+            <option value="all">All Status</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+            <option value="trial">Trial</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Contacts Table */}
+      <div className="card">
+        {displayContacts.length === 0 ? (
+          <div className="text-center py-12">
+            <UserCheck className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No contacts found</h3>
+            <p className="text-gray-600 mb-6">Get started by adding your first contact</p>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="btn btn-primary btn-md"
+            >
+              <Plus size={16} className="mr-2" />
+              Add Contact
+            </button>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="text-left py-3 px-4 font-medium text-gray-900">Contact</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-900">Company</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-900">Status</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-900">Accounts</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-900">Total Spent</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-900">Last Contact</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-900">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {displayContacts.map((contact) => (
+                  <tr key={contact.id} className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="py-4 px-4">
+                      <div className="flex items-center">
+                        <div className="w-10 h-10 bg-primary-600 rounded-full flex items-center justify-center mr-3">
+                          <span className="text-white font-medium">
+                            {contact.first_name[0]}{contact.last_name[0]}
+                          </span>
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-900">
+                            {contact.first_name} {contact.last_name}
+                          </p>
+                          <div className="flex items-center text-sm text-gray-600">
+                            <Mail size={12} className="mr-1" />
+                            {contact.email}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-4 px-4">
+                      <div className="flex items-center text-gray-900">
+                        <Building2 size={14} className="mr-2 text-gray-400" />
+                        {contact.company}
+                      </div>
+                    </td>
+                    <td className="py-4 px-4">
+                      <span className={getStatusBadge(contact.status)}>
+                        {contact.status}
+                      </span>
+                    </td>
+                    <td className="py-4 px-4">
+                      <span className="text-gray-900 font-medium">{contact.total_accounts}</span>
+                    </td>
+                    <td className="py-4 px-4">
+                      <span className="text-gray-900 font-medium">${contact.total_spent}</span>
+                    </td>
+                    <td className="py-4 px-4">
+                      <div className="flex items-center text-sm text-gray-600">
+                        <Calendar size={12} className="mr-1" />
+                        {contact.last_contact}
+                      </div>
+                    </td>
+                    <td className="py-4 px-4">
+                      <div className="flex items-center gap-2">
+                        <button className="p-2 text-gray-600 hover:text-primary-600 hover:bg-gray-100 rounded-lg">
+                          <Eye size={16} />
+                        </button>
+                        <button className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg">
+                          <Edit2 size={16} />
+                        </button>
+                        <button className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg">
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Create Contact Modal - Placeholder */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <h2 className="text-xl font-bold mb-4">Add New Contact</h2>
+            <p className="text-gray-600 mb-4">Contact creation form will be implemented here</p>
+            <button
+              onClick={() => setShowCreateModal(false)}
+              className="btn btn-secondary btn-md w-full"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default ContactsPage

@@ -26,6 +26,9 @@ import SubscriptionManagement from './pages/SubscriptionManagement'
 import ImportLeads from './pages/ImportLeads'
 import ImportContacts from './pages/ImportContacts'
 import LeadDetail from './pages/LeadDetail'
+import ContactsPage from './pages/ContactsPage'
+import AccountsPage from './pages/AccountsPage'
+import BillingPage from './pages/BillingPage'
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuth()
@@ -100,7 +103,8 @@ function App() {
         <Route path="leads/new" element={<DynamicLeadForm />} />
         <Route path="leads/import" element={<ImportLeads />} />
         <Route path="contacts/import" element={<ImportContacts />} />
-        <Route path="accounts" element={<AccountManagement />} />
+        <Route path="accounts" element={<AccountsPage />} />
+        <Route path="billing" element={<BillingPage />} />
         <Route path="subscription" element={<SubscriptionManagement />} />
         <Route path="licenses" element={<AccountManagement />} />
       </Route>
