@@ -95,7 +95,7 @@ function App() {
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="leads" element={<Leads />} />
         <Route path="leads/:id" element={<LeadDetail />} />
-        <Route path="contacts" element={<Contacts />} />
+        <Route path="contacts" element={<ContactsPage />} />
         <Route path="team" element={<TeamPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="integrations/zapier" element={<ZapierIntegrationPage />} />

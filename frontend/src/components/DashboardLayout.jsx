@@ -29,30 +29,10 @@ import TrialBanner from './TrialBanner'
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Leads', href: '/leads', icon: Users },
-  { name: 'Add New Lead', href: '/leads/new', icon: Plus },
-  { name: 'Contacts', href: '/contacts', icon: UserPlus },
+  { name: 'Contacts', href: '/contacts', icon: UserCheck },
   { name: 'Accounts', href: '/accounts', icon: CreditCard },
   { name: 'Billing', href: '/billing', icon: DollarSign },
-  { name: 'Subscription', href: '/subscription', icon: CreditCard },
   { name: 'Team', href: '/team', icon: UserCheck },
-  {
-    name: 'Integrations',
-    icon: Puzzle,
-    hasSubmenu: true,
-    children: [
-      { name: 'Zapier', href: '/integrations/zapier', icon: Zap },
-    ]
-  },
-  {
-    name: 'Import',
-    icon: Download,
-    hasSubmenu: true,
-    children: [
-      { name: 'Import Leads', href: '/leads/import', icon: Users },
-      { name: 'Import Contacts', href: '/contacts/import', icon: UserPlus },
-    ]
-  },
-  { name: 'Field Configuration', href: '/admin/fields', icon: Sliders },
   { name: 'Settings', href: '/settings', icon: Settings },
 ]
 
