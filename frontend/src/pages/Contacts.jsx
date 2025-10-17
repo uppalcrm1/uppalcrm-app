@@ -379,7 +379,11 @@ const Contacts = () => {
                 </thead>
                 <tbody>
                   {contacts.map((contact) => (
-                    <tr key={contact.id} className="border-b border-gray-100 hover:bg-gray-50">
+                    <tr
+                      key={contact.id}
+                      onClick={() => handleViewContact(contact)}
+                      className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
+                    >
                       <td className="py-4 px-4">
                         <div>
                           <p className="font-medium text-gray-900">{contact.full_name}</p>
@@ -446,14 +450,7 @@ const Contacts = () => {
                         </div>
                       </td>
                       <td className="py-4 px-4">
-                        <div className="flex items-center space-x-2">
-                          <button
-                            onClick={() => handleViewContact(contact)}
-                            className="p-1 text-gray-600 hover:text-primary-600"
-                            title="View Details"
-                          >
-                            <Eye size={16} />
-                          </button>
+                        <div className="flex items-center space-x-2" onClick={(e) => e.stopPropagation()}>
                           <button
                             onClick={() => {
                               setSelectedContact(contact)

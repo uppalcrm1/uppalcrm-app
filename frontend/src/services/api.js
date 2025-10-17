@@ -278,7 +278,15 @@ export const contactsAPI = {
     const response = await api.put(`/contacts/${id}`, contactData)
     return response.data
   },
-  
+
+  updateContactStatus: async (id, status, accountData = null) => {
+    const response = await api.put(`/contacts/${id}/status`, {
+      status,
+      accountData
+    })
+    return response.data
+  },
+
   deleteContact: async (id) => {
     const response = await api.delete(`/contacts/${id}`)
     return response.data

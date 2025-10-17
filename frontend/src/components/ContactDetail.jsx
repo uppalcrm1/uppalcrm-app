@@ -1,8 +1,8 @@
 import React, { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { 
-  ArrowLeft, 
-  Edit, 
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import {
+  ArrowLeft,
+  Edit,
   Trash2,
   Mail,
   Phone,
@@ -16,25 +16,47 @@ import {
   Key,
   PlayCircle,
   Download,
-  Activity
+  Activity,
+  ArrowRight
 } from 'lucide-react'
 import { contactsAPI } from '../services/api'
 import LoadingSpinner from './LoadingSpinner'
 import { format } from 'date-fns'
+import toast from 'react-hot-toast'
 import AccountManagement from './AccountManagement'
 import DeviceRegistration from './DeviceRegistration'
 import LicenseManagement from './LicenseManagement'
 import TrialManagement from './TrialManagement'
 import ContactInteractions from './ContactInteractions'
+import AccountDetailsModal from './AccountDetailsModal'
 
 const ContactDetail = ({ contact, onBack, onEdit, onDelete }) => {
   const [activeTab, setActiveTab] = useState('overview')
+  const [showAccountModal, setShowAccountModal] = useState(false)
+  const [pendingStatus, setPendingStatus] = useState(null)
+  const queryClient = useQueryClient()
 
   // Fetch fresh contact data
   const { data: contactData, isLoading } = useQuery({
     queryKey: ['contact', contact.id],
     queryFn: () => contactsAPI.getContact(contact.id),
     initialData: { contact }
+  })
+
+  // Status update mutation
+  const updateStatusMutation = useMutation({
+    mutationFn: ({ status, accountData }) =>
+      contactsAPI.updateContactStatus(contact.id, status, accountData),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['contact', contact.id])
+      queryClient.invalidateQueries(['contacts'])
+      toast.success('Contact status updated successfully')
+      setShowAccountModal(false)
+      setPendingStatus(null)
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.message || 'Failed to update status')
+    }
   })
 
   if (isLoading) {
@@ -52,12 +74,40 @@ const ContactDetail = ({ contact, onBack, onEdit, onDelete }) => {
     { id: 'activity', label: 'Activity', icon: Activity }
   ]
 
+  // Status workflow: prospect → on_trial → first_follow_up → second_follow_up → won/lost
+  const statusWorkflow = {
+    'prospect': { next: 'on_trial', label: 'Start Trial' },
+    'on_trial': { next: 'first_follow_up', label: 'First Follow Up' },
+    'first_follow_up': { next: 'second_follow_up', label: 'Second Follow Up' },
+    'second_follow_up': { next: 'won', label: 'Mark as Won', secondary: 'lost' }
+  }
+
+  const handleStatusChange = (newStatus) => {
+    if (newStatus === 'won') {
+      // Show modal to collect account details
+      setPendingStatus(newStatus)
+      setShowAccountModal(true)
+    } else {
+      // Update status directly
+      updateStatusMutation.mutate({ status: newStatus, accountData: null })
+    }
+  }
+
+  const handleAccountSubmit = (accountData) => {
+    updateStatusMutation.mutate({ status: 'won', accountData })
+  }
+
   const getStatusBadgeColor = (status) => {
     const colors = {
       'active': 'green',
       'inactive': 'gray',
       'prospect': 'blue',
-      'customer': 'purple'
+      'customer': 'purple',
+      'on_trial': 'yellow',
+      'first_follow_up': 'orange',
+      'second_follow_up': 'orange',
+      'won': 'green',
+      'lost': 'red'
     }
     return colors[status] || 'gray'
   }
@@ -189,6 +239,32 @@ const ContactDetail = ({ contact, onBack, onEdit, onDelete }) => {
           </div>
         </div>
 
+        {/* Status Workflow */}
+        {statusWorkflow[contactInfo.status] && (
+          <div className="mt-6 pt-6 border-t border-gray-200">
+            <h3 className="text-sm font-medium text-gray-900 mb-4">Update Status</h3>
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => handleStatusChange(statusWorkflow[contactInfo.status].next)}
+                disabled={updateStatusMutation.isPending}
+                className="btn btn-primary btn-md"
+              >
+                {updateStatusMutation.isPending ? 'Updating...' : statusWorkflow[contactInfo.status].label}
+                <ArrowRight size={16} className="ml-2" />
+              </button>
+              {statusWorkflow[contactInfo.status].secondary && (
+                <button
+                  onClick={() => handleStatusChange(statusWorkflow[contactInfo.status].secondary)}
+                  disabled={updateStatusMutation.isPending}
+                  className="btn btn-danger btn-md"
+                >
+                  Mark as Lost
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Notes */}
         {contactInfo.notes && (
           <div className="mt-6 pt-6 border-t border-gray-200">
@@ -250,6 +326,19 @@ const ContactDetail = ({ contact, onBack, onEdit, onDelete }) => {
           )}
         </div>
       </div>
+
+      {/* Account Details Modal */}
+      {showAccountModal && (
+        <AccountDetailsModal
+          contactName={contactInfo.full_name}
+          onClose={() => {
+            setShowAccountModal(false)
+            setPendingStatus(null)
+          }}
+          onSubmit={handleAccountSubmit}
+          isLoading={updateStatusMutation.isPending}
+        />
+      )}
     </div>
   )
 }

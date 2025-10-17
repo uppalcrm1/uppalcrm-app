@@ -587,6 +587,87 @@ router.post('/',
 );
 
 /**
+ * PUT /contacts/:id/status
+ * Update contact status and optionally create account when status is "won"
+ */
+router.put('/:id/status',
+  validateUuidParam,
+  async (req, res) => {
+    try {
+      const { status, accountData } = req.body;
+
+      // Validate status
+      const validStatuses = ['prospect', 'on_trial', 'first_follow_up', 'second_follow_up', 'won', 'lost'];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({
+          error: 'Invalid status',
+          message: `Status must be one of: ${validStatuses.join(', ')}`
+        });
+      }
+
+      // Get the contact first
+      const contact = await Contact.findById(req.params.id, req.organizationId);
+      if (!contact) {
+        return res.status(404).json({
+          error: 'Contact not found',
+          message: 'Contact does not exist in this organization'
+        });
+      }
+
+      // Update the contact status
+      const updatedContact = await Contact.update(
+        req.params.id,
+        { status },
+        req.organizationId
+      );
+
+      // If status is "won" and accountData is provided, create an account
+      let account = null;
+      if (status === 'won' && accountData) {
+        const { edition_id, billing_cycle, price } = accountData;
+
+        // Create account
+        const accountInfo = {
+          contact_id: req.params.id,
+          account_name: `${contact.first_name} ${contact.last_name} Account`,
+          account_type: 'business',
+          status: 'active'
+        };
+
+        account = await Contact.createAccount(accountInfo, req.organizationId, req.user.id);
+
+        // Generate license for the account
+        if (edition_id) {
+          const licenseData = {
+            contact_id: req.params.id,
+            edition_id,
+            license_type: 'standard',
+            duration_months: billing_cycle === 'monthly' ? 1 : 12,
+            max_devices: 1,
+            custom_features: { price }
+          };
+
+          await Contact.generateLicense(licenseData, req.organizationId, req.user.id);
+        }
+      }
+
+      res.json({
+        message: 'Contact status updated successfully',
+        contact: updatedContact.toJSON(),
+        account: account
+      });
+    } catch (error) {
+      console.error('Update contact status error:', error);
+      res.status(500).json({
+        error: 'Status update failed',
+        message: 'Unable to update contact status',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+);
+
+/**
  * PUT /contacts/:id
  * Update contact information
  */
@@ -595,7 +676,7 @@ router.put('/:id',
   async (req, res) => {
     try {
       const contact = await Contact.update(req.params.id, req.body, req.organizationId);
-      
+
       if (!contact) {
         return res.status(404).json({
           error: 'Contact not found',
