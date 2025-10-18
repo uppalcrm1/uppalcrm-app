@@ -7,6 +7,7 @@ import {
   Users,
   Building2,
   BarChart3,
+  CreditCard,
   LogOut,
   Bell,
   Settings
@@ -32,6 +33,11 @@ const navigation = [
     name: 'Analytics',
     href: '/super-admin/analytics',
     icon: BarChart3,
+  },
+  {
+    name: 'Accounts',
+    href: '/super-admin/accounts',
+    icon: CreditCard,
   },
 ];
 

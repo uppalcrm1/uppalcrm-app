@@ -84,6 +84,7 @@ function App() {
         <Route path="organizations" element={<SuperAdminOrganizations />} />
         <Route path="organizations/:id" element={<SuperAdminOrgDetail />} />
         <Route path="analytics" element={<SuperAdminAnalytics />} />
+        <Route path="accounts" element={<AccountManagement />} />
       </Route>
 
       {/* Protected Routes */}
@@ -113,7 +114,6 @@ function App() {
         <Route path="integrations" element={<IntegrationsPage />} />
         <Route path="import" element={<ImportPage />} />
         <Route path="field-configuration" element={<FieldConfigurationPage />} />
-        <Route path="licenses" element={<AccountManagement />} />
       </Route>
 
       {/* Catch all route */}
