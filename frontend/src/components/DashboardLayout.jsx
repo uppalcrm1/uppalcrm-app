@@ -22,6 +22,8 @@ import {
   CreditCard,
   Download,
   DollarSign,
+  Plug,
+  Upload,
 } from 'lucide-react'
 import LoadingSpinner from './LoadingSpinner'
 import TrialBanner from './TrialBanner'
@@ -33,6 +35,10 @@ const navigation = [
   { name: 'Accounts', href: '/accounts', icon: CreditCard },
   { name: 'Billing', href: '/billing', icon: DollarSign },
   { name: 'Team', href: '/team', icon: UserCheck },
+  { name: 'Subscription', href: '/subscription', icon: CreditCard },
+  { name: 'Integrations', href: '/integrations', icon: Plug },
+  { name: 'Import', href: '/import', icon: Upload },
+  { name: 'Field Configuration', href: '/field-configuration', icon: Sliders },
   { name: 'Settings', href: '/settings', icon: Settings },
 ]
 

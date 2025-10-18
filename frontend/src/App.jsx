@@ -29,6 +29,10 @@ import LeadDetail from './pages/LeadDetail'
 import ContactsPage from './pages/ContactsPage'
 import AccountsPage from './pages/AccountsPage'
 import BillingPage from './pages/BillingPage'
+import SubscriptionPage from './pages/SubscriptionPage'
+import IntegrationsPage from './pages/IntegrationsPage'
+import ImportPage from './pages/ImportPage'
+import FieldConfigurationPage from './pages/FieldConfigurationPage'
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuth()
@@ -105,7 +109,10 @@ function App() {
         <Route path="contacts/import" element={<ImportContacts />} />
         <Route path="accounts" element={<AccountsPage />} />
         <Route path="billing" element={<BillingPage />} />
-        <Route path="subscription" element={<SubscriptionManagement />} />
+        <Route path="subscription" element={<SubscriptionPage />} />
+        <Route path="integrations" element={<IntegrationsPage />} />
+        <Route path="import" element={<ImportPage />} />
+        <Route path="field-configuration" element={<FieldConfigurationPage />} />
         <Route path="licenses" element={<AccountManagement />} />
       </Route>
 

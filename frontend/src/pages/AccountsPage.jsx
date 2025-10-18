@@ -117,7 +117,7 @@ const AccountsPage = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Account Management</h1>
-          <p className="text-gray-600 mt-1">Manage user accounts for all organizations ($15/user/month)</p>
+          <p className="text-gray-600 mt-1">Track software licenses, device registrations, and billing for customer accounts</p>
         </div>
         <button
           onClick={() => setShowPaymentModal(true)}
