@@ -42,6 +42,33 @@ A complete, production-ready CRM system built for software licensing businesses 
 - **Pricing Tiers**: Four pricing plans (Starter $49, Professional $149, Business $299, Enterprise custom)
 - **Trial Signup Form**: Comprehensive form capturing company information
 
+## 📐 Architecture
+
+Uppal CRM uses a **two-tier multi-tenant architecture**:
+
+### 🏢 Super Admin Platform (`/super-admin/*`)
+Manage the CRM as a SaaS business:
+- Monitor trial signups
+- Manage subscribing organizations
+- Track platform revenue ($15/user/month)
+- View platform analytics
+
+### 🏪 Organization CRM (`/*`)
+Each business manages their customers:
+- Lead & contact management
+- **Customer accounts** (software licenses)
+- Billing & payments (from customers)
+- Team management
+- Integrations & customization
+
+⚠️ **Important**: "Accounts" has different meanings in each tier:
+- **Super Admin Accounts** = Organizations paying us
+- **Organization Accounts** = Customers buying software licenses
+
+📚 **See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for complete details.**
+
+📋 **See [docs/QUICK-REFERENCE.md](docs/QUICK-REFERENCE.md) for quick reference.**
+
 ## 🛠 Tech Stack
 
 ### Backend
