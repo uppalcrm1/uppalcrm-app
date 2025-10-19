@@ -28,24 +28,30 @@ import {
 import LoadingSpinner from './LoadingSpinner'
 import TrialBanner from './TrialBanner'
 
-const navigation = [
+// Main navigation - Core business operations (sidebar)
+const mainNavigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Leads', href: '/leads', icon: Users },
   { name: 'Contacts', href: '/contacts', icon: UserCheck },
   { name: 'Accounts', href: '/accounts', icon: CreditCard },
   { name: 'Billing', href: '/billing', icon: DollarSign },
-  { name: 'Team', href: '/team', icon: UserCheck },
-  { name: 'Subscription', href: '/subscription', icon: CreditCard },
-  { name: 'Integrations', href: '/integrations', icon: Plug },
-  { name: 'Import', href: '/import', icon: Upload },
-  { name: 'Field Configuration', href: '/field-configuration', icon: Sliders },
-  { name: 'Settings', href: '/settings', icon: Settings },
+]
+
+// Admin navigation - System administration (dropdown)
+const adminNavigation = [
+  { name: 'Team', href: '/admin/team', icon: UserCheck },
+  { name: 'Subscription', href: '/admin/subscription', icon: CreditCard },
+  { name: 'Integrations', href: '/admin/integrations', icon: Plug },
+  { name: 'Import', href: '/admin/import', icon: Upload },
+  { name: 'Field Configuration', href: '/admin/fields', icon: Sliders },
+  { name: 'Settings', href: '/admin/settings', icon: Settings },
 ]
 
 const DashboardLayout = () => {
   const { user, organization, logout, isLoading } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [adminMenuOpen, setAdminMenuOpen] = useState(false)
   const [submenuOpen, setSubmenuOpen] = useState({})
   const location = useLocation()
 
@@ -103,7 +109,7 @@ const DashboardLayout = () => {
 
           {/* Navigation */}
           <nav className="flex-1 px-4 py-6 space-y-1">
-            {navigation.map((item) => {
+            {mainNavigation.map((item) => {
               const Icon = item.icon
               
               // Handle items with submenus
@@ -241,18 +247,22 @@ const DashboardLayout = () => {
               <div className="hidden sm:block">
                 <h2 className="text-lg font-semibold text-gray-900">
                   {(() => {
-                    // Check direct navigation items
-                    const directItem = navigation.find(item => item.href === location.pathname)
-                    if (directItem) return directItem.name
-                    
+                    // Check main navigation items
+                    const mainItem = mainNavigation.find(item => item.href === location.pathname)
+                    if (mainItem) return mainItem.name
+
+                    // Check admin navigation items
+                    const adminItem = adminNavigation.find(item => item.href === location.pathname)
+                    if (adminItem) return adminItem.name
+
                     // Check submenu items
-                    for (const item of navigation) {
+                    for (const item of mainNavigation) {
                       if (item.children) {
                         const childItem = item.children.find(child => child.href === location.pathname)
                         if (childItem) return childItem.name
                       }
                     }
-                    
+
                     return 'Dashboard'
                   })()}
                 </h2>
@@ -275,11 +285,45 @@ const DashboardLayout = () => {
                 <Bell size={20} />
               </button>
 
-              {/* User Role Badge */}
-              <div className="hidden sm:block">
-                <span className={`badge ${user?.role === 'admin' ? 'badge-info' : 'badge-gray'}`}>
-                  {user?.role}
-                </span>
+              {/* Admin Dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => setAdminMenuOpen(!adminMenuOpen)}
+                  className="flex items-center p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
+                >
+                  <Settings size={20} className="mr-2" />
+                  <span className="hidden sm:inline text-sm font-medium">Admin</span>
+                  <ChevronDown size={16} className="ml-1" />
+                </button>
+
+                {adminMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                    <div className="py-2">
+                      {adminNavigation.map((item) => {
+                        const Icon = item.icon
+                        const isActive = location.pathname === item.href
+
+                        return (
+                          <NavLink
+                            key={item.name}
+                            to={item.href}
+                            onClick={() => setAdminMenuOpen(false)}
+                            className={`
+                              flex items-center px-4 py-2 text-sm transition-colors
+                              ${isActive
+                                ? 'bg-primary-50 text-primary-700 font-medium'
+                                : 'text-gray-700 hover:bg-gray-50'
+                              }
+                            `}
+                          >
+                            <Icon size={16} className="mr-3" />
+                            {item.name}
+                          </NavLink>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -296,11 +340,14 @@ const DashboardLayout = () => {
         </main>
       </div>
 
-      {/* Click outside to close user menu */}
-      {userMenuOpen && (
-        <div 
+      {/* Click outside to close menus */}
+      {(userMenuOpen || adminMenuOpen) && (
+        <div
           className="fixed inset-0 z-30"
-          onClick={() => setUserMenuOpen(false)}
+          onClick={() => {
+            setUserMenuOpen(false)
+            setAdminMenuOpen(false)
+          }}
         />
       )}
     </div>

@@ -33,6 +33,12 @@ import SubscriptionPage from './pages/SubscriptionPage'
 import IntegrationsPage from './pages/IntegrationsPage'
 import ImportPage from './pages/ImportPage'
 import FieldConfigurationPage from './pages/FieldConfigurationPage'
+import AdminTeam from './pages/admin/AdminTeam'
+import AdminSubscription from './pages/admin/AdminSubscription'
+import AdminIntegrations from './pages/admin/AdminIntegrations'
+import AdminImport from './pages/admin/AdminImport'
+import AdminFields from './pages/admin/AdminFields'
+import AdminSettings from './pages/admin/AdminSettings'
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuth()
@@ -114,6 +120,14 @@ function App() {
         <Route path="integrations" element={<IntegrationsPage />} />
         <Route path="import" element={<ImportPage />} />
         <Route path="field-configuration" element={<FieldConfigurationPage />} />
+
+        {/* Admin Routes */}
+        <Route path="admin/team" element={<AdminTeam />} />
+        <Route path="admin/subscription" element={<AdminSubscription />} />
+        <Route path="admin/integrations" element={<AdminIntegrations />} />
+        <Route path="admin/import" element={<AdminImport />} />
+        <Route path="admin/fields" element={<AdminFields />} />
+        <Route path="admin/settings" element={<AdminSettings />} />
       </Route>
 
       {/* Catch all route */}
