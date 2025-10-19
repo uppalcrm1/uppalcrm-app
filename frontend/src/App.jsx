@@ -28,7 +28,7 @@ import ImportContacts from './pages/ImportContacts'
 import LeadDetail from './pages/LeadDetail'
 import ContactsPage from './pages/ContactsPage'
 import AccountsPage from './pages/AccountsPage'
-import BillingPage from './pages/BillingPage'
+import TransactionsPage from './pages/TransactionsPage'
 import SubscriptionPage from './pages/SubscriptionPage'
 import IntegrationsPage from './pages/IntegrationsPage'
 import ImportPage from './pages/ImportPage'
@@ -115,7 +115,7 @@ function App() {
         <Route path="leads/import" element={<ImportLeads />} />
         <Route path="contacts/import" element={<ImportContacts />} />
         <Route path="accounts" element={<AccountsPage />} />
-        <Route path="billing" element={<BillingPage />} />
+        <Route path="transactions" element={<TransactionsPage />} />
         <Route path="subscription" element={<SubscriptionPage />} />
         <Route path="integrations" element={<IntegrationsPage />} />
         <Route path="import" element={<ImportPage />} />

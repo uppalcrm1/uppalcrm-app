@@ -13,95 +13,90 @@ import {
   FileText
 } from 'lucide-react'
 
-const BillingPage = () => {
-  const [payments, setPayments] = useState([])
+const TransactionsPage = () => {
+  const [transactions, setTransactions] = useState([])
   const [searchQuery, setSearchQuery] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterMethod, setFilterMethod] = useState('all')
   const [dateRange, setDateRange] = useState('all')
 
-  // Mock payment data
-  const mockPayments = [
+  // Mock transaction data
+  const mockTransactions = [
     {
-      id: 'PAY001',
+      id: 'TXN-2024-001',
       account_id: 'ACC001',
       contact_name: 'John Doe',
       contact_email: 'john@example.com',
       amount: 99,
-      payment_date: '2024-10-01',
+      transaction_date: '2024-10-01',
       payment_method: 'Credit Card',
       billing_cycle: 'monthly',
       status: 'completed',
-      transaction_id: 'TXN-2024-001',
       notes: 'Renewal payment'
     },
     {
-      id: 'PAY002',
+      id: 'TXN-2024-002',
       account_id: 'ACC002',
       contact_name: 'Jane Smith',
       contact_email: 'jane@example.com',
       amount: 237,
-      payment_date: '2024-09-15',
+      transaction_date: '2024-09-15',
       payment_method: 'PayPal',
       billing_cycle: 'quarterly',
       status: 'completed',
-      transaction_id: 'TXN-2024-002',
       notes: 'Quarterly subscription'
     },
     {
-      id: 'PAY003',
+      id: 'TXN-2024-003',
       account_id: 'ACC001',
       contact_name: 'John Doe',
       contact_email: 'john@example.com',
       amount: 99,
-      payment_date: '2024-09-01',
+      transaction_date: '2024-09-01',
       payment_method: 'Credit Card',
       billing_cycle: 'monthly',
       status: 'completed',
-      transaction_id: 'TXN-2024-003',
       notes: 'Monthly renewal'
     },
     {
-      id: 'PAY004',
+      id: 'TXN-2024-004',
       account_id: 'ACC003',
       contact_name: 'Bob Wilson',
       contact_email: 'bob@example.com',
       amount: 588,
-      payment_date: '2024-08-10',
+      transaction_date: '2024-08-10',
       payment_method: 'Bank Transfer',
       billing_cycle: 'annual',
       status: 'pending',
-      transaction_id: 'TXN-2024-004',
       notes: 'Annual subscription - awaiting confirmation'
     },
     {
-      id: 'PAY005',
+      id: 'TXN-2024-005',
       account_id: 'ACC004',
       contact_name: 'Alice Johnson',
       contact_email: 'alice@example.com',
       amount: 149,
-      payment_date: '2024-08-05',
+      transaction_date: '2024-08-05',
       payment_method: 'Credit Card',
       billing_cycle: 'monthly',
       status: 'failed',
-      transaction_id: 'TXN-2024-005',
       notes: 'Payment declined - card expired'
     }
   ]
 
-  const displayPayments = payments.length > 0 ? payments : mockPayments
+  const displayTransactions = transactions.length > 0 ? transactions : mockTransactions
 
   // Calculate statistics
   const stats = {
-    totalRevenue: displayPayments
-      .filter(p => p.status === 'completed')
-      .reduce((sum, p) => sum + p.amount, 0),
-    completedPayments: displayPayments.filter(p => p.status === 'completed').length,
-    pendingPayments: displayPayments.filter(p => p.status === 'pending').length,
-    failedPayments: displayPayments.filter(p => p.status === 'failed').length,
-    avgPayment: displayPayments.filter(p => p.status === 'completed').length > 0
-      ? displayPayments.filter(p => p.status === 'completed').reduce((sum, p) => sum + p.amount, 0) /
-        displayPayments.filter(p => p.status === 'completed').length
+    totalRevenue: displayTransactions
+      .filter(t => t.status === 'completed')
+      .reduce((sum, t) => sum + t.amount, 0),
+    completedTransactions: displayTransactions.filter(t => t.status === 'completed').length,
+    pendingTransactions: displayTransactions.filter(t => t.status === 'pending').length,
+    failedTransactions: displayTransactions.filter(t => t.status === 'failed').length,
+    avgTransaction: displayTransactions.filter(t => t.status === 'completed').length > 0
+      ? displayTransactions.filter(t => t.status === 'completed').reduce((sum, t) => sum + t.amount, 0) /
+        displayTransactions.filter(t => t.status === 'completed').length
       : 0
   }
 
@@ -135,8 +130,8 @@ const BillingPage = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Billing & Payments</h1>
-          <p className="text-gray-600 mt-1">Track all payment transactions and revenue</p>
+          <h1 className="text-2xl font-bold text-gray-900">Transactions</h1>
+          <p className="text-gray-600 mt-1">Track all payment transactions from your customers</p>
         </div>
         <button className="btn btn-primary btn-md">
           <Download size={16} className="mr-2" />
@@ -164,7 +159,7 @@ const BillingPage = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600 mb-1">Completed</p>
-              <p className="text-2xl font-bold text-blue-600">{stats.completedPayments}</p>
+              <p className="text-2xl font-bold text-blue-600">{stats.completedTransactions}</p>
             </div>
             <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
               <CheckCircle className="text-blue-600" size={24} />
@@ -176,7 +171,7 @@ const BillingPage = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600 mb-1">Pending</p>
-              <p className="text-2xl font-bold text-yellow-600">{stats.pendingPayments}</p>
+              <p className="text-2xl font-bold text-yellow-600">{stats.pendingTransactions}</p>
             </div>
             <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
               <Clock className="text-yellow-600" size={24} />
@@ -187,9 +182,9 @@ const BillingPage = () => {
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 mb-1">Avg Payment</p>
+              <p className="text-sm text-gray-600 mb-1">Avg Transaction</p>
               <p className="text-2xl font-bold text-purple-600">
-                ${stats.avgPayment.toFixed(2)}
+                ${stats.avgTransaction.toFixed(2)}
               </p>
             </div>
             <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
@@ -251,25 +246,25 @@ const BillingPage = () => {
         </div>
       </div>
 
-      {/* Payment History Table */}
+      {/* Transaction History Table */}
       <div className="card">
         <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
           <FileText size={20} className="mr-2" />
-          Payment History
+          Transaction History
         </h2>
 
-        {displayPayments.length === 0 ? (
+        {displayTransactions.length === 0 ? (
           <div className="text-center py-12">
             <DollarSign className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No payments found</h3>
-            <p className="text-gray-600">Payment records will appear here once they are recorded</p>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No transactions found</h3>
+            <p className="text-gray-600">Transaction records will appear here once they are recorded</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">Payment ID</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-900">Transaction ID</th>
                   <th className="text-left py-3 px-4 font-medium text-gray-900">Contact</th>
                   <th className="text-left py-3 px-4 font-medium text-gray-900">Account</th>
                   <th className="text-left py-3 px-4 font-medium text-gray-900">Amount</th>
@@ -281,44 +276,44 @@ const BillingPage = () => {
                 </tr>
               </thead>
               <tbody>
-                {displayPayments.map((payment) => {
-                  const statusBadge = getStatusBadge(payment.status)
+                {displayTransactions.map((transaction) => {
+                  const statusBadge = getStatusBadge(transaction.status)
                   return (
-                    <tr key={payment.id} className="border-b border-gray-100 hover:bg-gray-50">
+                    <tr key={transaction.id} className="border-b border-gray-100 hover:bg-gray-50">
                       <td className="py-4 px-4">
                         <span className="font-mono text-sm font-medium text-gray-900">
-                          {payment.id}
+                          {transaction.id}
                         </span>
                       </td>
                       <td className="py-4 px-4">
                         <div>
-                          <p className="font-medium text-gray-900">{payment.contact_name}</p>
-                          <p className="text-sm text-gray-600">{payment.contact_email}</p>
+                          <p className="font-medium text-gray-900">{transaction.contact_name}</p>
+                          <p className="text-sm text-gray-600">{transaction.contact_email}</p>
                         </div>
                       </td>
                       <td className="py-4 px-4">
-                        <span className="font-mono text-sm text-gray-700">{payment.account_id}</span>
+                        <span className="font-mono text-sm text-gray-700">{transaction.account_id}</span>
                       </td>
                       <td className="py-4 px-4">
                         <span className="text-lg font-bold text-green-600">
-                          ${payment.amount}
+                          ${transaction.amount}
                         </span>
                       </td>
                       <td className="py-4 px-4">
                         <div className="flex items-center text-sm text-gray-900">
                           <Calendar size={12} className="mr-1" />
-                          {payment.payment_date}
+                          {transaction.transaction_date}
                         </div>
                       </td>
                       <td className="py-4 px-4">
                         <div className="flex items-center text-sm text-gray-700">
-                          {getPaymentMethodIcon(payment.payment_method)}
-                          {payment.payment_method}
+                          {getPaymentMethodIcon(transaction.payment_method)}
+                          {transaction.payment_method}
                         </div>
                       </td>
                       <td className="py-4 px-4">
                         <span className="badge badge-gray">
-                          {payment.billing_cycle}
+                          {transaction.billing_cycle}
                         </span>
                       </td>
                       <td className="py-4 px-4">
@@ -341,10 +336,10 @@ const BillingPage = () => {
         )}
 
         {/* Pagination placeholder */}
-        {displayPayments.length > 0 && (
+        {displayTransactions.length > 0 && (
           <div className="mt-4 flex items-center justify-between border-t border-gray-200 pt-4">
             <p className="text-sm text-gray-600">
-              Showing {displayPayments.length} payment(s)
+              Showing {displayTransactions.length} transaction(s)
             </p>
             <div className="flex gap-2">
               <button className="btn btn-sm btn-outline" disabled>Previous</button>
@@ -354,44 +349,44 @@ const BillingPage = () => {
         )}
       </div>
 
-      {/* Recent Activity Summary */}
+      {/* Transaction Summary */}
       <div className="card">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Payment Summary</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Transaction Summary</h2>
         <div className="space-y-3">
           <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
             <div className="flex items-center">
               <CheckCircle className="text-green-600 mr-3" size={20} />
               <div>
-                <p className="font-medium text-gray-900">Completed Payments</p>
-                <p className="text-sm text-gray-600">{stats.completedPayments} transactions</p>
+                <p className="font-medium text-gray-900">Completed Transactions</p>
+                <p className="text-sm text-gray-600">{stats.completedTransactions} transactions</p>
               </div>
             </div>
             <p className="text-lg font-bold text-green-600">${stats.totalRevenue.toFixed(2)}</p>
           </div>
 
-          {stats.pendingPayments > 0 && (
+          {stats.pendingTransactions > 0 && (
             <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
               <div className="flex items-center">
                 <Clock className="text-yellow-600 mr-3" size={20} />
                 <div>
-                  <p className="font-medium text-gray-900">Pending Payments</p>
+                  <p className="font-medium text-gray-900">Pending Transactions</p>
                   <p className="text-sm text-gray-600">Awaiting confirmation</p>
                 </div>
               </div>
-              <p className="text-lg font-bold text-yellow-600">{stats.pendingPayments}</p>
+              <p className="text-lg font-bold text-yellow-600">{stats.pendingTransactions}</p>
             </div>
           )}
 
-          {stats.failedPayments > 0 && (
+          {stats.failedTransactions > 0 && (
             <div className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
               <div className="flex items-center">
                 <XCircle className="text-red-600 mr-3" size={20} />
                 <div>
-                  <p className="font-medium text-gray-900">Failed Payments</p>
+                  <p className="font-medium text-gray-900">Failed Transactions</p>
                   <p className="text-sm text-gray-600">Requires attention</p>
                 </div>
               </div>
-              <p className="text-lg font-bold text-red-600">{stats.failedPayments}</p>
+              <p className="text-lg font-bold text-red-600">{stats.failedTransactions}</p>
             </div>
           )}
         </div>
@@ -400,4 +395,4 @@ const BillingPage = () => {
   )
 }
 
-export default BillingPage
+export default TransactionsPage
