@@ -303,6 +303,11 @@ class ScheduledJobs {
       }
 
     } catch (error) {
+      // Silently ignore if subscription tables don't exist yet
+      if (error.code === '42P01') {
+        // Tables don't exist, skip health check silently
+        return;
+      }
       console.error('❌ Health check detected issues:', error);
     }
   }

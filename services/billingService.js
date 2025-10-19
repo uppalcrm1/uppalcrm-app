@@ -414,6 +414,13 @@ class BillingService {
       return dueRenewals.rows.length;
     } catch (error) {
       console.error('❌ Error processing renewals:', error);
+
+      // If table doesn't exist (error code 42P01), silently return 0
+      if (error.code === '42P01') {
+        console.log('⚠️  Subscription tables do not exist yet - skipping automatic renewals');
+        return 0;
+      }
+
       throw error;
     }
   }
