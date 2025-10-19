@@ -14,6 +14,8 @@ class CustomField {
    */
   static async getFieldDefinitions(organizationId, entityType, activeOnly = true) {
     try {
+      console.log(`🔍 CustomField.getFieldDefinitions: org=${organizationId}, entity=${entityType}, activeOnly=${activeOnly}`)
+
       let query = `
         SELECT
           id,
@@ -50,10 +52,20 @@ class CustomField {
 
       query += ' ORDER BY display_order ASC, created_at ASC'
 
+      console.log('📝 Executing query:', query.substring(0, 100) + '...')
       const result = await db.query(query, params)
+      console.log(`✅ Query returned ${result.rows.length} rows`)
       return result.rows
     } catch (error) {
-      console.error('Error getting field definitions:', error)
+      console.error('❌ Error getting field definitions:', error.message)
+      console.error('Error code:', error.code)
+
+      // If table doesn't exist (error code 42P01), return empty array instead of throwing
+      if (error.code === '42P01') {
+        console.log('⚠️  custom_field_definitions table does not exist yet - returning empty array')
+        return []
+      }
+
       throw error
     }
   }

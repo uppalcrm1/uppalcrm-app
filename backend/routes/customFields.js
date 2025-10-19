@@ -11,6 +11,87 @@ router.use(authenticateToken)
 // ========================================
 
 /**
+ * GET /api/custom-fields
+ * Get all custom field definitions (optionally filtered by entityType query param)
+ */
+router.get('/', async (req, res) => {
+  try {
+    console.log('📥 GET /api/custom-fields - Request received')
+    console.log('Query params:', req.query)
+    console.log('User:', req.user?.id, 'Org:', req.user?.organization_id)
+
+    const { entityType, activeOnly = 'true' } = req.query
+    const organizationId = req.user.organization_id
+
+    if (!organizationId) {
+      console.error('❌ No organization_id found in request')
+      return res.status(400).json({
+        error: 'Missing organization context',
+        details: 'User must be associated with an organization'
+      })
+    }
+
+    // If entityType is provided, filter by it
+    if (entityType) {
+      // Validate entity type
+      const validEntityTypes = ['leads', 'contacts', 'accounts', 'transactions']
+      if (!validEntityTypes.includes(entityType)) {
+        return res.status(400).json({
+          error: 'Invalid entity type',
+          validTypes: validEntityTypes
+        })
+      }
+
+      console.log(`🔍 Fetching fields for entityType: ${entityType}`)
+      const fields = await CustomField.getFieldDefinitions(
+        organizationId,
+        entityType,
+        activeOnly === 'true'
+      )
+
+      console.log(`✅ Found ${fields.length} fields for ${entityType}`)
+      return res.json({
+        success: true,
+        entityType,
+        count: fields.length,
+        fields
+      })
+    }
+
+    // If no entityType, return all fields grouped by entity type
+    console.log('🔍 Fetching all fields for all entity types')
+    const allFields = {}
+    const entityTypes = ['leads', 'contacts', 'accounts', 'transactions']
+
+    for (const type of entityTypes) {
+      const fields = await CustomField.getFieldDefinitions(
+        organizationId,
+        type,
+        activeOnly === 'true'
+      )
+      allFields[type] = fields
+    }
+
+    const totalCount = Object.values(allFields).reduce((sum, fields) => sum + fields.length, 0)
+    console.log(`✅ Found ${totalCount} total fields across all entity types`)
+
+    res.json({
+      success: true,
+      count: totalCount,
+      fieldsByEntityType: allFields
+    })
+  } catch (error) {
+    console.error('❌ Error in GET /api/custom-fields:', error)
+    console.error('Stack trace:', error.stack)
+    res.status(500).json({
+      error: 'Failed to fetch custom fields',
+      details: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    })
+  }
+})
+
+/**
  * GET /api/custom-fields/definitions/:entityType
  * Get all custom field definitions for an entity type
  */
@@ -19,6 +100,8 @@ router.get('/definitions/:entityType', async (req, res) => {
     const { entityType } = req.params
     const { activeOnly = 'true' } = req.query
     const organizationId = req.user.organization_id
+
+    console.log(`📥 GET /api/custom-fields/definitions/${entityType}`)
 
     // Validate entity type
     const validEntityTypes = ['leads', 'contacts', 'accounts', 'transactions']
@@ -35,6 +118,8 @@ router.get('/definitions/:entityType', async (req, res) => {
       activeOnly === 'true'
     )
 
+    console.log(`✅ Found ${fields.length} fields`)
+
     res.json({
       success: true,
       entityType,
@@ -42,7 +127,7 @@ router.get('/definitions/:entityType', async (req, res) => {
       fields
     })
   } catch (error) {
-    console.error('Error fetching field definitions:', error)
+    console.error('❌ Error fetching field definitions:', error)
     res.status(500).json({
       error: 'Failed to fetch field definitions',
       details: error.message
@@ -59,6 +144,8 @@ router.get('/definitions/:entityType/:fieldId', async (req, res) => {
     const { fieldId } = req.params
     const organizationId = req.user.organization_id
 
+    console.log(`📥 GET /api/custom-fields/definitions/:entityType/${fieldId}`)
+
     const field = await CustomField.getFieldDefinitionById(fieldId, organizationId)
 
     if (!field) {
@@ -72,7 +159,7 @@ router.get('/definitions/:entityType/:fieldId', async (req, res) => {
       field
     })
   } catch (error) {
-    console.error('Error fetching field definition:', error)
+    console.error('❌ Error fetching field definition:', error)
     res.status(500).json({
       error: 'Failed to fetch field definition',
       details: error.message
@@ -86,6 +173,9 @@ router.get('/definitions/:entityType/:fieldId', async (req, res) => {
  */
 router.post('/definitions', async (req, res) => {
   try {
+    console.log('📥 POST /api/custom-fields/definitions')
+    console.log('Body:', req.body)
+
     const organizationId = req.user.organization_id
     const userId = req.user.id
     const {
@@ -172,13 +262,15 @@ router.post('/definitions', async (req, res) => {
 
     const field = await CustomField.createFieldDefinition(fieldData)
 
+    console.log('✅ Field created successfully:', field.id)
+
     res.status(201).json({
       success: true,
       message: 'Field definition created successfully',
       field
     })
   } catch (error) {
-    console.error('Error creating field definition:', error)
+    console.error('❌ Error creating field definition:', error)
 
     // Handle unique constraint violation
     if (error.code === '23505') {
@@ -205,6 +297,8 @@ router.put('/definitions/:fieldId', async (req, res) => {
     const userId = req.user.id
     const updateData = req.body
 
+    console.log(`📥 PUT /api/custom-fields/definitions/${fieldId}`)
+
     const field = await CustomField.updateFieldDefinition(
       fieldId,
       organizationId,
@@ -212,13 +306,15 @@ router.put('/definitions/:fieldId', async (req, res) => {
       userId
     )
 
+    console.log('✅ Field updated successfully')
+
     res.json({
       success: true,
       message: 'Field definition updated successfully',
       field
     })
   } catch (error) {
-    console.error('Error updating field definition:', error)
+    console.error('❌ Error updating field definition:', error)
 
     if (error.message === 'Field definition not found') {
       return res.status(404).json({
@@ -249,6 +345,8 @@ router.delete('/definitions/:fieldId', async (req, res) => {
     const { permanent = 'false' } = req.query
     const organizationId = req.user.organization_id
 
+    console.log(`📥 DELETE /api/custom-fields/definitions/${fieldId} (permanent: ${permanent})`)
+
     let success
 
     if (permanent === 'true') {
@@ -265,6 +363,8 @@ router.delete('/definitions/:fieldId', async (req, res) => {
       })
     }
 
+    console.log('✅ Field deleted successfully')
+
     res.json({
       success: true,
       message: permanent === 'true'
@@ -272,7 +372,7 @@ router.delete('/definitions/:fieldId', async (req, res) => {
         : 'Field definition deactivated'
     })
   } catch (error) {
-    console.error('Error deleting field definition:', error)
+    console.error('❌ Error deleting field definition:', error)
     res.status(500).json({
       error: 'Failed to delete field definition',
       details: error.message
@@ -293,11 +393,15 @@ router.get('/values/:entityType/:entityId', async (req, res) => {
     const { entityType, entityId } = req.params
     const organizationId = req.user.organization_id
 
+    console.log(`📥 GET /api/custom-fields/values/${entityType}/${entityId}`)
+
     const fieldValues = await CustomField.getFieldValues(
       organizationId,
       entityType,
       entityId
     )
+
+    console.log(`✅ Found ${fieldValues.length} field values`)
 
     res.json({
       success: true,
@@ -307,7 +411,7 @@ router.get('/values/:entityType/:entityId', async (req, res) => {
       fieldValues
     })
   } catch (error) {
-    console.error('Error fetching field values:', error)
+    console.error('❌ Error fetching field values:', error)
     res.status(500).json({
       error: 'Failed to fetch field values',
       details: error.message
@@ -321,6 +425,8 @@ router.get('/values/:entityType/:entityId', async (req, res) => {
  */
 router.post('/values', async (req, res) => {
   try {
+    console.log('📥 POST /api/custom-fields/values')
+
     const organizationId = req.user.organization_id
     const userId = req.user.id
     const {
@@ -368,13 +474,15 @@ router.post('/values', async (req, res) => {
 
     const value = await CustomField.setFieldValue(valueData)
 
+    console.log('✅ Field value saved successfully')
+
     res.status(201).json({
       success: true,
       message: 'Field value saved successfully',
       value
     })
   } catch (error) {
-    console.error('Error saving field value:', error)
+    console.error('❌ Error saving field value:', error)
     res.status(500).json({
       error: 'Failed to save field value',
       details: error.message
@@ -388,6 +496,8 @@ router.post('/values', async (req, res) => {
  */
 router.post('/values/bulk', async (req, res) => {
   try {
+    console.log('📥 POST /api/custom-fields/values/bulk')
+
     const organizationId = req.user.organization_id
     const userId = req.user.id
     const {
@@ -412,6 +522,8 @@ router.post('/values/bulk', async (req, res) => {
       userId
     )
 
+    console.log(`✅ Saved ${results.length} field values`)
+
     res.status(201).json({
       success: true,
       message: 'Field values saved successfully',
@@ -419,7 +531,7 @@ router.post('/values/bulk', async (req, res) => {
       values: results
     })
   } catch (error) {
-    console.error('Error saving field values:', error)
+    console.error('❌ Error saving field values:', error)
     res.status(500).json({
       error: 'Failed to save field values',
       details: error.message
@@ -436,6 +548,8 @@ router.delete('/values/:valueId', async (req, res) => {
     const { valueId } = req.params
     const organizationId = req.user.organization_id
 
+    console.log(`📥 DELETE /api/custom-fields/values/${valueId}`)
+
     const success = await CustomField.deleteFieldValue(valueId, organizationId)
 
     if (!success) {
@@ -444,12 +558,14 @@ router.delete('/values/:valueId', async (req, res) => {
       })
     }
 
+    console.log('✅ Field value deleted successfully')
+
     res.json({
       success: true,
       message: 'Field value deleted successfully'
     })
   } catch (error) {
-    console.error('Error deleting field value:', error)
+    console.error('❌ Error deleting field value:', error)
     res.status(500).json({
       error: 'Failed to delete field value',
       details: error.message
@@ -466,11 +582,15 @@ router.delete('/values/:entityType/:entityId', async (req, res) => {
     const { entityType, entityId } = req.params
     const organizationId = req.user.organization_id
 
+    console.log(`📥 DELETE /api/custom-fields/values/${entityType}/${entityId}`)
+
     const count = await CustomField.deleteAllFieldValuesForEntity(
       organizationId,
       entityType,
       entityId
     )
+
+    console.log(`✅ Deleted ${count} field values`)
 
     res.json({
       success: true,
@@ -478,7 +598,7 @@ router.delete('/values/:entityType/:entityId', async (req, res) => {
       count
     })
   } catch (error) {
-    console.error('Error deleting field values:', error)
+    console.error('❌ Error deleting field values:', error)
     res.status(500).json({
       error: 'Failed to delete field values',
       details: error.message
@@ -498,6 +618,8 @@ router.post('/validate', async (req, res) => {
   try {
     const { fieldDefinitionId, value } = req.body
     const organizationId = req.user.organization_id
+
+    console.log('📥 POST /api/custom-fields/validate')
 
     if (!fieldDefinitionId) {
       return res.status(400).json({
@@ -521,7 +643,7 @@ router.post('/validate', async (req, res) => {
       errors: validation.errors
     })
   } catch (error) {
-    console.error('Error validating field value:', error)
+    console.error('❌ Error validating field value:', error)
     res.status(500).json({
       error: 'Failed to validate field value',
       details: error.message
@@ -538,6 +660,8 @@ router.post('/values/batch', async (req, res) => {
     const { entityType, entityIds } = req.body
     const organizationId = req.user.organization_id
 
+    console.log('📥 POST /api/custom-fields/values/batch')
+
     if (!entityType || !entityIds || !Array.isArray(entityIds)) {
       return res.status(400).json({
         error: 'entityType and entityIds (array) are required'
@@ -550,6 +674,8 @@ router.post('/values/batch', async (req, res) => {
       entityIds
     )
 
+    console.log(`✅ Retrieved field values for ${Object.keys(fieldValues).length} entities`)
+
     res.json({
       success: true,
       entityType,
@@ -557,7 +683,7 @@ router.post('/values/batch', async (req, res) => {
       fieldValues
     })
   } catch (error) {
-    console.error('Error fetching batch field values:', error)
+    console.error('❌ Error fetching batch field values:', error)
     res.status(500).json({
       error: 'Failed to fetch field values',
       details: error.message
