@@ -25,8 +25,11 @@ const AdminUsers = () => {
   const [roleFilter, setRoleFilter] = useState('all')
   const [showAddModal, setShowAddModal] = useState(false)
 
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3004/api'
+
   useEffect(() => {
     console.log('🔍 AdminUsers: Component mounted, fetching data...')
+    console.log('API Base URL:', API_BASE_URL)
     console.log('Current user:', currentUser)
     fetchUsers()
     fetchStats()
@@ -38,7 +41,7 @@ const AdminUsers = () => {
       const token = localStorage.getItem('token')
       console.log('Token exists:', !!token)
 
-      const response = await fetch('/api/users', {
+      const response = await fetch(`${API_BASE_URL}/users`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -73,7 +76,7 @@ const AdminUsers = () => {
     try {
       console.log('📊 Fetching user statistics...')
       const token = localStorage.getItem('token')
-      const response = await fetch('/api/users/stats', {
+      const response = await fetch(`${API_BASE_URL}/users/stats`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
