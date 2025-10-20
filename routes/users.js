@@ -97,6 +97,47 @@ router.get('/',
 );
 
 /**
+ * GET /users/stats
+ * Get user statistics for the organization
+ * MUST come before /:id route to avoid matching "stats" as an ID
+ */
+router.get('/stats',
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const { query } = require('../database/connection');
+
+      const stats = await query(`
+        SELECT
+          COUNT(*) as total_users,
+          COUNT(CASE WHEN is_active THEN 1 END) as active_users,
+          COUNT(CASE WHEN role = 'admin' THEN 1 END) as admin_users,
+          COUNT(CASE WHEN role = 'user' THEN 1 END) as regular_users,
+          COUNT(CASE WHEN role = 'viewer' THEN 1 END) as viewer_users,
+          COUNT(CASE WHEN last_login > NOW() - INTERVAL '7 days' THEN 1 END) as active_last_week,
+          COUNT(CASE WHEN last_login > NOW() - INTERVAL '30 days' THEN 1 END) as active_last_month,
+          COUNT(CASE WHEN email_verified THEN 1 END) as verified_users
+        FROM users
+        WHERE organization_id = $1
+      `, [req.organizationId], req.organizationId);
+
+      const orgStats = await Organization.getStats(req.organizationId);
+
+      res.json({
+        user_stats: stats.rows[0],
+        organization_stats: orgStats
+      });
+    } catch (error) {
+      console.error('Get user stats error:', error);
+      res.status(500).json({
+        error: 'Failed to retrieve statistics',
+        message: 'Unable to get user statistics'
+      });
+    }
+  }
+);
+
+/**
  * GET /users/:id
  * Get specific user by ID
  */
@@ -106,7 +147,7 @@ router.get('/:id',
   async (req, res) => {
     try {
       const user = await User.findById(req.params.id, req.organizationId);
-      
+
       if (!user) {
         return res.status(404).json({
           error: 'User not found',
@@ -401,47 +442,6 @@ router.delete('/:id',
       res.status(500).json({
         error: 'User deactivation failed',
         message: 'Unable to deactivate user'
-      });
-    }
-  }
-);
-
-
-/**
- * GET /users/stats
- * Get user statistics for the organization
- */
-router.get('/stats',
-  requireAdmin,
-  async (req, res) => {
-    try {
-      const { query } = require('../database/connection');
-      
-      const stats = await query(`
-        SELECT 
-          COUNT(*) as total_users,
-          COUNT(CASE WHEN is_active THEN 1 END) as active_users,
-          COUNT(CASE WHEN role = 'admin' THEN 1 END) as admin_users,
-          COUNT(CASE WHEN role = 'user' THEN 1 END) as regular_users,
-          COUNT(CASE WHEN role = 'viewer' THEN 1 END) as viewer_users,
-          COUNT(CASE WHEN last_login > NOW() - INTERVAL '7 days' THEN 1 END) as active_last_week,
-          COUNT(CASE WHEN last_login > NOW() - INTERVAL '30 days' THEN 1 END) as active_last_month,
-          COUNT(CASE WHEN email_verified THEN 1 END) as verified_users
-        FROM users 
-        WHERE organization_id = $1
-      `, [req.organizationId], req.organizationId);
-
-      const orgStats = await Organization.getStats(req.organizationId);
-
-      res.json({
-        user_stats: stats.rows[0],
-        organization_stats: orgStats
-      });
-    } catch (error) {
-      console.error('Get user stats error:', error);
-      res.status(500).json({
-        error: 'Failed to retrieve statistics',
-        message: 'Unable to get user statistics'
       });
     }
   }
