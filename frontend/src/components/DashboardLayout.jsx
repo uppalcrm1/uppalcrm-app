@@ -35,6 +35,7 @@ const mainNavigation = [
   { name: 'Contacts', href: '/contacts', icon: UserCheck },
   { name: 'Accounts', href: '/accounts', icon: CreditCard },
   { name: 'Transactions', href: '/transactions', icon: DollarSign },
+  { name: 'User Management', href: '/team', icon: UserPlus },
 ]
 
 // Admin navigation - System administration (dropdown)
