@@ -41,7 +41,7 @@ class User {
     }
 
     // Validate role
-    const validRoles = ['admin', 'user', 'viewer'];
+    const validRoles = ['admin', 'manager', 'user', 'viewer'];
     if (!validRoles.includes(role)) {
       throw new Error('Invalid role specified');
     }

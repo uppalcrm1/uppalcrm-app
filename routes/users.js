@@ -178,6 +178,7 @@ router.post('/',
   // checkLicenseLimit,
   async (req, res) => {
     const { query: dbQuery } = require('../database/connection');
+    const crypto = require('crypto');
 
     try {
       // Start transaction
@@ -226,8 +227,17 @@ router.post('/',
         console.log(`💰 Updated pricing: ${currentMaxUsers} users × $${pricePerUser} = $${currentMaxUsers * pricePerUser} → ${newMaxUsers} users × $${pricePerUser} = $${newMonthlyPrice}`);
       }
 
+      // Generate temporary password if not provided (for invitation-based creation)
+      const userData = { ...req.body };
+      if (!userData.password) {
+        // Generate a secure random password
+        userData.password = crypto.randomBytes(16).toString('hex');
+        userData.is_first_login = true;
+        console.log('🔑 Generated temporary password for invitation-based user creation');
+      }
+
       // Create the user
-      const user = await User.create(req.body, req.organizationId, req.user.id);
+      const user = await User.create(userData, req.organizationId, req.user.id);
 
       // Verify final state
       const verifyResult = await dbQuery(`

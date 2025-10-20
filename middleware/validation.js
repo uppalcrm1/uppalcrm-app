@@ -88,10 +88,11 @@ const schemas = {
   createUser: {
     body: Joi.object({
       email: Joi.string().email().required(),
-      password: Joi.string().min(8).required(),
+      password: Joi.string().min(8).optional(), // Optional for invitation-based creation
       first_name: Joi.string().min(1).max(100).required(),
       last_name: Joi.string().min(1).max(100).required(),
-      role: Joi.string().valid('admin', 'user', 'viewer').default('user')
+      role: Joi.string().valid('admin', 'manager', 'user', 'viewer').default('user'),
+      send_invitation: Joi.boolean().optional()
     })
   },
 
@@ -99,7 +100,7 @@ const schemas = {
     body: Joi.object({
       first_name: Joi.string().min(1).max(100).optional(),
       last_name: Joi.string().min(1).max(100).optional(),
-      role: Joi.string().valid('admin', 'user', 'viewer').optional(),
+      role: Joi.string().valid('admin', 'manager', 'user', 'viewer').optional(),
       permissions: Joi.array().items(Joi.string()).optional(),
       email_verified: Joi.boolean().optional()
     }),
@@ -155,7 +156,7 @@ const schemas = {
     query: Joi.object({
       page: Joi.number().integer().min(1).default(1),
       limit: Joi.number().integer().min(1).max(100).default(20),
-      role: Joi.string().valid('admin', 'user', 'viewer').optional(),
+      role: Joi.string().valid('admin', 'manager', 'user', 'viewer').optional(),
       search: Joi.string().min(1).max(100).optional(),
       sort: Joi.string().valid('created_at', 'updated_at', 'email', 'first_name', 'last_name').default('created_at'),
       order: Joi.string().valid('asc', 'desc').default('desc')

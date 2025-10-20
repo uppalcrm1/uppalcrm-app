@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { usersAPI } from '../../services/api'
+import toast from 'react-hot-toast'
 import {
   Users,
   UserPlus,
@@ -25,6 +26,18 @@ const AdminUsers = () => {
   const [searchQuery, setSearchQuery] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
   const [showAddModal, setShowAddModal] = useState(false)
+
+  // Add User Form State
+  const [formData, setFormData] = useState({
+    first_name: '',
+    last_name: '',
+    email: '',
+    role: 'user',
+    send_invitation: true
+  })
+  const [formErrors, setFormErrors] = useState({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState(null)
 
   useEffect(() => {
     console.log('🔍 AdminUsers: Component mounted, fetching data...')
@@ -63,6 +76,101 @@ const AdminUsers = () => {
     } catch (error) {
       console.error('❌ Error fetching stats:', error)
       // Don't fail the whole page if stats fail
+    }
+  }
+
+  const resetForm = () => {
+    setFormData({
+      first_name: '',
+      last_name: '',
+      email: '',
+      role: 'user',
+      send_invitation: true
+    })
+    setFormErrors({})
+    setSubmitError(null)
+  }
+
+  const handleCloseModal = () => {
+    setShowAddModal(false)
+    resetForm()
+    setIsSubmitting(false)
+  }
+
+  const validateForm = () => {
+    const errors = {}
+
+    if (!formData.first_name.trim()) {
+      errors.first_name = 'First name is required'
+    }
+
+    if (!formData.last_name.trim()) {
+      errors.last_name = 'Last name is required'
+    }
+
+    if (!formData.email.trim()) {
+      errors.email = 'Email is required'
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      errors.email = 'Please enter a valid email address'
+    } else if (users.some(u => u.email.toLowerCase() === formData.email.toLowerCase())) {
+      errors.email = 'This email is already registered in your organization'
+    }
+
+    if (!formData.role) {
+      errors.role = 'Role is required'
+    }
+
+    setFormErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+
+  const handleInputChange = (e) => {
+    const { name, value, type, checked } = e.target
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }))
+    // Clear error for this field when user starts typing
+    if (formErrors[name]) {
+      setFormErrors(prev => ({
+        ...prev,
+        [name]: null
+      }))
+    }
+    setSubmitError(null)
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+
+    if (!validateForm()) {
+      return
+    }
+
+    setIsSubmitting(true)
+    setSubmitError(null)
+
+    try {
+      console.log('📤 Creating new user:', formData)
+      const response = await usersAPI.createUser(formData)
+      console.log('✅ User created successfully:', response)
+
+      // Show success message
+      toast.success(`${formData.first_name} ${formData.last_name} has been added to your team!`)
+
+      // Refresh the user list
+      await fetchUsers()
+      await fetchStats()
+
+      // Close modal and reset form
+      handleCloseModal()
+    } catch (error) {
+      console.error('❌ Error creating user:', error)
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to create user'
+      setSubmitError(errorMessage)
+      toast.error(errorMessage)
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -395,35 +503,176 @@ const AdminUsers = () => {
         )}
       </div>
 
-      {/* Add User Modal Placeholder */}
+      {/* Add User Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Add Team Member</h3>
-                <button
-                  onClick={() => setShowAddModal(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <XCircle size={20} />
-                </button>
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <form onSubmit={handleSubmit}>
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Add Team Member</h3>
+                    <p className="text-sm text-gray-600 mt-1">Invite a new team member to your organization</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCloseModal}
+                    className="text-gray-400 hover:text-gray-600"
+                    disabled={isSubmitting}
+                  >
+                    <XCircle size={20} />
+                  </button>
+                </div>
+
+                {/* Error Alert */}
+                {submitError && (
+                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <div className="flex items-start">
+                      <AlertCircle className="text-red-600 mt-0.5" size={16} />
+                      <div className="ml-2">
+                        <p className="text-sm text-red-800">{submitError}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Form Fields */}
+                <div className="space-y-4">
+                  {/* First Name and Last Name */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        First Name <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        name="first_name"
+                        value={formData.first_name}
+                        onChange={handleInputChange}
+                        className={`input ${formErrors.first_name ? 'border-red-500' : ''}`}
+                        placeholder="John"
+                        disabled={isSubmitting}
+                      />
+                      {formErrors.first_name && (
+                        <p className="mt-1 text-sm text-red-600">{formErrors.first_name}</p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Last Name <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        name="last_name"
+                        value={formData.last_name}
+                        onChange={handleInputChange}
+                        className={`input ${formErrors.last_name ? 'border-red-500' : ''}`}
+                        placeholder="Doe"
+                        disabled={isSubmitting}
+                      />
+                      {formErrors.last_name && (
+                        <p className="mt-1 text-sm text-red-600">{formErrors.last_name}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Email */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Email Address <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleInputChange}
+                      className={`input ${formErrors.email ? 'border-red-500' : ''}`}
+                      placeholder="john.doe@example.com"
+                      disabled={isSubmitting}
+                    />
+                    {formErrors.email && (
+                      <p className="mt-1 text-sm text-red-600">{formErrors.email}</p>
+                    )}
+                    <p className="mt-1 text-xs text-gray-500">
+                      Must be unique within your organization
+                    </p>
+                  </div>
+
+                  {/* Role */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Role <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      name="role"
+                      value={formData.role}
+                      onChange={handleInputChange}
+                      className={`select ${formErrors.role ? 'border-red-500' : ''}`}
+                      disabled={isSubmitting}
+                    >
+                      <option value="user">User - Standard access to leads and contacts</option>
+                      <option value="manager">Manager - User permissions + team management</option>
+                      <option value="admin">Admin - Full system access and configuration</option>
+                    </select>
+                    {formErrors.role && (
+                      <p className="mt-1 text-sm text-red-600">{formErrors.role}</p>
+                    )}
+                  </div>
+
+                  {/* Send Invitation Email */}
+                  <div className="flex items-start">
+                    <div className="flex items-center h-5">
+                      <input
+                        type="checkbox"
+                        name="send_invitation"
+                        checked={formData.send_invitation}
+                        onChange={handleInputChange}
+                        className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                        disabled={isSubmitting}
+                      />
+                    </div>
+                    <div className="ml-3">
+                      <label className="text-sm font-medium text-gray-700">
+                        Send invitation email
+                      </label>
+                      <p className="text-xs text-gray-500">
+                        User will receive an email with instructions to set up their account
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Form Actions */}
+                <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-gray-200">
+                  <button
+                    type="button"
+                    onClick={handleCloseModal}
+                    className="btn btn-outline"
+                    disabled={isSubmitting}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Adding User...
+                      </>
+                    ) : (
+                      <>
+                        <UserPlus size={16} className="mr-2" />
+                        Add User
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
-              <p className="text-gray-600 mb-4">
-                Use the existing UserManagement component or create a new user form here.
-              </p>
-              <div className="flex justify-end gap-2">
-                <button
-                  onClick={() => setShowAddModal(false)}
-                  className="btn btn-outline"
-                >
-                  Cancel
-                </button>
-                <button className="btn btn-primary">
-                  Add User
-                </button>
-              </div>
-            </div>
+            </form>
           </div>
         </div>
       )}
