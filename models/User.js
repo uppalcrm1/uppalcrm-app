@@ -33,7 +33,7 @@ class User {
    * @returns {User} Created user instance
    */
   static async create(userData, organizationId, createdBy = null) {
-    const { email, password, first_name, last_name, role = 'user' } = userData;
+    const { email, password, first_name, last_name, role = 'user', is_first_login = false } = userData;
 
     // Validate required fields
     if (!email || !password || !first_name || !last_name || !organizationId) {
@@ -52,10 +52,10 @@ class User {
     try {
       const result = await query(`
         INSERT INTO users (
-          organization_id, email, password_hash, first_name, last_name, 
-          role, created_by, email_verified
+          organization_id, email, password_hash, first_name, last_name,
+          role, created_by, email_verified, is_first_login
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING *
       `, [
         organizationId,
@@ -65,7 +65,8 @@ class User {
         last_name,
         role,
         createdBy,
-        false
+        false, // email_verified
+        is_first_login
       ], organizationId);
 
       return new User(result.rows[0]);
