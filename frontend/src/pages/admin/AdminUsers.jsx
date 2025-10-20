@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useAuth } from '../contexts/AuthContext'
+import { useAuth } from '../../contexts/AuthContext'
 import {
   Users,
   UserPlus,
@@ -11,27 +11,33 @@ import {
   Clock,
   CheckCircle,
   XCircle,
-  MoreVertical,
-  Filter
+  Filter,
+  AlertCircle
 } from 'lucide-react'
 
-const TeamPage = () => {
+const AdminUsers = () => {
   const { user: currentUser } = useAuth()
   const [users, setUsers] = useState([])
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
   const [showAddModal, setShowAddModal] = useState(false)
 
   useEffect(() => {
+    console.log('🔍 AdminUsers: Component mounted, fetching data...')
+    console.log('Current user:', currentUser)
     fetchUsers()
     fetchStats()
   }, [])
 
   const fetchUsers = async () => {
     try {
+      console.log('📡 Fetching users from API...')
       const token = localStorage.getItem('token')
+      console.log('Token exists:', !!token)
+
       const response = await fetch('/api/users', {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -39,14 +45,25 @@ const TeamPage = () => {
         }
       })
 
+      console.log('API Response status:', response.status)
+      console.log('API Response ok:', response.ok)
+
       if (!response.ok) {
-        throw new Error('Failed to fetch users')
+        const errorText = await response.text()
+        console.error('❌ API Error response:', errorText)
+        throw new Error(`Failed to fetch users: ${response.status} ${response.statusText}`)
       }
 
       const data = await response.json()
+      console.log('✅ Users data received:', data)
+      console.log('Number of users:', data.users?.length || 0)
+      console.log('Users array:', data.users)
+
       setUsers(data.users || [])
+      setError(null)
     } catch (error) {
-      console.error('Error fetching users:', error)
+      console.error('❌ Error fetching users:', error)
+      setError(error.message)
     } finally {
       setLoading(false)
     }
@@ -54,6 +71,7 @@ const TeamPage = () => {
 
   const fetchStats = async () => {
     try {
+      console.log('📊 Fetching user statistics...')
       const token = localStorage.getItem('token')
       const response = await fetch('/api/users/stats', {
         headers: {
@@ -62,12 +80,18 @@ const TeamPage = () => {
         }
       })
 
+      console.log('Stats API Response status:', response.status)
+
       if (response.ok) {
         const data = await response.json()
+        console.log('✅ Stats data received:', data)
         setStats(data.user_stats)
+      } else {
+        console.warn('⚠️  Stats endpoint returned non-OK status:', response.status)
       }
     } catch (error) {
-      console.error('Error fetching stats:', error)
+      console.error('❌ Error fetching stats:', error)
+      // Don't fail the whole page if stats fail
     }
   }
 
@@ -106,8 +130,40 @@ const TeamPage = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      <div className="flex flex-col items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mb-4"></div>
+        <p className="text-gray-600">Loading users...</p>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
+          <p className="text-gray-600 mt-1">Manage your team members and their access</p>
+        </div>
+        <div className="card bg-red-50 border-red-200">
+          <div className="flex items-start">
+            <AlertCircle className="text-red-600 mt-1" size={20} />
+            <div className="ml-3">
+              <h3 className="text-red-800 font-semibold">Error Loading Users</h3>
+              <p className="text-red-700 mt-1">{error}</p>
+              <button
+                onClick={() => {
+                  setLoading(true)
+                  setError(null)
+                  fetchUsers()
+                  fetchStats()
+                }}
+                className="mt-3 btn btn-sm btn-outline text-red-600 hover:bg-red-100"
+              >
+                Try Again
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     )
   }
@@ -130,6 +186,17 @@ const TeamPage = () => {
           </button>
         )}
       </div>
+
+      {/* Debug Info (only in development) */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="card bg-blue-50 border-blue-200">
+          <p className="text-sm text-blue-800">
+            <strong>Debug:</strong> Total users loaded: {users.length} |
+            Filtered: {filteredUsers.length} |
+            Current user: {currentUser?.email} ({currentUser?.role})
+          </p>
+        </div>
+      )}
 
       {/* Statistics Cards */}
       {stats && (
@@ -228,12 +295,25 @@ const TeamPage = () => {
           <div className="text-center py-12">
             <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No users found</h3>
-            <p className="text-gray-600">
+            <p className="text-gray-600 mb-4">
               {searchQuery || roleFilter !== 'all'
                 ? 'Try adjusting your search or filters'
+                : users.length === 0
+                ? 'No users available. Check API connection.'
                 : 'Add your first team member to get started'
               }
             </p>
+            {users.length === 0 && (
+              <button
+                onClick={() => {
+                  setLoading(true)
+                  fetchUsers()
+                }}
+                className="btn btn-primary"
+              >
+                Refresh Users
+              </button>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -380,4 +460,4 @@ const TeamPage = () => {
   )
 }
 
-export default TeamPage
+export default AdminUsers

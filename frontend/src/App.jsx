@@ -9,7 +9,6 @@ import DashboardLayout from './components/DashboardLayout'
 import Dashboard from './pages/Dashboard'
 import Leads from './pages/Leads'
 import Contacts from './pages/Contacts'
-import TeamPage from './pages/TeamPage'
 import SettingsPage from './pages/SettingsPage'
 import ZapierIntegrationPage from './pages/settings/ZapierIntegrationPage'
 import SuperAdminDashboard from './pages/SuperAdminDashboard'
@@ -33,7 +32,7 @@ import SubscriptionPage from './pages/SubscriptionPage'
 import IntegrationsPage from './pages/IntegrationsPage'
 import ImportPage from './pages/ImportPage'
 import FieldConfigurationPage from './pages/FieldConfigurationPage'
-import AdminTeam from './pages/admin/AdminTeam'
+import AdminUsers from './pages/admin/AdminUsers'
 import AdminSubscription from './pages/admin/AdminSubscription'
 import AdminIntegrations from './pages/admin/AdminIntegrations'
 import AdminImport from './pages/admin/AdminImport'
@@ -107,7 +106,6 @@ function App() {
         <Route path="leads" element={<Leads />} />
         <Route path="leads/:id" element={<LeadDetail />} />
         <Route path="contacts" element={<ContactsPage />} />
-        <Route path="team" element={<TeamPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="integrations/zapier" element={<ZapierIntegrationPage />} />
         <Route path="admin/fields" element={<FieldManager />} />
@@ -122,7 +120,7 @@ function App() {
         <Route path="field-configuration" element={<FieldConfigurationPage />} />
 
         {/* Admin Routes */}
-        <Route path="admin/team" element={<AdminTeam />} />
+        <Route path="admin/users" element={<AdminUsers />} />
         <Route path="admin/subscription" element={<AdminSubscription />} />
         <Route path="admin/integrations" element={<AdminIntegrations />} />
         <Route path="admin/import" element={<AdminImport />} />

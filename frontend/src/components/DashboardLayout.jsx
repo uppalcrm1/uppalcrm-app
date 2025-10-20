@@ -35,12 +35,11 @@ const mainNavigation = [
   { name: 'Contacts', href: '/contacts', icon: UserCheck },
   { name: 'Accounts', href: '/accounts', icon: CreditCard },
   { name: 'Transactions', href: '/transactions', icon: DollarSign },
-  { name: 'User Management', href: '/team', icon: UserPlus },
 ]
 
 // Admin navigation - System administration (dropdown)
 const adminNavigation = [
-  { name: 'Team', href: '/admin/team', icon: UserCheck },
+  { name: 'User Management', href: '/admin/users', icon: Users },
   { name: 'Subscription', href: '/admin/subscription', icon: CreditCard },
   { name: 'Integrations', href: '/admin/integrations', icon: Plug },
   { name: 'Import', href: '/admin/import', icon: Upload },
