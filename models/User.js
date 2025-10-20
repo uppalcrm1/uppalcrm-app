@@ -485,72 +485,7 @@ class User {
     };
   }
 
-  /**
-   * Enhanced create method for user management system
-   * @param {Object} userData - User data
-   * @returns {User} Created user instance
-   */
-  static async create(userData) {
-    const { 
-      name, 
-      email, 
-      password, 
-      role = 'user', 
-      organization_id, 
-      created_by,
-      status = 'active'
-    } = userData;
-
-    // Validate required fields
-    if (!name || !email || !password || !organization_id) {
-      throw new Error('Missing required fields: name, email, password, organization_id');
-    }
-
-    // Split name into first and last name
-    const nameParts = name.trim().split(' ');
-    const first_name = nameParts[0];
-    const last_name = nameParts.slice(1).join(' ') || '';
-
-    // Hash password
-    const passwordHash = await bcrypt.hash(password, parseInt(process.env.BCRYPT_ROUNDS) || 12);
-
-    try {
-      const result = await query(`
-        INSERT INTO users (
-          organization_id, 
-          email, 
-          password_hash, 
-          first_name, 
-          last_name, 
-          role, 
-          status,
-          is_first_login,
-          created_by,
-          created_at,
-          updated_at
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
-        RETURNING *
-      `, [
-        organization_id,
-        email.toLowerCase(),
-        passwordHash,
-        first_name,
-        last_name,
-        role,
-        status,
-        true, // is_first_login
-        created_by
-      ], organization_id);
-
-      return new User(result.rows[0]);
-    } catch (error) {
-      if (error.code === '23505') { // Unique violation
-        throw new Error('User with this email already exists');
-      }
-      throw error;
-    }
-  }
+  // Removed duplicate create method - using the main create method at line 35
 
   /**
    * Enhanced update method for user management
