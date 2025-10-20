@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
+import { usersAPI } from '../../services/api'
 import {
   Users,
   UserPlus,
@@ -25,48 +26,28 @@ const AdminUsers = () => {
   const [roleFilter, setRoleFilter] = useState('all')
   const [showAddModal, setShowAddModal] = useState(false)
 
-  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3004/api'
-
   useEffect(() => {
     console.log('🔍 AdminUsers: Component mounted, fetching data...')
-    console.log('API Base URL:', API_BASE_URL)
     console.log('Current user:', currentUser)
+    console.log('Auth token in localStorage:', localStorage.getItem('authToken'))
+    console.log('Org slug in localStorage:', localStorage.getItem('organizationSlug'))
     fetchUsers()
     fetchStats()
   }, [])
 
   const fetchUsers = async () => {
     try {
-      console.log('📡 Fetching users from API...')
-      const token = localStorage.getItem('token')
-      console.log('Token exists:', !!token)
+      console.log('📡 Fetching users from API using centralized service...')
 
-      const response = await fetch(`${API_BASE_URL}/users`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      })
-
-      console.log('API Response status:', response.status)
-      console.log('API Response ok:', response.ok)
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error('❌ API Error response:', errorText)
-        throw new Error(`Failed to fetch users: ${response.status} ${response.statusText}`)
-      }
-
-      const data = await response.json()
+      const data = await usersAPI.getUsers()
       console.log('✅ Users data received:', data)
       console.log('Number of users:', data.users?.length || 0)
-      console.log('Users array:', data.users)
 
       setUsers(data.users || [])
       setError(null)
     } catch (error) {
       console.error('❌ Error fetching users:', error)
-      setError(error.message)
+      setError(error.response?.data?.message || error.message || 'Failed to fetch users')
     } finally {
       setLoading(false)
     }
@@ -74,24 +55,11 @@ const AdminUsers = () => {
 
   const fetchStats = async () => {
     try {
-      console.log('📊 Fetching user statistics...')
-      const token = localStorage.getItem('token')
-      const response = await fetch(`${API_BASE_URL}/users/stats`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      })
+      console.log('📊 Fetching user statistics from API...')
 
-      console.log('Stats API Response status:', response.status)
-
-      if (response.ok) {
-        const data = await response.json()
-        console.log('✅ Stats data received:', data)
-        setStats(data.user_stats)
-      } else {
-        console.warn('⚠️  Stats endpoint returned non-OK status:', response.status)
-      }
+      const data = await usersAPI.getStats()
+      console.log('✅ Stats data received:', data)
+      setStats(data.user_stats)
     } catch (error) {
       console.error('❌ Error fetching stats:', error)
       // Don't fail the whole page if stats fail
