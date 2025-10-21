@@ -174,6 +174,38 @@ const AdminUsers = () => {
     }
   }
 
+  const handleDeleteUser = async (user) => {
+    // Show confirmation dialog
+    const confirmMessage = `Are you sure you want to delete ${user.first_name} ${user.last_name}?\n\nThis will permanently remove their account and cannot be undone.`
+
+    if (!window.confirm(confirmMessage)) {
+      return
+    }
+
+    try {
+      console.log('🗑️ Deleting user:', user.id, user.email)
+
+      // Show loading toast
+      const loadingToast = toast.loading(`Deleting ${user.first_name} ${user.last_name}...`)
+
+      await usersAPI.deleteUser(user.id)
+
+      console.log('✅ User deleted successfully')
+
+      // Dismiss loading toast and show success
+      toast.dismiss(loadingToast)
+      toast.success(`${user.first_name} ${user.last_name} has been deleted`)
+
+      // Refresh the user list and stats
+      await fetchUsers()
+      await fetchStats()
+    } catch (error) {
+      console.error('❌ Error deleting user:', error)
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to delete user'
+      toast.error(errorMessage)
+    }
+  }
+
   const getRoleBadgeClass = (role) => {
     const badges = {
       admin: 'bg-blue-100 text-blue-800',
@@ -467,6 +499,7 @@ const AdminUsers = () => {
                               <Edit2 size={14} />
                             </button>
                             <button
+                              onClick={() => handleDeleteUser(user)}
                               className="btn btn-sm btn-outline text-red-600 hover:bg-red-50"
                               title="Delete user"
                             >
