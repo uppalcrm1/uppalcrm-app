@@ -260,8 +260,57 @@ router.post('/',
 
       await dbQuery('COMMIT');
 
+      // ========================================================================
+      // ORGANIZATION-LEVEL EMAIL: Send team member invitation
+      // ========================================================================
+      // Send invitation email if send_invitation flag is true
+      const { send_invitation = true } = req.body; // Default to true for backward compatibility
+
+      if (send_invitation) {
+        try {
+          const emailService = require('../services/emailService');
+
+          // Get organization details
+          const orgResult = await dbQuery(`
+            SELECT name FROM organizations WHERE id = $1
+          `, [req.organizationId]);
+
+          const organization = orgResult.rows[0];
+          const organizationName = organization?.name || 'Your Organization';
+
+          // Get inviter details
+          const inviterName = req.user.first_name && req.user.last_name
+            ? `${req.user.first_name} ${req.user.last_name}`
+            : req.user.email;
+
+          // Construct member name
+          const memberName = userData.first_name && userData.last_name
+            ? `${userData.first_name} ${userData.last_name}`
+            : userData.email;
+
+          await emailService.sendTeamMemberInvitation({
+            memberName,
+            memberEmail: userData.email,
+            organizationName,
+            invitedBy: inviterName,
+            loginUrl: process.env.FRONTEND_URL || 'https://uppalcrmapp.netlify.app',
+            temporaryPassword: userData.password // The generated temp password
+          });
+
+          console.log(`📧 [ORG-LEVEL] Invitation email sent to ${userData.email} for ${organizationName}`);
+        } catch (emailError) {
+          console.error('❌ Failed to send invitation email:', emailError);
+          // Don't fail the user creation if email fails - just log the error
+          // User can still be created and admin can manually share credentials
+        }
+      } else {
+        console.log(`📧 Skipping invitation email (send_invitation = false)`);
+      }
+
       res.status(201).json({
-        message: 'User created successfully',
+        message: send_invitation
+          ? 'User created successfully and invitation email sent'
+          : 'User created successfully',
         user: user.toJSON(),
         license_info: {
           max_users: finalMaxUsers,
