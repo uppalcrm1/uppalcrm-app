@@ -396,7 +396,12 @@ const startServer = async () => {
   try {
     // Test database connection
     await testConnection();
-    
+
+    // Initialize email service
+    const emailService = require('./services/emailService');
+    await emailService.initialize();
+    console.log('📧 Email service initialization complete');
+
     // Initialize background jobs
     EngagementTracker.init();
     console.log('📊 Background jobs initialized');

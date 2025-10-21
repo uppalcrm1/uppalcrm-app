@@ -1,16 +1,64 @@
 const nodemailer = require('nodemailer');
 
 /**
+ * =============================================================================
  * Email Service using Brevo SMTP
- * 
+ * =============================================================================
+ *
+ * CRITICAL: TWO DISTINCT EMAIL CONTEXTS - DO NOT MIX!
+ *
+ * ========================================================================
+ * EMAIL CONTEXT 1: PLATFORM-LEVEL EMAILS
+ * ========================================================================
+ * Purpose: UppalCRM (the SaaS platform) sending emails to organizations
+ * Use Cases:
+ *   - Trial signup confirmations (sendTrialConfirmation)
+ *   - Trial credentials (sendTrialCredentials)
+ *   - Admin notifications for new signups (sendLeadNotification)
+ *   - Subscription/billing notifications
+ *   - Platform announcements
+ *
+ * Sender Configuration:
+ *   - FROM_EMAIL: uppalcrm1@gmail.com
+ *   - FROM_NAME: "UppalCRM" or "UppalCRM Team"
+ *   - Recipient: Organization admins/owners
+ *
+ * Functions:
+ *   - sendTrialConfirmation()
+ *   - sendTrialCredentials()
+ *   - sendLeadNotification()
+ *   - sendWelcomeEmail()
+ *   - sendTrialExpirationWarning()
+ *
+ * ========================================================================
+ * EMAIL CONTEXT 2: ORGANIZATION-LEVEL EMAILS
+ * ========================================================================
+ * Purpose: Organizations sending emails to their team members
+ * Use Cases:
+ *   - User invitation emails (sendTeamMemberInvitation)
+ *   - Password reset emails for team members
+ *   - Internal team notifications
+ *
+ * Sender Configuration:
+ *   - FROM_EMAIL: uppalcrm1@gmail.com (shared platform email - Option A)
+ *   - FROM_NAME: "UppalCRM - [Organization Name]" (dynamically set per org)
+ *   - Recipient: Team members within that organization
+ *   - TODO: Future Option B - Allow orgs to configure custom SMTP
+ *
+ * Functions:
+ *   - sendTeamMemberInvitation()
+ *   - sendPasswordResetEmail() (when used for team members)
+ *
+ * ========================================================================
+ *
  * Required Environment Variables:
  * - SMTP_HOST: Brevo SMTP server (default: smtp-relay.brevo.com)
  * - SMTP_PORT: SMTP port (default: 587)
  * - SMTP_USER: Your Brevo login email
  * - SMTP_PASS: Your Brevo SMTP key (not your login password!)
- * - FROM_EMAIL: Email address to send from
- * - FROM_NAME: Display name for emails (default: UppalCRM Team)
- * 
+ * - FROM_EMAIL: Email address to send from (uppalcrm1@gmail.com)
+ * - FROM_NAME: Default display name (UppalCRM Team)
+ *
  * Brevo SMTP Limits:
  * - 300 emails per day (free plan)
  * - 14 emails per second rate limit
@@ -78,17 +126,19 @@ class EmailService {
   }
 
   /**
-   * Send welcome email to new organization admin
-   * @param {Object} options - Email options
-   * @param {string} options.organizationName - Organization name
-   * @param {string} options.adminEmail - Admin email address
-   * @param {string} options.adminName - Admin full name
-   * @param {string} options.loginUrl - Direct login URL
-   * @param {string} options.temporaryPassword - Temporary password
-   * @param {string} options.organizationSlug - Organization slug
-   */
-  /**
+   * ========================================================================
+   * PLATFORM-LEVEL EMAIL (Context 1)
+   * ========================================================================
    * Send trial confirmation email to customer
+   *
+   * This is a PLATFORM-LEVEL email from UppalCRM to an organization admin,
+   * NOT an organization-to-team-member email.
+   *
+   * Sender Context:
+   * - FROM_NAME: "UppalCRM" (platform-level)
+   * - FROM_EMAIL: uppalcrm1@gmail.com
+   * - Recipient: Organization admin/owner signing up for trial
+   *
    * @param {Object} options - Email options
    * @param {string} options.customerName - Customer's full name
    * @param {string} options.customerEmail - Customer's email address
@@ -256,7 +306,18 @@ This email was sent to ${customerEmail} because you requested a trial at uppalcr
   }
 
   /**
+   * ========================================================================
+   * PLATFORM-LEVEL EMAIL (Context 1)
+   * ========================================================================
    * Send trial credentials email to customer with instant login access
+   *
+   * This is a PLATFORM-LEVEL email from UppalCRM to an organization admin.
+   *
+   * Sender Context:
+   * - FROM_NAME: "UppalCRM" (platform-level)
+   * - FROM_EMAIL: uppalcrm1@gmail.com
+   * - Recipient: Organization admin/owner who signed up
+   *
    * @param {Object} options - Email options
    * @param {string} options.customerName - Customer's full name
    * @param {string} options.customerEmail - Customer's email address
@@ -481,7 +542,17 @@ If you didn't sign up for UppalCRM, please ignore this email.
   }
 
   /**
+   * ========================================================================
+   * PLATFORM-LEVEL EMAIL (Context 1)
+   * ========================================================================
    * Send admin notification when a new lead signs up
+   *
+   * This is a PLATFORM-LEVEL email from UppalCRM to platform admins.
+   *
+   * Sender Context:
+   * - FROM_NAME: "UppalCRM Marketing" (platform-level)
+   * - FROM_EMAIL: uppalcrm1@gmail.com
+   * - Recipient: Platform admins (uppalcrm1@gmail.com)
    */
   async sendLeadNotification({ leadName, leadEmail, leadCompany, leadPhone, leadMessage, organizationName, utmSource, utmMedium, utmCampaign }) {
     if (!this.isAvailable()) {
@@ -972,7 +1043,19 @@ Organization Slug: ${organizationSlug}
   }
 
   /**
+   * ========================================================================
+   * ORGANIZATION-LEVEL EMAIL (Context 2)
+   * ========================================================================
    * Send team member invitation email
+   *
+   * This is an ORGANIZATION-LEVEL email sent from the organization to their
+   * team member, NOT a platform-level email from UppalCRM.
+   *
+   * Sender Context:
+   * - FROM_NAME: "UppalCRM - [Organization Name]" (organization-specific)
+   * - FROM_EMAIL: uppalcrm1@gmail.com (platform email for now)
+   * - TODO: Future Option B - Allow organizations to configure custom SMTP
+   *
    * @param {Object} options - Email options
    * @param {string} options.memberName - Name of the team member
    * @param {string} options.memberEmail - Email of the team member
@@ -988,11 +1071,13 @@ Organization Slug: ${organizationSlug}
         return false;
       }
 
+      // ORGANIZATION-LEVEL: From name includes organization name
+      const fromName = `UppalCRM - ${organizationName}`;
       const subject = `You've been invited to join ${organizationName} CRM`;
 
       const mailOptions = {
         from: {
-          name: process.env.FROM_NAME || 'UppalCRM Team',
+          name: fromName, // Organization-specific sender name
           address: process.env.FROM_EMAIL || process.env.SMTP_USER
         },
         to: memberEmail,
@@ -1001,12 +1086,14 @@ Organization Slug: ${organizationSlug}
         html: this.generateTeamInvitationEmailHTML({ memberName, organizationName, invitedBy, loginUrl, temporaryPassword, memberEmail }),
         headers: {
           'X-Mailer': 'UppalCRM via Brevo',
-          'X-Priority': '3'
+          'X-Priority': '3',
+          'X-Email-Context': 'organization-level', // Document context in headers
+          'X-Organization': organizationName
         }
       };
 
       const result = await this.transporter.sendMail(mailOptions);
-      console.log(`✅ Team invitation email sent to ${memberEmail} (${memberName})`, result.messageId);
+      console.log(`✅ [ORG-LEVEL] Team invitation email sent to ${memberEmail} (${memberName}) from ${organizationName}`, result.messageId);
       return true;
 
     } catch (error) {
@@ -1016,20 +1103,23 @@ Organization Slug: ${organizationSlug}
   }
 
   /**
+   * ORGANIZATION-LEVEL EMAIL TEMPLATE
    * Generate HTML content for team member invitation email
+   * This template is specifically for organization-to-team-member communication
    */
   generateTeamInvitationEmailHTML({ memberName, organizationName, invitedBy, loginUrl, temporaryPassword, memberEmail }) {
     return `
       <div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
         <div style="background: linear-gradient(135deg, #0ea5e9, #3b82f6); color: white; padding: 30px; text-align: center;">
-          <h1 style="margin: 0; font-size: 28px; font-weight: bold;">UppalCRM</h1>
+          <h1 style="margin: 0; font-size: 24px; font-weight: bold;">${organizationName}</h1>
+          <p style="margin: 5px 0 0 0; font-size: 14px; opacity: 0.8;">powered by UppalCRM</p>
           <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;">Team Member Invitation</p>
         </div>
-        
+
         <div style="padding: 30px; background: #f9fafb;">
           <p>Hello ${memberName},</p>
-          
-          <p><strong>${invitedBy}</strong> has invited you to join the <strong>${organizationName}</strong> CRM team!</p>
+
+          <p><strong>${invitedBy}</strong> from <strong>${organizationName}</strong> has invited you to join their team on UppalCRM!</p>
           
           <div style="background: white; border: 2px solid #0ea5e9; border-radius: 8px; padding: 20px; margin: 20px 0;">
             <h3 style="margin: 0 0 15px 0; color: #0ea5e9;">Your Login Details</h3>
@@ -1100,15 +1190,17 @@ Organization Slug: ${organizationSlug}
   }
 
   /**
+   * ORGANIZATION-LEVEL EMAIL TEMPLATE (Plain Text)
    * Generate text content for team member invitation email
+   * This template is specifically for organization-to-team-member communication
    */
   generateTeamInvitationEmailText({ memberName, organizationName, invitedBy, loginUrl, temporaryPassword, memberEmail }) {
     return `
-🎉 You've been invited to join ${organizationName} CRM!
+🎉 You've been invited to join ${organizationName}!
 
 Hello ${memberName},
 
-${invitedBy} has invited you to join the ${organizationName} CRM team!
+${invitedBy} from ${organizationName} has invited you to join their team on UppalCRM!
 
 YOUR LOGIN DETAILS:
 -------------------
