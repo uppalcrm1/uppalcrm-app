@@ -780,7 +780,7 @@ router.get('/form-config', async (req, res) => {
     let storedConfigs = {};
     try {
       const configResult = await db.query(`
-        SELECT field_name, field_options, is_enabled, is_required, sort_order
+        SELECT field_name, field_options, is_enabled, is_required
         FROM default_field_configurations
         WHERE organization_id = $1
       `, [req.organizationId]);
@@ -814,8 +814,7 @@ router.get('/form-config', async (req, res) => {
           field_type: fieldDef.type,
           field_options: fieldOptions,
           is_required: storedConfig.is_required !== undefined ? storedConfig.is_required : fieldDef.required,
-          is_enabled: true,
-          sort_order: storedConfig.sort_order || 0
+          is_enabled: true
         });
       }
     });
