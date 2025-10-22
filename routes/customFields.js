@@ -736,10 +736,10 @@ router.get('/form-config', async (req, res) => {
 
     // Get custom fields
     const customFields = await db.query(`
-      SELECT field_name, field_label, field_type, field_options, is_required, sort_order
+      SELECT field_name, field_label, field_type, field_options, is_required, created_at
       FROM custom_field_definitions
       WHERE organization_id = $1 AND is_enabled = true
-      ORDER BY sort_order ASC, created_at ASC
+      ORDER BY created_at ASC
     `, [req.organizationId]);
 
     // Define system field defaults
