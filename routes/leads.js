@@ -14,6 +14,34 @@ const db = require('../database/connection');
 
 const router = express.Router();
 
+// Azure Function notification helper
+const sendAzureNotification = async (leadData) => {
+  const azureFunctionUrl = process.env.AZURE_FUNCTION_URL;
+
+  if (!azureFunctionUrl) {
+    console.log('⚠️ AZURE_FUNCTION_URL not configured, skipping notification');
+    return;
+  }
+
+  try {
+    const response = await fetch(azureFunctionUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(leadData)
+    });
+
+    if (response.ok) {
+      console.log('✅ Azure notification sent successfully for lead:', leadData.id);
+    } else {
+      console.error('❌ Azure notification failed with status:', response.status);
+    }
+  } catch (error) {
+    console.error('❌ Error sending Azure notification:', error.message);
+  }
+};
+
 // Add this helper function to get field configurations
 const getFieldConfigurations = async (organizationId) => {
   const customFields = await db.query(`
@@ -599,9 +627,33 @@ router.post('/', async (req, res) => {
       req.userId
     ]);
 
+    const createdLead = result.rows[0];
+
+    // Send Azure notification if lead is assigned (fire-and-forget)
+    if (assignedTo) {
+      sendAzureNotification({
+        id: createdLead.id,
+        firstName: createdLead.first_name,
+        lastName: createdLead.last_name,
+        email: createdLead.email,
+        phone: createdLead.phone,
+        company: createdLead.company,
+        source: createdLead.source,
+        status: createdLead.status,
+        priority: createdLead.priority,
+        value: createdLead[valueColumnName],
+        assignedTo: createdLead.assigned_to,
+        organizationId: req.organizationId,
+        createdAt: createdLead.created_at
+      }).catch(err => {
+        // Log error but don't block the response
+        console.error('Azure notification error (non-blocking):', err);
+      });
+    }
+
     res.status(201).json({
       message: 'Lead created successfully',
-      lead: result.rows[0]
+      lead: createdLead
     });
   } catch (error) {
     console.error('Error creating lead:', error);
