@@ -641,39 +641,38 @@ router.post('/', async (req, res) => {
 
     const createdLead = result.rows[0];
 
-    // Send Azure notification if lead is assigned (fire-and-forget)
+    // Send Azure notification for both lead and assigned user (fire-and-forget)
+    let assignedUserEmail = null;
+
     if (assignedTo) {
       // Get assigned user's email
       const userResult = await db.query(
         'SELECT email FROM users WHERE id = $1',
         [assignedTo]
       );
-
-      const assignedUserEmail = userResult.rows[0]?.email;
-
-      if (assignedUserEmail) {
-        sendAzureNotification({
-          leadId: createdLead.id,
-          assignedTo: assignedUserEmail, // Send email address instead of ID
-          firstName: createdLead.first_name,
-          lastName: createdLead.last_name,
-          email: createdLead.email,
-          phone: createdLead.phone,
-          company: createdLead.company,
-          source: createdLead.source,
-          status: createdLead.status,
-          priority: createdLead.priority,
-          value: createdLead[valueColumnName],
-          organizationId: req.organizationId,
-          createdAt: createdLead.created_at
-        }).catch(err => {
-          // Log error but don't block the response
-          console.error('Azure notification error (non-blocking):', err);
-        });
-      } else {
-        console.log('⚠️ Could not find email for assigned user:', assignedTo);
-      }
+      assignedUserEmail = userResult.rows[0]?.email;
     }
+
+    // Always send notification (for lead welcome email)
+    // Include assignedToEmail only if there's an assigned user
+    sendAzureNotification({
+      leadId: createdLead.id,
+      assignedToEmail: assignedUserEmail, // User who gets the lead assignment notification
+      firstName: createdLead.first_name,
+      lastName: createdLead.last_name,
+      email: createdLead.email, // Lead's email for welcome message
+      phone: createdLead.phone,
+      company: createdLead.company,
+      source: createdLead.source,
+      status: createdLead.status,
+      priority: createdLead.priority,
+      value: createdLead[valueColumnName],
+      organizationId: req.organizationId,
+      createdAt: createdLead.created_at
+    }).catch(err => {
+      // Log error but don't block the response
+      console.error('Azure notification error (non-blocking):', err);
+    });
 
     res.status(201).json({
       message: 'Lead created successfully',
