@@ -29,8 +29,9 @@ const authenticateToken = async (req, res, next) => {
 
     // Set user and organization context
     req.user = user;
+    req.userId = user.id;
     req.organizationId = user.organization_id;
-    
+
     next();
   } catch (error) {
     console.error('Authentication error:', error);
