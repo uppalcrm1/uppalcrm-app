@@ -25,7 +25,12 @@
       "Bash(git pull:*)",
       "Bash(npx netlify:*)",
       "Bash(git checkout:*)",
-      "Bash(npm run logs:backend:*)"
+      "Bash(npm run logs:backend:*)",
+      "Bash(func start:*)",
+      "Bash(az monitor app-insights query:*)",
+      "Bash(az functionapp config appsettings list:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(npm install:*)"
     ],
     "deny": [],
     "ask": []

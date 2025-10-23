@@ -15,7 +15,7 @@ const nodemailer = require('nodemailer');
 
 const router = express.Router();
 
-// Create Brevo SMTP transporter
+// Create Brevo SMTP transporter (using nodemailer v6 for compatibility)
 const transporter = nodemailer.createTransporter({
   host: process.env.SMTP_HOST || 'smtp-relay.brevo.com',
   port: parseInt(process.env.SMTP_PORT) || 587,
