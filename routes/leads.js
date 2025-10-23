@@ -643,24 +643,36 @@ router.post('/', async (req, res) => {
 
     // Send Azure notification if lead is assigned (fire-and-forget)
     if (assignedTo) {
-      sendAzureNotification({
-        leadId: createdLead.id,
-        assignedTo: createdLead.assigned_to,
-        firstName: createdLead.first_name,
-        lastName: createdLead.last_name,
-        email: createdLead.email,
-        phone: createdLead.phone,
-        company: createdLead.company,
-        source: createdLead.source,
-        status: createdLead.status,
-        priority: createdLead.priority,
-        value: createdLead[valueColumnName],
-        organizationId: req.organizationId,
-        createdAt: createdLead.created_at
-      }).catch(err => {
-        // Log error but don't block the response
-        console.error('Azure notification error (non-blocking):', err);
-      });
+      // Get assigned user's email
+      const userResult = await db.query(
+        'SELECT email FROM users WHERE id = $1',
+        [assignedTo]
+      );
+
+      const assignedUserEmail = userResult.rows[0]?.email;
+
+      if (assignedUserEmail) {
+        sendAzureNotification({
+          leadId: createdLead.id,
+          assignedTo: assignedUserEmail, // Send email address instead of ID
+          firstName: createdLead.first_name,
+          lastName: createdLead.last_name,
+          email: createdLead.email,
+          phone: createdLead.phone,
+          company: createdLead.company,
+          source: createdLead.source,
+          status: createdLead.status,
+          priority: createdLead.priority,
+          value: createdLead[valueColumnName],
+          organizationId: req.organizationId,
+          createdAt: createdLead.created_at
+        }).catch(err => {
+          // Log error but don't block the response
+          console.error('Azure notification error (non-blocking):', err);
+        });
+      } else {
+        console.log('⚠️ Could not find email for assigned user:', assignedTo);
+      }
     }
 
     res.status(201).json({
