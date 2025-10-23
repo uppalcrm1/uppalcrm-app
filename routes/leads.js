@@ -11,39 +11,136 @@ const {
 } = require('../middleware/auth');
 const Joi = require('joi');
 const db = require('../database/connection');
+const nodemailer = require('nodemailer');
 
 const router = express.Router();
 
-// Azure Function notification helper
-const sendAzureNotification = async (leadData) => {
-  const azureFunctionUrl = process.env.AZURE_FUNCTION_URL;
-
-  if (!azureFunctionUrl) {
-    console.log('⚠️ AZURE_FUNCTION_URL not configured, skipping notification');
-    return;
+// Create Brevo SMTP transporter
+const transporter = nodemailer.createTransporter({
+  host: process.env.SMTP_HOST || 'smtp-relay.brevo.com',
+  port: parseInt(process.env.SMTP_PORT) || 587,
+  secure: false,
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS
   }
+});
 
+// Send welcome email to the lead
+async function sendLeadWelcomeEmail(leadData) {
   try {
-    const response = await fetch(azureFunctionUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(leadData)
-    });
+    const leadName = `${leadData.firstName || ''} ${leadData.lastName || ''}`.trim() || 'there';
 
-    if (response.ok) {
-      console.log('✅ Azure notification sent successfully for lead:', leadData.id);
-    } else {
-      const errorText = await response.text();
-      console.error('❌ Azure notification failed with status:', response.status);
-      console.error('❌ Azure error response:', errorText);
-      console.error('❌ Data sent:', JSON.stringify(leadData, null, 2));
-    }
+    const mailOptions = {
+      from: `${process.env.FROM_NAME || 'UppalCRM'} <${process.env.FROM_EMAIL}>`,
+      to: leadData.email,
+      subject: `Thank you for your interest!`,
+      html: `
+        <h2>Thank you for reaching out!</h2>
+        <p>Hi ${leadName},</p>
+
+        <p>We've received your information and appreciate your interest in our services. Our team will be in touch with you shortly to discuss how we can help.</p>
+
+        <h3>What happens next?</h3>
+        <ul>
+          <li>A member of our team will review your inquiry</li>
+          <li>We'll reach out to you within 24-48 hours</li>
+          <li>We'll schedule a time to discuss your needs in detail</li>
+        </ul>
+
+        <p>In the meantime, if you have any urgent questions, feel free to reply to this email.</p>
+
+        <p>Best regards,<br>
+        The ${process.env.FROM_NAME || 'UppalCRM'} Team</p>
+      `,
+      text: `
+Thank you for reaching out!
+
+Hi ${leadName},
+
+We've received your information and appreciate your interest in our services. Our team will be in touch with you shortly to discuss how we can help.
+
+What happens next?
+- A member of our team will review your inquiry
+- We'll reach out to you within 24-48 hours
+- We'll schedule a time to discuss your needs in detail
+
+In the meantime, if you have any urgent questions, feel free to reply to this email.
+
+Best regards,
+The ${process.env.FROM_NAME || 'UppalCRM'} Team
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`✅ Welcome email sent to lead: ${leadData.email}`);
+    return true;
   } catch (error) {
-    console.error('❌ Error sending Azure notification:', error.message);
+    console.error(`❌ Error sending lead welcome email:`, error.message);
+    return false;
   }
-};
+}
+
+// Send notification email to the assigned user
+async function sendUserNotificationEmail(leadData, assignedUserEmail) {
+  try {
+    const leadName = `${leadData.firstName || ''} ${leadData.lastName || ''}`.trim() || 'N/A';
+
+    const mailOptions = {
+      from: `${process.env.FROM_NAME || 'UppalCRM'} <${process.env.FROM_EMAIL}>`,
+      to: assignedUserEmail,
+      subject: `New Lead Assigned: ${leadName}`,
+      html: `
+        <h2>New Lead Assignment</h2>
+        <p>You have been assigned a new lead!</p>
+
+        <h3>Lead Details:</h3>
+        <ul>
+          <li><strong>Lead ID:</strong> ${leadData.leadId}</li>
+          <li><strong>Name:</strong> ${leadName}</li>
+          <li><strong>Email:</strong> ${leadData.email || 'N/A'}</li>
+          <li><strong>Phone:</strong> ${leadData.phone || 'N/A'}</li>
+          <li><strong>Company:</strong> ${leadData.company || 'N/A'}</li>
+          <li><strong>Source:</strong> ${leadData.source || 'N/A'}</li>
+          <li><strong>Priority:</strong> ${leadData.priority || 'medium'}</li>
+          <li><strong>Value:</strong> $${leadData.value || '0'}</li>
+        </ul>
+
+        <p><strong>Status:</strong> ${leadData.status || 'new'}</p>
+        <p><em>Assigned on: ${new Date(leadData.createdAt).toLocaleString()}</em></p>
+
+        <p><a href="https://uppalcrm-frontend.onrender.com/dashboard">View in CRM Dashboard</a></p>
+      `,
+      text: `
+New Lead Assignment
+
+You have been assigned a new lead!
+
+Lead Details:
+- Lead ID: ${leadData.leadId}
+- Name: ${leadName}
+- Email: ${leadData.email || 'N/A'}
+- Phone: ${leadData.phone || 'N/A'}
+- Company: ${leadData.company || 'N/A'}
+- Source: ${leadData.source || 'N/A'}
+- Priority: ${leadData.priority || 'medium'}
+- Value: $${leadData.value || '0'}
+
+Status: ${leadData.status || 'new'}
+Assigned on: ${new Date(leadData.createdAt).toLocaleString()}
+
+View in CRM Dashboard: https://uppalcrm-frontend.onrender.com/dashboard
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`✅ Notification email sent to user: ${assignedUserEmail}`);
+    return true;
+  } catch (error) {
+    console.error(`❌ Error sending user notification email:`, error.message);
+    return false;
+  }
+}
 
 // Add this helper function to get field configurations
 const getFieldConfigurations = async (organizationId) => {
@@ -641,38 +738,46 @@ router.post('/', async (req, res) => {
 
     const createdLead = result.rows[0];
 
-    // Send Azure notification for both lead and assigned user (fire-and-forget)
-    let assignedUserEmail = null;
+    // Send emails (fire-and-forget)
+    (async () => {
+      try {
+        // Send welcome email to the lead
+        if (createdLead.email) {
+          await sendLeadWelcomeEmail({
+            firstName: createdLead.first_name,
+            lastName: createdLead.last_name,
+            email: createdLead.email
+          });
+        }
 
-    if (assignedTo) {
-      // Get assigned user's email
-      const userResult = await db.query(
-        'SELECT email FROM users WHERE id = $1',
-        [assignedTo]
-      );
-      assignedUserEmail = userResult.rows[0]?.email;
-    }
+        // Send notification to assigned user
+        if (assignedTo) {
+          const userResult = await db.query(
+            'SELECT email FROM users WHERE id = $1',
+            [assignedTo]
+          );
+          const assignedUserEmail = userResult.rows[0]?.email;
 
-    // Always send notification (for lead welcome email)
-    // Include assignedToEmail only if there's an assigned user
-    sendAzureNotification({
-      leadId: createdLead.id,
-      assignedToEmail: assignedUserEmail, // User who gets the lead assignment notification
-      firstName: createdLead.first_name,
-      lastName: createdLead.last_name,
-      email: createdLead.email, // Lead's email for welcome message
-      phone: createdLead.phone,
-      company: createdLead.company,
-      source: createdLead.source,
-      status: createdLead.status,
-      priority: createdLead.priority,
-      value: createdLead[valueColumnName],
-      organizationId: req.organizationId,
-      createdAt: createdLead.created_at
-    }).catch(err => {
-      // Log error but don't block the response
-      console.error('Azure notification error (non-blocking):', err);
-    });
+          if (assignedUserEmail) {
+            await sendUserNotificationEmail({
+              leadId: createdLead.id,
+              firstName: createdLead.first_name,
+              lastName: createdLead.last_name,
+              email: createdLead.email,
+              phone: createdLead.phone,
+              company: createdLead.company,
+              source: createdLead.source,
+              status: createdLead.status,
+              priority: createdLead.priority,
+              value: createdLead[valueColumnName],
+              createdAt: createdLead.created_at
+            }, assignedUserEmail);
+          }
+        }
+      } catch (error) {
+        console.error('Email sending error (non-blocking):', error);
+      }
+    })();
 
     res.status(201).json({
       message: 'Lead created successfully',
