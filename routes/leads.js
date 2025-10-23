@@ -44,23 +44,32 @@ const sendAzureNotification = async (leadData) => {
 
 // Add this helper function to get field configurations
 const getFieldConfigurations = async (organizationId) => {
-  const customFields = await db.query(`
-    SELECT field_name, field_label, field_type, field_options, is_required, created_at
-    FROM custom_field_definitions
-    WHERE organization_id = $1 AND is_enabled = true
-    ORDER BY created_at ASC
-  `, [organizationId]);
+  try {
+    const customFields = await db.query(`
+      SELECT field_name, field_label, field_type, field_options, is_required, created_at
+      FROM custom_field_definitions
+      WHERE organization_id = $1
+      ORDER BY created_at ASC
+    `, [organizationId]);
 
-  const defaultFields = await db.query(`
-    SELECT field_name, is_enabled, is_required
-    FROM default_field_configurations
-    WHERE organization_id = $1
-  `, [organizationId]);
+    const defaultFields = await db.query(`
+      SELECT field_name, is_required
+      FROM default_field_configurations
+      WHERE organization_id = $1
+    `, [organizationId]);
 
-  return {
-    customFields: customFields.rows,
-    defaultFields: defaultFields.rows
-  };
+    return {
+      customFields: customFields.rows,
+      defaultFields: defaultFields.rows
+    };
+  } catch (error) {
+    console.log('⚠️ Error fetching field configurations, returning empty config:', error.message);
+    // Return empty configuration if tables don't exist or have schema issues
+    return {
+      customFields: [],
+      defaultFields: []
+    };
+  }
 };
 
 // Add validation for custom fields
