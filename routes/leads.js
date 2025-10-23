@@ -35,7 +35,10 @@ const sendAzureNotification = async (leadData) => {
     if (response.ok) {
       console.log('✅ Azure notification sent successfully for lead:', leadData.id);
     } else {
+      const errorText = await response.text();
       console.error('❌ Azure notification failed with status:', response.status);
+      console.error('❌ Azure error response:', errorText);
+      console.error('❌ Data sent:', JSON.stringify(leadData, null, 2));
     }
   } catch (error) {
     console.error('❌ Error sending Azure notification:', error.message);
