@@ -15,16 +15,22 @@ const nodemailer = require('nodemailer');
 
 const router = express.Router();
 
-// Create Brevo SMTP transporter (using nodemailer v6 for compatibility)
-const transporter = nodemailer.createTransporter({
-  host: process.env.SMTP_HOST || 'smtp-relay.brevo.com',
-  port: parseInt(process.env.SMTP_PORT) || 587,
-  secure: false,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS
+// Lazy-load email transporter to avoid startup issues
+let transporter = null;
+function getTransporter() {
+  if (!transporter) {
+    transporter = nodemailer.createTransporter({
+      host: process.env.SMTP_HOST || 'smtp-relay.brevo.com',
+      port: parseInt(process.env.SMTP_PORT) || 587,
+      secure: false,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+      }
+    });
   }
-});
+  return transporter;
+}
 
 // Send welcome email to the lead
 async function sendLeadWelcomeEmail(leadData) {
@@ -72,7 +78,7 @@ The ${process.env.FROM_NAME || 'UppalCRM'} Team
       `
     };
 
-    await transporter.sendMail(mailOptions);
+    await getTransporter().sendMail(mailOptions);
     console.log(`✅ Welcome email sent to lead: ${leadData.email}`);
     return true;
   } catch (error) {
@@ -133,7 +139,7 @@ View in CRM Dashboard: https://uppalcrm-frontend.onrender.com/dashboard
       `
     };
 
-    await transporter.sendMail(mailOptions);
+    await getTransporter().sendMail(mailOptions);
     console.log(`✅ Notification email sent to user: ${assignedUserEmail}`);
     return true;
   } catch (error) {
