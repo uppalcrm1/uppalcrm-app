@@ -644,7 +644,8 @@ router.post('/', async (req, res) => {
     // Send Azure notification if lead is assigned (fire-and-forget)
     if (assignedTo) {
       sendAzureNotification({
-        id: createdLead.id,
+        leadId: createdLead.id,
+        assignedTo: createdLead.assigned_to,
         firstName: createdLead.first_name,
         lastName: createdLead.last_name,
         email: createdLead.email,
@@ -654,7 +655,6 @@ router.post('/', async (req, res) => {
         status: createdLead.status,
         priority: createdLead.priority,
         value: createdLead[valueColumnName],
-        assignedTo: createdLead.assigned_to,
         organizationId: req.organizationId,
         createdAt: createdLead.created_at
       }).catch(err => {
