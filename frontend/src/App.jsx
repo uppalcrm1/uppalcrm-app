@@ -18,7 +18,6 @@ import SuperAdminOrgDetail from './pages/SuperAdminOrgDetail'
 import SuperAdminAnalytics from './pages/SuperAdminAnalytics'
 import SuperAdminLogin from './pages/SuperAdminLogin'
 import SuperAdminLayout from './components/SuperAdminLayout'
-import FieldManager from './components/FieldManager'
 import DynamicLeadForm from './components/DynamicLeadForm'
 import AccountManagement from './pages/AccountManagement'
 import SubscriptionManagement from './pages/SubscriptionManagement'
@@ -108,7 +107,6 @@ function App() {
         <Route path="contacts" element={<ContactsPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="integrations/zapier" element={<ZapierIntegrationPage />} />
-        <Route path="admin/fields" element={<FieldManager />} />
         <Route path="leads/new" element={<DynamicLeadForm />} />
         <Route path="leads/import" element={<ImportLeads />} />
         <Route path="contacts/import" element={<ImportContacts />} />
