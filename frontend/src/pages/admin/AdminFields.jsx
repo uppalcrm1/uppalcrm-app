@@ -14,6 +14,7 @@ import {
   AlertCircle,
   Move
 } from 'lucide-react'
+import api from '../../services/api'
 
 const ENTITY_TYPES = [
   { id: 'leads', label: 'Leads', icon: '👤' },
@@ -43,6 +44,8 @@ const AdminFields = () => {
   const [isCreating, setIsCreating] = useState(false)
   const [editingField, setEditingField] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
   const [formData, setFormData] = useState({
     field_name: '',
     field_label: '',
@@ -62,74 +65,57 @@ const AdminFields = () => {
     validation_rules: {}
   })
 
-  // Mock data for demonstration
-  const mockFields = {
-    leads: [
-      {
-        id: '1',
-        field_name: 'industry',
-        field_label: 'Industry',
-        field_type: 'select',
-        is_required: false,
-        show_in_list_view: true,
-        field_options: [
-          { value: 'tech', label: 'Technology' },
-          { value: 'finance', label: 'Finance' },
-          { value: 'healthcare', label: 'Healthcare' }
-        ],
-        display_order: 1
-      },
-      {
-        id: '2',
-        field_name: 'annual_revenue',
-        field_label: 'Annual Revenue',
-        field_type: 'number',
-        is_required: false,
-        show_in_list_view: false,
-        display_order: 2
-      }
-    ],
-    contacts: [
-      {
-        id: '3',
-        field_name: 'department',
-        field_label: 'Department',
-        field_type: 'text',
-        is_required: false,
-        show_in_list_view: true,
-        display_order: 1
-      }
-    ],
-    accounts: [],
-    transactions: []
+  // Load fields from API
+  const loadFields = async (entityType) => {
+    try {
+      setLoading(true)
+      setError(null)
+      const response = await api.get(`/custom-fields?entity_type=${entityType}`)
+      setFields(response.data.customFields || [])
+    } catch (err) {
+      console.error('Error loading fields:', err)
+      setError(err.response?.data?.message || 'Failed to load fields')
+      setFields([])
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
-    // Load fields for active tab
-    setFields(mockFields[activeTab] || [])
+    loadFields(activeTab)
   }, [activeTab])
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }))
   }
 
-  const handleSaveField = () => {
-    if (editingField) {
-      // Update existing field
-      setFields(prev => prev.map(f => f.id === editingField.id ? { ...formData, id: f.id } : f))
-      setEditingField(null)
-    } else {
-      // Create new field
-      const newField = {
-        ...formData,
-        id: Date.now().toString(),
-        entity_type: activeTab,
-        display_order: fields.length + 1
+  const handleSaveField = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      if (editingField) {
+        // Update existing field
+        const response = await api.put(`/custom-fields/${editingField.id}`, formData)
+        setFields(prev => prev.map(f => f.id === editingField.id ? response.data.field : f))
+        setEditingField(null)
+      } else {
+        // Create new field
+        const fieldData = {
+          ...formData,
+          entity_type: activeTab
+        }
+        const response = await api.post('/custom-fields', fieldData)
+        setFields(prev => [...prev, response.data.field])
+        setIsCreating(false)
       }
-      setFields(prev => [...prev, newField])
-      setIsCreating(false)
+      resetForm()
+    } catch (err) {
+      console.error('Error saving field:', err)
+      setError(err.response?.data?.error || 'Failed to save field')
+    } finally {
+      setLoading(false)
     }
-    resetForm()
   }
 
   const handleEditField = (field) => {
@@ -138,9 +124,19 @@ const AdminFields = () => {
     setIsCreating(true)
   }
 
-  const handleDeleteField = (fieldId) => {
+  const handleDeleteField = async (fieldId) => {
     if (confirm('Are you sure you want to delete this field? This action cannot be undone.')) {
-      setFields(prev => prev.filter(f => f.id !== fieldId))
+      try {
+        setLoading(true)
+        setError(null)
+        await api.delete(`/custom-fields/${fieldId}`)
+        setFields(prev => prev.filter(f => f.id !== fieldId))
+      } catch (err) {
+        console.error('Error deleting field:', err)
+        setError(err.response?.data?.error || 'Failed to delete field')
+      } finally {
+        setLoading(false)
+      }
     }
   }
 
@@ -202,6 +198,23 @@ const AdminFields = () => {
           </button>
         )}
       </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+          <AlertCircle size={20} className="text-red-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-red-800">Error</p>
+            <p className="text-sm text-red-700 mt-1">{error}</p>
+          </div>
+          <button
+            onClick={() => setError(null)}
+            className="text-red-400 hover:text-red-600"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
 
       {/* Entity Type Tabs */}
       <div className="card">

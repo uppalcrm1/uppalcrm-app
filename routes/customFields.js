@@ -159,9 +159,10 @@ const ensureTablesExist = async () => {
       CREATE TABLE IF NOT EXISTS custom_field_definitions (
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
         organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+        entity_type VARCHAR(50) DEFAULT 'leads',
         field_name VARCHAR(50) NOT NULL,
         field_label VARCHAR(100) NOT NULL,
-        field_type VARCHAR(20) NOT NULL CHECK (field_type IN ('text', 'select', 'number', 'date', 'email', 'tel', 'textarea')),
+        field_type VARCHAR(20) NOT NULL CHECK (field_type IN ('text', 'select', 'number', 'date', 'email', 'tel', 'textarea', 'url', 'datetime', 'multiselect', 'checkbox', 'radio', 'phone')),
         field_options JSONB,
         is_required BOOLEAN DEFAULT FALSE,
         is_enabled BOOLEAN DEFAULT TRUE,
@@ -170,10 +171,30 @@ const ensureTablesExist = async () => {
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
         created_by UUID REFERENCES users(id),
 
-        UNIQUE(organization_id, field_name),
+        UNIQUE(organization_id, entity_type, field_name),
         CONSTRAINT field_name_length CHECK (length(field_name) <= 50),
-        CONSTRAINT field_label_length CHECK (length(field_label) <= 100)
+        CONSTRAINT field_label_length CHECK (length(field_label) <= 100),
+        CONSTRAINT valid_entity_type CHECK (entity_type IN ('leads', 'contacts', 'accounts', 'transactions'))
       );
+    `);
+
+    // Add entity_type column if it doesn't exist (for existing tables)
+    await db.query(`
+      ALTER TABLE custom_field_definitions
+      ADD COLUMN IF NOT EXISTS entity_type VARCHAR(50) DEFAULT 'leads';
+    `);
+
+    // Add constraint for entity_type if it doesn't exist
+    await db.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'valid_entity_type'
+        ) THEN
+          ALTER TABLE custom_field_definitions
+          ADD CONSTRAINT valid_entity_type CHECK (entity_type IN ('leads', 'contacts', 'accounts', 'transactions'));
+        END IF;
+      END $$;
     `);
 
     // Create default field configurations table
@@ -295,6 +316,9 @@ const fieldCreationLimit = rateLimit({
 
 // Validation schemas
 const createFieldSchema = Joi.object({
+  entity_type: Joi.string()
+    .valid('leads', 'contacts', 'accounts', 'transactions')
+    .default('leads'),
   field_name: Joi.string()
     .max(50)
     .pattern(/^[a-zA-Z0-9_]+$/)
@@ -304,12 +328,17 @@ const createFieldSchema = Joi.object({
     }),
   field_label: Joi.string().max(100).required(),
   field_type: Joi.string()
-    .valid('text', 'select', 'number', 'date', 'email', 'tel', 'textarea')
+    .valid('text', 'select', 'number', 'date', 'email', 'tel', 'textarea', 'url', 'datetime', 'multiselect', 'checkbox', 'radio', 'phone')
     .required(),
   field_options: Joi.when('field_type', {
-    is: 'select',
-    then: Joi.array().items(Joi.string().max(100)).min(2).max(20).required(),
-    otherwise: Joi.array().length(0)
+    is: Joi.string().valid('select', 'multiselect', 'radio'),
+    then: Joi.array().items(
+      Joi.object({
+        value: Joi.string().required(),
+        label: Joi.string().required()
+      })
+    ).min(1).max(20).required(),
+    otherwise: Joi.array().optional()
   }),
   is_required: Joi.boolean().default(false)
 });
@@ -371,9 +400,12 @@ router.get('/debug', async (req, res) => {
 // Get all custom fields and configuration
 router.get('/', async (req, res) => {
   try {
+    const { entity_type = 'leads' } = req.query;
+
     console.log('🔍 Custom fields GET request debugging:');
     console.log('  - req.user:', req.user ? 'EXISTS' : 'NULL');
     console.log('  - req.organizationId:', req.organizationId);
+    console.log('  - entity_type:', entity_type);
     console.log('  - Headers Authorization:', req.headers.authorization ? 'EXISTS' : 'MISSING');
     console.log('  - Headers X-Organization-Slug:', req.headers['x-organization-slug']);
 
@@ -382,6 +414,15 @@ router.get('/', async (req, res) => {
       return res.status(400).json({
         error: 'Missing organization context',
         details: 'Organization ID is required'
+      });
+    }
+
+    // Validate entity_type
+    const validEntityTypes = ['leads', 'contacts', 'accounts', 'transactions'];
+    if (!validEntityTypes.includes(entity_type)) {
+      return res.status(400).json({
+        error: 'Invalid entity type',
+        details: `entity_type must be one of: ${validEntityTypes.join(', ')}`
       });
     }
 
@@ -400,6 +441,7 @@ router.get('/', async (req, res) => {
     const availableColumns = columnsCheck.rows.map(r => r.column_name);
     const hasIsEnabled = availableColumns.includes('is_enabled');
     const hasSortOrder = availableColumns.includes('sort_order');
+    const hasEntityType = availableColumns.includes('entity_type');
 
     console.log('📝 Available columns:', availableColumns);
 
@@ -407,15 +449,23 @@ router.get('/', async (req, res) => {
     let selectColumns = 'id, field_name, field_label, field_type, field_options, is_required, created_at';
     if (hasIsEnabled) selectColumns += ', is_enabled';
     if (hasSortOrder) selectColumns += ', sort_order';
+    if (hasEntityType) selectColumns += ', entity_type';
 
     const orderBy = hasSortOrder ? 'ORDER BY sort_order ASC, created_at ASC' : 'ORDER BY created_at ASC';
+
+    // Filter by entity_type if column exists
+    const whereClause = hasEntityType
+      ? 'WHERE organization_id = $1 AND entity_type = $2'
+      : 'WHERE organization_id = $1';
+
+    const queryParams = hasEntityType ? [req.organizationId, entity_type] : [req.organizationId];
 
     const customFields = await db.query(`
       SELECT ${selectColumns}
       FROM custom_field_definitions
-      WHERE organization_id = $1
+      ${whereClause}
       ${orderBy}
-    `, [req.organizationId]);
+    `, queryParams);
 
     console.log('Custom fields found:', customFields.rows.length);
 
@@ -564,16 +614,25 @@ router.post('/', fieldCreationLimit, async (req, res) => {
       return res.status(400).json({ error: error.details[0].message });
     }
 
-    const { field_name, field_label, field_type, field_options, is_required } = value;
+    const { field_name, field_label, field_type, field_options, is_required, entity_type = 'leads' } = value;
 
-    // Check if field name already exists
+    // Validate entity_type
+    const validEntityTypes = ['leads', 'contacts', 'accounts', 'transactions'];
+    if (!validEntityTypes.includes(entity_type)) {
+      return res.status(400).json({
+        error: 'Invalid entity type',
+        details: `entity_type must be one of: ${validEntityTypes.join(', ')}`
+      });
+    }
+
+    // Check if field name already exists for this entity type
     const existingField = await db.query(`
       SELECT id FROM custom_field_definitions
-      WHERE organization_id = $1 AND field_name = $2
-    `, [req.organizationId, field_name]);
+      WHERE organization_id = $1 AND field_name = $2 AND entity_type = $3
+    `, [req.organizationId, field_name, entity_type]);
 
     if (existingField.rows.length > 0) {
-      return res.status(400).json({ error: 'Field name already exists' });
+      return res.status(400).json({ error: `Field name already exists for ${entity_type}` });
     }
 
     // Check against system field names
@@ -584,10 +643,10 @@ router.post('/', fieldCreationLimit, async (req, res) => {
 
     const result = await db.query(`
       INSERT INTO custom_field_definitions
-      (organization_id, field_name, field_label, field_type, field_options, is_required, created_by)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
-      RETURNING id, field_name, field_label, field_type, field_options, is_required, is_enabled, created_at
-    `, [req.organizationId, field_name, field_label, field_type, field_options, is_required, req.userId]);
+      (organization_id, entity_type, field_name, field_label, field_type, field_options, is_required, created_by)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      RETURNING id, entity_type, field_name, field_label, field_type, field_options, is_required, is_enabled, created_at
+    `, [req.organizationId, entity_type, field_name, field_label, field_type, field_options, is_required, req.userId]);
 
     res.status(201).json({
       message: 'Custom field created successfully',
