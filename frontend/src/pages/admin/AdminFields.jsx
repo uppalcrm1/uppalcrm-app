@@ -170,10 +170,32 @@ const AdminFields = () => {
     }
   }
 
-  const handleToggleVisibility = (fieldId, property) => {
-    setFields(prev => prev.map(f =>
-      f.id === fieldId ? { ...f, [property]: !f[property] } : f
-    ))
+  const handleToggleVisibility = async (field) => {
+    try {
+      const newIsEnabled = !field.is_enabled
+
+      if (field.isSystemField) {
+        // For system fields, we need to update via a different endpoint
+        // For now, just update local state
+        // TODO: Implement system field configuration API
+        setSystemFields(prev => prev.map(f =>
+          f.field_name === field.field_name ? { ...f, is_enabled: newIsEnabled } : f
+        ))
+        console.log(`System field ${field.field_name} ${newIsEnabled ? 'enabled' : 'disabled'}`)
+      } else {
+        // For custom fields, update via the API
+        const response = await api.put(`/custom-fields/${field.id}`, {
+          is_enabled: newIsEnabled
+        })
+        setFields(prev => prev.map(f =>
+          f.id === field.id ? { ...f, is_enabled: newIsEnabled } : f
+        ))
+        console.log(`✅ Custom field ${field.field_name} ${newIsEnabled ? 'enabled' : 'disabled'}`)
+      }
+    } catch (err) {
+      console.error('Error toggling field visibility:', err)
+      setError(err.response?.data?.error || 'Failed to update field visibility')
+    }
   }
 
   const resetForm = () => {
@@ -613,10 +635,11 @@ const AdminFields = () => {
                       </td>
                       <td className="py-4 px-4">
                         <button
-                          onClick={() => handleToggleVisibility(field.id, 'show_in_list_view')}
-                          className={`p-1 rounded ${field.show_in_list_view ? 'text-green-600' : 'text-gray-400'}`}
+                          onClick={() => handleToggleVisibility(field)}
+                          className={`p-1 rounded transition-colors ${field.is_enabled ? 'text-green-600 hover:text-green-700' : 'text-gray-400 hover:text-gray-500'}`}
+                          title={field.is_enabled ? 'Click to hide this field' : 'Click to show this field'}
                         >
-                          {field.show_in_list_view ? <Eye size={16} /> : <EyeOff size={16} />}
+                          {field.is_enabled ? <Eye size={16} /> : <EyeOff size={16} />}
                         </button>
                       </td>
                       <td className="py-4 px-4">
