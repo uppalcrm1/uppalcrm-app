@@ -184,6 +184,18 @@ const ensureTablesExist = async () => {
       ADD COLUMN IF NOT EXISTS entity_type VARCHAR(50) DEFAULT 'leads';
     `);
 
+    // Add is_enabled column if it doesn't exist (for existing tables)
+    await db.query(`
+      ALTER TABLE custom_field_definitions
+      ADD COLUMN IF NOT EXISTS is_enabled BOOLEAN DEFAULT TRUE;
+    `);
+
+    // Add sort_order column if it doesn't exist (for existing tables)
+    await db.query(`
+      ALTER TABLE custom_field_definitions
+      ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+    `);
+
     // Add constraint for entity_type if it doesn't exist
     await db.query(`
       DO $$
