@@ -390,15 +390,41 @@ router.get('/', async (req, res) => {
 
     // Get custom fields
     console.log('📝 Querying custom_field_definitions...');
+
+    // First check which columns exist
+    const columnsCheck = await db.query(`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_name = 'custom_field_definitions'
+    `);
+    const availableColumns = columnsCheck.rows.map(r => r.column_name);
+    const hasIsEnabled = availableColumns.includes('is_enabled');
+    const hasSortOrder = availableColumns.includes('sort_order');
+
+    console.log('📝 Available columns:', availableColumns);
+
+    // Build query with only available columns
+    let selectColumns = 'id, field_name, field_label, field_type, field_options, is_required, created_at';
+    if (hasIsEnabled) selectColumns += ', is_enabled';
+    if (hasSortOrder) selectColumns += ', sort_order';
+
+    const orderBy = hasSortOrder ? 'ORDER BY sort_order ASC, created_at ASC' : 'ORDER BY created_at ASC';
+
     const customFields = await db.query(`
-      SELECT id, field_name, field_label, field_type, field_options,
-             is_required, is_enabled, sort_order, created_at
+      SELECT ${selectColumns}
       FROM custom_field_definitions
       WHERE organization_id = $1
-      ORDER BY sort_order ASC, created_at ASC
+      ${orderBy}
     `, [req.organizationId]);
 
     console.log('Custom fields found:', customFields.rows.length);
+
+    // Normalize customFields to add missing columns with defaults
+    customFields.rows = customFields.rows.map(field => ({
+      ...field,
+      is_enabled: field.is_enabled !== undefined ? field.is_enabled : true,
+      sort_order: field.sort_order !== undefined ? field.sort_order : 0
+    }));
 
     // Build system fields from defaults + stored configurations
     const systemFieldDefaults = {
