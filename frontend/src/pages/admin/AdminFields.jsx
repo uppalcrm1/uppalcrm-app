@@ -99,17 +99,31 @@ const AdminFields = () => {
       setError(null)
 
       if (editingField) {
-        // Update existing field
-        const response = await api.put(`/custom-fields/${editingField.id}`, formData)
+        // Update existing field - only send fields the backend expects
+        const updateData = {
+          field_label: formData.field_label,
+          field_type: formData.field_type,
+          field_options: formData.field_options,
+          is_required: formData.is_required
+        }
+        console.log('📤 Updating field:', editingField.id, updateData)
+        const response = await api.put(`/custom-fields/${editingField.id}`, updateData)
+        console.log('✅ Field updated:', response.data)
         setFields(prev => prev.map(f => f.id === editingField.id ? response.data.field : f))
         setEditingField(null)
       } else {
-        // Create new field
+        // Create new field - only send fields the backend expects
         const fieldData = {
-          ...formData,
-          entity_type: activeTab
+          entity_type: activeTab,
+          field_name: formData.field_name,
+          field_label: formData.field_label,
+          field_type: formData.field_type,
+          field_options: formData.field_options,
+          is_required: formData.is_required
         }
+        console.log('📤 Sending field data:', fieldData)
         const response = await api.post('/custom-fields', fieldData)
+        console.log('✅ Field created:', response.data)
         setFields(prev => [...prev, response.data.field])
         setIsCreating(false)
       }
