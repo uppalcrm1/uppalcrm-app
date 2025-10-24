@@ -70,10 +70,14 @@ const AdminFields = () => {
     try {
       setLoading(true)
       setError(null)
+      console.log('🔍 Loading fields for entity type:', entityType)
       const response = await api.get(`/custom-fields?entity_type=${entityType}`)
+      console.log('📦 API Response:', response.data)
+      console.log('📝 Custom fields received:', response.data.customFields)
       setFields(response.data.customFields || [])
     } catch (err) {
-      console.error('Error loading fields:', err)
+      console.error('❌ Error loading fields:', err)
+      console.error('❌ Error response:', err.response?.data)
       setError(err.response?.data?.message || 'Failed to load fields')
       setFields([])
     } finally {
