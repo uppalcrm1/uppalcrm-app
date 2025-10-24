@@ -4,10 +4,150 @@ const db = require('../database/connection');
 const { authenticateToken, validateOrganizationContext } = require('../middleware/auth');
 const Joi = require('joi');
 const rateLimit = require('express-rate-limit');
+const nodemailer = require('nodemailer');
 
 // Apply authentication and organization validation to all routes
 router.use(authenticateToken);
 router.use(validateOrganizationContext);
+
+// Email transporter setup (lazy-loaded)
+let transporter = null;
+function getTransporter() {
+  if (!transporter) {
+    transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || 'smtp-relay.brevo.com',
+      port: parseInt(process.env.SMTP_PORT) || 587,
+      secure: false,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+      }
+    });
+  }
+  return transporter;
+}
+
+// Send welcome email to the lead
+async function sendLeadWelcomeEmail(leadData) {
+  try {
+    console.log('📧 sendLeadWelcomeEmail called with:', leadData);
+    const leadName = `${leadData.firstName || ''} ${leadData.lastName || ''}`.trim() || 'there';
+
+    const mailOptions = {
+      from: `${process.env.FROM_NAME || 'UppalCRM'} <${process.env.FROM_EMAIL}>`,
+      to: leadData.email,
+      subject: `Thank you for your interest!`,
+      html: `
+        <h2>Thank you for reaching out!</h2>
+        <p>Hi ${leadName},</p>
+
+        <p>We've received your information and appreciate your interest in our services. Our team will be in touch with you shortly to discuss how we can help.</p>
+
+        <h3>What happens next?</h3>
+        <ul>
+          <li>A member of our team will review your inquiry</li>
+          <li>We'll reach out to you within 24-48 hours</li>
+          <li>We'll schedule a time to discuss your needs in detail</li>
+        </ul>
+
+        <p>In the meantime, if you have any urgent questions, feel free to reply to this email.</p>
+
+        <p>Best regards,<br>
+        The ${process.env.FROM_NAME || 'UppalCRM'} Team</p>
+      `,
+      text: `
+Thank you for reaching out!
+
+Hi ${leadName},
+
+We've received your information and appreciate your interest in our services. Our team will be in touch with you shortly to discuss how we can help.
+
+What happens next?
+- A member of our team will review your inquiry
+- We'll reach out to you within 24-48 hours
+- We'll schedule a time to discuss your needs in detail
+
+In the meantime, if you have any urgent questions, feel free to reply to this email.
+
+Best regards,
+The ${process.env.FROM_NAME || 'UppalCRM'} Team
+      `
+    };
+
+    console.log('📧 Sending mail with options:', JSON.stringify(mailOptions, null, 2));
+    const info = await getTransporter().sendMail(mailOptions);
+    console.log(`✅ Welcome email sent to lead: ${leadData.email}`, info);
+    return true;
+  } catch (error) {
+    console.error(`❌ Error sending lead welcome email:`, error.message);
+    console.error(`❌ Error stack:`, error.stack);
+    return false;
+  }
+}
+
+// Send notification email to the assigned user
+async function sendUserNotificationEmail(leadData, assignedUserEmail) {
+  try {
+    console.log('📧 sendUserNotificationEmail called with lead:', leadData.leadId, 'to:', assignedUserEmail);
+    const leadName = `${leadData.firstName || ''} ${leadData.lastName || ''}`.trim() || 'N/A';
+
+    const mailOptions = {
+      from: `${process.env.FROM_NAME || 'UppalCRM'} <${process.env.FROM_EMAIL}>`,
+      to: assignedUserEmail,
+      subject: `New Lead Assigned: ${leadName}`,
+      html: `
+        <h2>New Lead Assignment</h2>
+        <p>You have been assigned a new lead!</p>
+
+        <h3>Lead Details:</h3>
+        <ul>
+          <li><strong>Lead ID:</strong> ${leadData.leadId}</li>
+          <li><strong>Name:</strong> ${leadName}</li>
+          <li><strong>Email:</strong> ${leadData.email || 'N/A'}</li>
+          <li><strong>Phone:</strong> ${leadData.phone || 'N/A'}</li>
+          <li><strong>Company:</strong> ${leadData.company || 'N/A'}</li>
+          <li><strong>Source:</strong> ${leadData.source || 'N/A'}</li>
+          <li><strong>Priority:</strong> ${leadData.priority || 'medium'}</li>
+          <li><strong>Value:</strong> $${leadData.value || '0'}</li>
+        </ul>
+
+        <p><strong>Status:</strong> ${leadData.status || 'new'}</p>
+        <p><em>Assigned on: ${new Date(leadData.createdAt).toLocaleString()}</em></p>
+
+        <p><a href="https://uppalcrm-frontend.onrender.com/dashboard">View in CRM Dashboard</a></p>
+      `,
+      text: `
+New Lead Assignment
+
+You have been assigned a new lead!
+
+Lead Details:
+- Lead ID: ${leadData.leadId}
+- Name: ${leadName}
+- Email: ${leadData.email || 'N/A'}
+- Phone: ${leadData.phone || 'N/A'}
+- Company: ${leadData.company || 'N/A'}
+- Source: ${leadData.source || 'N/A'}
+- Priority: ${leadData.priority || 'medium'}
+- Value: $${leadData.value || '0'}
+
+Status: ${leadData.status || 'new'}
+Assigned on: ${new Date(leadData.createdAt).toLocaleString()}
+
+View in CRM Dashboard: https://uppalcrm-frontend.onrender.com/dashboard
+      `
+    };
+
+    console.log('📧 Sending user notification...');
+    const info = await getTransporter().sendMail(mailOptions);
+    console.log(`✅ Notification email sent to user: ${assignedUserEmail}`, info);
+    return true;
+  } catch (error) {
+    console.error(`❌ Error sending user notification email:`, error.message);
+    console.error(`❌ Error stack:`, error.stack);
+    return false;
+  }
+}
 
 // Add this helper function at the top after imports
 const ensureTablesExist = async () => {
@@ -679,9 +819,70 @@ router.post('/create-lead', async (req, res) => {
       req.user.id
     ], req.organizationId);
 
+    const createdLead = result.rows[0];
+
+    // Send emails (fire-and-forget)
+    (async () => {
+      try {
+        console.log('📧 Starting email sending process...');
+        console.log('📧 Lead email:', createdLead.email);
+        console.log('📧 Assigned to:', finalAssignedTo);
+
+        // Send welcome email to the lead
+        if (createdLead.email) {
+          console.log('📧 Attempting to send welcome email to:', createdLead.email);
+          await sendLeadWelcomeEmail({
+            firstName: createdLead.first_name,
+            lastName: createdLead.last_name,
+            email: createdLead.email
+          });
+          console.log('📧 Welcome email sent successfully');
+        } else {
+          console.log('📧 No lead email provided, skipping welcome email');
+        }
+
+        // Send notification to assigned user
+        if (finalAssignedTo) {
+          console.log('📧 Looking up assigned user email for ID:', finalAssignedTo);
+          const userResult = await db.query(
+            'SELECT email FROM users WHERE id = $1',
+            [finalAssignedTo],
+            req.organizationId
+          );
+          const assignedUserEmail = userResult.rows[0]?.email;
+          console.log('📧 Assigned user email:', assignedUserEmail);
+
+          if (assignedUserEmail) {
+            console.log('📧 Attempting to send notification to:', assignedUserEmail);
+            await sendUserNotificationEmail({
+              leadId: createdLead.id,
+              firstName: createdLead.first_name,
+              lastName: createdLead.last_name,
+              email: createdLead.email,
+              phone: createdLead.phone,
+              company: createdLead.company,
+              source: createdLead.source,
+              status: createdLead.status,
+              priority: createdLead.priority,
+              value: createdLead.value,
+              createdAt: createdLead.created_at
+            }, assignedUserEmail);
+            console.log('📧 User notification email sent successfully');
+          } else {
+            console.log('📧 No email found for assigned user');
+          }
+        } else {
+          console.log('📧 No user assigned, skipping notification email');
+        }
+      } catch (error) {
+        console.error('❌ Email sending error (non-blocking):', error);
+        console.error('❌ Error stack:', error.stack);
+      }
+    })();
+
     res.status(201).json({
       message: 'Lead created successfully',
-      lead: result.rows[0]
+      lead: createdLead
     });
   } catch (error) {
     console.error('Error creating lead:', error);
