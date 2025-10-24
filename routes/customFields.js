@@ -211,16 +211,19 @@ const ensureTablesExist = async () => {
 
     // Migrate existing fields: duplicate them for all entity types
     // This only runs once - it checks if there are fields with entity_type='leads' that don't have copies for other entities
+    console.log('🔄 Starting field migration check...');
     const existingLeadFields = await db.query(`
       SELECT DISTINCT field_name, field_label, field_type, field_options, is_required, organization_id
       FROM custom_field_definitions
       WHERE entity_type = 'leads'
     `);
 
+    console.log(`📋 Found ${existingLeadFields.rows.length} lead fields to potentially duplicate`);
     if (existingLeadFields.rows.length > 0) {
-      console.log(`📋 Found ${existingLeadFields.rows.length} lead fields to potentially duplicate`);
+      console.log(`📝 Lead field names:`, existingLeadFields.rows.map(f => f.field_name).join(', '));
 
       for (const field of existingLeadFields.rows) {
+        console.log(`🔍 Processing field: ${field.field_name} for org: ${field.organization_id}`);
         for (const entityType of ['contacts', 'accounts', 'transactions']) {
           // Check if this field already exists for this entity type
           const exists = await db.query(`
@@ -240,10 +243,13 @@ const ensureTablesExist = async () => {
             } catch (err) {
               console.log(`⚠️ Could not duplicate field '${field.field_name}' for ${entityType}:`, err.message);
             }
+          } else {
+            console.log(`⏭️ Field '${field.field_name}' already exists for ${entityType}, skipping`);
           }
         }
       }
     }
+    console.log('✅ Field migration check complete');
 
     // Create default field configurations table
     await db.query(`
