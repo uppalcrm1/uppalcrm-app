@@ -74,6 +74,10 @@ const AdminFields = () => {
       const response = await api.get(`/custom-fields?entity_type=${entityType}`)
       console.log('📦 API Response:', response.data)
       console.log('📝 Custom fields received:', response.data.customFields)
+      console.log('📊 Number of fields:', response.data.customFields?.length || 0)
+      if (response.data.customFields && response.data.customFields.length > 0) {
+        console.log('📋 Field names:', response.data.customFields.map(f => f.field_name).join(', '))
+      }
       setFields(response.data.customFields || [])
     } catch (err) {
       console.error('❌ Error loading fields:', err)
