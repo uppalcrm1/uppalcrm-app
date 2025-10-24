@@ -609,6 +609,9 @@ router.get('/', async (req, res) => {
 // Create new custom field
 router.post('/', fieldCreationLimit, async (req, res) => {
   try {
+    // Ensure tables exist before attempting to insert
+    await ensureTablesExist();
+
     const { error, value } = createFieldSchema.validate(req.body);
     if (error) {
       return res.status(400).json({ error: error.details[0].message });
@@ -653,11 +656,16 @@ router.post('/', fieldCreationLimit, async (req, res) => {
       field: result.rows[0]
     });
   } catch (error) {
-    console.error('Error creating custom field:', error);
+    console.error('❌ Error creating custom field:', error);
+    console.error('❌ Error message:', error.message);
+    console.error('❌ Error stack:', error.stack);
     if (error.message.includes('Custom field limit exceeded')) {
       return res.status(403).json({ error: error.message });
     }
-    res.status(500).json({ error: 'Failed to create custom field' });
+    res.status(500).json({
+      error: 'Failed to create custom field',
+      details: error.message
+    });
   }
 });
 
