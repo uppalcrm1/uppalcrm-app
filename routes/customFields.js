@@ -209,6 +209,42 @@ const ensureTablesExist = async () => {
       END $$;
     `);
 
+    // Migrate existing fields: duplicate them for all entity types
+    // This only runs once - it checks if there are fields with entity_type='leads' that don't have copies for other entities
+    const existingLeadFields = await db.query(`
+      SELECT DISTINCT field_name, field_label, field_type, field_options, is_required, organization_id
+      FROM custom_field_definitions
+      WHERE entity_type = 'leads'
+    `);
+
+    if (existingLeadFields.rows.length > 0) {
+      console.log(`📋 Found ${existingLeadFields.rows.length} lead fields to potentially duplicate`);
+
+      for (const field of existingLeadFields.rows) {
+        for (const entityType of ['contacts', 'accounts', 'transactions']) {
+          // Check if this field already exists for this entity type
+          const exists = await db.query(`
+            SELECT id FROM custom_field_definitions
+            WHERE organization_id = $1 AND field_name = $2 AND entity_type = $3
+          `, [field.organization_id, field.field_name, entityType]);
+
+          if (exists.rows.length === 0) {
+            // Create the field for this entity type
+            try {
+              await db.query(`
+                INSERT INTO custom_field_definitions
+                (organization_id, entity_type, field_name, field_label, field_type, field_options, is_required)
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
+              `, [field.organization_id, entityType, field.field_name, field.field_label, field.field_type, field.field_options, field.is_required]);
+              console.log(`✅ Duplicated field '${field.field_name}' for ${entityType}`);
+            } catch (err) {
+              console.log(`⚠️ Could not duplicate field '${field.field_name}' for ${entityType}:`, err.message);
+            }
+          }
+        }
+      }
+    }
+
     // Create default field configurations table
     await db.query(`
       CREATE TABLE IF NOT EXISTS default_field_configurations (
