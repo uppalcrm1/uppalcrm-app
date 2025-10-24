@@ -531,38 +531,103 @@ router.get('/', async (req, res) => {
     }));
 
     // Build system fields from defaults + stored configurations
-    const systemFieldDefaults = {
-      firstName: { label: 'First Name', type: 'text', required: true, editable: false },
-      lastName: { label: 'Last Name', type: 'text', required: true, editable: false },
-      email: { label: 'Email', type: 'email', required: false, editable: true },
-      phone: { label: 'Phone', type: 'tel', required: false, editable: true },
-      company: { label: 'Company', type: 'text', required: false, editable: true },
-      source: {
-        label: 'Source',
-        type: 'select',
-        required: false,
-        editable: true,
-        options: ['Website', 'Referral', 'Social', 'Cold-call', 'Email', 'Advertisement', 'Trade-show', 'Other']
+    // Define entity-specific system fields
+    const systemFieldsByEntity = {
+      leads: {
+        firstName: { label: 'First Name', type: 'text', required: true, editable: false },
+        lastName: { label: 'Last Name', type: 'text', required: true, editable: false },
+        email: { label: 'Email', type: 'email', required: false, editable: true },
+        phone: { label: 'Phone', type: 'tel', required: false, editable: true },
+        company: { label: 'Company', type: 'text', required: false, editable: true },
+        source: {
+          label: 'Source',
+          type: 'select',
+          required: false,
+          editable: true,
+          options: ['Website', 'Referral', 'Social', 'Cold-call', 'Email', 'Advertisement', 'Trade-show', 'Other']
+        },
+        status: {
+          label: 'Status',
+          type: 'select',
+          required: false,
+          editable: true,
+          options: ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'converted', 'lost']
+        },
+        priority: {
+          label: 'Priority',
+          type: 'select',
+          required: false,
+          editable: true,
+          options: ['low', 'medium', 'high']
+        },
+        potentialValue: { label: 'Potential Value ($)', type: 'number', required: false, editable: true },
+        assignedTo: { label: 'Assign To', type: 'user_select', required: false, editable: true },
+        nextFollowUp: { label: 'Next Follow Up', type: 'date', required: false, editable: true },
+        notes: { label: 'Notes', type: 'textarea', required: false, editable: true }
       },
-      status: {
-        label: 'Status',
-        type: 'select',
-        required: false,
-        editable: true,
-        options: ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'converted', 'lost']
+      contacts: {
+        firstName: { label: 'First Name', type: 'text', required: true, editable: false },
+        lastName: { label: 'Last Name', type: 'text', required: true, editable: false },
+        email: { label: 'Email', type: 'email', required: false, editable: true },
+        phone: { label: 'Phone', type: 'tel', required: false, editable: true },
+        company: { label: 'Company', type: 'text', required: false, editable: true },
+        title: { label: 'Job Title', type: 'text', required: false, editable: true },
+        department: { label: 'Department', type: 'text', required: false, editable: true },
+        linkedIn: { label: 'LinkedIn Profile', type: 'url', required: false, editable: true },
+        status: {
+          label: 'Status',
+          type: 'select',
+          required: false,
+          editable: true,
+          options: ['active', 'inactive', 'prospect']
+        },
+        assignedTo: { label: 'Assign To', type: 'user_select', required: false, editable: true },
+        lastContactDate: { label: 'Last Contact Date', type: 'date', required: false, editable: true },
+        notes: { label: 'Notes', type: 'textarea', required: false, editable: true }
       },
-      priority: {
-        label: 'Priority',
-        type: 'select',
-        required: false,
-        editable: true,
-        options: ['low', 'medium', 'high']
+      accounts: {
+        companyName: { label: 'Company Name', type: 'text', required: true, editable: false },
+        industry: { label: 'Industry', type: 'text', required: false, editable: true },
+        website: { label: 'Website', type: 'url', required: false, editable: true },
+        phone: { label: 'Phone', type: 'tel', required: false, editable: true },
+        email: { label: 'Email', type: 'email', required: false, editable: true },
+        address: { label: 'Address', type: 'text', required: false, editable: true },
+        city: { label: 'City', type: 'text', required: false, editable: true },
+        state: { label: 'State', type: 'text', required: false, editable: true },
+        country: { label: 'Country', type: 'text', required: false, editable: true },
+        employeeCount: { label: 'Employee Count', type: 'number', required: false, editable: true },
+        annualRevenue: { label: 'Annual Revenue ($)', type: 'number', required: false, editable: true },
+        assignedTo: { label: 'Account Owner', type: 'user_select', required: false, editable: true },
+        notes: { label: 'Notes', type: 'textarea', required: false, editable: true }
       },
-      potentialValue: { label: 'Potential Value ($)', type: 'number', required: false, editable: true },
-      assignedTo: { label: 'Assign To', type: 'user_select', required: false, editable: true },
-      nextFollowUp: { label: 'Next Follow Up', type: 'date', required: false, editable: true },
-      notes: { label: 'Notes', type: 'textarea', required: false, editable: true }
+      transactions: {
+        dealName: { label: 'Deal Name', type: 'text', required: true, editable: false },
+        amount: { label: 'Amount ($)', type: 'number', required: false, editable: true },
+        stage: {
+          label: 'Stage',
+          type: 'select',
+          required: false,
+          editable: true,
+          options: ['prospecting', 'qualification', 'proposal', 'negotiation', 'closed-won', 'closed-lost']
+        },
+        probability: { label: 'Probability (%)', type: 'number', required: false, editable: true },
+        expectedCloseDate: { label: 'Expected Close Date', type: 'date', required: false, editable: true },
+        actualCloseDate: { label: 'Actual Close Date', type: 'date', required: false, editable: true },
+        account: { label: 'Account', type: 'text', required: false, editable: true },
+        contact: { label: 'Contact', type: 'text', required: false, editable: true },
+        source: {
+          label: 'Source',
+          type: 'select',
+          required: false,
+          editable: true,
+          options: ['Inbound', 'Outbound', 'Partner', 'Referral', 'Event']
+        },
+        assignedTo: { label: 'Deal Owner', type: 'user_select', required: false, editable: true },
+        notes: { label: 'Notes', type: 'textarea', required: false, editable: true }
+      }
     };
+
+    const systemFieldDefaults = systemFieldsByEntity[entity_type] || systemFieldsByEntity.leads;
 
     // Get any stored configurations for system fields
     let storedConfigs = {};
