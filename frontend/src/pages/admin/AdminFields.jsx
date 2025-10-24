@@ -41,6 +41,7 @@ const FIELD_TYPES = [
 const AdminFields = () => {
   const [activeTab, setActiveTab] = useState('leads')
   const [fields, setFields] = useState([])
+  const [systemFields, setSystemFields] = useState([])
   const [isCreating, setIsCreating] = useState(false)
   const [editingField, setEditingField] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
@@ -74,16 +75,23 @@ const AdminFields = () => {
       const response = await api.get(`/custom-fields?entity_type=${entityType}`)
       console.log('📦 API Response:', response.data)
       console.log('📝 Custom fields received:', response.data.customFields)
-      console.log('📊 Number of fields:', response.data.customFields?.length || 0)
+      console.log('🔧 System fields received:', response.data.systemFields)
+      console.log('📊 Number of custom fields:', response.data.customFields?.length || 0)
+      console.log('📊 Number of system fields:', response.data.systemFields?.length || 0)
       if (response.data.customFields && response.data.customFields.length > 0) {
-        console.log('📋 Field names:', response.data.customFields.map(f => f.field_name).join(', '))
+        console.log('📋 Custom field names:', response.data.customFields.map(f => f.field_name).join(', '))
+      }
+      if (response.data.systemFields && response.data.systemFields.length > 0) {
+        console.log('📋 System field names:', response.data.systemFields.map(f => f.field_name).join(', '))
       }
       setFields(response.data.customFields || [])
+      setSystemFields(response.data.systemFields || [])
     } catch (err) {
       console.error('❌ Error loading fields:', err)
       console.error('❌ Error response:', err.response?.data)
       setError(err.response?.data?.message || 'Failed to load fields')
       setFields([])
+      setSystemFields([])
     } finally {
       setLoading(false)
     }
@@ -195,7 +203,13 @@ const AdminFields = () => {
     resetForm()
   }
 
-  const filteredFields = fields.filter(field =>
+  // Combine system fields and custom fields
+  const allFields = [
+    ...systemFields.map(f => ({ ...f, isSystemField: true })),
+    ...fields.map(f => ({ ...f, isSystemField: false }))
+  ]
+
+  const filteredFields = allFields.filter(field =>
     field.field_label.toLowerCase().includes(searchQuery.toLowerCase()) ||
     field.field_name.toLowerCase().includes(searchQuery.toLowerCase())
   )
