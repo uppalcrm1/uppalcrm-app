@@ -35,6 +35,7 @@ function getTransporter() {
 // Send welcome email to the lead
 async function sendLeadWelcomeEmail(leadData) {
   try {
+    console.log('📧 sendLeadWelcomeEmail called with:', leadData);
     const leadName = `${leadData.firstName || ''} ${leadData.lastName || ''}`.trim() || 'there';
 
     const mailOptions = {
@@ -78,11 +79,13 @@ The ${process.env.FROM_NAME || 'UppalCRM'} Team
       `
     };
 
-    await getTransporter().sendMail(mailOptions);
-    console.log(`✅ Welcome email sent to lead: ${leadData.email}`);
+    console.log('📧 Sending mail with options:', JSON.stringify(mailOptions, null, 2));
+    const info = await getTransporter().sendMail(mailOptions);
+    console.log(`✅ Welcome email sent to lead: ${leadData.email}`, info);
     return true;
   } catch (error) {
     console.error(`❌ Error sending lead welcome email:`, error.message);
+    console.error(`❌ Error stack:`, error.stack);
     return false;
   }
 }
@@ -747,24 +750,35 @@ router.post('/', async (req, res) => {
     // Send emails (fire-and-forget)
     (async () => {
       try {
+        console.log('📧 Starting email sending process...');
+        console.log('📧 Lead email:', createdLead.email);
+        console.log('📧 Assigned to:', assignedTo);
+
         // Send welcome email to the lead
         if (createdLead.email) {
+          console.log('📧 Attempting to send welcome email to:', createdLead.email);
           await sendLeadWelcomeEmail({
             firstName: createdLead.first_name,
             lastName: createdLead.last_name,
             email: createdLead.email
           });
+          console.log('📧 Welcome email sent successfully');
+        } else {
+          console.log('📧 No lead email provided, skipping welcome email');
         }
 
         // Send notification to assigned user
         if (assignedTo) {
+          console.log('📧 Looking up assigned user email for ID:', assignedTo);
           const userResult = await db.query(
             'SELECT email FROM users WHERE id = $1',
             [assignedTo]
           );
           const assignedUserEmail = userResult.rows[0]?.email;
+          console.log('📧 Assigned user email:', assignedUserEmail);
 
           if (assignedUserEmail) {
+            console.log('📧 Attempting to send notification to:', assignedUserEmail);
             await sendUserNotificationEmail({
               leadId: createdLead.id,
               firstName: createdLead.first_name,
@@ -778,10 +792,16 @@ router.post('/', async (req, res) => {
               value: createdLead[valueColumnName],
               createdAt: createdLead.created_at
             }, assignedUserEmail);
+            console.log('📧 User notification email sent successfully');
+          } else {
+            console.log('📧 No email found for assigned user');
           }
+        } else {
+          console.log('📧 No user assigned, skipping notification email');
         }
       } catch (error) {
-        console.error('Email sending error (non-blocking):', error);
+        console.error('❌ Email sending error (non-blocking):', error);
+        console.error('❌ Error stack:', error.stack);
       }
     })();
 
