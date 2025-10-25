@@ -399,10 +399,16 @@ const createFieldSchema = Joi.object({
 
 const updateFieldSchema = Joi.object({
   field_label: Joi.string().max(100),
+  field_type: Joi.string().valid('text', 'select', 'number', 'date', 'email', 'tel', 'textarea', 'url', 'datetime', 'multiselect', 'checkbox', 'radio', 'phone'),
   field_options: Joi.when('field_type', {
-    is: 'select',
-    then: Joi.array().items(Joi.string().max(100)).min(2).max(20),
-    otherwise: Joi.forbidden()
+    is: Joi.string().valid('select', 'multiselect', 'radio'),
+    then: Joi.array().items(
+      Joi.object({
+        value: Joi.string().required(),
+        label: Joi.string().required()
+      })
+    ).min(1).max(20),
+    otherwise: Joi.array().optional()
   }),
   is_required: Joi.boolean(),
   is_enabled: Joi.boolean(),

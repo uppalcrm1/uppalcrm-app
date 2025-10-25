@@ -150,7 +150,32 @@ const AdminFields = () => {
   }
 
   const handleEditField = (field) => {
-    setFormData(field)
+    // Normalize field_options to ensure it's an array of {value, label} objects
+    let normalizedOptions = []
+    if (field.field_options) {
+      if (Array.isArray(field.field_options)) {
+        normalizedOptions = field.field_options.map(option => {
+          // If it's already an object with label/value, use it
+          if (typeof option === 'object' && option !== null && option.label) {
+            return option
+          }
+          // If it's a string, convert to {value, label}
+          if (typeof option === 'string') {
+            return {
+              value: option.toLowerCase().replace(/\s+/g, '_'),
+              label: option
+            }
+          }
+          // Fallback
+          return { value: '', label: '' }
+        })
+      }
+    }
+
+    setFormData({
+      ...field,
+      field_options: normalizedOptions
+    })
     setEditingField(field)
     setIsCreating(true)
   }
