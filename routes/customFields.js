@@ -635,15 +635,15 @@ router.get('/', async (req, res) => {
       const configResult = await db.query(`
         SELECT field_name, field_options, is_enabled, is_required, sort_order
         FROM default_field_configurations
-        WHERE organization_id = $1
-      `, [req.organizationId]);
+        WHERE organization_id = $1 AND entity_type = $2
+      `, [req.organizationId, entity_type]);
 
       configResult.rows.forEach(config => {
         storedConfigs[config.field_name] = config;
       });
-      console.log('Stored system field configs found:', Object.keys(storedConfigs).length);
+      console.log('Stored system field configs found for', entity_type, ':', Object.keys(storedConfigs).length);
     } catch (configError) {
-      console.log('No stored system field configs found');
+      console.log('No stored system field configs found for', entity_type, ':', configError.message);
     }
 
     // Build complete system fields list
@@ -864,8 +864,13 @@ router.put('/default/:fieldName', async (req, res) => {
 
     await ensureTablesExist();
 
-    const { is_enabled, is_required, is_deleted, field_options, field_label, field_type } = req.body;
+    const { is_enabled, is_required, is_deleted, field_options, field_label, field_type, entity_type } = req.body;
     const { fieldName } = req.params;
+
+    // entity_type is required for proper field isolation
+    if (!entity_type) {
+      return res.status(400).json({ error: 'entity_type is required' });
+    }
 
     // Define system field defaults
     const systemFieldDefaults = {
@@ -933,9 +938,9 @@ router.put('/default/:fieldName', async (req, res) => {
 
     const result = await db.query(`
       INSERT INTO default_field_configurations
-      (organization_id, field_name, field_options, is_enabled, is_required, sort_order, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, NOW())
-      ON CONFLICT (organization_id, field_name)
+      (organization_id, field_name, entity_type, field_options, is_enabled, is_required, sort_order, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+      ON CONFLICT (organization_id, field_name, entity_type)
       DO UPDATE SET
         field_options = EXCLUDED.field_options,
         is_enabled = EXCLUDED.is_enabled,
@@ -946,6 +951,7 @@ router.put('/default/:fieldName', async (req, res) => {
     `, [
       req.organizationId,
       fieldName,
+      entity_type,
       JSON.stringify(fieldConfig.options),
       fieldConfig.is_enabled,
       fieldConfig.is_required,

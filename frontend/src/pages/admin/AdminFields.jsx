@@ -177,12 +177,13 @@ const AdminFields = () => {
       if (field.isSystemField) {
         // For system fields, update via the system field configuration API
         const response = await api.put(`/custom-fields/default/${field.field_name}`, {
-          is_enabled: newIsEnabled
+          is_enabled: newIsEnabled,
+          entity_type: activeTab  // Pass the current entity type
         })
         setSystemFields(prev => prev.map(f =>
           f.field_name === field.field_name ? { ...f, is_enabled: newIsEnabled } : f
         ))
-        console.log(`✅ System field ${field.field_name} ${newIsEnabled ? 'enabled' : 'disabled'}`)
+        console.log(`✅ System field ${field.field_name} ${newIsEnabled ? 'enabled' : 'disabled'} for ${activeTab}`)
       } else {
         // For custom fields, update via the API
         const response = await api.put(`/custom-fields/${field.id}`, {
