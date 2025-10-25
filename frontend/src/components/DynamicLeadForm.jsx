@@ -400,8 +400,8 @@ const DynamicLeadForm = ({
   };
 
   const getEnabledSystemFields = () => {
-    // Use the system fields from the API response
-    return formConfig.systemFields || [];
+    // Use the system fields from the API response, but only return enabled ones
+    return (formConfig.systemFields || []).filter(f => f.is_enabled !== false);
   };
 
   if (loading) {
