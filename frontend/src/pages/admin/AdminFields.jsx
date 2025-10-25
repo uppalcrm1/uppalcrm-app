@@ -47,6 +47,7 @@ const AdminFields = () => {
   const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [successMessage, setSuccessMessage] = useState(null)
   const [formData, setFormData] = useState({
     field_name: '',
     field_label: '',
@@ -173,6 +174,8 @@ const AdminFields = () => {
   const handleToggleVisibility = async (field) => {
     try {
       const newIsEnabled = !field.is_enabled
+      setError(null)
+      setSuccessMessage(null)
 
       if (field.isSystemField) {
         // For system fields, update via the system field configuration API
@@ -183,6 +186,10 @@ const AdminFields = () => {
         setSystemFields(prev => prev.map(f =>
           f.field_name === field.field_name ? { ...f, is_enabled: newIsEnabled } : f
         ))
+        const message = newIsEnabled
+          ? `${field.field_label} is now visible in forms`
+          : `${field.field_label} is now hidden from forms`
+        setSuccessMessage(message)
         console.log(`✅ System field ${field.field_name} ${newIsEnabled ? 'enabled' : 'disabled'} for ${activeTab}`)
       } else {
         // For custom fields, update via the API
@@ -192,8 +199,15 @@ const AdminFields = () => {
         setFields(prev => prev.map(f =>
           f.id === field.id ? { ...f, is_enabled: newIsEnabled } : f
         ))
+        const message = newIsEnabled
+          ? `${field.field_label} is now visible in forms`
+          : `${field.field_label} is now hidden from forms`
+        setSuccessMessage(message)
         console.log(`✅ Custom field ${field.field_name} ${newIsEnabled ? 'enabled' : 'disabled'}`)
       }
+
+      // Auto-hide success message after 3 seconds
+      setTimeout(() => setSuccessMessage(null), 3000)
     } catch (err) {
       console.error('Error toggling field visibility:', err)
       setError(err.response?.data?.error || 'Failed to update field visibility')
@@ -258,6 +272,23 @@ const AdminFields = () => {
           </button>
         )}
       </div>
+
+      {/* Success Message */}
+      {successMessage && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-start gap-3 animate-fade-in">
+          <CheckCircle size={20} className="text-green-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-green-800">Success</p>
+            <p className="text-sm text-green-700 mt-1">{successMessage}</p>
+          </div>
+          <button
+            onClick={() => setSuccessMessage(null)}
+            className="text-green-400 hover:text-green-600"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
 
       {/* Error Message */}
       {error && (
@@ -603,34 +634,53 @@ const AdminFields = () => {
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-gray-200">
+                  <tr className="border-b border-gray-200 bg-gray-50">
                     <th className="text-left py-3 px-4 font-medium text-gray-900">Field Label</th>
                     <th className="text-left py-3 px-4 font-medium text-gray-900">Field Name</th>
                     <th className="text-left py-3 px-4 font-medium text-gray-900">Type</th>
                     <th className="text-left py-3 px-4 font-medium text-gray-900">Required</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-900">List View</th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-900">
+                      <div className="flex items-center gap-2">
+                        <Eye size={16} className="text-gray-600" />
+                        <span>Show in Forms</span>
+                      </div>
+                    </th>
                     <th className="text-left py-3 px-4 font-medium text-gray-900">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredFields.map((field) => (
-                    <tr key={field.id} className="border-b border-gray-100 hover:bg-gray-50">
+                    <tr
+                      key={field.id}
+                      className={`border-b border-gray-100 hover:bg-gray-50 transition-all ${
+                        !field.is_enabled ? 'bg-gray-50 opacity-60' : ''
+                      }`}
+                    >
                       <td className="py-4 px-4">
-                        <span className="font-medium text-gray-900">{field.field_label}</span>
+                        <div className="flex items-center gap-2">
+                          <span className={`font-medium ${field.is_enabled ? 'text-gray-900' : 'text-gray-500 line-through'}`}>
+                            {field.field_label}
+                          </span>
+                          {!field.is_enabled && (
+                            <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Hidden</span>
+                          )}
+                        </div>
                       </td>
                       <td className="py-4 px-4">
-                        <code className="text-sm text-gray-600 bg-gray-100 px-2 py-1 rounded">
+                        <code className={`text-sm px-2 py-1 rounded ${
+                          field.is_enabled ? 'text-gray-600 bg-gray-100' : 'text-gray-400 bg-gray-50'
+                        }`}>
                           {field.field_name}
                         </code>
                       </td>
                       <td className="py-4 px-4">
-                        <span className="badge badge-gray">
+                        <span className={`badge ${field.is_enabled ? 'badge-gray' : 'badge-gray opacity-60'}`}>
                           {FIELD_TYPES.find(t => t.value === field.field_type)?.label || field.field_type}
                         </span>
                       </td>
                       <td className="py-4 px-4">
                         {field.is_required ? (
-                          <CheckCircle size={16} className="text-green-600" />
+                          <CheckCircle size={16} className={field.is_enabled ? 'text-green-600' : 'text-gray-400'} />
                         ) : (
                           <span className="text-gray-400">—</span>
                         )}
@@ -638,10 +688,28 @@ const AdminFields = () => {
                       <td className="py-4 px-4">
                         <button
                           onClick={() => handleToggleVisibility(field)}
-                          className={`p-1 rounded transition-colors ${field.is_enabled ? 'text-green-600 hover:text-green-700' : 'text-gray-400 hover:text-gray-500'}`}
-                          title={field.is_enabled ? 'Click to hide this field' : 'Click to show this field'}
+                          className={`relative group flex items-center gap-2 px-3 py-2 rounded-lg transition-all font-medium ${
+                            field.is_enabled
+                              ? 'bg-green-50 text-green-700 hover:bg-green-100 border border-green-200'
+                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-300'
+                          }`}
+                          title={field.is_enabled ? 'Click to hide this field from forms' : 'Click to show this field in forms'}
                         >
-                          {field.is_enabled ? <Eye size={16} /> : <EyeOff size={16} />}
+                          {field.is_enabled ? (
+                            <>
+                              <Eye size={18} />
+                              <span className="text-sm">Visible</span>
+                            </>
+                          ) : (
+                            <>
+                              <EyeOff size={18} />
+                              <span className="text-sm">Hidden</span>
+                            </>
+                          )}
+                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+                            {field.is_enabled ? 'Click to hide from forms' : 'Click to show in forms'}
+                            <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900"></div>
+                          </div>
                         </button>
                       </td>
                       <td className="py-4 px-4">
