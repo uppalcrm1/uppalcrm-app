@@ -175,13 +175,14 @@ const AdminFields = () => {
       const newIsEnabled = !field.is_enabled
 
       if (field.isSystemField) {
-        // For system fields, we need to update via a different endpoint
-        // For now, just update local state
-        // TODO: Implement system field configuration API
+        // For system fields, update via the system field configuration API
+        const response = await api.put(`/custom-fields/default/${field.field_name}`, {
+          is_enabled: newIsEnabled
+        })
         setSystemFields(prev => prev.map(f =>
           f.field_name === field.field_name ? { ...f, is_enabled: newIsEnabled } : f
         ))
-        console.log(`System field ${field.field_name} ${newIsEnabled ? 'enabled' : 'disabled'}`)
+        console.log(`✅ System field ${field.field_name} ${newIsEnabled ? 'enabled' : 'disabled'}`)
       } else {
         // For custom fields, update via the API
         const response = await api.put(`/custom-fields/${field.id}`, {
