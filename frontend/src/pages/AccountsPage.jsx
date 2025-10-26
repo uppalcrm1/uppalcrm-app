@@ -14,6 +14,8 @@ import {
   Filter
 } from 'lucide-react'
 import ColumnSelector from '../components/ColumnSelector'
+import InlineEditCell from '../components/InlineEditCell'
+import { accountsAPI } from '../services/api'
 
 // Define available columns with metadata
 const COLUMN_DEFINITIONS = [
@@ -37,8 +39,31 @@ const DEFAULT_VISIBLE_COLUMNS = {
   renewal: true
 }
 
+// Software edition options
+const SOFTWARE_EDITION_OPTIONS = [
+  { value: 'gold', label: 'Gold Edition' },
+  { value: 'smart', label: 'Smart Edition' },
+  { value: 'jio', label: 'Jio Edition' }
+]
+
+// Status options
+const STATUS_OPTIONS = [
+  { value: 'active', label: 'Active' },
+  { value: 'expiring_soon', label: 'Expiring Soon' },
+  { value: 'expired', label: 'Expired' }
+]
+
+// Billing cycle options
+const BILLING_CYCLE_OPTIONS = [
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'quarterly', label: 'Quarterly' },
+  { value: 'semi-annual', label: 'Semi-Annual' },
+  { value: 'annual', label: 'Annual' }
+]
+
 const AccountsPage = () => {
   const [accounts, setAccounts] = useState([])
+  const [localAccounts, setLocalAccounts] = useState([]) // For optimistic updates
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [selectedAccount, setSelectedAccount] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
@@ -63,6 +88,36 @@ const AccountsPage = () => {
   const handleResetColumns = () => {
     setVisibleColumns(DEFAULT_VISIBLE_COLUMNS)
     localStorage.setItem('accounts_visible_columns', JSON.stringify(DEFAULT_VISIBLE_COLUMNS))
+  }
+
+  // Inline edit handler with optimistic updates
+  const handleFieldUpdate = async (recordId, fieldName, newValue) => {
+    // Optimistic update: immediately update local state
+    setLocalAccounts(prevAccounts =>
+      prevAccounts.map(account =>
+        account.id === recordId
+          ? { ...account, [fieldName]: newValue }
+          : account
+      )
+    )
+
+    try {
+      // Make API call to update the account
+      await accountsAPI.updateAccount(recordId, { [fieldName]: newValue })
+
+      // Also update the main accounts state for consistency
+      setAccounts(prevAccounts =>
+        prevAccounts.map(account =>
+          account.id === recordId
+            ? { ...account, [fieldName]: newValue }
+            : account
+        )
+      )
+    } catch (error) {
+      // Error is thrown back to InlineEditCell for rollback
+      console.error('Failed to update account:', error)
+      throw error
+    }
   }
 
   // Mock data for demonstration
@@ -114,7 +169,14 @@ const AccountsPage = () => {
     }
   ]
 
-  const displayAccounts = accounts.length > 0 ? accounts : mockAccounts
+  // Use localAccounts for display (optimistic updates), fallback to accounts or mockAccounts
+  const sourceAccounts = accounts.length > 0 ? accounts : mockAccounts
+  const displayAccounts = localAccounts.length > 0 ? localAccounts : sourceAccounts
+
+  // Initialize localAccounts when source changes
+  React.useEffect(() => {
+    setLocalAccounts(sourceAccounts)
+  }, [accounts.length, mockAccounts.length])
 
   // Calculate statistics
   const stats = {
@@ -309,14 +371,34 @@ const AccountsPage = () => {
                       )}
                       {visibleColumns.software && (
                         <td className="py-4 px-4">
-                          <span className="badge badge-info">{account.software_edition}</span>
+                          <InlineEditCell
+                            value={account.software_edition}
+                            fieldName="software_edition"
+                            fieldType="select"
+                            recordId={account.id}
+                            entityType="accounts"
+                            onSave={handleFieldUpdate}
+                            options={SOFTWARE_EDITION_OPTIONS}
+                            displayValue={
+                              <span className="badge badge-info">{account.software_edition}</span>
+                            }
+                          />
                         </td>
                       )}
                       {visibleColumns.device && (
                         <td className="py-4 px-4">
                           <div>
-                            <p className="text-sm text-gray-900">{account.device_name}</p>
-                            <p className="text-xs text-gray-500 font-mono">{account.mac_address}</p>
+                            <InlineEditCell
+                              value={account.device_name}
+                              fieldName="device_name"
+                              fieldType="text"
+                              recordId={account.id}
+                              entityType="accounts"
+                              onSave={handleFieldUpdate}
+                              placeholder="Add device name..."
+                              className="text-sm"
+                            />
+                            <p className="text-xs text-gray-500 font-mono mt-1">{account.mac_address}</p>
                           </div>
                         </td>
                       )}
@@ -330,8 +412,33 @@ const AccountsPage = () => {
                       )}
                       {visibleColumns.cost && (
                         <td className="py-4 px-4">
-                          <span className="text-gray-900 font-semibold">${account.monthly_cost}</span>
-                          <span className="text-xs text-gray-500 block">{account.billing_cycle}</span>
+                          <div>
+                            <InlineEditCell
+                              value={account.monthly_cost}
+                              fieldName="monthly_cost"
+                              fieldType="number"
+                              recordId={account.id}
+                              entityType="accounts"
+                              onSave={handleFieldUpdate}
+                              prefix="$"
+                              placeholder="0"
+                              className="text-sm font-semibold"
+                            />
+                            <div className="mt-1">
+                              <InlineEditCell
+                                value={account.billing_cycle}
+                                fieldName="billing_cycle"
+                                fieldType="select"
+                                recordId={account.id}
+                                entityType="accounts"
+                                onSave={handleFieldUpdate}
+                                options={BILLING_CYCLE_OPTIONS}
+                                displayValue={
+                                  <span className="text-xs text-gray-500">{account.billing_cycle}</span>
+                                }
+                              />
+                            </div>
+                          </div>
                         </td>
                       )}
                       {visibleColumns.renewal && (
