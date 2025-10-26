@@ -310,8 +310,9 @@ const InlineEditCell = ({
         ${className}
       `}
       title={disabled ? 'This field cannot be edited' : 'Click to edit'}
+      style={{ userSelect: 'none' }}
     >
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 pointer-events-none">
         {icon && <span className="text-gray-400">{icon}</span>}
         <span className="flex-1">{getDisplayValue()}</span>
 
@@ -328,7 +329,7 @@ const InlineEditCell = ({
       </div>
 
       {error && (
-        <div className="text-xs text-red-600 mt-1">{error}</div>
+        <div className="text-xs text-red-600 mt-1 pointer-events-none">{error}</div>
       )}
     </div>
   )
