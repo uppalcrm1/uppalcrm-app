@@ -303,10 +303,10 @@ const InlineEditCell = ({
       onClick={handleClick}
       className={`
         inline-edit-cell
-        ${!disabled && !readOnly ? 'cursor-pointer hover:bg-gray-50 hover:ring-1 hover:ring-gray-300' : ''}
+        ${!disabled && !readOnly ? 'cursor-pointer hover:bg-gray-50' : ''}
         ${isSaving ? 'opacity-70' : ''}
         ${error ? 'bg-red-50' : ''}
-        px-2 py-1 rounded transition-all relative group
+        px-2 py-1 rounded transition-colors relative
         ${className}
       `}
       title={disabled ? 'This field cannot be edited' : 'Click to edit'}
@@ -326,11 +326,6 @@ const InlineEditCell = ({
           <X className="w-3 h-3 text-red-600" title={error} />
         )}
       </div>
-
-      {/* Hover indicator */}
-      {!disabled && !readOnly && !isSaving && (
-        <div className="hidden group-hover:block absolute inset-0 border border-gray-300 rounded pointer-events-none" />
-      )}
 
       {error && (
         <div className="text-xs text-red-600 mt-1">{error}</div>
