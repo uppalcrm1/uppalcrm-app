@@ -21,7 +21,9 @@ import {
 import { format } from 'date-fns'
 import LeadConversionButton from './LeadConversionButton'
 import ColumnSelector from './ColumnSelector'
+import InlineEditCell from './InlineEditCell'
 import api from '../services/api'
+import { leadsAPI } from '../services/api'
 
 // Define available columns with metadata
 const COLUMN_DEFINITIONS = [
@@ -70,6 +72,14 @@ const LeadListTable = ({
     return saved ? JSON.parse(saved) : DEFAULT_VISIBLE_COLUMNS
   })
 
+  // Local state for leads to enable optimistic updates
+  const [localLeads, setLocalLeads] = useState(leads)
+
+  // Sync local leads with prop leads
+  useEffect(() => {
+    setLocalLeads(leads)
+  }, [leads])
+
   // Fetch field configuration to get dynamic column labels
   useEffect(() => {
     const loadFieldConfiguration = async () => {
@@ -104,9 +114,9 @@ const LeadListTable = ({
 
   // Sort leads based on current sort configuration
   const sortedLeads = useMemo(() => {
-    if (!leads) return []
+    if (!localLeads) return []
 
-    const sortableLeads = [...leads]
+    const sortableLeads = [...localLeads]
     sortableLeads.sort((a, b) => {
       const aValue = a[sortConfig.key]
       const bValue = b[sortConfig.key]
@@ -121,7 +131,7 @@ const LeadListTable = ({
     })
 
     return sortableLeads
-  }, [leads, sortConfig])
+  }, [localLeads, sortConfig])
 
   const handleSort = (key) => {
     let direction = 'asc'
@@ -182,6 +192,30 @@ const LeadListTable = ({
     setVisibleColumns(DEFAULT_VISIBLE_COLUMNS)
     localStorage.setItem('leads_visible_columns', JSON.stringify(DEFAULT_VISIBLE_COLUMNS))
     console.log('📋 Columns reset to defaults')
+  }
+
+  // Inline edit handler with optimistic updates
+  const handleFieldUpdate = async (recordId, fieldName, newValue) => {
+    console.log(`📝 Updating lead ${recordId}: ${fieldName} = ${newValue}`)
+
+    // Optimistic update: immediately update local state
+    setLocalLeads(prevLeads =>
+      prevLeads.map(lead =>
+        lead.id === recordId
+          ? { ...lead, [fieldName]: newValue }
+          : lead
+      )
+    )
+
+    // Save to server
+    try {
+      await leadsAPI.updateLead(recordId, { [fieldName]: newValue })
+      console.log(`✅ Successfully updated lead ${recordId}`)
+    } catch (error) {
+      console.error(`❌ Failed to update lead ${recordId}:`, error)
+      // Error will be handled by InlineEditCell component (rollback)
+      throw error
+    }
   }
 
   const getStatusColor = (status) => {
@@ -411,9 +445,18 @@ const LeadListTable = ({
                         >
                           {lead.first_name} {lead.last_name}
                         </button>
-                        {lead.title && (
-                          <div className="text-sm text-gray-500">{lead.title}</div>
-                        )}
+                        <div className="text-sm text-gray-500">
+                          <InlineEditCell
+                            value={lead.title}
+                            fieldName="title"
+                            fieldType="text"
+                            recordId={lead.id}
+                            entityType="leads"
+                            onSave={handleFieldUpdate}
+                            placeholder="Add title..."
+                            className="text-sm"
+                          />
+                        </div>
                       </div>
                     </td>
                   )}
@@ -422,28 +465,28 @@ const LeadListTable = ({
                   {visibleColumns.email && (
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="space-y-1">
-                        {lead.email && (
-                          <div className="flex items-center gap-1 text-sm text-gray-600">
-                            <Mail className="w-3 h-3" />
-                            <a
-                              href={`mailto:${lead.email}`}
-                              className="hover:text-blue-600"
-                            >
-                              {lead.email}
-                            </a>
-                          </div>
-                        )}
-                        {lead.phone && (
-                          <div className="flex items-center gap-1 text-sm text-gray-600">
-                            <Phone className="w-3 h-3" />
-                            <a
-                              href={`tel:${lead.phone}`}
-                              className="hover:text-blue-600"
-                            >
-                              {lead.phone}
-                            </a>
-                          </div>
-                        )}
+                        <InlineEditCell
+                          value={lead.email}
+                          fieldName="email"
+                          fieldType="email"
+                          recordId={lead.id}
+                          entityType="leads"
+                          onSave={handleFieldUpdate}
+                          placeholder="Add email..."
+                          icon={<Mail className="w-3 h-3" />}
+                          className="text-sm"
+                        />
+                        <InlineEditCell
+                          value={lead.phone}
+                          fieldName="phone"
+                          fieldType="phone"
+                          recordId={lead.id}
+                          entityType="leads"
+                          onSave={handleFieldUpdate}
+                          placeholder="Add phone..."
+                          icon={<Phone className="w-3 h-3" />}
+                          className="text-sm"
+                        />
                       </div>
                     </td>
                   )}
@@ -451,12 +494,16 @@ const LeadListTable = ({
                   {/* Company */}
                   {visibleColumns.company && (
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {lead.company && (
-                        <div className="flex items-center gap-1 text-sm text-gray-900">
-                          <Building className="w-3 h-3 text-gray-400" />
-                          {lead.company}
-                        </div>
-                      )}
+                      <InlineEditCell
+                        value={lead.company}
+                        fieldName="company"
+                        fieldType="text"
+                        recordId={lead.id}
+                        entityType="leads"
+                        onSave={handleFieldUpdate}
+                        placeholder="Add company..."
+                        icon={<Building className="w-3 h-3 text-gray-400" />}
+                      />
                     </td>
                   )}
 
