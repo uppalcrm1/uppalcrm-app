@@ -20,7 +20,32 @@ import {
 } from 'lucide-react'
 import { format } from 'date-fns'
 import LeadConversionButton from './LeadConversionButton'
+import ColumnSelector from './ColumnSelector'
 import api from '../services/api'
+
+// Define available columns with metadata
+const COLUMN_DEFINITIONS = [
+  { key: 'name', label: 'Name', description: 'Contact name and title', required: true },
+  { key: 'email', label: 'Email', description: 'Email and phone contact info', required: false },
+  { key: 'company', label: 'Company', description: 'Company name', required: false },
+  { key: 'status', label: 'Status', description: 'Lead status', required: false },
+  { key: 'priority', label: 'Priority', description: 'Lead priority level', required: false },
+  { key: 'value', label: 'Value', description: 'Estimated value', required: false },
+  { key: 'assigned_to', label: 'Assigned To', description: 'Assigned team member', required: false },
+  { key: 'created_at', label: 'Created', description: 'Creation date', required: false }
+]
+
+// Default visible columns
+const DEFAULT_VISIBLE_COLUMNS = {
+  name: true,
+  email: true,
+  company: true,
+  status: true,
+  priority: true,
+  value: false,
+  assigned_to: true,
+  created_at: true
+}
 
 const LeadListTable = ({
   leads,
@@ -38,6 +63,12 @@ const LeadListTable = ({
   const [selectedLeads, setSelectedLeads] = useState([])
   const [showBulkActions, setShowBulkActions] = useState(false)
   const [fieldLabels, setFieldLabels] = useState({})
+
+  // Load column visibility from localStorage or use defaults
+  const [visibleColumns, setVisibleColumns] = useState(() => {
+    const saved = localStorage.getItem('leads_visible_columns')
+    return saved ? JSON.parse(saved) : DEFAULT_VISIBLE_COLUMNS
+  })
 
   // Fetch field configuration to get dynamic column labels
   useEffect(() => {
@@ -134,6 +165,23 @@ const LeadListTable = ({
   // Helper function to get field label with fallback
   const getFieldLabel = (fieldName, defaultLabel) => {
     return fieldLabels[fieldName] || defaultLabel
+  }
+
+  // Column visibility handlers
+  const handleColumnToggle = (columnKey) => {
+    const newVisibleColumns = {
+      ...visibleColumns,
+      [columnKey]: !visibleColumns[columnKey]
+    }
+    setVisibleColumns(newVisibleColumns)
+    localStorage.setItem('leads_visible_columns', JSON.stringify(newVisibleColumns))
+    console.log('📋 Column visibility updated:', newVisibleColumns)
+  }
+
+  const handleResetColumns = () => {
+    setVisibleColumns(DEFAULT_VISIBLE_COLUMNS)
+    localStorage.setItem('leads_visible_columns', JSON.stringify(DEFAULT_VISIBLE_COLUMNS))
+    console.log('📋 Columns reset to defaults')
   }
 
   const getStatusColor = (status) => {
@@ -258,6 +306,23 @@ const LeadListTable = ({
 
   return (
     <div className="bg-white">
+      {/* Toolbar */}
+      <div className="border-b border-gray-200 px-6 py-3 flex items-center justify-between bg-gray-50">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-gray-700">
+            {pagination.total || 0} {pagination.total === 1 ? 'Lead' : 'Leads'}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <ColumnSelector
+            columns={COLUMN_DEFINITIONS}
+            visibleColumns={visibleColumns}
+            onColumnToggle={handleColumnToggle}
+            onReset={handleResetColumns}
+          />
+        </div>
+      </div>
+
       {/* Bulk Actions Bar */}
       {selectedLeads.length > 0 && (
         <div className="bg-blue-50 border-b border-blue-200 px-6 py-3 flex items-center justify-between">
@@ -302,14 +367,14 @@ const LeadListTable = ({
                   className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
               </th>
-              <SortableHeader sortKey="first_name">{getFieldLabel('first_name', 'Name')}</SortableHeader>
-              <SortableHeader sortKey="email">{getFieldLabel('email', 'Email')}</SortableHeader>
-              <SortableHeader sortKey="company">{getFieldLabel('company', 'Company')}</SortableHeader>
-              <SortableHeader sortKey="status">{getFieldLabel('status', 'Status')}</SortableHeader>
-              <SortableHeader sortKey="priority">{getFieldLabel('priority', 'Priority')}</SortableHeader>
-              <SortableHeader sortKey="value">{getFieldLabel('value', 'Value')}</SortableHeader>
-              <SortableHeader sortKey="assigned_to">{getFieldLabel('assigned_to', 'Assigned To')}</SortableHeader>
-              <SortableHeader sortKey="created_at">{getFieldLabel('created_at', 'Created')}</SortableHeader>
+              {visibleColumns.name && <SortableHeader sortKey="first_name">{getFieldLabel('first_name', 'Name')}</SortableHeader>}
+              {visibleColumns.email && <SortableHeader sortKey="email">{getFieldLabel('email', 'Email')}</SortableHeader>}
+              {visibleColumns.company && <SortableHeader sortKey="company">{getFieldLabel('company', 'Company')}</SortableHeader>}
+              {visibleColumns.status && <SortableHeader sortKey="status">{getFieldLabel('status', 'Status')}</SortableHeader>}
+              {visibleColumns.priority && <SortableHeader sortKey="priority">{getFieldLabel('priority', 'Priority')}</SortableHeader>}
+              {visibleColumns.value && <SortableHeader sortKey="value">{getFieldLabel('value', 'Value')}</SortableHeader>}
+              {visibleColumns.assigned_to && <SortableHeader sortKey="assigned_to">{getFieldLabel('assigned_to', 'Assigned To')}</SortableHeader>}
+              {visibleColumns.created_at && <SortableHeader sortKey="created_at">{getFieldLabel('created_at', 'Created')}</SortableHeader>}
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Actions
               </th>
@@ -337,107 +402,123 @@ const LeadListTable = ({
                   </td>
 
                   {/* Name */}
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div>
-                      <button
-                        onClick={() => navigate(`/leads/${lead.id}`)}
-                        className="text-sm font-medium text-blue-600 hover:text-blue-900 hover:underline cursor-pointer text-left"
-                      >
-                        {lead.first_name} {lead.last_name}
-                      </button>
-                      {lead.title && (
-                        <div className="text-sm text-gray-500">{lead.title}</div>
-                      )}
-                    </div>
-                  </td>
+                  {visibleColumns.name && (
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div>
+                        <button
+                          onClick={() => navigate(`/leads/${lead.id}`)}
+                          className="text-sm font-medium text-blue-600 hover:text-blue-900 hover:underline cursor-pointer text-left"
+                        >
+                          {lead.first_name} {lead.last_name}
+                        </button>
+                        {lead.title && (
+                          <div className="text-sm text-gray-500">{lead.title}</div>
+                        )}
+                      </div>
+                    </td>
+                  )}
 
                   {/* Contact */}
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="space-y-1">
-                      {lead.email && (
-                        <div className="flex items-center gap-1 text-sm text-gray-600">
-                          <Mail className="w-3 h-3" />
-                          <a
-                            href={`mailto:${lead.email}`}
-                            className="hover:text-blue-600"
-                          >
-                            {lead.email}
-                          </a>
-                        </div>
-                      )}
-                      {lead.phone && (
-                        <div className="flex items-center gap-1 text-sm text-gray-600">
-                          <Phone className="w-3 h-3" />
-                          <a
-                            href={`tel:${lead.phone}`}
-                            className="hover:text-blue-600"
-                          >
-                            {lead.phone}
-                          </a>
-                        </div>
-                      )}
-                    </div>
-                  </td>
+                  {visibleColumns.email && (
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="space-y-1">
+                        {lead.email && (
+                          <div className="flex items-center gap-1 text-sm text-gray-600">
+                            <Mail className="w-3 h-3" />
+                            <a
+                              href={`mailto:${lead.email}`}
+                              className="hover:text-blue-600"
+                            >
+                              {lead.email}
+                            </a>
+                          </div>
+                        )}
+                        {lead.phone && (
+                          <div className="flex items-center gap-1 text-sm text-gray-600">
+                            <Phone className="w-3 h-3" />
+                            <a
+                              href={`tel:${lead.phone}`}
+                              className="hover:text-blue-600"
+                            >
+                              {lead.phone}
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  )}
 
                   {/* Company */}
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {lead.company && (
-                      <div className="flex items-center gap-1 text-sm text-gray-900">
-                        <Building className="w-3 h-3 text-gray-400" />
-                        {lead.company}
-                      </div>
-                    )}
-                  </td>
+                  {visibleColumns.company && (
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {lead.company && (
+                        <div className="flex items-center gap-1 text-sm text-gray-900">
+                          <Building className="w-3 h-3 text-gray-400" />
+                          {lead.company}
+                        </div>
+                      )}
+                    </td>
+                  )}
 
                   {/* Status */}
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(
-                        lead.status
-                      )}`}
-                    >
-                      {statuses.find(s => s.value === lead.status)?.label || lead.status}
-                    </span>
-                  </td>
+                  {visibleColumns.status && (
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span
+                        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(
+                          lead.status
+                        )}`}
+                      >
+                        {statuses.find(s => s.value === lead.status)?.label || lead.status}
+                      </span>
+                    </td>
+                  )}
 
                   {/* Priority */}
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(
-                        lead.priority
-                      )}`}
-                    >
-                      {lead.priority}
-                    </span>
-                  </td>
+                  {visibleColumns.priority && (
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span
+                        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(
+                          lead.priority
+                        )}`}
+                      >
+                        {lead.priority}
+                      </span>
+                    </td>
+                  )}
 
                   {/* Value */}
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {value > 0 && (
-                      <div className="flex items-center gap-1 text-sm font-semibold text-green-600">
-                        <DollarSign className="w-3 h-3" />
-                        {value.toLocaleString()}
-                      </div>
-                    )}
-                  </td>
+                  {visibleColumns.value && (
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {value > 0 && (
+                        <div className="flex items-center gap-1 text-sm font-semibold text-green-600">
+                          <DollarSign className="w-3 h-3" />
+                          {value.toLocaleString()}
+                        </div>
+                      )}
+                    </td>
+                  )}
 
                   {/* Assigned To */}
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {assignedUser && (
-                      <div className="flex items-center gap-1 text-sm text-gray-600">
-                        <User className="w-3 h-3" />
-                        {assignedUser.first_name} {assignedUser.last_name}
-                      </div>
-                    )}
-                  </td>
+                  {visibleColumns.assigned_to && (
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {assignedUser && (
+                        <div className="flex items-center gap-1 text-sm text-gray-600">
+                          <User className="w-3 h-3" />
+                          {assignedUser.first_name} {assignedUser.last_name}
+                        </div>
+                      )}
+                    </td>
+                  )}
 
                   {/* Created */}
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center gap-1 text-sm text-gray-600">
-                      <Calendar className="w-3 h-3" />
-                      {format(new Date(lead.created_at), 'MMM d, yyyy')}
-                    </div>
-                  </td>
+                  {visibleColumns.created_at && (
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-1 text-sm text-gray-600">
+                        <Calendar className="w-3 h-3" />
+                        {format(new Date(lead.created_at), 'MMM d, yyyy')}
+                      </div>
+                    </td>
+                  )}
 
                   {/* Actions */}
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
