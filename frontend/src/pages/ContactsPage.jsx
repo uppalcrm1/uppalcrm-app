@@ -12,12 +12,54 @@ import {
   Eye,
   Filter
 } from 'lucide-react'
+import ColumnSelector from '../components/ColumnSelector'
+
+// Define available columns with metadata
+const COLUMN_DEFINITIONS = [
+  { key: 'contact', label: 'Contact', description: 'Contact name and email', required: true },
+  { key: 'company', label: 'Company', description: 'Company name', required: false },
+  { key: 'status', label: 'Status', description: 'Contact status', required: false },
+  { key: 'accounts', label: 'Accounts', description: 'Number of accounts', required: false },
+  { key: 'spent', label: 'Total Spent', description: 'Total amount spent', required: false },
+  { key: 'last_contact', label: 'Last Contact', description: 'Last contact date', required: false }
+]
+
+// Default visible columns
+const DEFAULT_VISIBLE_COLUMNS = {
+  contact: true,
+  company: true,
+  status: true,
+  accounts: true,
+  spent: true,
+  last_contact: true
+}
 
 const ContactsPage = () => {
   const [contacts, setContacts] = useState([])
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
+
+  // Load column visibility from localStorage or use defaults
+  const [visibleColumns, setVisibleColumns] = useState(() => {
+    const saved = localStorage.getItem('contactspage_visible_columns')
+    return saved ? JSON.parse(saved) : DEFAULT_VISIBLE_COLUMNS
+  })
+
+  // Column visibility handlers
+  const handleColumnToggle = (columnKey) => {
+    const newVisibleColumns = {
+      ...visibleColumns,
+      [columnKey]: !visibleColumns[columnKey]
+    }
+    setVisibleColumns(newVisibleColumns)
+    localStorage.setItem('contactspage_visible_columns', JSON.stringify(newVisibleColumns))
+  }
+
+  const handleResetColumns = () => {
+    setVisibleColumns(DEFAULT_VISIBLE_COLUMNS)
+    localStorage.setItem('contactspage_visible_columns', JSON.stringify(DEFAULT_VISIBLE_COLUMNS))
+  }
 
   // Mock data for demonstration
   const mockContacts = [
@@ -162,6 +204,23 @@ const ContactsPage = () => {
 
       {/* Contacts Table */}
       <div className="card">
+        {/* Toolbar - Always visible */}
+        <div className="border-b border-gray-200 px-4 py-3 flex items-center justify-between bg-gray-50">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-gray-700">
+              {displayContacts.length} {displayContacts.length === 1 ? 'Contact' : 'Contacts'}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <ColumnSelector
+              columns={COLUMN_DEFINITIONS}
+              visibleColumns={visibleColumns}
+              onColumnToggle={handleColumnToggle}
+              onReset={handleResetColumns}
+            />
+          </div>
+        </div>
+
         {displayContacts.length === 0 ? (
           <div className="text-center py-12">
             <UserCheck className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -180,59 +239,71 @@ const ContactsPage = () => {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">Contact</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">Company</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">Status</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">Accounts</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">Total Spent</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">Last Contact</th>
+                  {visibleColumns.contact && <th className="text-left py-3 px-4 font-medium text-gray-900">Contact</th>}
+                  {visibleColumns.company && <th className="text-left py-3 px-4 font-medium text-gray-900">Company</th>}
+                  {visibleColumns.status && <th className="text-left py-3 px-4 font-medium text-gray-900">Status</th>}
+                  {visibleColumns.accounts && <th className="text-left py-3 px-4 font-medium text-gray-900">Accounts</th>}
+                  {visibleColumns.spent && <th className="text-left py-3 px-4 font-medium text-gray-900">Total Spent</th>}
+                  {visibleColumns.last_contact && <th className="text-left py-3 px-4 font-medium text-gray-900">Last Contact</th>}
                   <th className="text-left py-3 px-4 font-medium text-gray-900">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {displayContacts.map((contact) => (
                   <tr key={contact.id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="py-4 px-4">
-                      <div className="flex items-center">
-                        <div className="w-10 h-10 bg-primary-600 rounded-full flex items-center justify-center mr-3">
-                          <span className="text-white font-medium">
-                            {contact.first_name[0]}{contact.last_name[0]}
-                          </span>
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-900">
-                            {contact.first_name} {contact.last_name}
-                          </p>
-                          <div className="flex items-center text-sm text-gray-600">
-                            <Mail size={12} className="mr-1" />
-                            {contact.email}
+                    {visibleColumns.contact && (
+                      <td className="py-4 px-4">
+                        <div className="flex items-center">
+                          <div className="w-10 h-10 bg-primary-600 rounded-full flex items-center justify-center mr-3">
+                            <span className="text-white font-medium">
+                              {contact.first_name[0]}{contact.last_name[0]}
+                            </span>
+                          </div>
+                          <div>
+                            <p className="font-medium text-gray-900">
+                              {contact.first_name} {contact.last_name}
+                            </p>
+                            <div className="flex items-center text-sm text-gray-600">
+                              <Mail size={12} className="mr-1" />
+                              {contact.email}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="py-4 px-4">
-                      <div className="flex items-center text-gray-900">
-                        <Building2 size={14} className="mr-2 text-gray-400" />
-                        {contact.company}
-                      </div>
-                    </td>
-                    <td className="py-4 px-4">
-                      <span className={getStatusBadge(contact.status)}>
-                        {contact.status}
-                      </span>
-                    </td>
-                    <td className="py-4 px-4">
-                      <span className="text-gray-900 font-medium">{contact.total_accounts}</span>
-                    </td>
-                    <td className="py-4 px-4">
-                      <span className="text-gray-900 font-medium">${contact.total_spent}</span>
-                    </td>
-                    <td className="py-4 px-4">
-                      <div className="flex items-center text-sm text-gray-600">
-                        <Calendar size={12} className="mr-1" />
-                        {contact.last_contact}
-                      </div>
-                    </td>
+                      </td>
+                    )}
+                    {visibleColumns.company && (
+                      <td className="py-4 px-4">
+                        <div className="flex items-center text-gray-900">
+                          <Building2 size={14} className="mr-2 text-gray-400" />
+                          {contact.company}
+                        </div>
+                      </td>
+                    )}
+                    {visibleColumns.status && (
+                      <td className="py-4 px-4">
+                        <span className={getStatusBadge(contact.status)}>
+                          {contact.status}
+                        </span>
+                      </td>
+                    )}
+                    {visibleColumns.accounts && (
+                      <td className="py-4 px-4">
+                        <span className="text-gray-900 font-medium">{contact.total_accounts}</span>
+                      </td>
+                    )}
+                    {visibleColumns.spent && (
+                      <td className="py-4 px-4">
+                        <span className="text-gray-900 font-medium">${contact.total_spent}</span>
+                      </td>
+                    )}
+                    {visibleColumns.last_contact && (
+                      <td className="py-4 px-4">
+                        <div className="flex items-center text-sm text-gray-600">
+                          <Calendar size={12} className="mr-1" />
+                          {contact.last_contact}
+                        </div>
+                      </td>
+                    )}
                     <td className="py-4 px-4">
                       <div className="flex items-center gap-2">
                         <button className="p-2 text-gray-600 hover:text-primary-600 hover:bg-gray-100 rounded-lg">
