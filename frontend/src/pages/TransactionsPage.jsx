@@ -13,6 +13,8 @@ import {
   FileText
 } from 'lucide-react'
 import ColumnSelector from '../components/ColumnSelector'
+import InlineEditCell from '../components/InlineEditCell'
+import { transactionsAPI } from '../services/api'
 
 // Define available columns with metadata
 const COLUMN_DEFINITIONS = [
@@ -36,8 +38,32 @@ const DEFAULT_VISIBLE_COLUMNS = {
   status: true
 }
 
+// Payment method options
+const PAYMENT_METHOD_OPTIONS = [
+  { value: 'Credit Card', label: 'Credit Card' },
+  { value: 'PayPal', label: 'PayPal' },
+  { value: 'Bank Transfer', label: 'Bank Transfer' },
+  { value: 'Cash', label: 'Cash' }
+]
+
+// Billing cycle options
+const BILLING_CYCLE_OPTIONS = [
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'quarterly', label: 'Quarterly' },
+  { value: 'semi-annual', label: 'Semi-Annual' },
+  { value: 'annual', label: 'Annual' }
+]
+
+// Status options
+const STATUS_OPTIONS = [
+  { value: 'completed', label: 'Completed' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'failed', label: 'Failed' }
+]
+
 const TransactionsPage = () => {
   const [transactions, setTransactions] = useState([])
+  const [localTransactions, setLocalTransactions] = useState([]) // For optimistic updates
   const [searchQuery, setSearchQuery] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterMethod, setFilterMethod] = useState('all')
@@ -62,6 +88,36 @@ const TransactionsPage = () => {
   const handleResetColumns = () => {
     setVisibleColumns(DEFAULT_VISIBLE_COLUMNS)
     localStorage.setItem('transactions_visible_columns', JSON.stringify(DEFAULT_VISIBLE_COLUMNS))
+  }
+
+  // Inline edit handler with optimistic updates
+  const handleFieldUpdate = async (recordId, fieldName, newValue) => {
+    // Optimistic update: immediately update local state
+    setLocalTransactions(prevTransactions =>
+      prevTransactions.map(transaction =>
+        transaction.id === recordId
+          ? { ...transaction, [fieldName]: newValue }
+          : transaction
+      )
+    )
+
+    try {
+      // Make API call to update the transaction
+      await transactionsAPI.updateTransaction(recordId, { [fieldName]: newValue })
+
+      // Also update the main transactions state for consistency
+      setTransactions(prevTransactions =>
+        prevTransactions.map(transaction =>
+          transaction.id === recordId
+            ? { ...transaction, [fieldName]: newValue }
+            : transaction
+        )
+      )
+    } catch (error) {
+      // Error is thrown back to InlineEditCell for rollback
+      console.error('Failed to update transaction:', error)
+      throw error
+    }
   }
 
   // Mock transaction data
@@ -128,7 +184,14 @@ const TransactionsPage = () => {
     }
   ]
 
-  const displayTransactions = transactions.length > 0 ? transactions : mockTransactions
+  // Use localTransactions for display (optimistic updates), fallback to transactions or mockTransactions
+  const sourceTransactions = transactions.length > 0 ? transactions : mockTransactions
+  const displayTransactions = localTransactions.length > 0 ? localTransactions : sourceTransactions
+
+  // Initialize localTransactions when source changes
+  React.useEffect(() => {
+    setLocalTransactions(sourceTransactions)
+  }, [transactions.length, mockTransactions.length])
 
   // Calculate statistics
   const stats = {
@@ -163,6 +226,15 @@ const TransactionsPage = () => {
       }
     }
     return badges[status] || badges.completed
+  }
+
+  const getStatusColor = (status) => {
+    const colors = {
+      completed: 'bg-green-100 text-green-800',
+      pending: 'bg-yellow-100 text-yellow-800',
+      failed: 'bg-red-100 text-red-800'
+    }
+    return colors[status] || 'bg-gray-100 text-gray-800'
   }
 
   const getPaymentMethodIcon = (method) => {
@@ -355,9 +427,17 @@ const TransactionsPage = () => {
                       )}
                       {visibleColumns.amount && (
                         <td className="py-4 px-4">
-                          <span className="text-lg font-bold text-green-600">
-                            ${transaction.amount}
-                          </span>
+                          <InlineEditCell
+                            value={transaction.amount}
+                            fieldName="amount"
+                            fieldType="number"
+                            recordId={transaction.id}
+                            entityType="transactions"
+                            onSave={handleFieldUpdate}
+                            prefix="$"
+                            placeholder="0"
+                            className="text-lg font-bold text-green-600"
+                          />
                         </td>
                       )}
                       {visibleColumns.date && (
@@ -370,25 +450,54 @@ const TransactionsPage = () => {
                       )}
                       {visibleColumns.method && (
                         <td className="py-4 px-4">
-                          <div className="flex items-center text-sm text-gray-700">
+                          <div className="flex items-center gap-1">
                             {getPaymentMethodIcon(transaction.payment_method)}
-                            {transaction.payment_method}
+                            <InlineEditCell
+                              value={transaction.payment_method}
+                              fieldName="payment_method"
+                              fieldType="select"
+                              recordId={transaction.id}
+                              entityType="transactions"
+                              onSave={handleFieldUpdate}
+                              options={PAYMENT_METHOD_OPTIONS}
+                              className="text-sm"
+                            />
                           </div>
                         </td>
                       )}
                       {visibleColumns.cycle && (
                         <td className="py-4 px-4">
-                          <span className="badge badge-gray">
-                            {transaction.billing_cycle}
-                          </span>
+                          <InlineEditCell
+                            value={transaction.billing_cycle}
+                            fieldName="billing_cycle"
+                            fieldType="select"
+                            recordId={transaction.id}
+                            entityType="transactions"
+                            onSave={handleFieldUpdate}
+                            options={BILLING_CYCLE_OPTIONS}
+                            displayValue={
+                              <span className="badge badge-gray">{transaction.billing_cycle}</span>
+                            }
+                          />
                         </td>
                       )}
                       {visibleColumns.status && (
                         <td className="py-4 px-4">
-                          <span className={statusBadge.class}>
-                            {statusBadge.icon}
-                            {statusBadge.text}
-                          </span>
+                          <InlineEditCell
+                            value={transaction.status}
+                            fieldName="status"
+                            fieldType="select"
+                            recordId={transaction.id}
+                            entityType="transactions"
+                            onSave={handleFieldUpdate}
+                            options={STATUS_OPTIONS}
+                            displayValue={
+                              <span className={`inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(transaction.status)}`}>
+                                {statusBadge.icon}
+                                {statusBadge.text}
+                              </span>
+                            }
+                          />
                         </td>
                       )}
                       <td className="py-4 px-4">
