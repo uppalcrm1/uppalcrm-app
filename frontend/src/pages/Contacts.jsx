@@ -1,10 +1,10 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams, useNavigate } from 'react-router-dom'
-import { 
-  Plus, 
-  Search, 
-  Filter, 
+import {
+  Plus,
+  Search,
+  Filter,
   MoreVertical,
   Edit,
   Trash2,
@@ -27,12 +27,36 @@ import {
 } from 'lucide-react'
 import { contactsAPI, usersAPI } from '../services/api'
 import LoadingSpinner from '../components/LoadingSpinner'
+import ColumnSelector from '../components/ColumnSelector'
 import toast from 'react-hot-toast'
 import { useForm } from 'react-hook-form'
 import { format } from 'date-fns'
 import ContactDetail from '../components/ContactDetail'
 import ContactForm from '../components/ContactForm'
 import ConvertLeadModal from '../components/ConvertLeadModal'
+import api from '../services/api'
+
+// Define available columns with metadata
+const COLUMN_DEFINITIONS = [
+  { key: 'contact', label: 'Contact', description: 'Contact name and contact info', required: true },
+  { key: 'company', label: 'Company', description: 'Company name', required: false },
+  { key: 'status', label: 'Status', description: 'Contact status', required: false },
+  { key: 'type', label: 'Type', description: 'Contact type', required: false },
+  { key: 'value', label: 'Value', description: 'Contact value', required: false },
+  { key: 'assigned', label: 'Assigned', description: 'Assigned team member', required: false },
+  { key: 'created', label: 'Created', description: 'Creation date', required: false }
+]
+
+// Default visible columns
+const DEFAULT_VISIBLE_COLUMNS = {
+  contact: true,
+  company: true,
+  status: true,
+  type: true,
+  value: true,
+  assigned: true,
+  created: true
+}
 
 const CONTACT_STATUSES = [
   { value: 'active', label: 'Active', color: 'green' },
@@ -70,6 +94,36 @@ const Contacts = () => {
   const [selectedContact, setSelectedContact] = useState(null)
   const [showFilters, setShowFilters] = useState(false)
   const [viewMode, setViewMode] = useState('list') // 'list' or 'detail'
+  const [fieldLabels, setFieldLabels] = useState({})
+
+  // Load column visibility from localStorage or use defaults
+  const [visibleColumns, setVisibleColumns] = useState(() => {
+    const saved = localStorage.getItem('contacts_visible_columns')
+    return saved ? JSON.parse(saved) : DEFAULT_VISIBLE_COLUMNS
+  })
+
+  // Fetch field configuration to get dynamic column labels
+  useEffect(() => {
+    const loadFieldConfiguration = async () => {
+      try {
+        const response = await api.get('/custom-fields?entity_type=contacts')
+        const allFields = [
+          ...(response.data.systemFields || []),
+          ...(response.data.customFields || [])
+        ]
+        const labelMap = {}
+        allFields.forEach(field => {
+          labelMap[field.field_name] = field.field_label
+        })
+        setFieldLabels(labelMap)
+        console.log('📋 Field labels loaded for contacts:', labelMap)
+      } catch (error) {
+        console.error('❌ Error loading field configuration:', error)
+        setFieldLabels({})
+      }
+    }
+    loadFieldConfiguration()
+  }, [])
 
   // Get current filters from URL
   const currentFilters = {
@@ -90,6 +144,28 @@ const Contacts = () => {
       if (value) params.set(key, value.toString())
     })
     setSearchParams(params)
+  }
+
+  // Column visibility handlers
+  const handleColumnToggle = (columnKey) => {
+    const newVisibleColumns = {
+      ...visibleColumns,
+      [columnKey]: !visibleColumns[columnKey]
+    }
+    setVisibleColumns(newVisibleColumns)
+    localStorage.setItem('contacts_visible_columns', JSON.stringify(newVisibleColumns))
+    console.log('📋 Column visibility updated:', newVisibleColumns)
+  }
+
+  const handleResetColumns = () => {
+    setVisibleColumns(DEFAULT_VISIBLE_COLUMNS)
+    localStorage.setItem('contacts_visible_columns', JSON.stringify(DEFAULT_VISIBLE_COLUMNS))
+    console.log('📋 Columns reset to defaults')
+  }
+
+  // Helper function to get field label with fallback
+  const getFieldLabel = (fieldName, defaultLabel) => {
+    return fieldLabels[fieldName] || defaultLabel
   }
 
   // Fetch contacts
@@ -333,6 +409,25 @@ const Contacts = () => {
 
       {/* Contacts List */}
       <div className="card">
+        {/* Toolbar */}
+        {contacts.length > 0 && (
+          <div className="border-b border-gray-200 px-4 py-3 flex items-center justify-between bg-gray-50">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-gray-700">
+                {pagination.total || 0} {pagination.total === 1 ? 'Contact' : 'Contacts'}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <ColumnSelector
+                columns={COLUMN_DEFINITIONS}
+                visibleColumns={visibleColumns}
+                onColumnToggle={handleColumnToggle}
+                onReset={handleResetColumns}
+              />
+            </div>
+          </div>
+        )}
+
         {contacts.length === 0 ? (
           <div className="text-center py-12">
             <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -367,13 +462,13 @@ const Contacts = () => {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-200">
-                    <th className="text-left py-3 px-4 font-medium text-gray-900">Contact</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-900">Company</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-900">Status</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-900">Type</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-900">Value</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-900">Assigned</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-900">Created</th>
+                    {visibleColumns.contact && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('contact', 'Contact')}</th>}
+                    {visibleColumns.company && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('company', 'Company')}</th>}
+                    {visibleColumns.status && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('status', 'Status')}</th>}
+                    {visibleColumns.type && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('type', 'Type')}</th>}
+                    {visibleColumns.value && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('value', 'Value')}</th>}
+                    {visibleColumns.assigned && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('assigned_to', 'Assigned')}</th>}
+                    {visibleColumns.created && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('created_at', 'Created')}</th>}
                     <th className="text-left py-3 px-4 font-medium text-gray-900">Actions</th>
                   </tr>
                 </thead>
@@ -384,71 +479,85 @@ const Contacts = () => {
                       onClick={() => handleViewContact(contact)}
                       className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
                     >
-                      <td className="py-4 px-4">
-                        <div>
-                          <p className="font-medium text-gray-900">{contact.full_name}</p>
-                          <div className="flex items-center space-x-2 text-sm text-gray-600">
-                            {contact.email && (
-                              <div className="flex items-center">
-                                <Mail size={12} className="mr-1" />
-                                {contact.email}
-                              </div>
-                            )}
-                            {contact.phone && (
-                              <div className="flex items-center">
-                                <Phone size={12} className="mr-1" />
-                                {contact.phone}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-4 px-4">
-                        <div className="flex items-center text-gray-900">
-                          {contact.company && (
-                            <>
-                              <Building size={14} className="mr-2 text-gray-400" />
-                              {contact.company}
-                            </>
-                          )}
-                          {!contact.company && <span className="text-gray-500">—</span>}
-                        </div>
-                      </td>
-                      <td className="py-4 px-4">
-                        <span className={`badge badge-${getStatusBadgeColor(contact.status)}`}>
-                          {CONTACT_STATUSES.find(s => s.value === contact.status)?.label || contact.status}
-                        </span>
-                      </td>
-                      <td className="py-4 px-4">
-                        <span className={`badge badge-${getTypeBadgeColor(contact.type)}`}>
-                          {CONTACT_TYPES.find(t => t.value === contact.type)?.label || contact.type}
-                        </span>
-                      </td>
-                      <td className="py-4 px-4">
-                        <div className="flex items-center text-gray-900">
-                          <DollarSign size={14} className="mr-1" />
-                          {contact.value?.toLocaleString() || 0}
-                        </div>
-                      </td>
-                      <td className="py-4 px-4">
-                        {contact.assigned_user ? (
-                          <div className="flex items-center">
-                            <div className="w-6 h-6 bg-primary-600 rounded-full flex items-center justify-center mr-2">
-                              <span className="text-white text-xs font-medium">
-                                {contact.assigned_user.first_name[0]}{contact.assigned_user.last_name[0]}
-                              </span>
+                      {visibleColumns.contact && (
+                        <td className="py-4 px-4">
+                          <div>
+                            <p className="font-medium text-gray-900">{contact.full_name}</p>
+                            <div className="flex items-center space-x-2 text-sm text-gray-600">
+                              {contact.email && (
+                                <div className="flex items-center">
+                                  <Mail size={12} className="mr-1" />
+                                  {contact.email}
+                                </div>
+                              )}
+                              {contact.phone && (
+                                <div className="flex items-center">
+                                  <Phone size={12} className="mr-1" />
+                                  {contact.phone}
+                                </div>
+                              )}
                             </div>
-                            <span className="text-sm text-gray-900">{contact.assigned_user.full_name}</span>
                           </div>
-                        ) : (
-                          <span className="text-sm text-gray-500">Unassigned</span>
-                        )}
-                      </td>
-                      <td className="py-4 px-4">
-                        <div className="text-sm text-gray-600">
-                          {format(new Date(contact.created_at), 'MMM d, yyyy')}
-                        </div>
-                      </td>
+                        </td>
+                      )}
+                      {visibleColumns.company && (
+                        <td className="py-4 px-4">
+                          <div className="flex items-center text-gray-900">
+                            {contact.company && (
+                              <>
+                                <Building size={14} className="mr-2 text-gray-400" />
+                                {contact.company}
+                              </>
+                            )}
+                            {!contact.company && <span className="text-gray-500">—</span>}
+                          </div>
+                        </td>
+                      )}
+                      {visibleColumns.status && (
+                        <td className="py-4 px-4">
+                          <span className={`badge badge-${getStatusBadgeColor(contact.status)}`}>
+                            {CONTACT_STATUSES.find(s => s.value === contact.status)?.label || contact.status}
+                          </span>
+                        </td>
+                      )}
+                      {visibleColumns.type && (
+                        <td className="py-4 px-4">
+                          <span className={`badge badge-${getTypeBadgeColor(contact.type)}`}>
+                            {CONTACT_TYPES.find(t => t.value === contact.type)?.label || contact.type}
+                          </span>
+                        </td>
+                      )}
+                      {visibleColumns.value && (
+                        <td className="py-4 px-4">
+                          <div className="flex items-center text-gray-900">
+                            <DollarSign size={14} className="mr-1" />
+                            {contact.value?.toLocaleString() || 0}
+                          </div>
+                        </td>
+                      )}
+                      {visibleColumns.assigned && (
+                        <td className="py-4 px-4">
+                          {contact.assigned_user ? (
+                            <div className="flex items-center">
+                              <div className="w-6 h-6 bg-primary-600 rounded-full flex items-center justify-center mr-2">
+                                <span className="text-white text-xs font-medium">
+                                  {contact.assigned_user.first_name[0]}{contact.assigned_user.last_name[0]}
+                                </span>
+                              </div>
+                              <span className="text-sm text-gray-900">{contact.assigned_user.full_name}</span>
+                            </div>
+                          ) : (
+                            <span className="text-sm text-gray-500">Unassigned</span>
+                          )}
+                        </td>
+                      )}
+                      {visibleColumns.created && (
+                        <td className="py-4 px-4">
+                          <div className="text-sm text-gray-600">
+                            {format(new Date(contact.created_at), 'MMM d, yyyy')}
+                          </div>
+                        </td>
+                      )}
                       <td className="py-4 px-4">
                         <div className="flex items-center space-x-2" onClick={(e) => e.stopPropagation()}>
                           <button
