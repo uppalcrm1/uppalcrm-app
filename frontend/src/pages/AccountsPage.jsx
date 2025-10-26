@@ -13,6 +13,29 @@ import {
   Clock,
   Filter
 } from 'lucide-react'
+import ColumnSelector from '../components/ColumnSelector'
+
+// Define available columns with metadata
+const COLUMN_DEFINITIONS = [
+  { key: 'account_id', label: 'Account ID', description: 'Account identifier', required: true },
+  { key: 'contact', label: 'Contact', description: 'Contact name and email', required: false },
+  { key: 'software', label: 'Software Edition', description: 'Software edition', required: false },
+  { key: 'device', label: 'Device', description: 'Device name and MAC', required: false },
+  { key: 'status', label: 'Status', description: 'Account status', required: false },
+  { key: 'cost', label: 'Monthly Cost', description: 'Monthly cost and billing cycle', required: false },
+  { key: 'renewal', label: 'Next Renewal', description: 'Next renewal date', required: false }
+]
+
+// Default visible columns
+const DEFAULT_VISIBLE_COLUMNS = {
+  account_id: true,
+  contact: true,
+  software: true,
+  device: true,
+  status: true,
+  cost: true,
+  renewal: true
+}
 
 const AccountsPage = () => {
   const [accounts, setAccounts] = useState([])
@@ -20,6 +43,27 @@ const AccountsPage = () => {
   const [selectedAccount, setSelectedAccount] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
+
+  // Load column visibility from localStorage or use defaults
+  const [visibleColumns, setVisibleColumns] = useState(() => {
+    const saved = localStorage.getItem('accounts_visible_columns')
+    return saved ? JSON.parse(saved) : DEFAULT_VISIBLE_COLUMNS
+  })
+
+  // Column visibility handlers
+  const handleColumnToggle = (columnKey) => {
+    const newVisibleColumns = {
+      ...visibleColumns,
+      [columnKey]: !visibleColumns[columnKey]
+    }
+    setVisibleColumns(newVisibleColumns)
+    localStorage.setItem('accounts_visible_columns', JSON.stringify(newVisibleColumns))
+  }
+
+  const handleResetColumns = () => {
+    setVisibleColumns(DEFAULT_VISIBLE_COLUMNS)
+    localStorage.setItem('accounts_visible_columns', JSON.stringify(DEFAULT_VISIBLE_COLUMNS))
+  }
 
   // Mock data for demonstration
   const mockAccounts = [
@@ -195,10 +239,25 @@ const AccountsPage = () => {
 
       {/* Accounts Table */}
       <div className="card">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-          <Users size={20} className="mr-2" />
-          Organization Accounts
-        </h2>
+        {/* Toolbar */}
+        {displayAccounts.length > 0 && (
+          <div className="border-b border-gray-200 px-4 py-3 flex items-center justify-between bg-gray-50">
+            <div className="flex items-center gap-2">
+              <Users size={20} className="text-gray-700" />
+              <span className="text-sm font-medium text-gray-700">
+                {displayAccounts.length} {displayAccounts.length === 1 ? 'Account' : 'Accounts'}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <ColumnSelector
+                columns={COLUMN_DEFINITIONS}
+                visibleColumns={visibleColumns}
+                onColumnToggle={handleColumnToggle}
+                onReset={handleResetColumns}
+              />
+            </div>
+          </div>
+        )}
 
         {displayAccounts.length === 0 ? (
           <div className="text-center py-12">
@@ -218,13 +277,13 @@ const AccountsPage = () => {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">Account ID</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">Contact</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">Software Edition</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">Device</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">Status</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">Monthly Cost</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">Next Renewal</th>
+                  {visibleColumns.account_id && <th className="text-left py-3 px-4 font-medium text-gray-900">Account ID</th>}
+                  {visibleColumns.contact && <th className="text-left py-3 px-4 font-medium text-gray-900">Contact</th>}
+                  {visibleColumns.software && <th className="text-left py-3 px-4 font-medium text-gray-900">Software Edition</th>}
+                  {visibleColumns.device && <th className="text-left py-3 px-4 font-medium text-gray-900">Device</th>}
+                  {visibleColumns.status && <th className="text-left py-3 px-4 font-medium text-gray-900">Status</th>}
+                  {visibleColumns.cost && <th className="text-left py-3 px-4 font-medium text-gray-900">Monthly Cost</th>}
+                  {visibleColumns.renewal && <th className="text-left py-3 px-4 font-medium text-gray-900">Next Renewal</th>}
                   <th className="text-left py-3 px-4 font-medium text-gray-900">Actions</th>
                 </tr>
               </thead>
@@ -233,42 +292,56 @@ const AccountsPage = () => {
                   const statusBadge = getStatusBadge(account.status, account.days_until_expiry)
                   return (
                     <tr key={account.id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-4 px-4">
-                        <span className="font-mono text-sm font-medium text-gray-900">
-                          {account.id}
-                        </span>
-                      </td>
-                      <td className="py-4 px-4">
-                        <div>
-                          <p className="font-medium text-gray-900">{account.contact_name}</p>
-                          <p className="text-sm text-gray-600">{account.contact_email}</p>
-                        </div>
-                      </td>
-                      <td className="py-4 px-4">
-                        <span className="badge badge-info">{account.software_edition}</span>
-                      </td>
-                      <td className="py-4 px-4">
-                        <div>
-                          <p className="text-sm text-gray-900">{account.device_name}</p>
-                          <p className="text-xs text-gray-500 font-mono">{account.mac_address}</p>
-                        </div>
-                      </td>
-                      <td className="py-4 px-4">
-                        <span className={statusBadge.class}>
-                          {statusBadge.icon}
-                          {statusBadge.text}
-                        </span>
-                      </td>
-                      <td className="py-4 px-4">
-                        <span className="text-gray-900 font-semibold">${account.monthly_cost}</span>
-                        <span className="text-xs text-gray-500 block">{account.billing_cycle}</span>
-                      </td>
-                      <td className="py-4 px-4">
-                        <div className="flex items-center text-sm text-gray-900">
-                          <Calendar size={12} className="mr-1" />
-                          {account.next_renewal_date}
-                        </div>
-                      </td>
+                      {visibleColumns.account_id && (
+                        <td className="py-4 px-4">
+                          <span className="font-mono text-sm font-medium text-gray-900">
+                            {account.id}
+                          </span>
+                        </td>
+                      )}
+                      {visibleColumns.contact && (
+                        <td className="py-4 px-4">
+                          <div>
+                            <p className="font-medium text-gray-900">{account.contact_name}</p>
+                            <p className="text-sm text-gray-600">{account.contact_email}</p>
+                          </div>
+                        </td>
+                      )}
+                      {visibleColumns.software && (
+                        <td className="py-4 px-4">
+                          <span className="badge badge-info">{account.software_edition}</span>
+                        </td>
+                      )}
+                      {visibleColumns.device && (
+                        <td className="py-4 px-4">
+                          <div>
+                            <p className="text-sm text-gray-900">{account.device_name}</p>
+                            <p className="text-xs text-gray-500 font-mono">{account.mac_address}</p>
+                          </div>
+                        </td>
+                      )}
+                      {visibleColumns.status && (
+                        <td className="py-4 px-4">
+                          <span className={statusBadge.class}>
+                            {statusBadge.icon}
+                            {statusBadge.text}
+                          </span>
+                        </td>
+                      )}
+                      {visibleColumns.cost && (
+                        <td className="py-4 px-4">
+                          <span className="text-gray-900 font-semibold">${account.monthly_cost}</span>
+                          <span className="text-xs text-gray-500 block">{account.billing_cycle}</span>
+                        </td>
+                      )}
+                      {visibleColumns.renewal && (
+                        <td className="py-4 px-4">
+                          <div className="flex items-center text-sm text-gray-900">
+                            <Calendar size={12} className="mr-1" />
+                            {account.next_renewal_date}
+                          </div>
+                        </td>
+                      )}
                       <td className="py-4 px-4">
                         <div className="flex items-center gap-2">
                           <button

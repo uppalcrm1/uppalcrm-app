@@ -12,6 +12,29 @@ import {
   TrendingUp,
   FileText
 } from 'lucide-react'
+import ColumnSelector from '../components/ColumnSelector'
+
+// Define available columns with metadata
+const COLUMN_DEFINITIONS = [
+  { key: 'transaction_id', label: 'Transaction ID', description: 'Transaction identifier', required: true },
+  { key: 'contact', label: 'Contact', description: 'Contact name and email', required: false },
+  { key: 'amount', label: 'Amount', description: 'Transaction amount', required: false },
+  { key: 'date', label: 'Date', description: 'Transaction date', required: false },
+  { key: 'method', label: 'Payment Method', description: 'Payment method used', required: false },
+  { key: 'cycle', label: 'Billing Cycle', description: 'Billing cycle', required: false },
+  { key: 'status', label: 'Status', description: 'Transaction status', required: false }
+]
+
+// Default visible columns
+const DEFAULT_VISIBLE_COLUMNS = {
+  transaction_id: true,
+  contact: true,
+  amount: true,
+  date: true,
+  method: true,
+  cycle: false,
+  status: true
+}
 
 const TransactionsPage = () => {
   const [transactions, setTransactions] = useState([])
@@ -19,6 +42,27 @@ const TransactionsPage = () => {
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterMethod, setFilterMethod] = useState('all')
   const [dateRange, setDateRange] = useState('all')
+
+  // Load column visibility from localStorage or use defaults
+  const [visibleColumns, setVisibleColumns] = useState(() => {
+    const saved = localStorage.getItem('transactions_visible_columns')
+    return saved ? JSON.parse(saved) : DEFAULT_VISIBLE_COLUMNS
+  })
+
+  // Column visibility handlers
+  const handleColumnToggle = (columnKey) => {
+    const newVisibleColumns = {
+      ...visibleColumns,
+      [columnKey]: !visibleColumns[columnKey]
+    }
+    setVisibleColumns(newVisibleColumns)
+    localStorage.setItem('transactions_visible_columns', JSON.stringify(newVisibleColumns))
+  }
+
+  const handleResetColumns = () => {
+    setVisibleColumns(DEFAULT_VISIBLE_COLUMNS)
+    localStorage.setItem('transactions_visible_columns', JSON.stringify(DEFAULT_VISIBLE_COLUMNS))
+  }
 
   // Mock transaction data
   const mockTransactions = [
@@ -248,10 +292,25 @@ const TransactionsPage = () => {
 
       {/* Transaction History Table */}
       <div className="card">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-          <FileText size={20} className="mr-2" />
-          Transaction History
-        </h2>
+        {/* Toolbar */}
+        {displayTransactions.length > 0 && (
+          <div className="border-b border-gray-200 px-4 py-3 flex items-center justify-between bg-gray-50">
+            <div className="flex items-center gap-2">
+              <FileText size={20} className="text-gray-700" />
+              <span className="text-sm font-medium text-gray-700">
+                {displayTransactions.length} {displayTransactions.length === 1 ? 'Transaction' : 'Transactions'}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <ColumnSelector
+                columns={COLUMN_DEFINITIONS}
+                visibleColumns={visibleColumns}
+                onColumnToggle={handleColumnToggle}
+                onReset={handleResetColumns}
+              />
+            </div>
+          </div>
+        )}
 
         {displayTransactions.length === 0 ? (
           <div className="text-center py-12">
@@ -264,14 +323,13 @@ const TransactionsPage = () => {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">Transaction ID</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">Contact</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">Account</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">Amount</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">Date</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">Method</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">Cycle</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">Status</th>
+                  {visibleColumns.transaction_id && <th className="text-left py-3 px-4 font-medium text-gray-900">Transaction ID</th>}
+                  {visibleColumns.contact && <th className="text-left py-3 px-4 font-medium text-gray-900">Contact</th>}
+                  {visibleColumns.amount && <th className="text-left py-3 px-4 font-medium text-gray-900">Amount</th>}
+                  {visibleColumns.date && <th className="text-left py-3 px-4 font-medium text-gray-900">Date</th>}
+                  {visibleColumns.method && <th className="text-left py-3 px-4 font-medium text-gray-900">Method</th>}
+                  {visibleColumns.cycle && <th className="text-left py-3 px-4 font-medium text-gray-900">Cycle</th>}
+                  {visibleColumns.status && <th className="text-left py-3 px-4 font-medium text-gray-900">Status</th>}
                   <th className="text-left py-3 px-4 font-medium text-gray-900">Actions</th>
                 </tr>
               </thead>
@@ -280,48 +338,59 @@ const TransactionsPage = () => {
                   const statusBadge = getStatusBadge(transaction.status)
                   return (
                     <tr key={transaction.id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-4 px-4">
-                        <span className="font-mono text-sm font-medium text-gray-900">
-                          {transaction.id}
-                        </span>
-                      </td>
-                      <td className="py-4 px-4">
-                        <div>
-                          <p className="font-medium text-gray-900">{transaction.contact_name}</p>
-                          <p className="text-sm text-gray-600">{transaction.contact_email}</p>
-                        </div>
-                      </td>
-                      <td className="py-4 px-4">
-                        <span className="font-mono text-sm text-gray-700">{transaction.account_id}</span>
-                      </td>
-                      <td className="py-4 px-4">
-                        <span className="text-lg font-bold text-green-600">
-                          ${transaction.amount}
-                        </span>
-                      </td>
-                      <td className="py-4 px-4">
-                        <div className="flex items-center text-sm text-gray-900">
-                          <Calendar size={12} className="mr-1" />
-                          {transaction.transaction_date}
-                        </div>
-                      </td>
-                      <td className="py-4 px-4">
-                        <div className="flex items-center text-sm text-gray-700">
-                          {getPaymentMethodIcon(transaction.payment_method)}
-                          {transaction.payment_method}
-                        </div>
-                      </td>
-                      <td className="py-4 px-4">
-                        <span className="badge badge-gray">
-                          {transaction.billing_cycle}
-                        </span>
-                      </td>
-                      <td className="py-4 px-4">
-                        <span className={statusBadge.class}>
-                          {statusBadge.icon}
-                          {statusBadge.text}
-                        </span>
-                      </td>
+                      {visibleColumns.transaction_id && (
+                        <td className="py-4 px-4">
+                          <span className="font-mono text-sm font-medium text-gray-900">
+                            {transaction.id}
+                          </span>
+                        </td>
+                      )}
+                      {visibleColumns.contact && (
+                        <td className="py-4 px-4">
+                          <div>
+                            <p className="font-medium text-gray-900">{transaction.contact_name}</p>
+                            <p className="text-sm text-gray-600">{transaction.contact_email}</p>
+                          </div>
+                        </td>
+                      )}
+                      {visibleColumns.amount && (
+                        <td className="py-4 px-4">
+                          <span className="text-lg font-bold text-green-600">
+                            ${transaction.amount}
+                          </span>
+                        </td>
+                      )}
+                      {visibleColumns.date && (
+                        <td className="py-4 px-4">
+                          <div className="flex items-center text-sm text-gray-900">
+                            <Calendar size={12} className="mr-1" />
+                            {transaction.transaction_date}
+                          </div>
+                        </td>
+                      )}
+                      {visibleColumns.method && (
+                        <td className="py-4 px-4">
+                          <div className="flex items-center text-sm text-gray-700">
+                            {getPaymentMethodIcon(transaction.payment_method)}
+                            {transaction.payment_method}
+                          </div>
+                        </td>
+                      )}
+                      {visibleColumns.cycle && (
+                        <td className="py-4 px-4">
+                          <span className="badge badge-gray">
+                            {transaction.billing_cycle}
+                          </span>
+                        </td>
+                      )}
+                      {visibleColumns.status && (
+                        <td className="py-4 px-4">
+                          <span className={statusBadge.class}>
+                            {statusBadge.icon}
+                            {statusBadge.text}
+                          </span>
+                        </td>
+                      )}
                       <td className="py-4 px-4">
                         <button className="btn btn-sm btn-outline">
                           View Details
