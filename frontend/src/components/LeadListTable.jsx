@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ChevronDown,
@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { format } from 'date-fns'
 import LeadConversionButton from './LeadConversionButton'
+import api from '../services/api'
 
 const LeadListTable = ({
   leads,
@@ -36,6 +37,39 @@ const LeadListTable = ({
   const [sortConfig, setSortConfig] = useState({ key: 'created_at', direction: 'desc' })
   const [selectedLeads, setSelectedLeads] = useState([])
   const [showBulkActions, setShowBulkActions] = useState(false)
+  const [fieldLabels, setFieldLabels] = useState({})
+
+  // Fetch field configuration to get dynamic column labels
+  useEffect(() => {
+    const loadFieldConfiguration = async () => {
+      try {
+        // Fetch field configuration for leads entity type
+        const response = await api.get('/custom-fields?entity_type=leads')
+
+        // Create a mapping of field_name -> field_label for leads
+        // Combine both system and custom fields
+        const allFields = [
+          ...(response.data.systemFields || []),
+          ...(response.data.customFields || [])
+        ]
+
+        const labelMap = {}
+        allFields.forEach(field => {
+          // Store the label for each field
+          labelMap[field.field_name] = field.field_label
+        })
+
+        setFieldLabels(labelMap)
+        console.log('📋 Field labels loaded for leads:', labelMap)
+      } catch (error) {
+        console.error('❌ Error loading field configuration:', error)
+        // Use default labels if API fails
+        setFieldLabels({})
+      }
+    }
+
+    loadFieldConfiguration()
+  }, [])
 
   // Sort leads based on current sort configuration
   const sortedLeads = useMemo(() => {
@@ -95,6 +129,11 @@ const LeadListTable = ({
       onBulkAction(selectedLeads, 'export')
       setShowBulkActions(false)
     }
+  }
+
+  // Helper function to get field label with fallback
+  const getFieldLabel = (fieldName, defaultLabel) => {
+    return fieldLabels[fieldName] || defaultLabel
   }
 
   const getStatusColor = (status) => {
@@ -263,14 +302,14 @@ const LeadListTable = ({
                   className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
               </th>
-              <SortableHeader sortKey="first_name">Name</SortableHeader>
-              <SortableHeader sortKey="email">Contact</SortableHeader>
-              <SortableHeader sortKey="company">Company</SortableHeader>
-              <SortableHeader sortKey="status">Status</SortableHeader>
-              <SortableHeader sortKey="priority">Priority</SortableHeader>
-              <SortableHeader sortKey="value">Value</SortableHeader>
-              <SortableHeader sortKey="assigned_to">Assigned To</SortableHeader>
-              <SortableHeader sortKey="created_at">Created</SortableHeader>
+              <SortableHeader sortKey="first_name">{getFieldLabel('first_name', 'Name')}</SortableHeader>
+              <SortableHeader sortKey="email">{getFieldLabel('email', 'Email')}</SortableHeader>
+              <SortableHeader sortKey="company">{getFieldLabel('company', 'Company')}</SortableHeader>
+              <SortableHeader sortKey="status">{getFieldLabel('status', 'Status')}</SortableHeader>
+              <SortableHeader sortKey="priority">{getFieldLabel('priority', 'Priority')}</SortableHeader>
+              <SortableHeader sortKey="value">{getFieldLabel('value', 'Value')}</SortableHeader>
+              <SortableHeader sortKey="assigned_to">{getFieldLabel('assigned_to', 'Assigned To')}</SortableHeader>
+              <SortableHeader sortKey="created_at">{getFieldLabel('created_at', 'Created')}</SortableHeader>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Actions
               </th>
