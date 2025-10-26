@@ -284,7 +284,7 @@ const InlineEditCell = ({
       return `${prefix}${parseFloat(currentValue).toLocaleString()}`
     }
 
-    return currentValue || <span className="text-gray-400 italic">Empty</span>
+    return currentValue || <span className="text-gray-400 text-xs italic">{placeholder || 'Click to add...'}</span>
   }
 
   if (isEditing) {

@@ -441,30 +441,21 @@ const LeadListTable = ({
                       <div>
                         <button
                           onClick={() => navigate(`/leads/${lead.id}`)}
-                          className="text-sm font-medium text-blue-600 hover:text-blue-900 hover:underline cursor-pointer text-left"
+                          className="text-sm font-medium text-blue-600 hover:text-blue-900 hover:underline cursor-pointer text-left block"
                         >
                           {lead.first_name} {lead.last_name}
                         </button>
-                        <div className="text-sm text-gray-500">
-                          <InlineEditCell
-                            value={lead.title}
-                            fieldName="title"
-                            fieldType="text"
-                            recordId={lead.id}
-                            entityType="leads"
-                            onSave={handleFieldUpdate}
-                            placeholder="Add title..."
-                            className="text-sm"
-                          />
-                        </div>
+                        {lead.title && (
+                          <div className="text-xs text-gray-500 mt-0.5">{lead.title}</div>
+                        )}
                       </div>
                     </td>
                   )}
 
                   {/* Contact */}
                   {visibleColumns.email && (
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="space-y-1">
+                    <td className="px-6 py-4">
+                      <div className="space-y-0.5">
                         <InlineEditCell
                           value={lead.email}
                           fieldName="email"
@@ -485,7 +476,7 @@ const LeadListTable = ({
                           onSave={handleFieldUpdate}
                           placeholder="Add phone..."
                           icon={<Phone className="w-3 h-3" />}
-                          className="text-sm"
+                          className="text-xs"
                         />
                       </div>
                     </td>
