@@ -13,6 +13,8 @@ import {
   Filter
 } from 'lucide-react'
 import ColumnSelector from '../components/ColumnSelector'
+import InlineEditCell from '../components/InlineEditCell'
+import { contactsAPI } from '../services/api'
 
 // Define available columns with metadata
 const COLUMN_DEFINITIONS = [
@@ -34,8 +36,16 @@ const DEFAULT_VISIBLE_COLUMNS = {
   last_contact: true
 }
 
+// Status options for dropdown
+const STATUS_OPTIONS = [
+  { value: 'active', label: 'Active' },
+  { value: 'inactive', label: 'Inactive' },
+  { value: 'trial', label: 'Trial' }
+]
+
 const ContactsPage = () => {
   const [contacts, setContacts] = useState([])
+  const [localContacts, setLocalContacts] = useState([]) // For optimistic updates
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
@@ -59,6 +69,36 @@ const ContactsPage = () => {
   const handleResetColumns = () => {
     setVisibleColumns(DEFAULT_VISIBLE_COLUMNS)
     localStorage.setItem('contactspage_visible_columns', JSON.stringify(DEFAULT_VISIBLE_COLUMNS))
+  }
+
+  // Inline edit handler with optimistic updates
+  const handleFieldUpdate = async (recordId, fieldName, newValue) => {
+    // Optimistic update: immediately update local state
+    setLocalContacts(prevContacts =>
+      prevContacts.map(contact =>
+        contact.id === recordId
+          ? { ...contact, [fieldName]: newValue }
+          : contact
+      )
+    )
+
+    try {
+      // Make API call to update the contact
+      await contactsAPI.updateContact(recordId, { [fieldName]: newValue })
+
+      // Also update the main contacts state for consistency
+      setContacts(prevContacts =>
+        prevContacts.map(contact =>
+          contact.id === recordId
+            ? { ...contact, [fieldName]: newValue }
+            : contact
+        )
+      )
+    } catch (error) {
+      // Error is thrown back to InlineEditCell for rollback
+      console.error('Failed to update contact:', error)
+      throw error
+    }
   }
 
   // Mock data for demonstration
@@ -91,7 +131,14 @@ const ContactsPage = () => {
     }
   ]
 
-  const displayContacts = contacts.length > 0 ? contacts : mockContacts
+  // Use localContacts for display (optimistic updates), fallback to contacts or mockContacts
+  const sourceContacts = contacts.length > 0 ? contacts : mockContacts
+  const displayContacts = localContacts.length > 0 ? localContacts : sourceContacts
+
+  // Initialize localContacts when source changes
+  React.useEffect(() => {
+    setLocalContacts(sourceContacts)
+  }, [contacts.length, mockContacts.length])
 
   const getStatusBadge = (status) => {
     const badges = {
@@ -100,6 +147,15 @@ const ContactsPage = () => {
       trial: 'badge badge-warning'
     }
     return badges[status] || 'badge badge-gray'
+  }
+
+  const getStatusColor = (status) => {
+    const colors = {
+      active: 'bg-green-100 text-green-800',
+      inactive: 'bg-gray-100 text-gray-800',
+      trial: 'bg-yellow-100 text-yellow-800'
+    }
+    return colors[status] || 'bg-gray-100 text-gray-800'
   }
 
   return (
@@ -259,31 +315,68 @@ const ContactsPage = () => {
                               {contact.first_name[0]}{contact.last_name[0]}
                             </span>
                           </div>
-                          <div>
-                            <p className="font-medium text-gray-900">
+                          <div className="flex-1">
+                            <p className="font-medium text-gray-900 mb-1">
                               {contact.first_name} {contact.last_name}
                             </p>
-                            <div className="flex items-center text-sm text-gray-600">
-                              <Mail size={12} className="mr-1" />
-                              {contact.email}
+                            <div className="flex items-center gap-1">
+                              <Mail className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                              <InlineEditCell
+                                value={contact.email}
+                                fieldName="email"
+                                fieldType="email"
+                                recordId={contact.id}
+                                entityType="contacts"
+                                onSave={handleFieldUpdate}
+                                placeholder="Add email..."
+                                className="text-xs"
+                              />
                             </div>
+                            {contact.phone && (
+                              <div className="flex items-center gap-1 text-xs text-gray-600 mt-0.5">
+                                <Phone className="w-3 h-3" />
+                                <a href={`tel:${contact.phone}`} className="hover:text-blue-600">
+                                  {contact.phone}
+                                </a>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </td>
                     )}
                     {visibleColumns.company && (
                       <td className="py-4 px-4">
-                        <div className="flex items-center text-gray-900">
-                          <Building2 size={14} className="mr-2 text-gray-400" />
-                          {contact.company}
+                        <div className="flex items-center gap-1">
+                          <Building2 size={14} className="text-gray-400 flex-shrink-0" />
+                          <InlineEditCell
+                            value={contact.company}
+                            fieldName="company"
+                            fieldType="text"
+                            recordId={contact.id}
+                            entityType="contacts"
+                            onSave={handleFieldUpdate}
+                            placeholder="Add company..."
+                            className="text-sm"
+                          />
                         </div>
                       </td>
                     )}
                     {visibleColumns.status && (
                       <td className="py-4 px-4">
-                        <span className={getStatusBadge(contact.status)}>
-                          {contact.status}
-                        </span>
+                        <InlineEditCell
+                          value={contact.status}
+                          fieldName="status"
+                          fieldType="select"
+                          recordId={contact.id}
+                          entityType="contacts"
+                          onSave={handleFieldUpdate}
+                          options={STATUS_OPTIONS}
+                          displayValue={
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(contact.status)}`}>
+                              {STATUS_OPTIONS.find(s => s.value === contact.status)?.label || contact.status}
+                            </span>
+                          }
+                        />
                       </td>
                     )}
                     {visibleColumns.accounts && (
