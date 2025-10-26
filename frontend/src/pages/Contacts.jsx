@@ -409,24 +409,22 @@ const Contacts = () => {
 
       {/* Contacts List */}
       <div className="card">
-        {/* Toolbar */}
-        {contacts.length > 0 && (
-          <div className="border-b border-gray-200 px-4 py-3 flex items-center justify-between bg-gray-50">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-gray-700">
-                {pagination.total || 0} {pagination.total === 1 ? 'Contact' : 'Contacts'}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <ColumnSelector
-                columns={COLUMN_DEFINITIONS}
-                visibleColumns={visibleColumns}
-                onColumnToggle={handleColumnToggle}
-                onReset={handleResetColumns}
-              />
-            </div>
+        {/* Toolbar - Always visible */}
+        <div className="border-b border-gray-200 px-4 py-3 flex items-center justify-between bg-gray-50">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-gray-700">
+              {pagination.total || 0} {pagination.total === 1 ? 'Contact' : 'Contacts'}
+            </span>
           </div>
-        )}
+          <div className="flex items-center gap-2">
+            <ColumnSelector
+              columns={COLUMN_DEFINITIONS}
+              visibleColumns={visibleColumns}
+              onColumnToggle={handleColumnToggle}
+              onReset={handleResetColumns}
+            />
+          </div>
+        </div>
 
         {contacts.length === 0 ? (
           <div className="text-center py-12">
