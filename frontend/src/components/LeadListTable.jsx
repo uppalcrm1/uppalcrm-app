@@ -64,7 +64,7 @@ const LeadRow = React.memo(({
   getStatusColor,
   getPriorityColor
 }) => {
-  // Memoize displayValue JSX to prevent recreation on every render
+  // Memoize all JSX props to prevent recreation on every render
   const statusBadge = useMemo(() => (
     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(lead.status)}`}>
       {statuses.find(s => s.value === lead.status)?.label || lead.status}
@@ -76,6 +76,12 @@ const LeadRow = React.memo(({
       {lead.priority}
     </span>
   ), [lead.priority, getPriorityColor])
+
+  // Memoize icons to prevent re-creating JSX on every render
+  const mailIcon = useMemo(() => <Mail className="w-3 h-3" />, [])
+  const buildingIcon = useMemo(() => <Building className="w-3 h-3 text-gray-400" />, [])
+  const dollarIcon = useMemo(() => <DollarSign className="w-3 h-3 text-green-600" />, [])
+  const userIcon = useMemo(() => <User className="w-3 h-3" />, [])
 
   return (
     <tr
@@ -117,7 +123,7 @@ const LeadRow = React.memo(({
               entityType="leads"
               onSave={onFieldUpdate}
               placeholder="Add email..."
-              icon={<Mail className="w-3 h-3" />}
+              icon={mailIcon}
               className="text-sm"
             />
             {lead.phone && (
@@ -142,7 +148,7 @@ const LeadRow = React.memo(({
             entityType="leads"
             onSave={onFieldUpdate}
             placeholder="Add company..."
-            icon={<Building className="w-3 h-3 text-gray-400" />}
+            icon={buildingIcon}
           />
         </td>
       )}
@@ -192,7 +198,7 @@ const LeadRow = React.memo(({
             onSave={onFieldUpdate}
             placeholder="Add value..."
             prefix="$"
-            icon={<DollarSign className="w-3 h-3 text-green-600" />}
+            icon={dollarIcon}
             className="text-sm font-semibold text-green-600"
           />
         </td>
@@ -208,7 +214,7 @@ const LeadRow = React.memo(({
             entityType="leads"
             onSave={onFieldUpdate}
             users={users}
-            icon={<User className="w-3 h-3" />}
+            icon={userIcon}
             className="text-sm"
           />
         </td>
@@ -352,13 +358,13 @@ const LeadListTable = ({
     }
   }
 
-  const handleSelectLead = (leadId, checked) => {
+  const handleSelectLead = useCallback((leadId, checked) => {
     if (checked) {
       setSelectedLeads(prev => [...prev, leadId])
     } else {
       setSelectedLeads(prev => prev.filter(id => id !== leadId))
     }
-  }
+  }, [])
 
   const handleBulkDelete = () => {
     if (selectedLeads.length > 0 && onBulkAction) {
@@ -398,7 +404,7 @@ const LeadListTable = ({
   }
 
   // Inline edit handler with optimistic updates
-  const handleFieldUpdate = async (recordId, fieldName, newValue) => {
+  const handleFieldUpdate = useCallback(async (recordId, fieldName, newValue) => {
     console.log(`📝 Updating lead ${recordId}: ${fieldName} = ${newValue}`)
 
     // Optimistic update: immediately update local state
@@ -419,7 +425,7 @@ const LeadListTable = ({
       // Error will be handled by InlineEditCell component (rollback)
       throw error
     }
-  }
+  }, [])
 
   const getStatusColor = useCallback((status) => {
     const statusColors = {
