@@ -342,7 +342,6 @@ const InlineEditCell = React.memo(({
               handleClick(e)
             }
           }}
-          className={!disabled && !readOnly ? 'cursor-pointer-all' : ''}
           style={{
             userSelect: 'none',
             display: 'inline-block'

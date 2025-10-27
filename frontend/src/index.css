@@ -76,13 +76,4 @@
   .badge-gray {
     @apply bg-gray-100 text-gray-800;
   }
-
-  /* Force cursor pointer on all descendants to prevent flicker */
-  .cursor-pointer-all {
-    cursor: pointer !important;
-  }
-
-  .cursor-pointer-all * {
-    cursor: pointer !important;
-  }
 }
