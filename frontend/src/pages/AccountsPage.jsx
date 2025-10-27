@@ -353,7 +353,7 @@ const AccountsPage = () => {
                 {displayAccounts.map((account) => {
                   const statusBadge = getStatusBadge(account.status, account.days_until_expiry)
                   return (
-                    <tr key={account.id} className="border-b border-gray-100 hover:bg-gray-50">
+                    <tr key={account.id} className="border-b border-gray-100">
                       {visibleColumns.account_id && (
                         <td className="py-4 px-4">
                           <span className="font-mono text-sm font-medium text-gray-900">

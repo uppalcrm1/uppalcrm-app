@@ -409,7 +409,7 @@ const TransactionsPage = () => {
                 {displayTransactions.map((transaction) => {
                   const statusBadge = getStatusBadge(transaction.status)
                   return (
-                    <tr key={transaction.id} className="border-b border-gray-100 hover:bg-gray-50">
+                    <tr key={transaction.id} className="border-b border-gray-100">
                       {visibleColumns.transaction_id && (
                         <td className="py-4 px-4">
                           <span className="font-mono text-sm font-medium text-gray-900">

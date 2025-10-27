@@ -306,7 +306,7 @@ const ContactsPage = () => {
               </thead>
               <tbody>
                 {displayContacts.map((contact) => (
-                  <tr key={contact.id} className="border-b border-gray-100 hover:bg-gray-50">
+                  <tr key={contact.id} className="border-b border-gray-100">
                     {visibleColumns.contact && (
                       <td className="py-4 px-4">
                         <div className="flex items-center">

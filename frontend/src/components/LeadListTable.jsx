@@ -422,7 +422,7 @@ const LeadListTable = ({
               return (
                 <tr
                   key={lead.id}
-                  className={`hover:bg-gray-50 ${
+                  className={`${
                     selectedLeads.includes(lead.id) ? 'bg-blue-50' : ''
                   }`}
                 >
@@ -498,50 +498,87 @@ const LeadListTable = ({
                   {/* Status */}
                   {visibleColumns.status && (
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(
-                          lead.status
-                        )}`}
-                      >
-                        {statuses.find(s => s.value === lead.status)?.label || lead.status}
-                      </span>
+                      <InlineEditCell
+                        value={lead.status}
+                        fieldName="status"
+                        fieldType="select"
+                        recordId={lead.id}
+                        entityType="leads"
+                        onSave={handleFieldUpdate}
+                        options={statuses}
+                        displayValue={
+                          <span
+                            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(
+                              lead.status
+                            )}`}
+                          >
+                            {statuses.find(s => s.value === lead.status)?.label || lead.status}
+                          </span>
+                        }
+                      />
                     </td>
                   )}
 
                   {/* Priority */}
                   {visibleColumns.priority && (
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(
-                          lead.priority
-                        )}`}
-                      >
-                        {lead.priority}
-                      </span>
+                      <InlineEditCell
+                        value={lead.priority}
+                        fieldName="priority"
+                        fieldType="select"
+                        recordId={lead.id}
+                        entityType="leads"
+                        onSave={handleFieldUpdate}
+                        options={[
+                          { value: 'low', label: 'Low' },
+                          { value: 'medium', label: 'Medium' },
+                          { value: 'high', label: 'High' }
+                        ]}
+                        displayValue={
+                          <span
+                            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(
+                              lead.priority
+                            )}`}
+                          >
+                            {lead.priority}
+                          </span>
+                        }
+                      />
                     </td>
                   )}
 
                   {/* Value */}
                   {visibleColumns.value && (
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {value > 0 && (
-                        <div className="flex items-center gap-1 text-sm font-semibold text-green-600">
-                          <DollarSign className="w-3 h-3" />
-                          {value.toLocaleString()}
-                        </div>
-                      )}
+                      <InlineEditCell
+                        value={lead.value}
+                        fieldName="value"
+                        fieldType="number"
+                        recordId={lead.id}
+                        entityType="leads"
+                        onSave={handleFieldUpdate}
+                        placeholder="Add value..."
+                        prefix="$"
+                        icon={<DollarSign className="w-3 h-3 text-green-600" />}
+                        className="text-sm font-semibold text-green-600"
+                      />
                     </td>
                   )}
 
                   {/* Assigned To */}
                   {visibleColumns.assigned_to && (
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {assignedUser && (
-                        <div className="flex items-center gap-1 text-sm text-gray-600">
-                          <User className="w-3 h-3" />
-                          {assignedUser.first_name} {assignedUser.last_name}
-                        </div>
-                      )}
+                      <InlineEditCell
+                        value={lead.assigned_to}
+                        fieldName="assigned_to"
+                        fieldType="user-select"
+                        recordId={lead.id}
+                        entityType="leads"
+                        onSave={handleFieldUpdate}
+                        users={users}
+                        icon={<User className="w-3 h-3" />}
+                        className="text-sm"
+                      />
                     </td>
                   )}
 

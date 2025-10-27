@@ -1,36 +1,7 @@
 {
   "permissions": {
     "allow": [
-      "Bash(curl:*)",
-      "Bash(npm start)",
-      "Bash(taskkill:*)",
-      "Bash(npm run build:*)",
-      "Bash(git add:*)",
-      "Bash(node:*)",
-      "Bash(git commit:*)",
-      "Bash(git push:*)",
-      "WebFetch(domain:uppalcrm-api.onrender.com)",
-      "Bash(npm run logs:*)",
-      "Bash(for i in {1..3})",
-      "Bash(do echo \"Attempt $i:\")",
-      "Bash(done)",
-      "Read(//c/Users/uppal/crm-marketing-site/**)",
-      "Bash(git merge:*)",
-      "Bash(cat:*)",
-      "WebFetch(domain:uppalcrmapp.netlify.app)",
-      "Read(//c/Users/uppal/**)",
-      "Bash(xargs ls:*)",
-      "WebFetch(domain:files.manuscdn.com)",
-      "Bash(npx netlify deploy:*)",
-      "Bash(git pull:*)",
-      "Bash(npx netlify:*)",
-      "Bash(git checkout:*)",
-      "Bash(npm run logs:backend:*)",
-      "Bash(func start:*)",
-      "Bash(az monitor app-insights query:*)",
-      "Bash(az functionapp config appsettings list:*)",
-      "Bash(npm uninstall:*)",
-      "Bash(npm install:*)"
+      "Bash(npm run logs:frontend:*)"
     ],
     "deny": [],
     "ask": []
