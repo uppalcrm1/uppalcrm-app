@@ -298,20 +298,24 @@ const InlineEditCell = ({
     )
   }
 
-  // If displayValue is provided, clone it and add click handler directly
-  if (displayValue && React.isValidElement(displayValue)) {
-    const clickableDisplay = React.cloneElement(displayValue, {
-      onClick: handleClick,
-      style: {
-        ...displayValue.props.style,
-        cursor: (!disabled && !readOnly) ? 'pointer' : 'default',
-        userSelect: 'none'
-      }
-    })
-
+  // If displayValue is provided, wrap it in a button with reset styles
+  if (displayValue) {
     return (
       <div className="inline-flex items-center gap-1">
-        {clickableDisplay}
+        <button
+          type="button"
+          onClick={handleClick}
+          disabled={disabled || readOnly}
+          className="border-0 bg-transparent p-0 m-0 cursor-pointer disabled:cursor-default"
+          style={{
+            font: 'inherit',
+            color: 'inherit',
+            outline: 'none',
+            appearance: 'none'
+          }}
+        >
+          {displayValue}
+        </button>
         {isSaving && <Loader2 className="w-3 h-3 text-blue-500 animate-spin" />}
         {showSuccess && <Check className="w-3 h-3 text-green-600" />}
         {error && <X className="w-3 h-3 text-red-600" title={error} />}
@@ -325,7 +329,7 @@ const InlineEditCell = ({
       onClick={handleClick}
       className={`
         inline-edit-cell
-        ${!disabled && !readOnly ? 'cursor-pointer hover:bg-gray-50' : ''}
+        ${!disabled && !readOnly ? 'cursor-pointer' : ''}
         ${isSaving ? 'opacity-70' : ''}
         ${error ? 'bg-red-50' : ''}
         px-2 py-1 rounded relative
