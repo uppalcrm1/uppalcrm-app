@@ -83,16 +83,19 @@ const InlineEditCell = React.memo(({
     setError(null)
   }, [])
 
-  const handleSave = useCallback(async () => {
+  const handleSave = useCallback(async (valueToSave = null) => {
+    // Use provided value or current state value
+    const saveValue = valueToSave !== null ? valueToSave : currentValue
+
     // Don't save if value hasn't changed
-    if (currentValue === originalValue.current) {
+    if (saveValue === originalValue.current) {
       setIsEditing(false)
       return
     }
 
     // Validate if validation function provided
     if (validation) {
-      const validationResult = validation(currentValue)
+      const validationResult = validation(saveValue)
       if (validationResult !== true) {
         setError(typeof validationResult === 'string' ? validationResult : 'Invalid value')
         return
@@ -100,7 +103,7 @@ const InlineEditCell = React.memo(({
     }
 
     // Basic email validation
-    if (fieldType === 'email' && currentValue && !isValidEmail(currentValue)) {
+    if (fieldType === 'email' && saveValue && !isValidEmail(saveValue)) {
       setError('Invalid email format')
       return
     }
@@ -111,11 +114,11 @@ const InlineEditCell = React.memo(({
 
     // Update original value for optimistic UI
     const previousValue = originalValue.current
-    originalValue.current = currentValue
+    originalValue.current = saveValue
 
     try {
       // Call the onSave callback (should return a promise)
-      await onSave(recordId, fieldName, currentValue)
+      await onSave(recordId, fieldName, saveValue)
 
       // Show success indicator briefly
       setShowSuccess(true)
@@ -216,10 +219,9 @@ const InlineEditCell = React.memo(({
             onChange={(e) => {
               const newValue = e.target.value
               setCurrentValue(newValue)
-              // Save immediately on select change (no timeout)
-              // Use a small delay to ensure state is updated
+              // Pass the new value directly to handleSave to avoid state timing issues
               setTimeout(() => {
-                handleSave()
+                handleSave(newValue)
               }, 50)
             }}
             onKeyDown={handleKeyDown}
@@ -247,10 +249,9 @@ const InlineEditCell = React.memo(({
             onChange={(e) => {
               const newValue = e.target.value
               setCurrentValue(newValue)
-              // Save immediately on select change (no timeout)
-              // Use a small delay to ensure state is updated
+              // Pass the new value directly to handleSave to avoid state timing issues
               setTimeout(() => {
-                handleSave()
+                handleSave(newValue)
               }, 50)
             }}
             onKeyDown={handleKeyDown}
