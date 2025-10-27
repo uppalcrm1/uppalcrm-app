@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { Check, X, Loader2 } from 'lucide-react'
 
 /**
@@ -12,7 +12,7 @@ import { Check, X, Loader2 } from 'lucide-react'
  * - Loading states and error handling
  * - Rollback on failure
  */
-const InlineEditCell = ({
+const InlineEditCell = React.memo(({
   // Data
   value,
   fieldName,
@@ -63,23 +63,24 @@ const InlineEditCell = ({
     }
   }, [isEditing])
 
-  const handleClick = (e) => {
+  const handleClick = useCallback((e) => {
     if (e) {
       e.preventDefault()
       e.stopPropagation()
+      e.nativeEvent?.stopImmediatePropagation?.()
     }
     if (disabled || readOnly || isSaving) return
     setIsEditing(true)
     setError(null)
-  }
+  }, [disabled, readOnly, isSaving])
 
-  const handleCancel = () => {
+  const handleCancel = useCallback(() => {
     setCurrentValue(originalValue.current)
     setIsEditing(false)
     setError(null)
-  }
+  }, [])
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     // Don't save if value hasn't changed
     if (currentValue === originalValue.current) {
       setIsEditing(false)
@@ -136,9 +137,9 @@ const InlineEditCell = ({
     } finally {
       setIsSaving(false)
     }
-  }
+  }, [currentValue, fieldType, validation, recordId, fieldName, onSave, onError])
 
-  const handleKeyDown = (e) => {
+  const handleKeyDown = useCallback((e) => {
     if (e.key === 'Enter') {
       e.preventDefault()
       handleSave()
@@ -146,14 +147,14 @@ const InlineEditCell = ({
       e.preventDefault()
       handleCancel()
     }
-  }
+  }, [handleSave, handleCancel])
 
-  const handleBlur = () => {
+  const handleBlur = useCallback(() => {
     // Small delay to allow click events on buttons to register
     setTimeout(() => {
       handleSave()
     }, 200)
-  }
+  }, [handleSave])
 
   // Email validation helper
   const isValidEmail = (email) => {
@@ -372,6 +373,9 @@ const InlineEditCell = ({
       )}
     </div>
   )
-}
+})
+
+// Add display name for debugging
+InlineEditCell.displayName = 'InlineEditCell'
 
 export default InlineEditCell
