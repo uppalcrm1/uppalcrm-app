@@ -49,6 +49,209 @@ const DEFAULT_VISIBLE_COLUMNS = {
   created_at: true
 }
 
+// Memoized LeadRow component to prevent unnecessary re-renders and flickering
+const LeadRow = React.memo(({
+  lead,
+  visibleColumns,
+  selectedLeads,
+  onSelectLead,
+  onNavigate,
+  onFieldUpdate,
+  onEditLead,
+  onDeleteLead,
+  users,
+  statuses,
+  getStatusColor,
+  getPriorityColor
+}) => {
+  // Memoize displayValue JSX to prevent recreation on every render
+  const statusBadge = useMemo(() => (
+    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(lead.status)}`}>
+      {statuses.find(s => s.value === lead.status)?.label || lead.status}
+    </span>
+  ), [lead.status, statuses, getStatusColor])
+
+  const priorityBadge = useMemo(() => (
+    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(lead.priority)}`}>
+      {lead.priority}
+    </span>
+  ), [lead.priority, getPriorityColor])
+
+  return (
+    <tr
+      className={`${selectedLeads.includes(lead.id) ? 'bg-blue-50' : ''}`}
+    >
+      <td className="px-6 py-4 whitespace-nowrap">
+        <input
+          type="checkbox"
+          checked={selectedLeads.includes(lead.id)}
+          onChange={(e) => onSelectLead(lead.id, e.target.checked)}
+          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+        />
+      </td>
+
+      {visibleColumns.name && (
+        <td className="px-6 py-4 whitespace-nowrap">
+          <div>
+            <button
+              onClick={() => onNavigate(`/leads/${lead.id}`)}
+              className="text-sm font-medium text-blue-600 hover:text-blue-900 hover:underline cursor-pointer text-left block"
+            >
+              {lead.first_name} {lead.last_name}
+            </button>
+            {lead.title && (
+              <div className="text-xs text-gray-500 mt-0.5">{lead.title}</div>
+            )}
+          </div>
+        </td>
+      )}
+
+      {visibleColumns.email && (
+        <td className="px-6 py-4">
+          <div className="space-y-1">
+            <InlineEditCell
+              value={lead.email}
+              fieldName="email"
+              fieldType="email"
+              recordId={lead.id}
+              entityType="leads"
+              onSave={onFieldUpdate}
+              placeholder="Add email..."
+              icon={<Mail className="w-3 h-3" />}
+              className="text-sm"
+            />
+            {lead.phone && (
+              <div className="flex items-center gap-1 text-xs text-gray-600">
+                <Phone className="w-3 h-3" />
+                <a href={`tel:${lead.phone}`} className="hover:text-blue-600">
+                  {lead.phone}
+                </a>
+              </div>
+            )}
+          </div>
+        </td>
+      )}
+
+      {visibleColumns.company && (
+        <td className="px-6 py-4 whitespace-nowrap">
+          <InlineEditCell
+            value={lead.company}
+            fieldName="company"
+            fieldType="text"
+            recordId={lead.id}
+            entityType="leads"
+            onSave={onFieldUpdate}
+            placeholder="Add company..."
+            icon={<Building className="w-3 h-3 text-gray-400" />}
+          />
+        </td>
+      )}
+
+      {visibleColumns.status && (
+        <td className="px-6 py-4 whitespace-nowrap">
+          <InlineEditCell
+            value={lead.status}
+            fieldName="status"
+            fieldType="select"
+            recordId={lead.id}
+            entityType="leads"
+            onSave={onFieldUpdate}
+            options={statuses}
+            displayValue={statusBadge}
+          />
+        </td>
+      )}
+
+      {visibleColumns.priority && (
+        <td className="px-6 py-4 whitespace-nowrap">
+          <InlineEditCell
+            value={lead.priority}
+            fieldName="priority"
+            fieldType="select"
+            recordId={lead.id}
+            entityType="leads"
+            onSave={onFieldUpdate}
+            options={[
+              { value: 'low', label: 'Low' },
+              { value: 'medium', label: 'Medium' },
+              { value: 'high', label: 'High' }
+            ]}
+            displayValue={priorityBadge}
+          />
+        </td>
+      )}
+
+      {visibleColumns.value && (
+        <td className="px-6 py-4 whitespace-nowrap">
+          <InlineEditCell
+            value={lead.value}
+            fieldName="value"
+            fieldType="number"
+            recordId={lead.id}
+            entityType="leads"
+            onSave={onFieldUpdate}
+            placeholder="Add value..."
+            prefix="$"
+            icon={<DollarSign className="w-3 h-3 text-green-600" />}
+            className="text-sm font-semibold text-green-600"
+          />
+        </td>
+      )}
+
+      {visibleColumns.assigned_to && (
+        <td className="px-6 py-4 whitespace-nowrap">
+          <InlineEditCell
+            value={lead.assigned_to}
+            fieldName="assigned_to"
+            fieldType="user-select"
+            recordId={lead.id}
+            entityType="leads"
+            onSave={onFieldUpdate}
+            users={users}
+            icon={<User className="w-3 h-3" />}
+            className="text-sm"
+          />
+        </td>
+      )}
+
+      {visibleColumns.created_at && (
+        <td className="px-6 py-4 whitespace-nowrap">
+          <div className="flex items-center gap-1 text-sm text-gray-600">
+            <Calendar className="w-3 h-3" />
+            {format(new Date(lead.created_at), 'MMM d, yyyy')}
+          </div>
+        </td>
+      )}
+
+      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+        <div className="flex items-center gap-2">
+          <LeadConversionButton
+            lead={lead}
+            variant="icon"
+            onSuccess={() => {}}
+          />
+          <button
+            onClick={() => onEditLead(lead)}
+            className="text-blue-600 hover:text-blue-900"
+            title="Edit lead"
+          >
+            <Edit className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => onDeleteLead(lead)}
+            className="text-red-600 hover:text-red-900"
+            title="Delete lead"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
+      </td>
+    </tr>
+  )
+})
+
+LeadRow.displayName = 'LeadRow'
+
 const LeadListTable = ({
   leads,
   pagination,
@@ -218,7 +421,7 @@ const LeadListTable = ({
     }
   }
 
-  const getStatusColor = (status) => {
+  const getStatusColor = useCallback((status) => {
     const statusColors = {
       new: 'bg-blue-100 text-blue-800',
       contacted: 'bg-yellow-100 text-yellow-800',
@@ -229,16 +432,16 @@ const LeadListTable = ({
       lost: 'bg-red-100 text-red-800',
     }
     return statusColors[status] || 'bg-gray-100 text-gray-800'
-  }
+  }, [])
 
-  const getPriorityColor = (priority) => {
+  const getPriorityColor = useCallback((priority) => {
     const priorityColors = {
       low: 'bg-gray-100 text-gray-800',
       medium: 'bg-yellow-100 text-yellow-800',
       high: 'bg-red-100 text-red-800',
     }
     return priorityColors[priority] || 'bg-gray-100 text-gray-800'
-  }
+  }, [])
 
   const SortableHeader = ({ children, sortKey, className = '' }) => (
     <th
@@ -415,212 +618,23 @@ const LeadListTable = ({
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {sortedLeads.map((lead) => {
-              const assignedUser = users.find(user => user.id === lead.assigned_to)
-              const value = parseFloat(lead.value) || 0
-
-              return (
-                <tr
-                  key={lead.id}
-                  className={`${
-                    selectedLeads.includes(lead.id) ? 'bg-blue-50' : ''
-                  }`}
-                >
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <input
-                      type="checkbox"
-                      checked={selectedLeads.includes(lead.id)}
-                      onChange={(e) => handleSelectLead(lead.id, e.target.checked)}
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    />
-                  </td>
-
-                  {/* Name */}
-                  {visibleColumns.name && (
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <button
-                          onClick={() => navigate(`/leads/${lead.id}`)}
-                          className="text-sm font-medium text-blue-600 hover:text-blue-900 hover:underline cursor-pointer text-left block"
-                        >
-                          {lead.first_name} {lead.last_name}
-                        </button>
-                        {lead.title && (
-                          <div className="text-xs text-gray-500 mt-0.5">{lead.title}</div>
-                        )}
-                      </div>
-                    </td>
-                  )}
-
-                  {/* Contact */}
-                  {visibleColumns.email && (
-                    <td className="px-6 py-4">
-                      <div className="space-y-1">
-                        <InlineEditCell
-                          value={lead.email}
-                          fieldName="email"
-                          fieldType="email"
-                          recordId={lead.id}
-                          entityType="leads"
-                          onSave={handleFieldUpdate}
-                          placeholder="Add email..."
-                          icon={<Mail className="w-3 h-3" />}
-                          className="text-sm"
-                        />
-                        {lead.phone && (
-                          <div className="flex items-center gap-1 text-xs text-gray-600">
-                            <Phone className="w-3 h-3" />
-                            <a href={`tel:${lead.phone}`} className="hover:text-blue-600">
-                              {lead.phone}
-                            </a>
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                  )}
-
-                  {/* Company */}
-                  {visibleColumns.company && (
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <InlineEditCell
-                        value={lead.company}
-                        fieldName="company"
-                        fieldType="text"
-                        recordId={lead.id}
-                        entityType="leads"
-                        onSave={handleFieldUpdate}
-                        placeholder="Add company..."
-                        icon={<Building className="w-3 h-3 text-gray-400" />}
-                      />
-                    </td>
-                  )}
-
-                  {/* Status */}
-                  {visibleColumns.status && (
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <InlineEditCell
-                        value={lead.status}
-                        fieldName="status"
-                        fieldType="select"
-                        recordId={lead.id}
-                        entityType="leads"
-                        onSave={handleFieldUpdate}
-                        options={statuses}
-                        displayValue={
-                          <span
-                            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(
-                              lead.status
-                            )}`}
-                          >
-                            {statuses.find(s => s.value === lead.status)?.label || lead.status}
-                          </span>
-                        }
-                      />
-                    </td>
-                  )}
-
-                  {/* Priority */}
-                  {visibleColumns.priority && (
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <InlineEditCell
-                        value={lead.priority}
-                        fieldName="priority"
-                        fieldType="select"
-                        recordId={lead.id}
-                        entityType="leads"
-                        onSave={handleFieldUpdate}
-                        options={[
-                          { value: 'low', label: 'Low' },
-                          { value: 'medium', label: 'Medium' },
-                          { value: 'high', label: 'High' }
-                        ]}
-                        displayValue={
-                          <span
-                            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(
-                              lead.priority
-                            )}`}
-                          >
-                            {lead.priority}
-                          </span>
-                        }
-                      />
-                    </td>
-                  )}
-
-                  {/* Value */}
-                  {visibleColumns.value && (
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <InlineEditCell
-                        value={lead.value}
-                        fieldName="value"
-                        fieldType="number"
-                        recordId={lead.id}
-                        entityType="leads"
-                        onSave={handleFieldUpdate}
-                        placeholder="Add value..."
-                        prefix="$"
-                        icon={<DollarSign className="w-3 h-3 text-green-600" />}
-                        className="text-sm font-semibold text-green-600"
-                      />
-                    </td>
-                  )}
-
-                  {/* Assigned To */}
-                  {visibleColumns.assigned_to && (
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <InlineEditCell
-                        value={lead.assigned_to}
-                        fieldName="assigned_to"
-                        fieldType="user-select"
-                        recordId={lead.id}
-                        entityType="leads"
-                        onSave={handleFieldUpdate}
-                        users={users}
-                        icon={<User className="w-3 h-3" />}
-                        className="text-sm"
-                      />
-                    </td>
-                  )}
-
-                  {/* Created */}
-                  {visibleColumns.created_at && (
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-1 text-sm text-gray-600">
-                        <Calendar className="w-3 h-3" />
-                        {format(new Date(lead.created_at), 'MMM d, yyyy')}
-                      </div>
-                    </td>
-                  )}
-
-                  {/* Actions */}
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex items-center gap-2">
-                      <LeadConversionButton
-                        lead={lead}
-                        variant="icon"
-                        onSuccess={() => {
-                          // Refresh data will be handled by the component's query invalidation
-                        }}
-                      />
-                      <button
-                        onClick={() => onEditLead(lead)}
-                        className="text-blue-600 hover:text-blue-900"
-                        title="Edit lead"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => onDeleteLead(lead)}
-                        className="text-red-600 hover:text-red-900"
-                        title="Delete lead"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              )
-            })}
+            {sortedLeads.map((lead) => (
+              <LeadRow
+                key={lead.id}
+                lead={lead}
+                visibleColumns={visibleColumns}
+                selectedLeads={selectedLeads}
+                onSelectLead={handleSelectLead}
+                onNavigate={navigate}
+                onFieldUpdate={handleFieldUpdate}
+                onEditLead={onEditLead}
+                onDeleteLead={onDeleteLead}
+                users={users}
+                statuses={statuses}
+                getStatusColor={getStatusColor}
+                getPriorityColor={getPriorityColor}
+              />
+            ))}
           </tbody>
         </table>
 
