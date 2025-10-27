@@ -63,7 +63,11 @@ const InlineEditCell = ({
     }
   }, [isEditing])
 
-  const handleClick = () => {
+  const handleClick = (e) => {
+    if (e) {
+      e.preventDefault()
+      e.stopPropagation()
+    }
     if (disabled || readOnly || isSaving) return
     setIsEditing(true)
     setError(null)
@@ -303,13 +307,18 @@ const InlineEditCell = ({
     return (
       <span className="inline-flex items-center gap-1">
         <span
-          onClick={!disabled && !readOnly ? handleClick : undefined}
+          onClick={(e) => {
+            if (!disabled && !readOnly) {
+              handleClick(e)
+            }
+          }}
           role="button"
           tabIndex={!disabled && !readOnly ? 0 : -1}
           onKeyDown={(e) => {
             if (!disabled && !readOnly && (e.key === 'Enter' || e.key === ' ')) {
               e.preventDefault()
-              handleClick()
+              e.stopPropagation()
+              handleClick(e)
             }
           }}
           style={{
@@ -330,7 +339,7 @@ const InlineEditCell = ({
   // Default rendering for non-displayValue fields
   return (
     <div
-      onClick={handleClick}
+      onClick={(e) => handleClick(e)}
       className={`
         inline-edit-cell
         ${!disabled && !readOnly ? 'cursor-pointer' : ''}
