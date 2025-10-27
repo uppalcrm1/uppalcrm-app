@@ -298,25 +298,23 @@ const InlineEditCell = ({
     )
   }
 
-  // If displayValue is provided, render it directly as clickable
-  if (displayValue) {
+  // If displayValue is provided, clone it and add click handler directly
+  if (displayValue && React.isValidElement(displayValue)) {
+    const clickableDisplay = React.cloneElement(displayValue, {
+      onClick: handleClick,
+      style: {
+        ...displayValue.props.style,
+        cursor: (!disabled && !readOnly) ? 'pointer' : 'default',
+        userSelect: 'none'
+      }
+    })
+
     return (
-      <div
-        onClick={handleClick}
-        className={`inline-block ${!disabled && !readOnly ? 'cursor-pointer' : ''}`}
-        style={{ userSelect: 'none' }}
-      >
-        <div className="pointer-events-none">
-          {displayValue}
-        </div>
-        {/* Status indicators overlay */}
-        {(isSaving || showSuccess || error) && (
-          <div className="inline-flex ml-2 pointer-events-none">
-            {isSaving && <Loader2 className="w-3 h-3 text-blue-500 animate-spin" />}
-            {showSuccess && <Check className="w-3 h-3 text-green-600" />}
-            {error && <X className="w-3 h-3 text-red-600" title={error} />}
-          </div>
-        )}
+      <div className="inline-flex items-center gap-1">
+        {clickableDisplay}
+        {isSaving && <Loader2 className="w-3 h-3 text-blue-500 animate-spin" />}
+        {showSuccess && <Check className="w-3 h-3 text-green-600" />}
+        {error && <X className="w-3 h-3 text-red-600" title={error} />}
       </div>
     )
   }
