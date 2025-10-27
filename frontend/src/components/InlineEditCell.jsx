@@ -298,28 +298,32 @@ const InlineEditCell = ({
     )
   }
 
-  // If displayValue is provided, wrap it in a button with reset styles
+  // If displayValue is provided, render with minimal wrapper
   if (displayValue) {
     return (
-      <div className="inline-flex items-center gap-1">
-        <button
-          type="button"
-          onClick={handleClick}
-          disabled={disabled || readOnly}
-          className="border-0 bg-transparent p-0 m-0 cursor-pointer disabled:cursor-default"
+      <span className="inline-flex items-center gap-1">
+        <span
+          onClick={!disabled && !readOnly ? handleClick : undefined}
+          role="button"
+          tabIndex={!disabled && !readOnly ? 0 : -1}
+          onKeyDown={(e) => {
+            if (!disabled && !readOnly && (e.key === 'Enter' || e.key === ' ')) {
+              e.preventDefault()
+              handleClick()
+            }
+          }}
           style={{
-            font: 'inherit',
-            color: 'inherit',
-            outline: 'none',
-            appearance: 'none'
+            cursor: !disabled && !readOnly ? 'pointer' : 'default',
+            userSelect: 'none',
+            display: 'inline-block'
           }}
         >
           {displayValue}
-        </button>
+        </span>
         {isSaving && <Loader2 className="w-3 h-3 text-blue-500 animate-spin" />}
         {showSuccess && <Check className="w-3 h-3 text-green-600" />}
         {error && <X className="w-3 h-3 text-red-600" title={error} />}
-      </div>
+      </span>
     )
   }
 
