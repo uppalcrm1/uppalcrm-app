@@ -348,7 +348,9 @@ const InlineEditCell = React.memo(({
             display: 'inline-block'
           }}
         >
-          {displayValue}
+          <span style={{ cursor: 'inherit', pointerEvents: 'none' }}>
+            {displayValue}
+          </span>
         </span>
         {isSaving && <Loader2 className="w-3 h-3 text-blue-500 animate-spin" />}
         {showSuccess && <Check className="w-3 h-3 text-green-600" />}
