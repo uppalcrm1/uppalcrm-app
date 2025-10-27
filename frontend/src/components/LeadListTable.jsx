@@ -49,8 +49,8 @@ const DEFAULT_VISIBLE_COLUMNS = {
   created_at: true
 }
 
-// Memoized LeadRow component to prevent unnecessary re-renders and flickering
-const LeadRow = React.memo(({
+// LeadRow component
+const LeadRow = ({
   lead,
   visibleColumns,
   selectedLeads,
@@ -64,25 +64,6 @@ const LeadRow = React.memo(({
   getStatusColor,
   getPriorityColor
 }) => {
-  // Memoize all JSX props to prevent recreation on every render
-  const statusBadge = useMemo(() => (
-    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(lead.status)}`}>
-      {statuses.find(s => s.value === lead.status)?.label || lead.status}
-    </span>
-  ), [lead.status, statuses, getStatusColor])
-
-  const priorityBadge = useMemo(() => (
-    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(lead.priority)}`}>
-      {lead.priority}
-    </span>
-  ), [lead.priority, getPriorityColor])
-
-  // Memoize icons to prevent re-creating JSX on every render
-  const mailIcon = useMemo(() => <Mail className="w-3 h-3" />, [])
-  const buildingIcon = useMemo(() => <Building className="w-3 h-3 text-gray-400" />, [])
-  const dollarIcon = useMemo(() => <DollarSign className="w-3 h-3 text-green-600" />, [])
-  const userIcon = useMemo(() => <User className="w-3 h-3" />, [])
-
   return (
     <tr
       className={`${selectedLeads.includes(lead.id) ? 'bg-blue-50' : ''}`}
@@ -123,7 +104,7 @@ const LeadRow = React.memo(({
               entityType="leads"
               onSave={onFieldUpdate}
               placeholder="Add email..."
-              icon={mailIcon}
+              icon={<Mail className="w-3 h-3" />}
               className="text-sm"
             />
             {lead.phone && (
@@ -148,7 +129,7 @@ const LeadRow = React.memo(({
             entityType="leads"
             onSave={onFieldUpdate}
             placeholder="Add company..."
-            icon={buildingIcon}
+            icon={<Building className="w-3 h-3 text-gray-400" />}
           />
         </td>
       )}
@@ -163,7 +144,11 @@ const LeadRow = React.memo(({
             entityType="leads"
             onSave={onFieldUpdate}
             options={statuses}
-            displayValue={statusBadge}
+            displayValue={
+              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(lead.status)}`}>
+                {statuses.find(s => s.value === lead.status)?.label || lead.status}
+              </span>
+            }
           />
         </td>
       )}
@@ -182,7 +167,11 @@ const LeadRow = React.memo(({
               { value: 'medium', label: 'Medium' },
               { value: 'high', label: 'High' }
             ]}
-            displayValue={priorityBadge}
+            displayValue={
+              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(lead.priority)}`}>
+                {lead.priority}
+              </span>
+            }
           />
         </td>
       )}
@@ -198,7 +187,7 @@ const LeadRow = React.memo(({
             onSave={onFieldUpdate}
             placeholder="Add value..."
             prefix="$"
-            icon={dollarIcon}
+            icon={<DollarSign className="w-3 h-3 text-green-600" />}
             className="text-sm font-semibold text-green-600"
           />
         </td>
@@ -214,7 +203,7 @@ const LeadRow = React.memo(({
             entityType="leads"
             onSave={onFieldUpdate}
             users={users}
-            icon={userIcon}
+            icon={<User className="w-3 h-3" />}
             className="text-sm"
           />
         </td>
@@ -254,9 +243,7 @@ const LeadRow = React.memo(({
       </td>
     </tr>
   )
-})
-
-LeadRow.displayName = 'LeadRow'
+}
 
 const LeadListTable = ({
   leads,
