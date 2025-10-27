@@ -325,17 +325,6 @@ const InlineEditCell = React.memo(({
 
   // If displayValue is provided, render with minimal wrapper
   if (displayValue) {
-    const cursorStyle = !disabled && !readOnly ? 'pointer' : 'default'
-
-    // Clone displayValue and inject cursor style to prevent flickering
-    const displayValueWithCursor = React.cloneElement(displayValue, {
-      style: {
-        ...displayValue.props?.style,
-        cursor: cursorStyle,
-        pointerEvents: 'none'
-      }
-    })
-
     return (
       <span className="inline-flex items-center gap-1">
         <span
@@ -353,13 +342,13 @@ const InlineEditCell = React.memo(({
               handleClick(e)
             }
           }}
+          className={!disabled && !readOnly ? 'cursor-pointer-all' : ''}
           style={{
-            cursor: cursorStyle,
             userSelect: 'none',
             display: 'inline-block'
           }}
         >
-          {displayValueWithCursor}
+          {displayValue}
         </span>
         {isSaving && <Loader2 className="w-3 h-3 text-blue-500 animate-spin" />}
         {showSuccess && <Check className="w-3 h-3 text-green-600" />}
