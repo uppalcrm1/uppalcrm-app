@@ -214,11 +214,19 @@ const InlineEditCell = React.memo(({
             ref={inputRef}
             value={currentValue || ''}
             onChange={(e) => {
-              setCurrentValue(e.target.value)
-              // Auto-save on select change
-              setTimeout(() => handleSave(), 100)
+              const newValue = e.target.value
+              setCurrentValue(newValue)
+              // Save immediately on select change (no timeout)
+              // Use a small delay to ensure state is updated
+              setTimeout(() => {
+                handleSave()
+              }, 50)
             }}
             onKeyDown={handleKeyDown}
+            onBlur={(e) => {
+              // Prevent double-save on blur
+              e.preventDefault()
+            }}
             className={baseInputClass}
             disabled={isSaving}
           >
@@ -237,11 +245,19 @@ const InlineEditCell = React.memo(({
             ref={inputRef}
             value={currentValue || ''}
             onChange={(e) => {
-              setCurrentValue(e.target.value)
-              // Auto-save on select change
-              setTimeout(() => handleSave(), 100)
+              const newValue = e.target.value
+              setCurrentValue(newValue)
+              // Save immediately on select change (no timeout)
+              // Use a small delay to ensure state is updated
+              setTimeout(() => {
+                handleSave()
+              }, 50)
             }}
             onKeyDown={handleKeyDown}
+            onBlur={(e) => {
+              // Prevent double-save on blur
+              e.preventDefault()
+            }}
             className={baseInputClass}
             disabled={isSaving}
           >
