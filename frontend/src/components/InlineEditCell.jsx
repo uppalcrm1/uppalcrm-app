@@ -298,6 +298,30 @@ const InlineEditCell = ({
     )
   }
 
+  // If displayValue is provided, render it directly as clickable
+  if (displayValue) {
+    return (
+      <div
+        onClick={handleClick}
+        className={`inline-block ${!disabled && !readOnly ? 'cursor-pointer' : ''}`}
+        style={{ userSelect: 'none' }}
+      >
+        <div className="pointer-events-none">
+          {displayValue}
+        </div>
+        {/* Status indicators overlay */}
+        {(isSaving || showSuccess || error) && (
+          <div className="inline-flex ml-2 pointer-events-none">
+            {isSaving && <Loader2 className="w-3 h-3 text-blue-500 animate-spin" />}
+            {showSuccess && <Check className="w-3 h-3 text-green-600" />}
+            {error && <X className="w-3 h-3 text-red-600" title={error} />}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Default rendering for non-displayValue fields
   return (
     <div
       onClick={handleClick}
@@ -306,7 +330,7 @@ const InlineEditCell = ({
         ${!disabled && !readOnly ? 'cursor-pointer hover:bg-gray-50' : ''}
         ${isSaving ? 'opacity-70' : ''}
         ${error ? 'bg-red-50' : ''}
-        px-2 py-1 rounded transition-colors relative
+        px-2 py-1 rounded relative
         ${className}
       `}
       title={disabled ? 'This field cannot be edited' : 'Click to edit'}
