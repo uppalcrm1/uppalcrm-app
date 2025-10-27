@@ -113,7 +113,7 @@ const LeadRow = React.memo(({
       )}
 
       {visibleColumns.email && (
-        <td className="px-6 py-4">
+        <td className="px-6 py-4 cursor-pointer">
           <div className="space-y-1">
             <InlineEditCell
               value={lead.email}
@@ -139,7 +139,7 @@ const LeadRow = React.memo(({
       )}
 
       {visibleColumns.company && (
-        <td className="px-6 py-4 whitespace-nowrap">
+        <td className="px-6 py-4 whitespace-nowrap cursor-pointer">
           <InlineEditCell
             value={lead.company}
             fieldName="company"
@@ -154,7 +154,7 @@ const LeadRow = React.memo(({
       )}
 
       {visibleColumns.status && (
-        <td className="px-6 py-4 whitespace-nowrap">
+        <td className="px-6 py-4 whitespace-nowrap cursor-pointer">
           <InlineEditCell
             value={lead.status}
             fieldName="status"
@@ -169,7 +169,7 @@ const LeadRow = React.memo(({
       )}
 
       {visibleColumns.priority && (
-        <td className="px-6 py-4 whitespace-nowrap">
+        <td className="px-6 py-4 whitespace-nowrap cursor-pointer">
           <InlineEditCell
             value={lead.priority}
             fieldName="priority"
@@ -188,7 +188,7 @@ const LeadRow = React.memo(({
       )}
 
       {visibleColumns.value && (
-        <td className="px-6 py-4 whitespace-nowrap">
+        <td className="px-6 py-4 whitespace-nowrap cursor-pointer">
           <InlineEditCell
             value={lead.value}
             fieldName="value"
@@ -205,7 +205,7 @@ const LeadRow = React.memo(({
       )}
 
       {visibleColumns.assigned_to && (
-        <td className="px-6 py-4 whitespace-nowrap">
+        <td className="px-6 py-4 whitespace-nowrap cursor-pointer">
           <InlineEditCell
             value={lead.assigned_to}
             fieldName="assigned_to"
