@@ -59,9 +59,12 @@ const InlineEditCell = React.memo(({
   useEffect(() => {
     if (isEditing && inputRef.current) {
       inputRef.current.focus()
-      inputRef.current.select()
+      // Only call select() for text-based inputs, not select elements
+      if (fieldType !== 'select' && fieldType !== 'user-select' && typeof inputRef.current.select === 'function') {
+        inputRef.current.select()
+      }
     }
-  }, [isEditing])
+  }, [isEditing, fieldType])
 
   const handleClick = useCallback((e) => {
     if (e) {
