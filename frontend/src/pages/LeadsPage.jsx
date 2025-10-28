@@ -59,8 +59,8 @@ const LeadsPage = () => {
   const [selectedLead, setSelectedLead] = useState(null)
   const [showFilters, setShowFilters] = useState(false)
 
-  // Get current filters from URL
-  const currentFilters = {
+  // Get current filters from URL - memoized to prevent unnecessary re-renders
+  const currentFilters = React.useMemo(() => ({
     page: parseInt(searchParams.get('page')) || 1,
     limit: parseInt(searchParams.get('limit')) || 20,
     search: searchParams.get('search') || '',
@@ -68,7 +68,7 @@ const LeadsPage = () => {
     priority: searchParams.get('priority') || '',
     assigned_to: searchParams.get('assigned_to') || '',
     source: searchParams.get('source') || '',
-  }
+  }), [searchParams])
 
   // Update URL with new filters
   const updateFilters = (newFilters) => {
