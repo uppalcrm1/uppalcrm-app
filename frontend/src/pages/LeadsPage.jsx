@@ -48,9 +48,11 @@ const LEAD_SOURCES = [
 ]
 
 const LeadsPage = () => {
+  console.log('🔴 LeadsPage RENDER', Date.now())
+
   const [searchParams, setSearchParams] = useSearchParams()
   const queryClient = useQueryClient()
-  
+
   // State
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
@@ -69,6 +71,8 @@ const LeadsPage = () => {
     assigned_to: searchParams.get('assigned_to') || '',
     source: searchParams.get('source') || '',
   }), [searchParams])
+
+  console.log('🔵 currentFilters memoized:', currentFilters)
 
   // Update URL with new filters
   const updateFilters = (newFilters) => {
