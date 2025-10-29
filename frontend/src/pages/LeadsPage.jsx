@@ -49,6 +49,7 @@ const LEAD_SOURCES = [
 
 const LeadsPage = () => {
   console.log('🔴 LeadsPage RENDER', Date.now())
+  console.log('🟢 DEPLOYMENT CHECK - Build timestamp:', new Date().toISOString())
 
   const [searchParams, setSearchParams] = useSearchParams()
   const queryClient = useQueryClient()
