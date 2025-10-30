@@ -77,3 +77,51 @@
     @apply bg-gray-100 text-gray-800;
   }
 }
+
+/* ========================================
+   CURSOR FLICKERING FIX
+   ======================================== */
+
+/* Fix cursor flickering globally */
+* {
+  cursor: inherit !important;
+}
+
+body {
+  cursor: default !important;
+}
+
+/* Stable pointer for interactive elements */
+button,
+a,
+[role="button"],
+[onclick],
+input[type="button"],
+input[type="submit"],
+.cursor-pointer,
+td.cursor-pointer {
+  cursor: pointer !important;
+}
+
+/* Prevent child elements from changing cursor */
+button *,
+a *,
+[role="button"] *,
+.cursor-pointer * {
+  pointer-events: none;
+}
+
+/* Force stable cursor on table cells */
+table td {
+  cursor: default !important;
+}
+
+table td:hover {
+  cursor: pointer !important;
+}
+
+/* Specific fix for inline edit cells */
+.inline-edit-cell,
+.inline-edit-cell * {
+  cursor: pointer !important;
+}
