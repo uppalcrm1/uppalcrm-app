@@ -24,6 +24,7 @@ const notifyAdminRoutes = require('./routes/notify-admin');
 const adminRoutes = require('./routes/admin');
 const webhooksRoutes = require('./routes/webhooks');
 const apiKeysRoutes = require('./routes/api-keys');
+const aiSettingsRoutes = require('./routes/ai-settings');
 const customFieldsRoutes = require('./routes/customFields');
 const subscriptionRoutes = require('./routes/subscription');
 const platformAdminRoutes = require('./routes/platformAdmin');
@@ -200,6 +201,9 @@ app.use('/api/webhooks', rateLimiters.webhook, webhooksRoutes);
 
 // API Keys management routes (admin functionality)
 app.use('/api/organizations/current/api-keys', rateLimiters.general, apiKeysRoutes);
+
+// AI Settings management routes (admin functionality)
+app.use('/api/organizations/current', rateLimiters.general, aiSettingsRoutes);
 
 // Custom Fields management routes
 app.use('/api/custom-fields', rateLimiters.general, customFieldsRoutes);

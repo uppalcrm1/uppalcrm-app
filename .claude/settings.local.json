@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm run logs:frontend:*)"
+      "Bash(npm run logs:frontend:*)",
+      "Bash(psql:*)"
     ],
     "deny": [],
     "ask": []
