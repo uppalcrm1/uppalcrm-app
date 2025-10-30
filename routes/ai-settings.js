@@ -6,7 +6,7 @@ const {
   requireAdmin,
   validateOrganizationContext
 } = require('../middleware/auth');
-const db = require('../db');
+const db = require('../database/connection');
 const sentimentService = require('../services/sentimentAnalysis');
 
 const router = express.Router();
