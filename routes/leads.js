@@ -906,9 +906,22 @@ router.delete('/:id',
       });
     } catch (error) {
       console.error('Delete lead error:', error);
+      console.error('Error code:', error.code);
+      console.error('Error detail:', error.detail);
+
+      // Check if it's a foreign key constraint error
+      if (error.code === '23503') {
+        return res.status(400).json({
+          error: 'Cannot delete lead',
+          message: 'This lead cannot be deleted because it has related records. Please delete or reassign related items first.',
+          detail: error.detail
+        });
+      }
+
       res.status(500).json({
         error: 'Lead deletion failed',
-        message: 'Unable to delete lead'
+        message: error.message || 'Unable to delete lead',
+        detail: process.env.NODE_ENV === 'development' ? error.detail : undefined
       });
     }
   }
