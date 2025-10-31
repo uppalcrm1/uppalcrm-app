@@ -119,11 +119,31 @@ const AdminFields = () => {
           field_options: formData.field_options,
           is_required: formData.is_required
         }
-        console.log('📤 Updating field:', editingField.id, updateData)
-        const response = await api.put(`/custom-fields/${editingField.id}`, updateData)
-        console.log('✅ Field updated:', response.data)
-        setFields(prev => prev.map(f => f.id === editingField.id ? response.data.field : f))
+
+        // Check if this is a system field or custom field
+        if (editingField.isSystemField) {
+          // System fields use field_name as identifier and different endpoint
+          updateData.entity_type = activeTab
+          console.log('📤 Updating system field:', editingField.field_name, updateData)
+          const response = await api.put(`/custom-fields/default/${editingField.field_name}`, updateData)
+          console.log('✅ System field updated:', response.data)
+          setSystemFields(prev => prev.map(f =>
+            f.field_name === editingField.field_name ? response.data.field : f
+          ))
+          setSuccessMessage(`System field "${formData.field_label}" updated successfully`)
+        } else {
+          // Custom fields use id as identifier
+          console.log('📤 Updating custom field:', editingField.id, updateData)
+          const response = await api.put(`/custom-fields/${editingField.id}`, updateData)
+          console.log('✅ Custom field updated:', response.data)
+          setFields(prev => prev.map(f => f.id === editingField.id ? response.data.field : f))
+          setSuccessMessage(`Custom field "${formData.field_label}" updated successfully`)
+        }
         setEditingField(null)
+        setIsCreating(false)
+
+        // Auto-hide success message after 5 seconds
+        setTimeout(() => setSuccessMessage(null), 5000)
       } else {
         // Create new field - only send fields the backend expects
         const fieldData = {
@@ -139,6 +159,10 @@ const AdminFields = () => {
         console.log('✅ Field created:', response.data)
         setFields(prev => [...prev, response.data.field])
         setIsCreating(false)
+        setSuccessMessage(`Custom field "${formData.field_label}" created successfully`)
+
+        // Auto-hide success message after 5 seconds
+        setTimeout(() => setSuccessMessage(null), 5000)
       }
       resetForm()
     } catch (err) {
@@ -364,9 +388,20 @@ const AdminFields = () => {
       {isCreating && (
         <div className="card">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-semibold text-gray-900">
-              {editingField ? 'Edit Custom Field' : 'Create Custom Field'}
-            </h2>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">
+                {editingField
+                  ? editingField.isSystemField
+                    ? 'Edit System Field'
+                    : 'Edit Custom Field'
+                  : 'Create Custom Field'}
+              </h2>
+              {editingField?.isSystemField && (
+                <p className="text-xs text-blue-600 mt-1">
+                  System fields have limited editing options
+                </p>
+              )}
+            </div>
             <button onClick={handleCancel} className="text-gray-400 hover:text-gray-600">
               <X size={20} />
             </button>
@@ -399,8 +434,13 @@ const AdminFields = () => {
                   onChange={(e) => handleInputChange('field_name', e.target.value.toLowerCase().replace(/\s+/g, '_'))}
                   placeholder="e.g., industry"
                   className="input"
+                  disabled={editingField?.isSystemField}
                 />
-                <p className="text-xs text-gray-500 mt-1">Internal identifier (lowercase, no spaces)</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {editingField?.isSystemField
+                    ? 'System field names cannot be changed'
+                    : 'Internal identifier (lowercase, no spaces)'}
+                </p>
               </div>
             </div>
 
@@ -742,15 +782,22 @@ const AdminFields = () => {
                           <button
                             onClick={() => handleEditField(field)}
                             className="btn btn-sm btn-outline"
+                            title="Edit field"
                           >
                             <Edit2 size={14} />
                           </button>
-                          <button
-                            onClick={() => handleDeleteField(field.id)}
-                            className="btn btn-sm btn-outline text-red-600 hover:bg-red-50"
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                          {!field.isSystemField && (
+                            <button
+                              onClick={() => handleDeleteField(field.id)}
+                              className="btn btn-sm btn-outline text-red-600 hover:bg-red-50"
+                              title="Delete field"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                          {field.isSystemField && (
+                            <span className="text-xs text-gray-400 px-2">System Field</span>
+                          )}
                         </div>
                       </td>
                     </tr>

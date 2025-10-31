@@ -642,4 +642,37 @@ export const userManagementAPI = {
   }
 }
 
+// AI Settings API
+export const aiSettingsAPI = {
+  // Get current organization's AI settings
+  getSettings: async () => {
+    const response = await api.get('/organizations/current/ai-settings')
+    return response.data
+  },
+
+  // Update AI settings
+  updateSettings: async (settings) => {
+    const response = await api.put('/organizations/current/ai-settings', settings)
+    return response.data
+  },
+
+  // Test sentiment analysis
+  testSentiment: async (testData) => {
+    const response = await api.post('/organizations/current/ai-settings/test', testData)
+    return response.data
+  },
+
+  // Get usage statistics
+  getUsage: async () => {
+    const response = await api.get('/organizations/current/ai-settings/usage')
+    return response.data
+  },
+
+  // Reset to default settings
+  resetDefaults: async () => {
+    const response = await api.post('/organizations/current/ai-settings/reset-defaults')
+    return response.data
+  }
+}
+
 export default api

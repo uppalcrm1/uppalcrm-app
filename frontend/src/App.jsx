@@ -37,6 +37,7 @@ import AdminIntegrations from './pages/admin/AdminIntegrations'
 import AdminImport from './pages/admin/AdminImport'
 import AdminFields from './pages/admin/AdminFields'
 import AdminSettings from './pages/admin/AdminSettings'
+import AdminAISettings from './pages/admin/AdminAISettings'
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuth()
@@ -124,6 +125,7 @@ function App() {
         <Route path="admin/import" element={<AdminImport />} />
         <Route path="admin/fields" element={<AdminFields />} />
         <Route path="admin/settings" element={<AdminSettings />} />
+        <Route path="admin/ai-settings" element={<AdminAISettings />} />
       </Route>
 
       {/* Catch all route */}
