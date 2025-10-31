@@ -289,9 +289,16 @@ const DynamicLeadForm = ({
               className={baseClasses}
             >
               <option value="">Select {fieldLabel}</option>
-              {options && options.map(option => (
-                <option key={option} value={option}>{option}</option>
-              ))}
+              {options && options.map(option => {
+                // Handle both string options and {label, value} object options
+                const optionValue = typeof option === 'string' ? option : option.value;
+                const optionLabel = typeof option === 'string' ? option : option.label;
+                return (
+                  <option key={optionValue} value={optionValue}>
+                    {optionLabel}
+                  </option>
+                );
+              })}
             </select>
             {errors[errorKey] && (
               <p className="text-red-600 text-sm mt-1">{errors[errorKey]}</p>
