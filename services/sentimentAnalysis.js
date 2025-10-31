@@ -63,7 +63,7 @@ async function analyzeSentiment(text) {
     };
   } catch (error) {
     console.error('Error analyzing sentiment:', error.response?.data || error.message);
-    throw new Error('Failed to analyze sentiment');
+    throw new Error(`Azure Text Analytics error: ${error.response?.data?.error?.message || error.message || 'Unknown error'}`);
   }
 }
 
