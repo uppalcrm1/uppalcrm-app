@@ -67,7 +67,20 @@ const Leads = () => {
       handleFormSuccess()
     } catch (error) {
       console.error('Error deleting lead:', error)
-      toast.error('Failed to delete lead')
+      console.error('Error response:', error.response?.data)
+
+      // Show specific error message from backend
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Failed to delete lead'
+      const errorDetail = error.response?.data?.detail
+
+      toast.error(errorMessage, {
+        duration: 5000
+      })
+
+      // Log detail for debugging
+      if (errorDetail) {
+        console.error('Delete error detail:', errorDetail)
+      }
     }
   }
 
