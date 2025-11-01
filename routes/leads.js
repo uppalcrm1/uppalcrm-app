@@ -823,8 +823,10 @@ router.put('/:id',
   validate(leadSchemas.updateLead),
   async (req, res) => {
     try {
-      const lead = await Lead.update(req.params.id, req.body, req.organizationId);
-      
+      // Pass user ID for audit trail tracking
+      const userId = req.user?.id || null;
+      const lead = await Lead.update(req.params.id, req.body, req.organizationId, userId);
+
       if (!lead) {
         return res.status(404).json({
           error: 'Lead not found',

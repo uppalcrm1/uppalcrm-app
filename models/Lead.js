@@ -341,17 +341,18 @@ class Lead {
    * @param {string} id - Lead ID
    * @param {Object} updates - Fields to update
    * @param {string} organizationId - Organization ID
+   * @param {string} userId - User ID performing the update (for audit trail)
    * @returns {Lead|null} Updated lead
    */
-  static async update(id, updates, organizationId) {
+  static async update(id, updates, organizationId, userId = null) {
     const allowedFields = [
       'title', 'company', 'first_name', 'last_name', 'email', 'phone',
       'source', 'status', 'priority', 'value', 'notes', 'assigned_to',
       'last_contact_date', 'next_follow_up'
     ];
-    
+
     const updateFields = Object.keys(updates).filter(key => allowedFields.includes(key));
-    
+
     if (updateFields.length === 0) {
       throw new Error('No valid fields to update');
     }
@@ -368,18 +369,52 @@ class Lead {
       return updates[field];
     })];
 
-    const result = await query(`
-      UPDATE leads 
-      SET ${setClause}, updated_at = NOW()
-      WHERE id = $1 AND organization_id = $2
-      RETURNING *
-    `, values, organizationId);
+    // If userId is provided, use a transaction to set the user context for the trigger
+    if (userId) {
+      const db = require('../database/connection');
+      const client = await db.pool.connect();
 
-    if (result.rows.length === 0) {
-      return null;
+      try {
+        await client.query('BEGIN');
+
+        // Set user context for the trigger
+        await client.query('SELECT set_config($1, $2, true)', ['app.current_user_id', userId]);
+
+        const result = await client.query(`
+          UPDATE leads
+          SET ${setClause}, updated_at = NOW()
+          WHERE id = $1 AND organization_id = $2
+          RETURNING *
+        `, values);
+
+        await client.query('COMMIT');
+
+        if (result.rows.length === 0) {
+          return null;
+        }
+
+        return new Lead(result.rows[0]);
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
+    } else {
+      // Fallback to regular query if no userId provided
+      const result = await query(`
+        UPDATE leads
+        SET ${setClause}, updated_at = NOW()
+        WHERE id = $1 AND organization_id = $2
+        RETURNING *
+      `, values, organizationId);
+
+      if (result.rows.length === 0) {
+        return null;
+      }
+
+      return new Lead(result.rows[0]);
     }
-
-    return new Lead(result.rows[0]);
   }
 
   /**
