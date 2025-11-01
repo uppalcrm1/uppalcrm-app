@@ -1289,7 +1289,8 @@ router.post('/:id/convert',
         macAddress: Joi.string().max(17).optional(),
         billingCycle: Joi.string().valid('monthly', 'quarterly', 'semi-annual', 'annual').optional(),
         price: Joi.number().min(0).optional(),
-        isTrial: Joi.boolean().default(false).optional()
+        isTrial: Joi.boolean().default(false).optional(),
+        productId: Joi.string().guid({ version: 'uuidv4' }).optional()
       }).optional(),
       existingContactId: Joi.string().guid({ version: 'uuidv4' }).optional(),
       relationshipType: Joi.string().valid('new_customer', 'existing_customer', 'additional_device').default('new_customer').optional(),
@@ -1459,12 +1460,33 @@ router.post('/:id/convert',
       if (req.body.createAccount && req.body.accountDetails) {
         const details = req.body.accountDetails;
 
+        // Get product_id: use provided value or get organization's default product
+        let productId = details.productId;
+        if (!productId) {
+          console.log('📦 No product_id provided, fetching default product...');
+          const defaultProductResult = await client.query(
+            `SELECT id FROM products
+             WHERE organization_id = $1
+             AND is_active = true
+             AND is_default = true
+             LIMIT 1`,
+            [req.organizationId]
+          );
+
+          if (defaultProductResult.rows.length > 0) {
+            productId = defaultProductResult.rows[0].id;
+            console.log('✅ Using default product:', productId);
+          } else {
+            console.log('⚠️ No default product found, account will have NULL product_id');
+          }
+        }
+
         const accountResult = await client.query(
           `INSERT INTO accounts (
             organization_id, contact_id, account_name, edition,
             device_name, mac_address, billing_cycle, price,
-            is_trial, account_type, license_status, created_by
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+            is_trial, account_type, license_status, created_by, product_id
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
           RETURNING *`,
           [
             req.organizationId,
@@ -1478,7 +1500,8 @@ router.post('/:id/convert',
             details.isTrial || false,
             details.isTrial ? 'trial' : 'active',
             'pending',
-            req.userId
+            req.userId,
+            productId
           ]
         );
 
@@ -1516,7 +1539,8 @@ router.post('/:id/convert',
           accountName: account.account_name,
           edition: account.edition,
           accountType: account.account_type,
-          isTrial: account.is_trial
+          isTrial: account.is_trial,
+          productId: account.product_id
         } : null,
         isNewContact
       };
