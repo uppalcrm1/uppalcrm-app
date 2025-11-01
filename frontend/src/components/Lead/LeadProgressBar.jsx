@@ -29,7 +29,7 @@ const LeadProgressBar = ({ currentStatus, onStatusChange, timeInCurrentStage }) 
         // Convert field options to stages format
         const colors = ['gray', 'blue', 'purple', 'orange', 'pink', 'indigo', 'teal', 'cyan']
 
-        // Filter out negative statuses that shouldn't be in the progress bar
+        // Keywords for color assignment (but don't filter them out)
         const negativeKeywords = ['lost', 'not qualified', 'cold', 'rejected', 'dead']
 
         const allStages = statusField.field_options.map((option, index) => {
@@ -37,7 +37,7 @@ const LeadProgressBar = ({ currentStatus, onStatusChange, timeInCurrentStage }) 
           const value = typeof option === 'string' ? option.toLowerCase().replace(/\s+/g, '_') : option.value
           const label = typeof option === 'string' ? option : option.label
 
-          // Special handling for specific statuses
+          // Special handling for specific statuses - assign appropriate colors
           let color = colors[index % colors.length]
           const labelLower = label.toLowerCase()
 
@@ -49,22 +49,16 @@ const LeadProgressBar = ({ currentStatus, onStatusChange, timeInCurrentStage }) 
             color = 'gray'
           }
 
-          // Check if this is a negative status
-          const isNegative = negativeKeywords.some(keyword => labelLower.includes(keyword))
-
           return {
             key: value,
             label: label,
             color: color,
-            description: label,
-            isNegative: isNegative
+            description: label
           }
         })
 
-        // Separate progressive stages from negative ones
-        const progressiveStages = allStages.filter(stage => !stage.isNegative)
-
-        setStages(progressiveStages)
+        // Show ALL stages from field configuration (no filtering)
+        setStages(allStages)
       } else {
         // Fallback to default stages if config not found
         setStages(getDefaultStages())
