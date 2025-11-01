@@ -27,6 +27,7 @@ import LeadActivityTimeline from '../components/Lead/LeadActivityTimeline'
 import AddActivityModal from '../components/Lead/AddActivityModal'
 import LeadHistoryPanel from '../components/Lead/LeadHistoryPanel'
 import DuplicateAlert from '../components/Lead/DuplicateAlert'
+import DynamicLeadForm from '../components/DynamicLeadForm'
 
 const LeadDetail = () => {
   const { id } = useParams()
@@ -41,6 +42,7 @@ const LeadDetail = () => {
   const [activeTab, setActiveTab] = useState('details')
   const [isFollowing, setIsFollowing] = useState(false)
   const [showAddActivity, setShowAddActivity] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
 
   useEffect(() => {
@@ -210,7 +212,10 @@ const LeadDetail = () => {
                 {isFollowing ? 'Following' : 'Follow'}
               </button>
 
-              <button className="btn btn-outline">
+              <button
+                onClick={() => setShowEditModal(true)}
+                className="btn btn-outline"
+              >
                 <Edit size={16} className="mr-2" />
                 Edit
               </button>
@@ -379,6 +384,20 @@ const LeadDetail = () => {
         />
       )}
 
+      {/* Edit Lead Modal */}
+      {showEditModal && (
+        <DynamicLeadForm
+          isOpen={showEditModal}
+          onClose={() => setShowEditModal(false)}
+          onSuccess={() => {
+            setShowEditModal(false)
+            setRefreshKey(prev => prev + 1)
+          }}
+          mode="edit"
+          leadData={lead}
+        />
+      )}
+
       {/* Error Message */}
       {error && (
         <div className="fixed bottom-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
@@ -391,20 +410,11 @@ const LeadDetail = () => {
 
 // Lead Details Panel Component
 const LeadDetailsPanel = ({ lead }) => {
-  const [isEditing, setIsEditing] = useState(false)
-
   return (
     <div className="bg-white rounded-lg shadow">
       <div className="p-6">
-        <div className="flex justify-between items-center mb-6">
+        <div className="mb-6">
           <h2 className="text-lg font-semibold">Lead Information</h2>
-          <button
-            onClick={() => setIsEditing(!isEditing)}
-            className="btn btn-outline btn-sm"
-          >
-            <Edit size={16} className="mr-2" />
-            {isEditing ? 'Cancel' : 'Edit'}
-          </button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
