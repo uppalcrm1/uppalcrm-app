@@ -24,6 +24,7 @@ import {
   DollarSign,
   Plug,
   Upload,
+  Package,
 } from 'lucide-react'
 import LoadingSpinner from './LoadingSpinner'
 import TrialBanner from './TrialBanner'
@@ -44,6 +45,7 @@ const adminNavigation = [
   { name: 'Integrations', href: '/admin/integrations', icon: Plug },
   { name: 'Import', href: '/admin/import', icon: Upload },
   { name: 'Field Configuration', href: '/admin/fields', icon: Sliders },
+  { name: 'Products', href: '/admin/products', icon: Package },
   { name: 'Settings', href: '/admin/settings', icon: Settings },
 ]
 
