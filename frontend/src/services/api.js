@@ -555,8 +555,10 @@ export const trialAPI = {
 
 // Custom Fields API
 export const customFieldsAPI = {
-  getFields: async () => {
-    const response = await api.get('/custom-fields')
+  getFields: async (entityType = 'leads') => {
+    const response = await api.get('/custom-fields', {
+      params: { entity_type: entityType }
+    })
     return response.data
   },
 

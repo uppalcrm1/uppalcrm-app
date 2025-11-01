@@ -1,48 +1,90 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Check, Clock, ChevronRight } from 'lucide-react'
+import { customFieldsAPI } from '../../services/api'
 
 const LeadProgressBar = ({ currentStatus, onStatusChange, timeInCurrentStage }) => {
   const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [selectedStatus, setSelectedStatus] = useState(null)
+  const [stages, setStages] = useState([])
+  const [loading, setLoading] = useState(true)
 
-  // Define the standard lead stages with order
-  const stages = [
-    {
-      key: 'new',
-      label: 'New',
-      color: 'gray',
-      description: 'Just created, not yet contacted'
-    },
-    {
-      key: 'contacted',
-      label: 'Contacted',
-      color: 'blue',
-      description: 'Initial contact made'
-    },
-    {
-      key: 'qualified',
-      label: 'Qualified',
-      color: 'purple',
-      description: 'Meets qualification criteria'
-    },
-    {
-      key: 'proposal',
-      label: 'Proposal',
-      color: 'orange',
-      description: 'Proposal sent'
-    },
-    {
-      key: 'negotiation',
-      label: 'Negotiation',
-      color: 'pink',
-      description: 'In negotiation phase'
-    },
-    {
-      key: 'converted',
-      label: 'Converted',
-      color: 'green',
-      description: 'Successfully converted to customer'
+  // Fetch stages dynamically from Field Configuration
+  useEffect(() => {
+    fetchStagesFromConfig()
+  }, [])
+
+  const fetchStagesFromConfig = async () => {
+    try {
+      // Fetch fields for leads entity type
+      const response = await customFieldsAPI.getFields('leads')
+      const leadFields = response.customFields || []
+      const systemFields = response.systemFields || []
+
+      // Find the status field (could be in either custom or system fields)
+      const statusField = [...systemFields, ...leadFields].find(
+        field => field.field_name === 'status' || field.field_name === 'stage'
+      )
+
+      if (statusField && statusField.field_options) {
+        // Convert field options to stages format
+        const colors = ['gray', 'blue', 'purple', 'orange', 'pink', 'indigo', 'teal', 'cyan']
+
+        // Filter out negative statuses that shouldn't be in the progress bar
+        const negativeKeywords = ['lost', 'not qualified', 'cold', 'rejected', 'dead']
+
+        const allStages = statusField.field_options.map((option, index) => {
+          // Handle both string and {label, value} formats
+          const value = typeof option === 'string' ? option.toLowerCase().replace(/\s+/g, '_') : option.value
+          const label = typeof option === 'string' ? option : option.label
+
+          // Special handling for specific statuses
+          let color = colors[index % colors.length]
+          const labelLower = label.toLowerCase()
+
+          if (value === 'converted' || labelLower.includes('converted')) {
+            color = 'green'
+          } else if (negativeKeywords.some(keyword => labelLower.includes(keyword))) {
+            color = 'red'
+          } else if (labelLower.includes('new')) {
+            color = 'gray'
+          }
+
+          // Check if this is a negative status
+          const isNegative = negativeKeywords.some(keyword => labelLower.includes(keyword))
+
+          return {
+            key: value,
+            label: label,
+            color: color,
+            description: label,
+            isNegative: isNegative
+          }
+        })
+
+        // Separate progressive stages from negative ones
+        const progressiveStages = allStages.filter(stage => !stage.isNegative)
+
+        setStages(progressiveStages)
+      } else {
+        // Fallback to default stages if config not found
+        setStages(getDefaultStages())
+      }
+    } catch (error) {
+      console.error('Error fetching field configuration:', error)
+      // Use default stages on error
+      setStages(getDefaultStages())
+    } finally {
+      setLoading(false)
     }
+  }
+
+  const getDefaultStages = () => [
+    { key: 'new', label: 'New', color: 'gray', description: 'Just created' },
+    { key: 'contacted', label: 'Contacted', color: 'blue', description: 'Initial contact made' },
+    { key: 'qualified', label: 'Qualified', color: 'purple', description: 'Meets criteria' },
+    { key: 'proposal', label: 'Proposal', color: 'orange', description: 'Proposal sent' },
+    { key: 'negotiation', label: 'Negotiation', color: 'pink', description: 'In negotiation' },
+    { key: 'converted', label: 'Converted', color: 'green', description: 'Successfully converted' }
   ]
 
   // Add lost as a separate status (can be reached from any stage)
@@ -51,6 +93,14 @@ const LeadProgressBar = ({ currentStatus, onStatusChange, timeInCurrentStage }) 
     label: 'Lost',
     color: 'red',
     description: 'Opportunity lost'
+  }
+
+  if (loading) {
+    return (
+      <div className="w-full py-8 flex justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+      </div>
+    )
   }
 
   const getCurrentStageIndex = () => {
