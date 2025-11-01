@@ -194,50 +194,73 @@ const LeadProgressBar = ({ currentStatus, onStatusChange, timeInCurrentStage }) 
     return timeString
   }
 
+  // Truncate long stage names for display
+  const getTruncatedLabel = (label) => {
+    if (label.length <= 12) return label
+    // Try to truncate at a word boundary
+    const words = label.split(' ')
+    if (words.length > 1 && words[0].length <= 10) {
+      return words[0]
+    }
+    return label.substring(0, 10) + '...'
+  }
+
   return (
     <div className="w-full">
       {/* Progress Bar */}
-      <div className="relative">
-        <div className="flex items-center justify-between">
+      <div className="relative pb-2">
+        <div className="flex items-center justify-between px-4">
           {stages.map((stage, index) => {
             const status = getStageStatus(index)
             const isClickable = index === getCurrentStageIndex() + 1 || index === getCurrentStageIndex() || currentStatus === 'new'
+            const truncatedLabel = getTruncatedLabel(stage.label)
 
             return (
               <div key={stage.key} className="flex items-center flex-1">
-                {/* Stage Circle */}
-                <div className="relative flex items-center">
+                {/* Stage Circle and Label Container */}
+                <div className="relative flex flex-col items-center flex-1 group">
+                  {/* Tooltip - Full stage name on hover */}
+                  <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-20">
+                    <div className="bg-gray-900 text-white text-xs rounded-lg py-2 px-3 whitespace-nowrap shadow-lg">
+                      {stage.label}
+                      <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-px">
+                        <div className="border-4 border-transparent border-t-gray-900"></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Stage Circle */}
                   <button
                     onClick={() => handleStageClick(stage, index)}
                     disabled={!isClickable}
                     className={`
-                      w-10 h-10 rounded-full border-2 flex items-center justify-center text-sm font-medium
+                      w-14 h-14 rounded-full border-3 flex items-center justify-center text-base font-semibold
                       transition-all duration-200 relative z-10
                       ${getStageColorClasses(status, stage.color)}
-                      ${isClickable ? 'cursor-pointer hover:scale-105 hover:shadow-lg' : 'cursor-default'}
-                      ${status === 'current' ? 'ring-4 ring-opacity-20 ring-' + stage.color + '-500' : ''}
+                      ${isClickable ? 'cursor-pointer hover:scale-110 hover:shadow-xl' : 'cursor-default opacity-75'}
+                      ${status === 'current' ? 'ring-4 ring-opacity-30 ring-' + stage.color + '-400 shadow-lg' : ''}
                     `}
-                    title={stage.description}
+                    title={stage.label}
                   >
                     {status === 'completed' ? (
-                      <Check size={16} />
+                      <Check size={20} />
                     ) : status === 'current' ? (
-                      <Clock size={16} />
+                      <Clock size={20} />
                     ) : (
                       index + 1
                     )}
                   </button>
 
                   {/* Stage Label */}
-                  <div className="absolute top-12 left-1/2 transform -translate-x-1/2 text-center">
-                    <div className={`text-xs font-medium ${
-                      status === 'current' ? `text-${stage.color}-600` :
-                      status === 'completed' ? 'text-green-600' : 'text-gray-500'
+                  <div className="mt-3 text-center min-h-[32px]">
+                    <div className={`text-xs font-medium leading-tight ${
+                      status === 'current' ? `text-${stage.color}-700` :
+                      status === 'completed' ? 'text-green-700' : 'text-gray-600'
                     }`}>
-                      {stage.label}
+                      {truncatedLabel}
                     </div>
                     {status === 'current' && timeInCurrentStage && (
-                      <div className="text-xs text-gray-500 mt-1">
+                      <div className="text-xs text-gray-500 mt-1 font-normal">
                         {formatTimeInStage(timeInCurrentStage)}
                       </div>
                     )}
@@ -247,9 +270,12 @@ const LeadProgressBar = ({ currentStatus, onStatusChange, timeInCurrentStage }) 
                 {/* Connector Line */}
                 {index < stages.length - 1 && (
                   <div className={`
-                    flex-1 h-1 mx-2 rounded
+                    h-1.5 mx-3 rounded-full -mt-10
                     ${getConnectorClasses(getStageStatus(index))}
-                  `} />
+                    transition-all duration-300
+                  `}
+                  style={{ width: '100%', maxWidth: '60px' }}
+                  />
                 )}
               </div>
             )
@@ -258,17 +284,18 @@ const LeadProgressBar = ({ currentStatus, onStatusChange, timeInCurrentStage }) 
 
         {/* Lost Status */}
         {currentStatus === 'lost' && (
-          <div className="mt-4 flex justify-center">
-            <div className="flex items-center">
+          <div className="mt-8 flex justify-center">
+            <div className="flex items-center bg-red-50 rounded-lg px-6 py-4 border-2 border-red-200">
               <div className={`
-                w-10 h-10 rounded-full border-2 flex items-center justify-center text-sm font-medium
+                w-14 h-14 rounded-full border-2 flex items-center justify-center text-lg font-bold
                 ${getStageColorClasses('lost', 'red')}
+                shadow-lg
               `}>
                 ✕
               </div>
-              <div className="ml-3">
-                <div className="text-sm font-medium text-red-600">{lostStatus.label}</div>
-                <div className="text-xs text-gray-500">{lostStatus.description}</div>
+              <div className="ml-4">
+                <div className="text-base font-semibold text-red-700">{lostStatus.label}</div>
+                <div className="text-sm text-red-600">{lostStatus.description}</div>
               </div>
             </div>
           </div>
@@ -276,10 +303,15 @@ const LeadProgressBar = ({ currentStatus, onStatusChange, timeInCurrentStage }) 
 
         {/* Converted Status Indicator */}
         {currentStatus === 'converted' && (
-          <div className="mt-4 text-center">
-            <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
-              <Check size={16} className="mr-2" />
-              Lead Successfully Converted
+          <div className="mt-8 flex justify-center">
+            <div className="inline-flex items-center bg-green-50 rounded-lg px-6 py-4 border-2 border-green-200 shadow-md">
+              <div className="w-14 h-14 rounded-full bg-green-500 flex items-center justify-center mr-4">
+                <Check size={24} className="text-white" />
+              </div>
+              <div>
+                <div className="text-base font-semibold text-green-800">Lead Successfully Converted</div>
+                <div className="text-sm text-green-600">This lead is now a customer contact</div>
+              </div>
             </div>
           </div>
         )}
