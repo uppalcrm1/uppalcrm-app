@@ -28,6 +28,7 @@ import AddActivityModal from '../components/Lead/AddActivityModal'
 import LeadHistoryPanel from '../components/Lead/LeadHistoryPanel'
 import DuplicateAlert from '../components/Lead/DuplicateAlert'
 import DynamicLeadForm from '../components/DynamicLeadForm'
+import LeadConversionModal from '../components/LeadConversionModal'
 
 const LeadDetail = () => {
   const { id } = useParams()
@@ -43,6 +44,8 @@ const LeadDetail = () => {
   const [isFollowing, setIsFollowing] = useState(false)
   const [showAddActivity, setShowAddActivity] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
+  const [showConversionModal, setShowConversionModal] = useState(false)
+  const [isConverting, setIsConverting] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
 
   useEffect(() => {
@@ -94,22 +97,26 @@ const LeadDetail = () => {
     }
   }
 
-  const handleConvertToContact = async () => {
-    try {
-      // Show confirmation dialog
-      const confirmed = window.confirm(
-        'Convert this lead to a contact? This action cannot be undone.'
-      )
+  const handleConvertToContact = () => {
+    setShowConversionModal(true)
+  }
 
-      if (!confirmed) return
+  const handleConversionSubmit = async (conversionData) => {
+    try {
+      setIsConverting(true)
 
       // Call the API to convert
-      const response = await api.post(`/leads/${id}/convert`, {
-        relationshipType: 'new_customer'
-      })
+      const response = await api.post(`/leads/${id}/convert`, conversionData)
 
       // Show success message
-      alert(`✅ Lead converted successfully!\n\nContact: ${response.data.contact.firstName} ${response.data.contact.lastName}\nEmail: ${response.data.contact.email}`)
+      const accountMsg = response.data.account
+        ? `\nAccount: ${response.data.account.accountName}${response.data.account.productId ? ' (Product assigned)' : ''}`
+        : ''
+
+      alert(`✅ Lead converted successfully!\n\nContact: ${response.data.contact.firstName} ${response.data.contact.lastName}\nEmail: ${response.data.contact.email}${accountMsg}`)
+
+      // Close modal
+      setShowConversionModal(false)
 
       // Refresh the lead data to show updated status
       setRefreshKey(prev => prev + 1)
@@ -127,6 +134,8 @@ const LeadDetail = () => {
       } else {
         setError('Failed to convert lead to contact. Please try again.')
       }
+    } finally {
+      setIsConverting(false)
     }
   }
 
@@ -395,6 +404,16 @@ const LeadDetail = () => {
           }}
           mode="edit"
           leadData={lead}
+        />
+      )}
+
+      {/* Lead Conversion Modal */}
+      {showConversionModal && lead && (
+        <LeadConversionModal
+          lead={lead}
+          onClose={() => setShowConversionModal(false)}
+          onConvert={handleConversionSubmit}
+          isConverting={isConverting}
         />
       )}
 
