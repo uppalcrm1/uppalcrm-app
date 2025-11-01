@@ -677,4 +677,32 @@ export const aiSettingsAPI = {
   }
 }
 
+// Products API
+export const productsAPI = {
+  // Get all products
+  getProducts: async (includeInactive = false) => {
+    const params = includeInactive ? { include_inactive: 'true' } : {}
+    const response = await api.get('/products', { params })
+    return response.data
+  },
+
+  // Create a new product
+  createProduct: async (productData) => {
+    const response = await api.post('/products', productData)
+    return response.data
+  },
+
+  // Update a product
+  updateProduct: async (id, productData) => {
+    const response = await api.put(`/products/${id}`, productData)
+    return response.data
+  },
+
+  // Delete (deactivate) a product
+  deleteProduct: async (id) => {
+    const response = await api.delete(`/products/${id}`)
+    return response.data
+  }
+}
+
 export default api

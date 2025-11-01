@@ -26,6 +26,7 @@ const webhooksRoutes = require('./routes/webhooks');
 const apiKeysRoutes = require('./routes/api-keys');
 const aiSettingsRoutes = require('./routes/ai-settings');
 const customFieldsRoutes = require('./routes/customFields');
+const productsRoutes = require('./routes/products');
 const subscriptionRoutes = require('./routes/subscription');
 const platformAdminRoutes = require('./routes/platformAdmin');
 const adminFixTrialsRoutes = require('./routes/admin-fix-trials');
@@ -207,6 +208,9 @@ app.use('/api/organizations/current', rateLimiters.general, aiSettingsRoutes);
 
 // Custom Fields management routes
 app.use('/api/custom-fields', rateLimiters.general, customFieldsRoutes);
+
+// Products management routes
+app.use('/api/products', rateLimiters.general, productsRoutes);
 
 // Subscription management routes
 app.use('/api/subscription', rateLimiters.general, subscriptionRoutes);
