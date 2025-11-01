@@ -87,14 +87,6 @@ const LeadProgressBar = ({ currentStatus, onStatusChange, timeInCurrentStage }) 
     { key: 'converted', label: 'Converted', color: 'green', description: 'Successfully converted' }
   ]
 
-  // Add lost as a separate status (can be reached from any stage)
-  const lostStatus = {
-    key: 'lost',
-    label: 'Lost',
-    color: 'red',
-    description: 'Opportunity lost'
-  }
-
   if (loading) {
     return (
       <div className="w-full py-8 flex justify-center">
@@ -124,32 +116,6 @@ const LeadProgressBar = ({ currentStatus, onStatusChange, timeInCurrentStage }) 
       return 'current'
     } else {
       return 'future'
-    }
-  }
-
-  const getStageColorClasses = (status, color) => {
-    switch (status) {
-      case 'completed':
-        return 'bg-green-500 text-white border-green-500'
-      case 'current':
-        return `bg-${color}-500 text-white border-${color}-500`
-      case 'lost':
-        return 'bg-red-500 text-white border-red-500'
-      case 'future':
-      default:
-        return 'bg-gray-200 text-gray-500 border-gray-300'
-    }
-  }
-
-  const getConnectorClasses = (status) => {
-    switch (status) {
-      case 'completed':
-        return 'bg-green-500'
-      case 'current':
-        return 'bg-gray-300'
-      case 'future':
-      default:
-        return 'bg-gray-300'
     }
   }
 
@@ -194,108 +160,71 @@ const LeadProgressBar = ({ currentStatus, onStatusChange, timeInCurrentStage }) 
     return timeString
   }
 
-  // Truncate long stage names for display
-  const getTruncatedLabel = (label) => {
-    if (label.length <= 12) return label
-    // Try to truncate at a word boundary
-    const words = label.split(' ')
-    if (words.length > 1 && words[0].length <= 10) {
-      return words[0]
+  // Get Salesforce-style pill button classes based on stage status
+  const getSalesforcePillClasses = (status) => {
+    switch (status) {
+      case 'completed':
+        return 'bg-green-500 text-white border-green-600 hover:bg-green-600'
+      case 'current':
+        return 'bg-blue-600 text-white border-blue-700 hover:bg-blue-700 shadow-md'
+      case 'lost':
+        return 'bg-red-500 text-white border-red-600'
+      case 'future':
+      default:
+        return 'bg-gray-200 text-gray-700 border-gray-300 hover:bg-gray-300'
     }
-    return label.substring(0, 10) + '...'
   }
 
   return (
     <div className="w-full">
-      {/* Progress Bar */}
-      <div className="relative pb-2">
-        <div className="flex items-center justify-between px-4">
+      {/* Salesforce-Style Progress Bar */}
+      <div className="relative">
+        {/* Progress Path Container */}
+        <div className="flex items-stretch gap-2">
           {stages.map((stage, index) => {
             const status = getStageStatus(index)
             const isClickable = index === getCurrentStageIndex() + 1 || index === getCurrentStageIndex() || currentStatus === 'new'
-            const truncatedLabel = getTruncatedLabel(stage.label)
 
             return (
-              <div key={stage.key} className="flex items-center flex-1">
-                {/* Stage Circle and Label Container */}
-                <div className="relative flex flex-col items-center flex-1 group">
-                  {/* Tooltip - Full stage name on hover */}
-                  <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-20">
-                    <div className="bg-gray-900 text-white text-xs rounded-lg py-2 px-3 whitespace-nowrap shadow-lg">
-                      {stage.label}
-                      <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-px">
-                        <div className="border-4 border-transparent border-t-gray-900"></div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Stage Circle */}
-                  <button
-                    onClick={() => handleStageClick(stage, index)}
-                    disabled={!isClickable}
-                    className={`
-                      w-14 h-14 rounded-full border-3 flex items-center justify-center text-base font-semibold
-                      transition-all duration-200 relative z-10
-                      ${getStageColorClasses(status, stage.color)}
-                      ${isClickable ? 'cursor-pointer hover:scale-110 hover:shadow-xl' : 'cursor-default opacity-75'}
-                      ${status === 'current' ? 'ring-4 ring-opacity-30 ring-' + stage.color + '-400 shadow-lg' : ''}
-                    `}
-                    title={stage.label}
-                  >
-                    {status === 'completed' ? (
-                      <Check size={20} />
-                    ) : status === 'current' ? (
-                      <Clock size={20} />
-                    ) : (
-                      index + 1
-                    )}
-                  </button>
-
-                  {/* Stage Label */}
-                  <div className="mt-3 text-center min-h-[32px]">
-                    <div className={`text-xs font-medium leading-tight ${
-                      status === 'current' ? `text-${stage.color}-700` :
-                      status === 'completed' ? 'text-green-700' : 'text-gray-600'
-                    }`}>
-                      {truncatedLabel}
-                    </div>
-                    {status === 'current' && timeInCurrentStage && (
-                      <div className="text-xs text-gray-500 mt-1 font-normal">
-                        {formatTimeInStage(timeInCurrentStage)}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Connector Line */}
-                {index < stages.length - 1 && (
-                  <div className={`
-                    h-1.5 mx-3 rounded-full -mt-10
-                    ${getConnectorClasses(getStageStatus(index))}
-                    transition-all duration-300
-                  `}
-                  style={{ width: '100%', maxWidth: '60px' }}
-                  />
-                )}
-              </div>
+              <button
+                key={stage.key}
+                onClick={() => handleStageClick(stage, index)}
+                disabled={!isClickable}
+                className={`
+                  flex-1 min-h-[48px] px-3 py-2 rounded-full border-2
+                  flex items-center justify-center text-center
+                  font-medium transition-all duration-200
+                  ${getSalesforcePillClasses(status)}
+                  ${isClickable ? 'cursor-pointer' : 'cursor-default opacity-80'}
+                  ${status === 'current' ? 'ring-2 ring-blue-300 ring-offset-2' : ''}
+                `}
+                style={{
+                  fontSize: stage.label.length > 15 ? '0.7rem' : stage.label.length > 10 ? '0.75rem' : '0.875rem'
+                }}
+                title={stage.label}
+              >
+                <span className="leading-tight">
+                  {status === 'completed' && <Check size={14} className="inline mr-1" />}
+                  {stage.label}
+                </span>
+              </button>
             )
           })}
         </div>
 
-        {/* Lost Status */}
+        {/* Time in Current Stage */}
+        {timeInCurrentStage && (
+          <div className="text-center mt-2 text-sm text-gray-600">
+            Time in current stage: <span className="font-medium">{formatTimeInStage(timeInCurrentStage)}</span>
+          </div>
+        )}
+
+        {/* Lost Status Indicator */}
         {currentStatus === 'lost' && (
-          <div className="mt-8 flex justify-center">
-            <div className="flex items-center bg-red-50 rounded-lg px-6 py-4 border-2 border-red-200">
-              <div className={`
-                w-14 h-14 rounded-full border-2 flex items-center justify-center text-lg font-bold
-                ${getStageColorClasses('lost', 'red')}
-                shadow-lg
-              `}>
-                ✕
-              </div>
-              <div className="ml-4">
-                <div className="text-base font-semibold text-red-700">{lostStatus.label}</div>
-                <div className="text-sm text-red-600">{lostStatus.description}</div>
+          <div className="mt-4">
+            <div className="flex items-center justify-center bg-red-50 rounded-lg px-4 py-3 border-2 border-red-200">
+              <div className="text-sm font-medium text-red-700">
+                ✕ Lead Marked as Lost
               </div>
             </div>
           </div>
@@ -303,14 +232,11 @@ const LeadProgressBar = ({ currentStatus, onStatusChange, timeInCurrentStage }) 
 
         {/* Converted Status Indicator */}
         {currentStatus === 'converted' && (
-          <div className="mt-8 flex justify-center">
-            <div className="inline-flex items-center bg-green-50 rounded-lg px-6 py-4 border-2 border-green-200 shadow-md">
-              <div className="w-14 h-14 rounded-full bg-green-500 flex items-center justify-center mr-4">
-                <Check size={24} className="text-white" />
-              </div>
-              <div>
-                <div className="text-base font-semibold text-green-800">Lead Successfully Converted</div>
-                <div className="text-sm text-green-600">This lead is now a customer contact</div>
+          <div className="mt-4">
+            <div className="flex items-center justify-center bg-green-50 rounded-lg px-4 py-3 border-2 border-green-200">
+              <Check size={16} className="text-green-700 mr-2" />
+              <div className="text-sm font-medium text-green-800">
+                Lead Successfully Converted
               </div>
             </div>
           </div>
