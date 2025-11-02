@@ -1045,6 +1045,17 @@ router.post('/create-lead', async (req, res) => {
 
     const createdLead = result.rows[0];
 
+    // Log the lead creation in change history
+    try {
+      await db.query(`
+        INSERT INTO lead_change_history (lead_id, change_type, changed_by, changed_at)
+        VALUES ($1, $2, $3, NOW())
+      `, [createdLead.id, 'creation', req.user.id], req.organizationId);
+    } catch (historyError) {
+      console.error('Failed to log lead creation in history:', historyError);
+      // Don't fail the lead creation if history logging fails
+    }
+
     // Send emails (fire-and-forget)
     (async () => {
       try {
