@@ -82,15 +82,17 @@ class Lead {
         next_follow_up
       ], organizationId);
 
-      // Log the lead creation in change history
-      try {
-        await query(`
-          INSERT INTO lead_change_history (lead_id, change_type, changed_by, changed_at)
-          VALUES ($1, $2, $3, NOW())
-        `, [result.rows[0].id, 'creation', createdBy], organizationId);
-      } catch (historyError) {
-        console.error('Failed to log lead creation in history:', historyError);
-        // Don't fail the lead creation if history logging fails
+      // Log the lead creation in change history (only if createdBy is provided)
+      if (createdBy) {
+        try {
+          await query(`
+            INSERT INTO lead_change_history (lead_id, change_type, changed_by, changed_at)
+            VALUES ($1, $2, $3, NOW())
+          `, [result.rows[0].id, 'creation', createdBy], organizationId);
+        } catch (historyError) {
+          console.error('Failed to log lead creation in history:', historyError);
+          // Don't fail the lead creation if history logging fails
+        }
       }
 
       return new Lead(result.rows[0]);
