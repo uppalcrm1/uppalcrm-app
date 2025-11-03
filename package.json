@@ -9,6 +9,7 @@
     "dev": "nodemon server.js",
     "migrate": "node scripts/migrate.js",
     "migrate:production": "node scripts/production-migrate.js",
+    "migrate:subscription": "node scripts/run-subscription-migration.js",
     "seed": "node scripts/seed.js",
     "generate:secrets": "node scripts/generate-secrets.js",
     "setup:staging": "node scripts/setup-staging-user.js",
