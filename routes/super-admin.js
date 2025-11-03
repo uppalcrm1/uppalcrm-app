@@ -392,125 +392,30 @@ router.get('/dashboard', authenticateSuperAdmin, async (req, res) => {
   }
 });
 
-// GET ORGANIZATIONS
+// GET ORGANIZATIONS WITH SUBSCRIPTION STATS
 router.get('/organizations', authenticateSuperAdmin, async (req, res) => {
   try {
-    const { page = 1, limit = 20, status = 'all', search = '' } = req.query;
-    const offset = (page - 1) * limit;
+    const Organization = require('../models/Organization');
+    console.log('📊 Getting all organizations with subscription stats');
 
-    let whereClause = 'WHERE 1=1';
-    const params = [];
+    // Use the new getAllWithStats method for comprehensive data
+    const organizations = await Organization.getAllWithStats();
 
-    if (status !== 'all') {
-      if (status === 'active') {
-        whereClause += ` AND o.is_active = true`;
-      } else if (status === 'inactive') {
-        whereClause += ` AND o.is_active = false`;
-      }
-    }
-
-    if (search) {
-      whereClause += ` AND (o.name ILIKE $${params.length + 1} OR o.domain ILIKE $${params.length + 1})`;
-      params.push(`%${search}%`);
-    }
-
-    const organizations = await query(`
-      SELECT 
-        o.id,
-        o.name as organization_name,
-        o.domain,
-        o.subscription_plan,
-        o.max_users,
-        o.is_active,
-        o.created_at,
-        o.updated_at
-      FROM organizations o
-      ${whereClause}
-      ORDER BY o.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}
-    `, [...params, limit, offset]);
-
-    // Enhance each organization with contact and trial info
-    for (let org of organizations.rows) {
-      try {
-        // Get admin user info
-        const adminUser = await query(`
-          SELECT email, first_name, last_name, role, last_login 
-          FROM users 
-          WHERE organization_id = $1 AND role = 'admin' 
-          LIMIT 1
-        `, [org.id]);
-        
-        if (adminUser.rows.length > 0) {
-          const admin = adminUser.rows[0];
-          org.admin_email = admin.email;
-          org.admin_name = `${admin.first_name} ${admin.last_name}`;
-          org.admin_last_login = admin.last_login;
-        }
-
-        // Get user count
-        const userCount = await query(`
-          SELECT COUNT(*) as count FROM users WHERE organization_id = $1 AND is_active = true
-        `, [org.id]);
-        org.active_user_count = userCount.rows[0].count;
-
-        // Get trial info directly from organizations table
-        const orgDetails = await query(`
-          SELECT trial_status, trial_started_at, trial_ends_at, payment_status,
-          CASE 
-            WHEN trial_ends_at IS NOT NULL THEN 
-              EXTRACT(days FROM trial_ends_at - CURRENT_DATE)
-            ELSE NULL 
-          END as days_remaining
-          FROM organizations WHERE id = $1
-        `, [org.id]);
-        
-        if (orgDetails.rows.length > 0) {
-          const details = orgDetails.rows[0];
-          org.trial_status = details.trial_status || 'no_trial';
-          org.trial_started_at = details.trial_started_at;
-          org.trial_ends_at = details.trial_ends_at;
-          org.days_remaining = details.days_remaining;
-          org.payment_status = details.payment_status;
-          
-          // Calculate engagement score based on user activity
-          org.engagement_score = org.active_user_count >= 5 ? 85 : 
-                                org.active_user_count >= 3 ? 65 : 
-                                org.active_user_count >= 1 ? 45 : 25;
-        } else {
-          org.trial_status = 'no_trial';
-          org.engagement_score = 0;
-        }
-
-        // Set trial history count (table doesn't exist yet)
-        org.total_trials = 0;
-
-      } catch (enhanceError) {
-        console.log(`Failed to enhance org ${org.id}:`, enhanceError.message);
-      }
-    }
-
-    const totalResult = await query(`
-      SELECT COUNT(*) as total 
-      FROM organizations o
-      ${whereClause}
-    `, params);
-
-    const total = parseInt(totalResult.rows[0].total);
-    const totalPages = Math.ceil(total / limit);
+    console.log(`✅ Retrieved ${organizations.length} organizations with full stats`);
 
     res.json({
-      organizations: organizations.rows,
-      pagination: {
-        current_page: parseInt(page),
-        per_page: parseInt(limit),
-        total_records: total,
-        total_pages: totalPages
-      }
+      success: true,
+      organizations: organizations,
+      total: organizations.length,
+      timestamp: new Date().toISOString()
     });
 
   } catch (error) {
     console.error('Organizations list error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({
+      error: 'Failed to retrieve organizations',
+      message: error.message
+    });
   }
 });
 
@@ -1473,6 +1378,334 @@ router.post('/sync-license-fields', authenticateSuperAdmin, async (req, res) => 
     res.status(500).json({
       success: false,
       error: 'Failed to sync license fields',
+      message: error.message
+    });
+  }
+});
+
+// ===============================
+// SUBSCRIPTION MANAGEMENT ROUTES
+// ===============================
+
+// GET SINGLE ORGANIZATION WITH DETAILED STATS
+router.get('/organizations/:id', authenticateSuperAdmin, async (req, res) => {
+  try {
+    const Organization = require('../models/Organization');
+    const organizationId = req.params.id;
+
+    console.log(`📊 Getting detailed stats for organization: ${organizationId}`);
+
+    // Get organization with basic info
+    const org = await Organization.findById(organizationId);
+
+    if (!org) {
+      return res.status(404).json({
+        error: 'Organization not found',
+        id: organizationId
+      });
+    }
+
+    // Get comprehensive stats
+    const stats = await Organization.getStats(organizationId);
+
+    // Combine organization data with stats
+    const response = {
+      ...org.toJSON(),
+      stats: stats
+    };
+
+    console.log(`✅ Retrieved detailed info for: ${org.name}`);
+
+    res.json({
+      success: true,
+      organization: response,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('Get organization error:', error);
+    res.status(500).json({
+      error: 'Failed to retrieve organization',
+      message: error.message
+    });
+  }
+});
+
+// UPDATE ORGANIZATION SUBSCRIPTION
+router.put('/organizations/:id/subscription', authenticateSuperAdmin, async (req, res) => {
+  try {
+    const Organization = require('../models/Organization');
+    const organizationId = req.params.id;
+    const subscriptionData = req.body;
+
+    console.log(`📝 Updating subscription for organization: ${organizationId}`);
+    console.log('Subscription data:', subscriptionData);
+
+    // Validate organization exists
+    const org = await Organization.findById(organizationId);
+    if (!org) {
+      return res.status(404).json({
+        error: 'Organization not found',
+        id: organizationId
+      });
+    }
+
+    // Auto-calculate monthly_cost if max_users is being updated
+    if (subscriptionData.max_users !== undefined && subscriptionData.monthly_cost === undefined) {
+      const pricePerUser = 15; // Default price per user
+      subscriptionData.monthly_cost = Organization.calculateMonthlyCost(
+        subscriptionData.max_users,
+        pricePerUser
+      );
+      console.log(`💰 Auto-calculated monthly_cost: $${subscriptionData.monthly_cost}`);
+    }
+
+    // Update subscription
+    const updated = await Organization.updateSubscription(organizationId, subscriptionData);
+
+    if (!updated) {
+      return res.status(500).json({
+        error: 'Failed to update subscription',
+        id: organizationId
+      });
+    }
+
+    console.log(`✅ Subscription updated for: ${updated.name}`);
+
+    res.json({
+      success: true,
+      message: 'Subscription updated successfully',
+      organization: updated.toJSON(),
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('Update subscription error:', error);
+    res.status(500).json({
+      error: 'Failed to update subscription',
+      message: error.message
+    });
+  }
+});
+
+// ADD LICENSES TO ORGANIZATION
+router.post('/organizations/:id/add-licenses', authenticateSuperAdmin, async (req, res) => {
+  try {
+    const Organization = require('../models/Organization');
+    const organizationId = req.params.id;
+    const { additional_licenses } = req.body;
+
+    console.log(`➕ Adding ${additional_licenses} licenses to organization: ${organizationId}`);
+
+    // Validate input
+    if (!additional_licenses || additional_licenses < 1) {
+      return res.status(400).json({
+        error: 'Invalid license count',
+        message: 'additional_licenses must be a positive integer'
+      });
+    }
+
+    // Get current organization
+    const org = await Organization.findById(organizationId);
+    if (!org) {
+      return res.status(404).json({
+        error: 'Organization not found',
+        id: organizationId
+      });
+    }
+
+    const previousMaxUsers = org.max_users || 0;
+    const previousCost = org.monthly_cost || 0;
+    const newMaxUsers = previousMaxUsers + parseInt(additional_licenses);
+    const pricePerUser = 15; // Default price per user
+    const newCost = Organization.calculateMonthlyCost(newMaxUsers, pricePerUser);
+
+    // Update organization
+    const updated = await Organization.updateSubscription(organizationId, {
+      max_users: newMaxUsers,
+      monthly_cost: newCost,
+      notes: `${org.notes || ''}\n[${new Date().toISOString()}] Added ${additional_licenses} licenses by ${req.superAdmin.email}`
+    });
+
+    console.log(`✅ Added licenses: ${previousMaxUsers} → ${newMaxUsers}`);
+
+    res.json({
+      success: true,
+      message: `Added ${additional_licenses} licenses successfully`,
+      organization: updated.toJSON(),
+      changes: {
+        previous_max_users: previousMaxUsers,
+        new_max_users: newMaxUsers,
+        licenses_added: additional_licenses,
+        previous_cost: previousCost,
+        new_cost: newCost,
+        cost_increase: newCost - previousCost
+      },
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('Add licenses error:', error);
+    res.status(500).json({
+      error: 'Failed to add licenses',
+      message: error.message
+    });
+  }
+});
+
+// REMOVE LICENSES FROM ORGANIZATION
+router.post('/organizations/:id/remove-licenses', authenticateSuperAdmin, async (req, res) => {
+  try {
+    const Organization = require('../models/Organization');
+    const organizationId = req.params.id;
+    const { licenses_to_remove } = req.body;
+
+    console.log(`➖ Removing ${licenses_to_remove} licenses from organization: ${organizationId}`);
+
+    // Validate input
+    if (!licenses_to_remove || licenses_to_remove < 1) {
+      return res.status(400).json({
+        error: 'Invalid license count',
+        message: 'licenses_to_remove must be a positive integer'
+      });
+    }
+
+    // Get current organization
+    const org = await Organization.findById(organizationId);
+    if (!org) {
+      return res.status(404).json({
+        error: 'Organization not found',
+        id: organizationId
+      });
+    }
+
+    // Get current active user count
+    const activeUserCount = await Organization.getUserCount(organizationId);
+    const previousMaxUsers = org.max_users || 0;
+    const newMaxUsers = previousMaxUsers - parseInt(licenses_to_remove);
+
+    // Validate that removal won't go below active user count
+    if (newMaxUsers < activeUserCount) {
+      return res.status(400).json({
+        error: 'Cannot remove licenses',
+        message: `Cannot reduce to ${newMaxUsers} licenses. Organization has ${activeUserCount} active users.`,
+        current_active_users: activeUserCount,
+        requested_new_max: newMaxUsers,
+        minimum_required: activeUserCount
+      });
+    }
+
+    // Validate that we don't go below 1 license
+    if (newMaxUsers < 1) {
+      return res.status(400).json({
+        error: 'Cannot remove licenses',
+        message: 'Organization must have at least 1 license',
+        current_max_users: previousMaxUsers,
+        requested_removal: licenses_to_remove
+      });
+    }
+
+    const previousCost = org.monthly_cost || 0;
+    const pricePerUser = 15; // Default price per user
+    const newCost = Organization.calculateMonthlyCost(newMaxUsers, pricePerUser);
+
+    // Update organization
+    const updated = await Organization.updateSubscription(organizationId, {
+      max_users: newMaxUsers,
+      monthly_cost: newCost,
+      notes: `${org.notes || ''}\n[${new Date().toISOString()}] Removed ${licenses_to_remove} licenses by ${req.superAdmin.email}`
+    });
+
+    console.log(`✅ Removed licenses: ${previousMaxUsers} → ${newMaxUsers}`);
+
+    res.json({
+      success: true,
+      message: `Removed ${licenses_to_remove} licenses successfully`,
+      organization: updated.toJSON(),
+      changes: {
+        previous_max_users: previousMaxUsers,
+        new_max_users: newMaxUsers,
+        licenses_removed: licenses_to_remove,
+        previous_cost: previousCost,
+        new_cost: newCost,
+        cost_decrease: previousCost - newCost,
+        active_users: activeUserCount,
+        available_seats: newMaxUsers - activeUserCount
+      },
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('Remove licenses error:', error);
+    res.status(500).json({
+      error: 'Failed to remove licenses',
+      message: error.message
+    });
+  }
+});
+
+// CONVERT TRIAL TO PAID (Enhanced)
+router.post('/organizations/:id/convert-to-paid', authenticateSuperAdmin, async (req, res) => {
+  try {
+    const Organization = require('../models/Organization');
+    const organizationId = req.params.id;
+
+    console.log(`💰 Converting trial to paid for organization: ${organizationId}`);
+
+    // Get current organization
+    const org = await Organization.findById(organizationId);
+    if (!org) {
+      return res.status(404).json({
+        error: 'Organization not found',
+        id: organizationId
+      });
+    }
+
+    // Validate it's in trial status
+    if (org.subscription_status !== 'trial') {
+      return res.status(400).json({
+        error: 'Organization is not in trial status',
+        current_status: org.subscription_status,
+        message: 'Only trial organizations can be converted to paid'
+      });
+    }
+
+    // Calculate next billing date (30 days from now)
+    const nextBillingDate = new Date();
+    nextBillingDate.setDate(nextBillingDate.getDate() + 30);
+
+    // Prepare update data
+    const updateData = {
+      subscription_status: 'active',
+      trial_ends_at: null,
+      last_payment_date: new Date(),
+      next_billing_date: nextBillingDate,
+      notes: `${org.notes || ''}\n[${new Date().toISOString()}] Converted from trial to paid by ${req.superAdmin.email}`
+    };
+
+    // Update to paid status
+    const updated = await Organization.updateSubscription(organizationId, updateData);
+
+    console.log(`✅ Converted to paid: ${updated.name}`);
+
+    res.json({
+      success: true,
+      message: 'Successfully converted trial to paid subscription',
+      organization: updated.toJSON(),
+      changes: {
+        previous_status: 'trial',
+        new_status: 'active',
+        last_payment_date: updateData.last_payment_date,
+        next_billing_date: nextBillingDate,
+        monthly_cost: updated.monthly_cost
+      },
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('Convert to paid error:', error);
+    res.status(500).json({
+      error: 'Failed to convert to paid',
       message: error.message
     });
   }
