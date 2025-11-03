@@ -1028,26 +1028,35 @@ router.post('/create-lead', async (req, res) => {
       notes
     });
 
-    // Set session variables for database triggers to use
-    await db.query(`SELECT set_config('app.current_user_id', $1, true)`, [req.user.id], req.organizationId);
-    await db.query(`SELECT set_config('app.current_organization_id', $1, true)`, [req.organizationId], req.organizationId);
+    // Get a dedicated client to maintain session variables across queries
+    const client = await db.pool.connect();
+    let createdLead;
 
-    // Create the lead (database trigger will automatically log to lead_change_history)
-    const result = await db.query(`
-      INSERT INTO leads
-      (organization_id, first_name, last_name, email, phone, company, source,
-       status, priority, value, assigned_to, next_follow_up, notes, created_by)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-      RETURNING id, first_name, last_name, email, phone, company, source, status,
-                priority, value, assigned_to, next_follow_up, notes, created_at
-    `, [
-      req.organizationId, finalFirstName, finalLastName, email || null, phone || null, company || null, source || null,
-      status || 'new', priority || 'medium', finalPotentialValue,
-      finalAssignedTo || null, finalNextFollowUp || null, notes || null,
-      req.user.id
-    ], req.organizationId);
+    try {
+      // Set session variables on THIS specific client connection (so trigger can read them)
+      await client.query(`SELECT set_config('app.current_user_id', $1, true)`, [req.user.id]);
+      await client.query(`SELECT set_config('app.current_organization_id', $1, true)`, [req.organizationId]);
 
-    const createdLead = result.rows[0];
+      // Create the lead using the SAME client (database trigger will automatically log to lead_change_history)
+      const result = await client.query(`
+        INSERT INTO leads
+        (organization_id, first_name, last_name, email, phone, company, source,
+         status, priority, value, assigned_to, next_follow_up, notes, created_by)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        RETURNING id, first_name, last_name, email, phone, company, source, status,
+                  priority, value, assigned_to, next_follow_up, notes, created_at
+      `, [
+        req.organizationId, finalFirstName, finalLastName, email || null, phone || null, company || null, source || null,
+        status || 'new', priority || 'medium', finalPotentialValue,
+        finalAssignedTo || null, finalNextFollowUp || null, notes || null,
+        req.user.id
+      ]);
+
+      createdLead = result.rows[0];
+    } finally {
+      // Always release the client back to the pool
+      client.release();
+    }
 
     // Note: History logging is handled automatically by the track_lead_creation_trigger database trigger
 
