@@ -405,6 +405,16 @@ const startServer = async () => {
     // Test database connection
     await testConnection();
 
+    // Fix lead creation trigger (run once on startup)
+    try {
+      const { fixLeadCreationTrigger } = require('./scripts/fix-lead-creation-trigger');
+      await fixLeadCreationTrigger();
+      console.log('✅ Lead creation trigger verified/updated');
+    } catch (triggerError) {
+      console.error('⚠️  Lead creation trigger update failed:', triggerError.message);
+      // Don't stop server if this fails
+    }
+
     // Initialize email service
     const emailService = require('./services/emailService');
     await emailService.initialize();
