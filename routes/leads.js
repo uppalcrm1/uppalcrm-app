@@ -323,6 +323,7 @@ const leadSchemas = {
       status: Joi.string().valid('new', 'contacted', 'qualified', 'proposal', 'negotiation', 'converted', 'lost').allow(null).optional(),
       priority: Joi.string().valid('low', 'medium', 'high').allow(null).optional(),
       value: Joi.number().min(0).allow(null).optional(),
+      potential_value: Joi.number().min(0).allow(null).optional(),
       notes: Joi.string().allow('', null).optional(),
       assigned_to: Joi.string().guid({ version: 'uuidv4' }).allow(null, '').optional(),
       last_contact_date: Joi.date().iso().allow(null, '').optional(),
@@ -330,8 +331,16 @@ const leadSchemas = {
       created_at: Joi.date().optional(),
       updated_at: Joi.date().optional(),
       organization_id: Joi.string().guid({ version: 'uuidv4' }).optional(),
-      created_by: Joi.string().guid({ version: 'uuidv4' }).optional()
-    }),
+      created_by: Joi.string().guid({ version: 'uuidv4' }).optional(),
+      customFields: Joi.object().optional(),
+      linked_contact_id: Joi.string().guid({ version: 'uuidv4' }).allow(null).optional(),
+      relationship_type: Joi.string().allow(null).optional(),
+      interest_type: Joi.string().allow(null).optional(),
+      converted_date: Joi.date().iso().allow(null).optional(),
+      owner_first_name: Joi.string().allow(null).optional(),
+      owner_last_name: Joi.string().allow(null).optional(),
+      owner_email: Joi.string().allow(null).optional()
+    }).unknown(true),
     params: Joi.object({
       id: Joi.string().guid({ version: 'uuidv4' }).required()
     })
