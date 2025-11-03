@@ -18,6 +18,17 @@ class Organization {
     this.is_trial = data.is_trial || false;
     this.trial_status = data.trial_status;
     this.trial_expires_at = data.trial_expires_at;
+    // Subscription management fields
+    this.subscription_status = data.subscription_status || 'trial';
+    this.trial_ends_at = data.trial_ends_at;
+    this.contact_email = data.contact_email;
+    this.contact_phone = data.contact_phone;
+    this.billing_email = data.billing_email;
+    this.payment_method = data.payment_method;
+    this.last_payment_date = data.last_payment_date;
+    this.next_billing_date = data.next_billing_date;
+    this.monthly_cost = data.monthly_cost || 0;
+    this.notes = data.notes;
   }
 
   /**
@@ -163,7 +174,7 @@ class Organization {
   static async update(id, updates) {
     const allowedFields = ['name', 'domain', 'settings', 'subscription_plan', 'max_users'];
     const updateFields = Object.keys(updates).filter(key => allowedFields.includes(key));
-    
+
     if (updateFields.length === 0) {
       throw new Error('No valid fields to update');
     }
@@ -172,7 +183,7 @@ class Organization {
     const values = [id, ...updateFields.map(field => updates[field])];
 
     const result = await query(`
-      UPDATE organizations 
+      UPDATE organizations
       SET ${setClause}, updated_at = NOW()
       WHERE id = $1 AND is_active = true
       RETURNING *
@@ -183,6 +194,71 @@ class Organization {
     }
 
     return new Organization(result.rows[0]);
+  }
+
+  /**
+   * Update organization subscription (Super Admin only - bypasses RLS)
+   * @param {string} organizationId - Organization ID
+   * @param {Object} subscriptionData - Subscription fields to update
+   * @returns {Organization|null} Updated organization
+   */
+  static async updateSubscription(organizationId, subscriptionData) {
+    const allowedFields = [
+      'subscription_status',
+      'subscription_plan',
+      'max_users',
+      'trial_ends_at',
+      'billing_email',
+      'contact_email',
+      'contact_phone',
+      'payment_method',
+      'last_payment_date',
+      'next_billing_date',
+      'monthly_cost',
+      'notes'
+    ];
+
+    const updateFields = Object.keys(subscriptionData).filter(key => allowedFields.includes(key));
+
+    if (updateFields.length === 0) {
+      throw new Error('No valid subscription fields to update');
+    }
+
+    // Build dynamic SET clause
+    const setClause = updateFields.map((field, index) => `${field} = $${index + 2}`).join(', ');
+    const values = [organizationId, ...updateFields.map(field => subscriptionData[field])];
+
+    // Bypass RLS by using security definer or direct query without RLS context
+    const result = await query(`
+      UPDATE organizations
+      SET ${setClause}, updated_at = NOW()
+      WHERE id = $1
+      RETURNING *
+    `, values);
+
+    if (result.rows.length === 0) {
+      return null;
+    }
+
+    return new Organization(result.rows[0]);
+  }
+
+  /**
+   * Calculate monthly cost based on user count
+   * @param {number} userCount - Number of users
+   * @param {number} pricePerUser - Price per user (default: $15)
+   * @returns {number} Total monthly cost
+   */
+  static calculateMonthlyCost(userCount, pricePerUser = 15) {
+    if (typeof userCount !== 'number' || userCount < 0) {
+      throw new Error('User count must be a non-negative number');
+    }
+
+    if (typeof pricePerUser !== 'number' || pricePerUser < 0) {
+      throw new Error('Price per user must be a non-negative number');
+    }
+
+    return parseFloat((userCount * pricePerUser).toFixed(2));
   }
 
   /**
@@ -423,6 +499,73 @@ class Organization {
   }
 
   /**
+   * Get all organizations with detailed subscription statistics (Super Admin only)
+   * Bypasses RLS - for super admin dashboard use
+   * @returns {Array} Array of organizations with comprehensive stats
+   */
+  static async getAllWithStats() {
+    try {
+      const result = await query(`
+        SELECT
+          o.id,
+          o.name,
+          o.slug,
+          o.domain,
+          o.subscription_status,
+          o.subscription_plan,
+          o.max_users,
+          o.monthly_cost,
+          o.trial_ends_at,
+          o.next_billing_date,
+          o.contact_email,
+          o.contact_phone,
+          o.billing_email,
+          o.payment_method,
+          o.last_payment_date,
+          o.notes,
+          o.is_active,
+          o.created_at,
+          o.updated_at,
+          -- User statistics
+          COALESCE(COUNT(DISTINCT u.id), 0)::INTEGER as total_users,
+          COALESCE(COUNT(DISTINCT CASE WHEN u.is_active THEN u.id END), 0)::INTEGER as active_users,
+          COALESCE(COUNT(DISTINCT CASE WHEN u.is_active AND u.last_login >= NOW() - INTERVAL '30 days' THEN u.id END), 0)::INTEGER as recent_active_users,
+          -- Usage percentage (active users / max users)
+          CASE
+            WHEN o.max_users > 0 THEN
+              ROUND((COALESCE(COUNT(DISTINCT CASE WHEN u.is_active THEN u.id END), 0)::DECIMAL / o.max_users) * 100, 2)::FLOAT
+            ELSE 0::FLOAT
+          END as usage_percentage,
+          -- Calculate days until trial ends (if applicable)
+          CASE
+            WHEN o.subscription_status = 'trial' AND o.trial_ends_at IS NOT NULL THEN
+              EXTRACT(DAY FROM (o.trial_ends_at - NOW()))::INTEGER
+            ELSE NULL
+          END as trial_days_remaining,
+          -- Calculate days until next billing
+          CASE
+            WHEN o.subscription_status = 'active' AND o.next_billing_date IS NOT NULL THEN
+              EXTRACT(DAY FROM (o.next_billing_date - NOW()))::INTEGER
+            ELSE NULL
+          END as billing_days_remaining
+        FROM organizations o
+        LEFT JOIN users u ON u.organization_id = o.id
+        GROUP BY
+          o.id, o.name, o.slug, o.domain, o.subscription_status, o.subscription_plan,
+          o.max_users, o.monthly_cost, o.trial_ends_at, o.next_billing_date,
+          o.contact_email, o.contact_phone, o.billing_email, o.payment_method,
+          o.last_payment_date, o.notes, o.is_active, o.created_at, o.updated_at
+        ORDER BY o.created_at DESC
+      `);
+
+      return result.rows;
+    } catch (error) {
+      console.error('Error in Organization.getAllWithStats():', error);
+      throw error;
+    }
+  }
+
+  /**
    * Get organization statistics
    * @param {string} organizationId - Organization ID
    * @returns {Object} Organization statistics
@@ -585,7 +728,18 @@ class Organization {
       max_users: this.max_users,
       created_at: this.created_at,
       updated_at: this.updated_at,
-      is_active: this.is_active
+      is_active: this.is_active,
+      // Subscription management fields
+      subscription_status: this.subscription_status,
+      trial_ends_at: this.trial_ends_at,
+      contact_email: this.contact_email,
+      contact_phone: this.contact_phone,
+      billing_email: this.billing_email,
+      payment_method: this.payment_method,
+      last_payment_date: this.last_payment_date,
+      next_billing_date: this.next_billing_date,
+      monthly_cost: this.monthly_cost,
+      notes: this.notes
     };
   }
 }
