@@ -26,7 +26,8 @@
     "migrate:user-management": "node migrations/add-user-management-fields.js",
     "fix:lead-trigger": "node scripts/fix-lead-trigger.js",
     "fix:lead-history-tables": "node scripts/apply-lead-history-tables.js",
-    "test:subscription-api": "node test/super-admin-subscription-api.test.js"
+    "test:subscription-api": "node test/super-admin-subscription-api.test.js",
+    "test:super-admin-auth": "node test/super-admin-middleware.test.js"
   },
   "dependencies": {
     "axios": "^1.11.0",

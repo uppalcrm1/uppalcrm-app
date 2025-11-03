@@ -2,6 +2,7 @@ const User = require('../models/User');
 const Organization = require('../models/Organization');
 const Trial = require('../models/Trial');
 const jwt = require('jsonwebtoken');
+const { query } = require('../database/connection');
 
 /**
  * Middleware to authenticate JWT token and set user context
@@ -284,6 +285,96 @@ const checkSubscriptionAccess = async (req, res, next) => {
   }
 };
 
+/**
+ * Middleware to authenticate and authorize super admin users
+ * Super admins are NOT tied to any organization and have platform-wide access
+ */
+const requireSuperAdmin = async (req, res, next) => {
+  try {
+    // Check for authorization header
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+
+    if (!token) {
+      return res.status(401).json({
+        error: 'Access denied',
+        message: 'No token provided'
+      });
+    }
+
+    // Verify JWT token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Check if token is marked as super admin
+    if (!decoded.is_super_admin) {
+      return res.status(403).json({
+        error: 'Access forbidden',
+        message: 'Super admin access required'
+      });
+    }
+
+    // Verify super admin user exists in database and is active
+    const result = await query(
+      'SELECT * FROM super_admin_users WHERE id = $1 AND is_active = true',
+      [decoded.user_id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(403).json({
+        error: 'Access forbidden',
+        message: 'Invalid super admin user or account is inactive'
+      });
+    }
+
+    const superAdmin = result.rows[0];
+
+    // Check if role is super_admin
+    if (superAdmin.role !== 'super_admin') {
+      return res.status(403).json({
+        error: 'Access forbidden',
+        message: 'User is not a super admin'
+      });
+    }
+
+    // Set super admin context on request
+    req.superAdmin = {
+      id: superAdmin.id,
+      email: superAdmin.email,
+      first_name: superAdmin.first_name,
+      last_name: superAdmin.last_name,
+      role: superAdmin.role,
+      permissions: superAdmin.permissions,
+      is_super_admin: true
+    };
+
+    // For backward compatibility with routes that check req.user
+    req.user = req.superAdmin;
+
+    next();
+  } catch (error) {
+    console.error('Super admin authentication error:', error);
+
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({
+        error: 'Access denied',
+        message: 'Invalid token'
+      });
+    }
+
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({
+        error: 'Access denied',
+        message: 'Token has expired'
+      });
+    }
+
+    res.status(500).json({
+      error: 'Server error',
+      message: 'Failed to authenticate super admin'
+    });
+  }
+};
+
 module.exports = {
   authenticateToken,
   requireRole,
@@ -294,5 +385,6 @@ module.exports = {
   canManageUsers,
   validateOrganizationContext,
   optionalAuth,
-  checkSubscriptionAccess
+  checkSubscriptionAccess,
+  requireSuperAdmin
 };

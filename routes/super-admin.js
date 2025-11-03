@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { query, transaction } = require('../database/connection');
+const { requireSuperAdmin } = require('../middleware/auth');
 // const { getLicenseInfo, updateLicenses, getAllOrganizationsLicenses } = require('../controllers/licenseController');
 const router = express.Router();
 
@@ -35,38 +36,8 @@ router.post('/debug-login', async (req, res) => {
   }
 });
 
-// Super Admin Authentication Middleware
-const authenticateSuperAdmin = async (req, res, next) => {
-  try {
-    const authHeader = req.headers.authorization;
-    const token = authHeader && authHeader.split(' ')[1];
-
-    if (!token) {
-      return res.status(401).json({ error: 'Access token required' });
-    }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
-    if (!decoded.is_super_admin) {
-      return res.status(403).json({ error: 'Super admin access required' });
-    }
-
-    const result = await query(
-      'SELECT * FROM super_admin_users WHERE id = $1 AND is_active = true',
-      [decoded.user_id]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(403).json({ error: 'Invalid super admin user' });
-    }
-
-    req.superAdmin = result.rows[0];
-    next();
-  } catch (error) {
-    console.error('Super admin auth error:', error);
-    res.status(403).json({ error: 'Invalid or expired token' });
-  }
-};
+// Note: requireSuperAdmin has been replaced with requireSuperAdmin middleware
+// from middleware/auth.js for centralized authentication management
 
 // LOGIN
 router.post('/login', async (req, res) => {
@@ -129,7 +100,7 @@ router.post('/login', async (req, res) => {
 });
 
 // Test enhanced query
-router.get('/test-enhanced', authenticateSuperAdmin, async (req, res) => {
+router.get('/test-enhanced', requireSuperAdmin, async (req, res) => {
   try {
     const sampleOrg = await query(`
       SELECT 
@@ -179,7 +150,7 @@ router.get('/test-enhanced', authenticateSuperAdmin, async (req, res) => {
 });
 
 // Check production database schema and trial data
-router.get('/schema-check', authenticateSuperAdmin, async (req, res) => {
+router.get('/schema-check', requireSuperAdmin, async (req, res) => {
   try {
     const orgColumns = await query(`
       SELECT column_name, data_type 
@@ -239,7 +210,7 @@ router.get('/schema-check', authenticateSuperAdmin, async (req, res) => {
 });
 
 // DASHBOARD
-router.get('/dashboard', authenticateSuperAdmin, async (req, res) => {
+router.get('/dashboard', requireSuperAdmin, async (req, res) => {
   try {
     console.log('🔍 Super Admin dashboard request');
 
@@ -393,7 +364,7 @@ router.get('/dashboard', authenticateSuperAdmin, async (req, res) => {
 });
 
 // GET ORGANIZATIONS WITH SUBSCRIPTION STATS
-router.get('/organizations', authenticateSuperAdmin, async (req, res) => {
+router.get('/organizations', requireSuperAdmin, async (req, res) => {
   try {
     const Organization = require('../models/Organization');
     console.log('📊 Getting all organizations with subscription stats');
@@ -420,7 +391,7 @@ router.get('/organizations', authenticateSuperAdmin, async (req, res) => {
 });
 
 // EXTEND TRIAL
-router.put('/organizations/:id/trial', authenticateSuperAdmin, async (req, res) => {
+router.put('/organizations/:id/trial', requireSuperAdmin, async (req, res) => {
   try {
     const organizationId = req.params.id;
     const { action, days = 0, reason } = req.body;
@@ -449,7 +420,7 @@ router.put('/organizations/:id/trial', authenticateSuperAdmin, async (req, res) 
 });
 
 // CONVERT TRIAL TO PAID WITH LICENSE SUPPORT
-router.put('/organizations/:id/convert-to-paid', authenticateSuperAdmin, async (req, res) => {
+router.put('/organizations/:id/convert-to-paid', requireSuperAdmin, async (req, res) => {
   try {
     const organizationId = req.params.id;
     console.log('🔄 Trial conversion started for organization:', organizationId);
@@ -760,7 +731,7 @@ router.put('/organizations/:id/convert-to-paid', authenticateSuperAdmin, async (
 });
 
 // BUSINESS LEADS
-router.get('/business-leads', authenticateSuperAdmin, async (req, res) => {
+router.get('/business-leads', requireSuperAdmin, async (req, res) => {
   try {
     const { days = 30, temperature = 'all' } = req.query;
 
@@ -796,7 +767,7 @@ router.get('/business-leads', authenticateSuperAdmin, async (req, res) => {
 });
 
 // DIAGNOSTIC - Check what orgs exist (temporary endpoint)
-router.get('/debug-organizations', authenticateSuperAdmin, async (req, res) => {
+router.get('/debug-organizations', requireSuperAdmin, async (req, res) => {
   try {
     console.log('🔍 DEBUG: Checking organizations in production database');
     
@@ -826,7 +797,7 @@ router.get('/debug-organizations', authenticateSuperAdmin, async (req, res) => {
 });
 
 // DELETE ORGANIZATION
-router.delete('/organizations/:id', authenticateSuperAdmin, async (req, res) => {
+router.delete('/organizations/:id', requireSuperAdmin, async (req, res) => {
   try {
     const organizationId = req.params.id;
     console.log(`🗑️ Super Admin deletion request for organization: ${organizationId}`);
@@ -1000,7 +971,7 @@ router.delete('/organizations/:id', authenticateSuperAdmin, async (req, res) => 
 });
 
 // EXPIRING TRIALS
-router.get('/expiring-trials', authenticateSuperAdmin, async (req, res) => {
+router.get('/expiring-trials', requireSuperAdmin, async (req, res) => {
   try {
     const { days = 7 } = req.query;
 
@@ -1053,7 +1024,7 @@ router.get('/expiring-trials', authenticateSuperAdmin, async (req, res) => {
 });
 
 // MIGRATION - Create essential CRM tables
-router.post('/migration/create-crm-tables', authenticateSuperAdmin, async (req, res) => {
+router.post('/migration/create-crm-tables', requireSuperAdmin, async (req, res) => {
   try {
     console.log('🚀 Creating essential CRM tables via super admin...');
     
@@ -1077,7 +1048,7 @@ router.post('/migration/create-crm-tables', authenticateSuperAdmin, async (req, 
 });
 
 // DIAGNOSTIC - Test database schema and updates
-router.get('/debug/database-test/:orgId', authenticateSuperAdmin, async (req, res) => {
+router.get('/debug/database-test/:orgId', requireSuperAdmin, async (req, res) => {
   try {
     const { orgId } = req.params;
     console.log(`🔧 DATABASE DIAGNOSTIC for org: ${orgId}`);
@@ -1142,7 +1113,7 @@ router.get('/debug/database-test/:orgId', authenticateSuperAdmin, async (req, re
 });
 
 // DEBUG ENDPOINT - Check organization status after conversion
-router.get('/debug/organization/:name', authenticateSuperAdmin, async (req, res) => {
+router.get('/debug/organization/:name', requireSuperAdmin, async (req, res) => {
   try {
     const { name } = req.params;
     console.log(`🔍 DEBUG: Checking organization status for: ${name}`);
@@ -1202,13 +1173,13 @@ router.get('/debug/organization/:name', authenticateSuperAdmin, async (req, res)
 // ===============================
 
 // Get all organizations with license information
-// router.get('/organizations/licenses', authenticateSuperAdmin, getAllOrganizationsLicenses);
+// router.get('/organizations/licenses', requireSuperAdmin, getAllOrganizationsLicenses);
 
 // Get detailed license info for specific organization
-// router.get('/organizations/:organizationId/license-info', authenticateSuperAdmin, getLicenseInfo);
+// router.get('/organizations/:organizationId/license-info', requireSuperAdmin, getLicenseInfo);
 
 // Update licenses for organization
-// router.put('/organizations/:organizationId/licenses', authenticateSuperAdmin, updateLicenses);
+// router.put('/organizations/:organizationId/licenses', requireSuperAdmin, updateLicenses);
 
 // Public endpoint to check current license values (debug)
 router.get('/public-check-license-values', async (req, res) => {
@@ -1311,7 +1282,7 @@ router.post('/public-sync-license-fields', async (req, res) => {
 });
 
 // Sync license fields to resolve discrepancies between max_users and purchased_licenses
-router.post('/sync-license-fields', authenticateSuperAdmin, async (req, res) => {
+router.post('/sync-license-fields', requireSuperAdmin, async (req, res) => {
   try {
     console.log('🔧 Super Admin: Starting license field synchronization...');
     
@@ -1388,7 +1359,7 @@ router.post('/sync-license-fields', authenticateSuperAdmin, async (req, res) => 
 // ===============================
 
 // GET SINGLE ORGANIZATION WITH DETAILED STATS
-router.get('/organizations/:id', authenticateSuperAdmin, async (req, res) => {
+router.get('/organizations/:id', requireSuperAdmin, async (req, res) => {
   try {
     const Organization = require('../models/Organization');
     const organizationId = req.params.id;
@@ -1432,7 +1403,7 @@ router.get('/organizations/:id', authenticateSuperAdmin, async (req, res) => {
 });
 
 // UPDATE ORGANIZATION SUBSCRIPTION
-router.put('/organizations/:id/subscription', authenticateSuperAdmin, async (req, res) => {
+router.put('/organizations/:id/subscription', requireSuperAdmin, async (req, res) => {
   try {
     const Organization = require('../models/Organization');
     const organizationId = req.params.id;
@@ -1489,7 +1460,7 @@ router.put('/organizations/:id/subscription', authenticateSuperAdmin, async (req
 });
 
 // ADD LICENSES TO ORGANIZATION
-router.post('/organizations/:id/add-licenses', authenticateSuperAdmin, async (req, res) => {
+router.post('/organizations/:id/add-licenses', requireSuperAdmin, async (req, res) => {
   try {
     const Organization = require('../models/Organization');
     const organizationId = req.params.id;
@@ -1554,7 +1525,7 @@ router.post('/organizations/:id/add-licenses', authenticateSuperAdmin, async (re
 });
 
 // REMOVE LICENSES FROM ORGANIZATION
-router.post('/organizations/:id/remove-licenses', authenticateSuperAdmin, async (req, res) => {
+router.post('/organizations/:id/remove-licenses', requireSuperAdmin, async (req, res) => {
   try {
     const Organization = require('../models/Organization');
     const organizationId = req.params.id;
@@ -1645,7 +1616,7 @@ router.post('/organizations/:id/remove-licenses', authenticateSuperAdmin, async 
 });
 
 // CONVERT TRIAL TO PAID (Enhanced)
-router.post('/organizations/:id/convert-to-paid', authenticateSuperAdmin, async (req, res) => {
+router.post('/organizations/:id/convert-to-paid', requireSuperAdmin, async (req, res) => {
   try {
     const Organization = require('../models/Organization');
     const organizationId = req.params.id;
