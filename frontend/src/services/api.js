@@ -70,9 +70,31 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     const message = error.response?.data?.message || error.message || 'An error occurred'
+    const details = error.response?.data?.details
     const isSupedAdminRoute = error.config?.url?.includes('/api/super-admin')
-    
-    if (error.response?.status === 401) {
+
+    // Log validation errors with full details for debugging
+    if (error.response?.status === 400 && details) {
+      console.error('❌ Validation Error Details:', {
+        message,
+        details,
+        url: error.config?.url,
+        method: error.config?.method,
+        requestData: error.config?.data,
+        requestParams: error.config?.params
+      })
+
+      // Show detailed field errors in toast
+      if (details.body && Array.isArray(details.body)) {
+        const fieldErrors = details.body.map(err => `${err.field}: ${err.message}`).join(', ')
+        toast.error(`Validation Error: ${fieldErrors}`)
+      } else if (details.params && Array.isArray(details.params)) {
+        const paramErrors = details.params.map(err => `${err.field}: ${err.message}`).join(', ')
+        toast.error(`Parameter Error: ${paramErrors}`)
+      } else {
+        toast.error(message)
+      }
+    } else if (error.response?.status === 401) {
       // Don't interfere with super admin authentication
       if (!isSupedAdminRoute) {
         clearAuth()
@@ -86,7 +108,7 @@ api.interceptors.response.use(
     } else if (!error.response) {
       toast.error('Network error. Please check your connection.')
     }
-    
+
     return Promise.reject(error)
   }
 )
