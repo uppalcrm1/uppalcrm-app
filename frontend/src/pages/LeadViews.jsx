@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import {
@@ -102,21 +102,21 @@ const LeadViews = ({ onAddLead, onEditLead, onDeleteLead }) => {
     setSearchParams(params, { replace: true })
   }, [view, filters, pagination, setSearchParams])
 
-  const handleViewChange = (newView) => {
+  const handleViewChange = useCallback((newView) => {
     setView(newView)
     setPagination(prev => ({ ...prev, page: 1 })) // Reset to first page when changing views
-  }
+  }, [])
 
-  const handleFiltersChange = (newFilters) => {
+  const handleFiltersChange = useCallback((newFilters) => {
     setFilters(newFilters)
     setPagination(prev => ({ ...prev, page: 1 })) // Reset to first page when filters change
-  }
+  }, [])
 
-  const handlePaginationChange = (newPagination) => {
+  const handlePaginationChange = useCallback((newPagination) => {
     setPagination(newPagination)
-  }
+  }, [])
 
-  const handleStatusUpdate = async (leadId, newStatus) => {
+  const handleStatusUpdate = useCallback(async (leadId, newStatus) => {
     try {
       await leadsAPI.updateLeadStatus(leadId, newStatus)
       toast.success('Lead status updated successfully')
@@ -125,9 +125,9 @@ const LeadViews = ({ onAddLead, onEditLead, onDeleteLead }) => {
       console.error('Error updating lead status:', error)
       toast.error('Failed to update lead status')
     }
-  }
+  }, [refetchLeads])
 
-  const handleBulkAction = async (leadIds, action, data) => {
+  const handleBulkAction = useCallback(async (leadIds, action, data) => {
     try {
       switch (action) {
         case 'update':
@@ -160,9 +160,9 @@ const LeadViews = ({ onAddLead, onEditLead, onDeleteLead }) => {
       console.error(`Error performing bulk action ${action}:`, error)
       toast.error(`Failed to ${action} leads`)
     }
-  }
+  }, [filters, refetchLeads])
 
-  const handleExport = async () => {
+  const handleExport = useCallback(async () => {
     try {
       const exportData = await leadsAPI.exportLeads(filters)
       const blob = new Blob([exportData], { type: 'text/csv' })
@@ -179,7 +179,7 @@ const LeadViews = ({ onAddLead, onEditLead, onDeleteLead }) => {
       console.error('Error exporting leads:', error)
       toast.error('Failed to export leads')
     }
-  }
+  }, [filters])
 
   if (leadsError) {
     return (
