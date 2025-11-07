@@ -92,6 +92,178 @@ router.get('/', async (req, res) => {
 })
 
 /**
+ * POST /api/custom-fields
+ * Create a new custom field definition (convenience endpoint - same as POST /definitions)
+ */
+router.post('/', async (req, res) => {
+  try {
+    console.log('📥 POST /api/custom-fields')
+    console.log('Request body:', JSON.stringify(req.body, null, 2))
+    console.log('User:', { id: req.user?.id, organization_id: req.user?.organization_id })
+
+    const organizationId = req.user.organization_id
+    const userId = req.user.id
+
+    if (!organizationId) {
+      console.error('❌ No organization_id found')
+      return res.status(400).json({
+        error: 'Missing organization context',
+        details: 'User must be associated with an organization'
+      })
+    }
+
+    const {
+      fieldName,
+      fieldLabel,
+      fieldDescription,
+      entityType,
+      fieldType,
+      isRequired,
+      isSearchable,
+      isFilterable,
+      displayOrder,
+      showInListView,
+      showInDetailView,
+      showInCreateForm,
+      showInEditForm,
+      validationRules,
+      fieldOptions,
+      defaultValue,
+      placeholder,
+      fieldGroup
+    } = req.body
+
+    console.log('📋 Extracted field data:', {
+      fieldName,
+      fieldLabel,
+      entityType,
+      fieldType,
+      fieldOptions: fieldOptions?.length || 0,
+      organizationId
+    })
+
+    // Validate required fields
+    if (!fieldName || !fieldLabel || !entityType || !fieldType) {
+      console.error('❌ Missing required fields:', { fieldName, fieldLabel, entityType, fieldType })
+      return res.status(400).json({
+        error: 'Missing required fields',
+        required: ['fieldName', 'fieldLabel', 'entityType', 'fieldType'],
+        received: { fieldName, fieldLabel, entityType, fieldType }
+      })
+    }
+
+    // Validate entity type
+    const validEntityTypes = ['leads', 'contacts', 'accounts', 'transactions']
+    if (!validEntityTypes.includes(entityType)) {
+      console.error('❌ Invalid entity type:', entityType)
+      return res.status(400).json({
+        error: 'Invalid entity type',
+        validTypes: validEntityTypes,
+        received: entityType
+      })
+    }
+
+    // Validate field type
+    const validFieldTypes = [
+      'text', 'number', 'email', 'phone', 'url', 'date', 'datetime',
+      'textarea', 'select', 'multiselect', 'checkbox', 'radio'
+    ]
+    if (!validFieldTypes.includes(fieldType)) {
+      console.error('❌ Invalid field type:', fieldType)
+      return res.status(400).json({
+        error: 'Invalid field type',
+        validTypes: validFieldTypes,
+        received: fieldType
+      })
+    }
+
+    // Validate field options for select/multiselect/radio
+    if (['select', 'multiselect', 'radio'].includes(fieldType)) {
+      console.log('🔍 Validating field options for', fieldType)
+      console.log('Field options received:', fieldOptions)
+
+      if (!fieldOptions || !Array.isArray(fieldOptions) || fieldOptions.length === 0) {
+        console.error('❌ Missing or invalid field options for select/multiselect/radio field')
+        return res.status(400).json({
+          error: 'Field options are required for select, multiselect, and radio field types',
+          fieldType,
+          received: fieldOptions
+        })
+      }
+      console.log('✅ Field options valid:', fieldOptions.length, 'options')
+    }
+
+    const fieldData = {
+      organizationId,
+      fieldName,
+      fieldLabel,
+      fieldDescription,
+      entityType,
+      fieldType,
+      isRequired,
+      isSearchable,
+      isFilterable,
+      displayOrder,
+      showInListView,
+      showInDetailView,
+      showInCreateForm,
+      showInEditForm,
+      validationRules,
+      fieldOptions,
+      defaultValue,
+      placeholder,
+      fieldGroup,
+      createdBy: userId
+    }
+
+    console.log('💾 Calling CustomField.createFieldDefinition with:', {
+      ...fieldData,
+      fieldOptions: fieldData.fieldOptions?.length || 0
+    })
+
+    const field = await CustomField.createFieldDefinition(fieldData)
+
+    console.log('✅ Field created successfully:', field.id)
+
+    res.status(201).json({
+      success: true,
+      message: 'Field definition created successfully',
+      field
+    })
+  } catch (error) {
+    console.error('❌ Error creating field definition:', error)
+    console.error('Error name:', error.name)
+    console.error('Error message:', error.message)
+    console.error('Error code:', error.code)
+    console.error('Error stack:', error.stack)
+
+    // Handle unique constraint violation
+    if (error.code === '23505') {
+      return res.status(409).json({
+        error: 'A field with this name already exists for this entity type',
+        details: error.message
+      })
+    }
+
+    // Handle database errors
+    if (error.code) {
+      return res.status(500).json({
+        error: 'Database error',
+        code: error.code,
+        details: error.message,
+        hint: error.hint
+      })
+    }
+
+    res.status(500).json({
+      error: 'Failed to create field definition',
+      details: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    })
+  }
+})
+
+/**
  * GET /api/custom-fields/definitions/:entityType
  * Get all custom field definitions for an entity type
  */
