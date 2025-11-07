@@ -120,78 +120,13 @@ const TransactionsPage = () => {
     }
   }
 
-  // Mock transaction data
-  const mockTransactions = [
-    {
-      id: 'TXN-2024-001',
-      account_id: 'ACC001',
-      contact_name: 'John Doe',
-      contact_email: 'john@example.com',
-      amount: 99,
-      transaction_date: '2024-10-01',
-      payment_method: 'Credit Card',
-      billing_cycle: 'monthly',
-      status: 'completed',
-      notes: 'Renewal payment'
-    },
-    {
-      id: 'TXN-2024-002',
-      account_id: 'ACC002',
-      contact_name: 'Jane Smith',
-      contact_email: 'jane@example.com',
-      amount: 237,
-      transaction_date: '2024-09-15',
-      payment_method: 'PayPal',
-      billing_cycle: 'quarterly',
-      status: 'completed',
-      notes: 'Quarterly subscription'
-    },
-    {
-      id: 'TXN-2024-003',
-      account_id: 'ACC001',
-      contact_name: 'John Doe',
-      contact_email: 'john@example.com',
-      amount: 99,
-      transaction_date: '2024-09-01',
-      payment_method: 'Credit Card',
-      billing_cycle: 'monthly',
-      status: 'completed',
-      notes: 'Monthly renewal'
-    },
-    {
-      id: 'TXN-2024-004',
-      account_id: 'ACC003',
-      contact_name: 'Bob Wilson',
-      contact_email: 'bob@example.com',
-      amount: 588,
-      transaction_date: '2024-08-10',
-      payment_method: 'Bank Transfer',
-      billing_cycle: 'annual',
-      status: 'pending',
-      notes: 'Annual subscription - awaiting confirmation'
-    },
-    {
-      id: 'TXN-2024-005',
-      account_id: 'ACC004',
-      contact_name: 'Alice Johnson',
-      contact_email: 'alice@example.com',
-      amount: 149,
-      transaction_date: '2024-08-05',
-      payment_method: 'Credit Card',
-      billing_cycle: 'monthly',
-      status: 'failed',
-      notes: 'Payment declined - card expired'
-    }
-  ]
+  // Use localTransactions for display (optimistic updates), fallback to transactions
+  const displayTransactions = localTransactions.length > 0 ? localTransactions : transactions
 
-  // Use localTransactions for display (optimistic updates), fallback to transactions or mockTransactions
-  const sourceTransactions = transactions.length > 0 ? transactions : mockTransactions
-  const displayTransactions = localTransactions.length > 0 ? localTransactions : sourceTransactions
-
-  // Initialize localTransactions when source changes
+  // Initialize localTransactions when transactions changes
   React.useEffect(() => {
-    setLocalTransactions(sourceTransactions)
-  }, [transactions.length, mockTransactions.length])
+    setLocalTransactions(transactions)
+  }, [transactions])
 
   // Calculate statistics
   const stats = {

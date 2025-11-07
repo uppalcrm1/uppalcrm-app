@@ -101,44 +101,13 @@ const ContactsPage = () => {
     }
   }
 
-  // Mock data for demonstration
-  const mockContacts = [
-    {
-      id: '1',
-      first_name: 'John',
-      last_name: 'Doe',
-      email: 'john@example.com',
-      phone: '+1 234-567-8900',
-      company: 'Tech Corp',
-      status: 'active',
-      total_accounts: 3,
-      total_spent: 297,
-      created_at: '2024-10-01',
-      last_contact: '2024-10-15'
-    },
-    {
-      id: '2',
-      first_name: 'Jane',
-      last_name: 'Smith',
-      email: 'jane@example.com',
-      phone: '+1 234-567-8901',
-      company: 'Design Studio',
-      status: 'active',
-      total_accounts: 2,
-      total_spent: 198,
-      created_at: '2024-09-15',
-      last_contact: '2024-10-10'
-    }
-  ]
+  // Use localContacts for display (optimistic updates), fallback to contacts
+  const displayContacts = localContacts.length > 0 ? localContacts : contacts
 
-  // Use localContacts for display (optimistic updates), fallback to contacts or mockContacts
-  const sourceContacts = contacts.length > 0 ? contacts : mockContacts
-  const displayContacts = localContacts.length > 0 ? localContacts : sourceContacts
-
-  // Initialize localContacts when source changes
+  // Initialize localContacts when contacts changes
   React.useEffect(() => {
-    setLocalContacts(sourceContacts)
-  }, [contacts.length, mockContacts.length])
+    setLocalContacts(contacts)
+  }, [contacts])
 
   const getStatusBadge = (status) => {
     const badges = {

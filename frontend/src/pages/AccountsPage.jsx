@@ -120,63 +120,13 @@ const AccountsPage = () => {
     }
   }
 
-  // Mock data for demonstration
-  const mockAccounts = [
-    {
-      id: 'ACC001',
-      contact_name: 'John Doe',
-      contact_email: 'john@example.com',
-      software_edition: 'Gold Edition',
-      device_name: 'MacBook Pro',
-      mac_address: '00:1B:63:84:45:E6',
-      status: 'active',
-      billing_cycle: 'monthly',
-      monthly_cost: 99,
-      last_payment_date: '2024-10-01',
-      next_renewal_date: '2024-11-01',
-      days_until_expiry: 15,
-      total_paid: 297
-    },
-    {
-      id: 'ACC002',
-      contact_name: 'Jane Smith',
-      contact_email: 'jane@example.com',
-      software_edition: 'Smart Edition',
-      device_name: 'Windows Desktop',
-      mac_address: '00:1B:63:84:45:E7',
-      status: 'expiring_soon',
-      billing_cycle: 'quarterly',
-      monthly_cost: 79,
-      last_payment_date: '2024-07-15',
-      next_renewal_date: '2024-10-20',
-      days_until_expiry: 3,
-      total_paid: 237
-    },
-    {
-      id: 'ACC003',
-      contact_name: 'Bob Wilson',
-      contact_email: 'bob@example.com',
-      software_edition: 'Jio Edition',
-      device_name: 'iPad Pro',
-      mac_address: '00:1B:63:84:45:E8',
-      status: 'expired',
-      billing_cycle: 'annual',
-      monthly_cost: 49,
-      last_payment_date: '2023-10-10',
-      next_renewal_date: '2024-10-10',
-      days_until_expiry: -7,
-      total_paid: 588
-    }
-  ]
+  // Use localAccounts for display (optimistic updates), fallback to accounts
+  const displayAccounts = localAccounts.length > 0 ? localAccounts : accounts
 
-  // Use localAccounts for display (optimistic updates), fallback to accounts or mockAccounts
-  const sourceAccounts = accounts.length > 0 ? accounts : mockAccounts
-  const displayAccounts = localAccounts.length > 0 ? localAccounts : sourceAccounts
-
-  // Initialize localAccounts when source changes
+  // Initialize localAccounts when accounts changes
   React.useEffect(() => {
-    setLocalAccounts(sourceAccounts)
-  }, [accounts.length, mockAccounts.length])
+    setLocalAccounts(accounts)
+  }, [accounts])
 
   // Calculate statistics
   const stats = {
