@@ -121,6 +121,23 @@ class CustomField {
    */
   static async createFieldDefinition(fieldData) {
     try {
+      console.log('================================================================================')
+      console.log('📊 CustomField.createFieldDefinition - MODEL ENTRY POINT')
+      console.log('================================================================================')
+      console.log('📊 MODEL RECEIVED - Full fieldData object:')
+      console.log(JSON.stringify(fieldData, null, 2))
+      console.log('')
+      console.log('📊 MODEL RECEIVED fieldOptions type:', typeof fieldData.fieldOptions)
+      console.log('📊 MODEL RECEIVED fieldOptions value:', fieldData.fieldOptions)
+      console.log('📊 MODEL RECEIVED fieldOptions stringified:', JSON.stringify(fieldData.fieldOptions))
+      console.log('📊 MODEL RECEIVED fieldOptions is array?:', Array.isArray(fieldData.fieldOptions))
+      if (Array.isArray(fieldData.fieldOptions) && fieldData.fieldOptions.length > 0) {
+        console.log('📊 MODEL RECEIVED fieldOptions[0]:', fieldData.fieldOptions[0])
+        console.log('📊 MODEL RECEIVED fieldOptions[0] type:', typeof fieldData.fieldOptions[0])
+        console.log('📊 MODEL RECEIVED fieldOptions[0] stringified:', JSON.stringify(fieldData.fieldOptions[0]))
+      }
+      console.log('================================================================================')
+
       const {
         organizationId,
         fieldName,
@@ -179,6 +196,21 @@ class CustomField {
       console.log('  validationRules type:', typeof validationRules)
       console.log('  validationRules value:', JSON.stringify(validationRules, null, 2))
 
+      console.log('================================================================================')
+      console.log('📊 PREPARING DATABASE QUERY')
+      console.log('================================================================================')
+      console.log('📊 QUERY PARAMETER fieldOptions (before JSON.stringify):')
+      console.log('  Type:', typeof fieldOptions)
+      console.log('  Is Array:', Array.isArray(fieldOptions))
+      console.log('  Value:', fieldOptions)
+      console.log('  Stringified:', JSON.stringify(fieldOptions))
+      console.log('')
+      console.log('📊 QUERY PARAMETER validationRules (before JSON.stringify):')
+      console.log('  Type:', typeof validationRules)
+      console.log('  Value:', validationRules)
+      console.log('  Stringified:', JSON.stringify(validationRules))
+      console.log('================================================================================')
+
       const values = [
         organizationId,
         fieldName,
@@ -204,14 +236,19 @@ class CustomField {
         createdBy
       ]
 
-      console.log('📊 Inserting field with values:')
-      console.log('  fieldName:', fieldName)
-      console.log('  fieldType:', fieldType)
-      console.log('  fieldOptions param 15:', values[15])
-      console.log('  validationRules param 14:', values[14])
-      console.log('  organizationId:', organizationId)
+      console.log('================================================================================')
+      console.log('📊 FULL VALUES ARRAY (passed to db.query):')
+      console.log('================================================================================')
+      console.log(JSON.stringify(values, null, 2))
+      console.log('')
+      console.log('📊 CRITICAL JSONB PARAMETERS:')
+      console.log('  values[14] (validationRules - will use ::jsonb cast):', values[14])
+      console.log('  values[14] type:', typeof values[14])
+      console.log('  values[15] (fieldOptions - will use ::jsonb cast):', values[15])
+      console.log('  values[15] type:', typeof values[15])
+      console.log('================================================================================')
 
-      console.log('🚀 Executing database query...')
+      console.log('🚀 Executing database query with ::jsonb casts on parameters 15 and 16...')
       const result = await db.query(query, values)
       console.log('✅ Database query successful!')
 

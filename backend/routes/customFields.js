@@ -97,8 +97,20 @@ router.get('/', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
-    console.log('📥 POST /api/custom-fields')
-    console.log('Request body:', JSON.stringify(req.body, null, 2))
+    console.log('================================================================================')
+    console.log('📥 POST /api/custom-fields - ROUTE HANDLER START')
+    console.log('================================================================================')
+    console.log('🔍 STEP 1: RAW REQUEST BODY')
+    console.log('  Full body:', JSON.stringify(req.body, null, 2))
+    console.log('  field_options type:', typeof req.body.field_options)
+    console.log('  field_options value:', req.body.field_options)
+    console.log('  field_options is array?:', Array.isArray(req.body.field_options))
+    if (Array.isArray(req.body.field_options)) {
+      console.log('  field_options length:', req.body.field_options.length)
+      console.log('  First element:', req.body.field_options[0])
+      console.log('  First element type:', typeof req.body.field_options[0])
+      console.log('  First element stringified:', JSON.stringify(req.body.field_options[0]))
+    }
     console.log('User:', { id: req.user?.id, organization_id: req.user?.organization_id })
 
     const organizationId = req.user.organization_id
@@ -154,6 +166,15 @@ router.post('/', async (req, res) => {
       defaultValue: defaultValue !== undefined ? defaultValue : default_value,
       placeholder: placeholder,
       fieldGroup: fieldGroup || field_group
+    }
+
+    console.log('🔍 STEP 2: AFTER NORMALIZATION')
+    console.log('  normalizedData.fieldOptions type:', typeof normalizedData.fieldOptions)
+    console.log('  normalizedData.fieldOptions is array?:', Array.isArray(normalizedData.fieldOptions))
+    console.log('  normalizedData.fieldOptions value:', normalizedData.fieldOptions)
+    if (Array.isArray(normalizedData.fieldOptions) && normalizedData.fieldOptions.length > 0) {
+      console.log('  normalizedData.fieldOptions[0]:', normalizedData.fieldOptions[0])
+      console.log('  normalizedData.fieldOptions[0] type:', typeof normalizedData.fieldOptions[0])
     }
 
     console.log('📋 Extracted field data:', {
@@ -255,17 +276,22 @@ router.post('/', async (req, res) => {
     })
 
     // CRITICAL: Log the exact data about to be passed to model
-    console.log('🔍 CRITICAL - ABOUT TO CALL MODEL:')
-    console.log('  fieldOptions type:', typeof fieldData.fieldOptions)
-    console.log('  fieldOptions is array?', Array.isArray(fieldData.fieldOptions))
-    console.log('  fieldOptions value:', JSON.stringify(fieldData.fieldOptions))
-    console.log('  fieldOptions raw:', fieldData.fieldOptions)
-    console.log('  First option:', fieldData.fieldOptions?.[0])
-    console.log('  First option type:', typeof fieldData.fieldOptions?.[0])
+    console.log('🔍 STEP 3: BEFORE CALLING MODEL')
+    console.log('  fieldData.fieldOptions type:', typeof fieldData.fieldOptions)
+    console.log('  fieldData.fieldOptions is array?:', Array.isArray(fieldData.fieldOptions))
+    console.log('  fieldData.fieldOptions value:', fieldData.fieldOptions)
+    console.log('  fieldData.fieldOptions stringified:', JSON.stringify(fieldData.fieldOptions))
+    if (Array.isArray(fieldData.fieldOptions) && fieldData.fieldOptions.length > 0) {
+      console.log('  fieldData.fieldOptions[0]:', fieldData.fieldOptions[0])
+      console.log('  fieldData.fieldOptions[0] type:', typeof fieldData.fieldOptions[0])
+    }
+    console.log('================================================================================')
 
     const field = await CustomField.createFieldDefinition(fieldData)
 
+    console.log('================================================================================')
     console.log('🎉 Model returned successfully:', field.id)
+    console.log('================================================================================')
 
     console.log('✅ Field created successfully:', field.id)
 
@@ -547,17 +573,22 @@ router.post('/definitions', async (req, res) => {
     })
 
     // CRITICAL: Log the exact data about to be passed to model
-    console.log('🔍 CRITICAL - ABOUT TO CALL MODEL:')
-    console.log('  fieldOptions type:', typeof fieldData.fieldOptions)
-    console.log('  fieldOptions is array?', Array.isArray(fieldData.fieldOptions))
-    console.log('  fieldOptions value:', JSON.stringify(fieldData.fieldOptions))
-    console.log('  fieldOptions raw:', fieldData.fieldOptions)
-    console.log('  First option:', fieldData.fieldOptions?.[0])
-    console.log('  First option type:', typeof fieldData.fieldOptions?.[0])
+    console.log('🔍 STEP 3: BEFORE CALLING MODEL')
+    console.log('  fieldData.fieldOptions type:', typeof fieldData.fieldOptions)
+    console.log('  fieldData.fieldOptions is array?:', Array.isArray(fieldData.fieldOptions))
+    console.log('  fieldData.fieldOptions value:', fieldData.fieldOptions)
+    console.log('  fieldData.fieldOptions stringified:', JSON.stringify(fieldData.fieldOptions))
+    if (Array.isArray(fieldData.fieldOptions) && fieldData.fieldOptions.length > 0) {
+      console.log('  fieldData.fieldOptions[0]:', fieldData.fieldOptions[0])
+      console.log('  fieldData.fieldOptions[0] type:', typeof fieldData.fieldOptions[0])
+    }
+    console.log('================================================================================')
 
     const field = await CustomField.createFieldDefinition(fieldData)
 
+    console.log('================================================================================')
     console.log('🎉 Model returned successfully:', field.id)
+    console.log('================================================================================')
 
     console.log('✅ Field created successfully:', field.id)
 
