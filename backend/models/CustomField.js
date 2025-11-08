@@ -185,18 +185,33 @@ class CustomField {
         showInDetailView,
         showInCreateForm,
         showInEditForm,
-        JSON.stringify(validationRules),
-        JSON.stringify(fieldOptions),
+        // For JSONB columns, pg driver handles conversion automatically
+        // Pass objects/arrays directly, not stringified
+        validationRules || {},
+        fieldOptions || [],
         defaultValue,
         placeholder,
         fieldGroup,
         createdBy
       ]
 
+      console.log('📊 Inserting field with values:', {
+        fieldName,
+        fieldType,
+        fieldOptions: fieldOptions || [],
+        validationRules: validationRules || {}
+      })
+
       const result = await db.query(query, values)
+
+      console.log('✅ Field created in database:', result.rows[0].id)
+
       return result.rows[0]
     } catch (error) {
-      console.error('Error creating field definition:', error)
+      console.error('❌ Error creating field definition:', error)
+      console.error('Error code:', error.code)
+      console.error('Error detail:', error.detail)
+      console.error('Error hint:', error.hint)
       throw error
     }
   }
@@ -240,12 +255,9 @@ class CustomField {
         if (allowedFields.includes(snakeKey)) {
           updates.push(`${snakeKey} = $${paramCount}`)
 
-          // Handle JSONB fields
-          if (['validation_rules', 'field_options'].includes(snakeKey)) {
-            values.push(JSON.stringify(updateData[key]))
-          } else {
-            values.push(updateData[key])
-          }
+          // Handle JSONB fields - pg driver handles conversion automatically
+          // No need to stringify, just pass the object/array
+          values.push(updateData[key])
           paramCount++
         }
       })
@@ -416,7 +428,7 @@ class CustomField {
         fieldDefinitionId,
         entityType,
         entityId,
-        JSON.stringify({ value: fieldValue }),
+        { value: fieldValue }, // pg driver handles JSONB conversion
         createdBy
       ]
 
