@@ -199,17 +199,24 @@ class CustomField {
       console.log('================================================================================')
       console.log('📊 PREPARING DATABASE QUERY')
       console.log('================================================================================')
-      console.log('📊 QUERY PARAMETER fieldOptions (before JSON.stringify):')
+      console.log('📊 QUERY PARAMETER fieldOptions (raw - no stringify):')
       console.log('  Type:', typeof fieldOptions)
       console.log('  Is Array:', Array.isArray(fieldOptions))
       console.log('  Value:', fieldOptions)
-      console.log('  Stringified:', JSON.stringify(fieldOptions))
       console.log('')
-      console.log('📊 QUERY PARAMETER validationRules (before JSON.stringify):')
+      console.log('📊 QUERY PARAMETER validationRules (raw - no stringify):')
       console.log('  Type:', typeof validationRules)
       console.log('  Value:', validationRules)
-      console.log('  Stringified:', JSON.stringify(validationRules))
       console.log('================================================================================')
+
+      // Clean and ensure proper format - handle edge cases where data might already be stringified
+      const cleanFieldOptions = Array.isArray(fieldOptions)
+        ? fieldOptions
+        : (typeof fieldOptions === 'string' ? JSON.parse(fieldOptions) : (fieldOptions || []))
+
+      const cleanValidationRules = (validationRules && typeof validationRules === 'object' && !Array.isArray(validationRules))
+        ? validationRules
+        : (typeof validationRules === 'string' ? JSON.parse(validationRules) : {})
 
       const values = [
         organizationId,
@@ -226,10 +233,11 @@ class CustomField {
         showInDetailView,
         showInCreateForm,
         showInEditForm,
-        // For JSONB columns, we must JSON.stringify and use ::jsonb cast in SQL
-        // pg driver does NOT automatically convert objects to JSONB
-        JSON.stringify(validationRules || {}),
-        JSON.stringify(fieldOptions || []),
+        // CRITICAL FIX: Pass raw JavaScript objects/arrays to pg driver
+        // The ::jsonb cast in SQL will handle the conversion automatically
+        // DO NOT use JSON.stringify - that causes double-stringification!
+        cleanValidationRules,  // Raw object
+        cleanFieldOptions,     // Raw array
         defaultValue,
         placeholder,
         fieldGroup,
@@ -241,14 +249,20 @@ class CustomField {
       console.log('================================================================================')
       console.log(JSON.stringify(values, null, 2))
       console.log('')
-      console.log('📊 CRITICAL JSONB PARAMETERS:')
-      console.log('  values[14] (validationRules - will use ::jsonb cast):', values[14])
+      console.log('📊 CRITICAL JSONB PARAMETERS (CLEANED):')
+      console.log('  cleanValidationRules:', cleanValidationRules)
+      console.log('  cleanValidationRules type:', typeof cleanValidationRules)
+      console.log('  cleanValidationRules is object?:', typeof cleanValidationRules === 'object')
+      console.log('  cleanFieldOptions:', cleanFieldOptions)
+      console.log('  cleanFieldOptions type:', typeof cleanFieldOptions)
+      console.log('  cleanFieldOptions is array?:', Array.isArray(cleanFieldOptions))
+      console.log('  values[14] (validationRules - RAW OBJECT for ::jsonb):', values[14])
       console.log('  values[14] type:', typeof values[14])
-      console.log('  values[15] (fieldOptions - will use ::jsonb cast):', values[15])
+      console.log('  values[15] (fieldOptions - RAW ARRAY for ::jsonb):', values[15])
       console.log('  values[15] type:', typeof values[15])
       console.log('================================================================================')
 
-      console.log('🚀 Executing database query with ::jsonb casts on parameters 15 and 16...')
+      console.log('🚀 Executing database query with ::jsonb casts - pg will auto-convert raw objects/arrays...')
       const result = await db.query(query, values)
       console.log('✅ Database query successful!')
 
@@ -301,10 +315,17 @@ class CustomField {
       Object.keys(updateData).forEach(key => {
         const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`)
         if (allowedFields.includes(snakeKey)) {
-          // Handle JSONB fields - must stringify and use ::jsonb cast
+          // Handle JSONB fields - pass raw objects/arrays, pg will handle conversion
           if (snakeKey === 'validation_rules' || snakeKey === 'field_options') {
             updates.push(`${snakeKey} = $${paramCount}::jsonb`)
-            values.push(JSON.stringify(updateData[key]))
+            // Clean the data - ensure it's the right type
+            let cleanValue = updateData[key]
+            if (snakeKey === 'field_options') {
+              cleanValue = Array.isArray(cleanValue) ? cleanValue : (typeof cleanValue === 'string' ? JSON.parse(cleanValue) : [])
+            } else if (snakeKey === 'validation_rules') {
+              cleanValue = (cleanValue && typeof cleanValue === 'object' && !Array.isArray(cleanValue)) ? cleanValue : (typeof cleanValue === 'string' ? JSON.parse(cleanValue) : {})
+            }
+            values.push(cleanValue)  // Raw object/array
           } else {
             updates.push(`${snakeKey} = $${paramCount}`)
             values.push(updateData[key])
@@ -479,7 +500,7 @@ class CustomField {
         fieldDefinitionId,
         entityType,
         entityId,
-        JSON.stringify({ value: fieldValue }), // Must stringify for ::jsonb cast
+        { value: fieldValue }, // Raw object - pg will handle ::jsonb conversion
         createdBy
       ]
 
