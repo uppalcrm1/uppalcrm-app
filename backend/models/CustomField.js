@@ -166,7 +166,7 @@ class CustomField {
           placeholder,
           field_group,
           created_by
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15::jsonb, $16::jsonb, $17, $18, $19, $20)
         RETURNING *
       `
 
@@ -194,10 +194,10 @@ class CustomField {
         showInDetailView,
         showInCreateForm,
         showInEditForm,
-        // For JSONB columns, pg driver handles conversion automatically
-        // Pass objects/arrays directly, not stringified
-        validationRules || {},
-        fieldOptions || [],
+        // For JSONB columns, we must JSON.stringify and use ::jsonb cast in SQL
+        // pg driver does NOT automatically convert objects to JSONB
+        JSON.stringify(validationRules || {}),
+        JSON.stringify(fieldOptions || []),
         defaultValue,
         placeholder,
         fieldGroup,
@@ -264,11 +264,14 @@ class CustomField {
       Object.keys(updateData).forEach(key => {
         const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`)
         if (allowedFields.includes(snakeKey)) {
-          updates.push(`${snakeKey} = $${paramCount}`)
-
-          // Handle JSONB fields - pg driver handles conversion automatically
-          // No need to stringify, just pass the object/array
-          values.push(updateData[key])
+          // Handle JSONB fields - must stringify and use ::jsonb cast
+          if (snakeKey === 'validation_rules' || snakeKey === 'field_options') {
+            updates.push(`${snakeKey} = $${paramCount}::jsonb`)
+            values.push(JSON.stringify(updateData[key]))
+          } else {
+            updates.push(`${snakeKey} = $${paramCount}`)
+            values.push(updateData[key])
+          }
           paramCount++
         }
       })
@@ -425,7 +428,7 @@ class CustomField {
           field_value,
           created_by,
           updated_by
-        ) VALUES ($1, $2, $3, $4, $5, $6, $6)
+        ) VALUES ($1, $2, $3, $4, $5::jsonb, $6, $6)
         ON CONFLICT (field_definition_id, entity_id)
         DO UPDATE SET
           field_value = EXCLUDED.field_value,
@@ -439,7 +442,7 @@ class CustomField {
         fieldDefinitionId,
         entityType,
         entityId,
-        { value: fieldValue }, // pg driver handles JSONB conversion
+        JSON.stringify({ value: fieldValue }), // Must stringify for ::jsonb cast
         createdBy
       ]
 

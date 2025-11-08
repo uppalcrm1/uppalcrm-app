@@ -254,7 +254,18 @@ router.post('/', async (req, res) => {
       fieldOptions: fieldData.fieldOptions?.length || 0
     })
 
+    // CRITICAL: Log the exact data about to be passed to model
+    console.log('🔍 CRITICAL - ABOUT TO CALL MODEL:')
+    console.log('  fieldOptions type:', typeof fieldData.fieldOptions)
+    console.log('  fieldOptions is array?', Array.isArray(fieldData.fieldOptions))
+    console.log('  fieldOptions value:', JSON.stringify(fieldData.fieldOptions))
+    console.log('  fieldOptions raw:', fieldData.fieldOptions)
+    console.log('  First option:', fieldData.fieldOptions?.[0])
+    console.log('  First option type:', typeof fieldData.fieldOptions?.[0])
+
     const field = await CustomField.createFieldDefinition(fieldData)
+
+    console.log('🎉 Model returned successfully:', field.id)
 
     console.log('✅ Field created successfully:', field.id)
 
@@ -535,7 +546,18 @@ router.post('/definitions', async (req, res) => {
       fieldOptions: fieldData.fieldOptions?.length || 0
     })
 
+    // CRITICAL: Log the exact data about to be passed to model
+    console.log('🔍 CRITICAL - ABOUT TO CALL MODEL:')
+    console.log('  fieldOptions type:', typeof fieldData.fieldOptions)
+    console.log('  fieldOptions is array?', Array.isArray(fieldData.fieldOptions))
+    console.log('  fieldOptions value:', JSON.stringify(fieldData.fieldOptions))
+    console.log('  fieldOptions raw:', fieldData.fieldOptions)
+    console.log('  First option:', fieldData.fieldOptions?.[0])
+    console.log('  First option type:', typeof fieldData.fieldOptions?.[0])
+
     const field = await CustomField.createFieldDefinition(fieldData)
+
+    console.log('🎉 Model returned successfully:', field.id)
 
     console.log('✅ Field created successfully:', field.id)
 
