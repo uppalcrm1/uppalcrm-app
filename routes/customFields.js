@@ -237,7 +237,7 @@ const ensureTablesExist = async () => {
               await db.query(`
                 INSERT INTO custom_field_definitions
                 (organization_id, entity_type, field_name, field_label, field_type, field_options, is_required)
-                VALUES ($1, $2, $3, $4, $5, $6, $7)
+                VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)
               `, [field.organization_id, entityType, field.field_name, field.field_label, field.field_type, field.field_options, field.is_required]);
               console.log(`✅ Duplicated field '${field.field_name}' for ${entityType}`);
             } catch (err) {
@@ -772,7 +772,7 @@ router.post('/', fieldCreationLimit, async (req, res) => {
     const result = await db.query(`
       INSERT INTO custom_field_definitions
       (organization_id, entity_type, field_name, field_label, field_type, field_options, is_required, created_by)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8)
       RETURNING id, entity_type, field_name, field_label, field_type, field_options, is_required, is_enabled, created_at
     `, [req.organizationId, entity_type, field_name, field_label, field_type, field_options, is_required, req.userId]);
 
@@ -808,7 +808,12 @@ router.put('/:fieldId', async (req, res) => {
 
     Object.entries(value).forEach(([key, val]) => {
       if (val !== undefined) {
-        updates.push(`${key} = $${paramCount++}`);
+        // Add ::jsonb cast for JSONB columns
+        if (key === 'field_options') {
+          updates.push(`${key} = $${paramCount++}::jsonb`);
+        } else {
+          updates.push(`${key} = $${paramCount++}`);
+        }
         values.push(val);
       }
     });
