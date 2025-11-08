@@ -379,45 +379,101 @@ router.get('/definitions/:entityType/:fieldId', async (req, res) => {
 router.post('/definitions', async (req, res) => {
   try {
     console.log('📥 POST /api/custom-fields/definitions')
-    console.log('Body:', req.body)
+    console.log('Request body:', JSON.stringify(req.body, null, 2))
+    console.log('User:', { id: req.user?.id, organization_id: req.user?.organization_id })
 
     const organizationId = req.user.organization_id
     const userId = req.user.id
+
+    if (!organizationId) {
+      console.error('❌ No organization_id found')
+      return res.status(400).json({
+        error: 'Missing organization context',
+        details: 'User must be associated with an organization'
+      })
+    }
+
+    // Support both camelCase and snake_case field names from frontend
     const {
-      fieldName,
-      fieldLabel,
-      fieldDescription,
-      entityType,
-      fieldType,
-      isRequired,
-      isSearchable,
-      isFilterable,
-      displayOrder,
-      showInListView,
-      showInDetailView,
-      showInCreateForm,
-      showInEditForm,
-      validationRules,
-      fieldOptions,
-      defaultValue,
+      fieldName, field_name,
+      fieldLabel, field_label,
+      fieldDescription, field_description,
+      entityType, entity_type,
+      fieldType, field_type,
+      isRequired, is_required,
+      isSearchable, is_searchable,
+      isFilterable, is_filterable,
+      displayOrder, display_order,
+      showInListView, show_in_list_view,
+      showInDetailView, show_in_detail_view,
+      showInCreateForm, show_in_create_form,
+      showInEditForm, show_in_edit_form,
+      validationRules, validation_rules,
+      fieldOptions, field_options,
+      defaultValue, default_value,
       placeholder,
-      fieldGroup
+      fieldGroup, field_group
     } = req.body
 
+    // Normalize to camelCase (prefer camelCase, fallback to snake_case)
+    const normalizedData = {
+      fieldName: fieldName || field_name,
+      fieldLabel: fieldLabel || field_label,
+      fieldDescription: fieldDescription || field_description,
+      entityType: entityType || entity_type || 'leads', // Default to 'leads' if not provided
+      fieldType: fieldType || field_type,
+      isRequired: isRequired !== undefined ? isRequired : is_required,
+      isSearchable: isSearchable !== undefined ? isSearchable : is_searchable,
+      isFilterable: isFilterable !== undefined ? isFilterable : is_filterable,
+      displayOrder: displayOrder !== undefined ? displayOrder : display_order,
+      showInListView: showInListView !== undefined ? showInListView : show_in_list_view,
+      showInDetailView: showInDetailView !== undefined ? showInDetailView : show_in_detail_view,
+      showInCreateForm: showInCreateForm !== undefined ? showInCreateForm : show_in_create_form,
+      showInEditForm: showInEditForm !== undefined ? showInEditForm : show_in_edit_form,
+      validationRules: validationRules || validation_rules,
+      fieldOptions: fieldOptions || field_options,
+      defaultValue: defaultValue !== undefined ? defaultValue : default_value,
+      placeholder: placeholder,
+      fieldGroup: fieldGroup || field_group
+    }
+
+    console.log('📋 Extracted field data:', {
+      fieldName: normalizedData.fieldName,
+      fieldLabel: normalizedData.fieldLabel,
+      entityType: normalizedData.entityType,
+      fieldType: normalizedData.fieldType,
+      fieldOptions: normalizedData.fieldOptions?.length || 0,
+      organizationId
+    })
+
     // Validate required fields
-    if (!fieldName || !fieldLabel || !entityType || !fieldType) {
+    if (!normalizedData.fieldName || !normalizedData.fieldLabel || !normalizedData.entityType || !normalizedData.fieldType) {
+      console.error('❌ Missing required fields:', {
+        fieldName: normalizedData.fieldName,
+        fieldLabel: normalizedData.fieldLabel,
+        entityType: normalizedData.entityType,
+        fieldType: normalizedData.fieldType
+      })
       return res.status(400).json({
         error: 'Missing required fields',
-        required: ['fieldName', 'fieldLabel', 'entityType', 'fieldType']
+        required: ['fieldName', 'fieldLabel', 'entityType', 'fieldType'],
+        received: {
+          fieldName: normalizedData.fieldName,
+          fieldLabel: normalizedData.fieldLabel,
+          entityType: normalizedData.entityType,
+          fieldType: normalizedData.fieldType
+        }
       })
     }
 
     // Validate entity type
     const validEntityTypes = ['leads', 'contacts', 'accounts', 'transactions']
-    if (!validEntityTypes.includes(entityType)) {
+    if (!validEntityTypes.includes(normalizedData.entityType)) {
+      console.error('❌ Invalid entity type:', normalizedData.entityType)
       return res.status(400).json({
         error: 'Invalid entity type',
-        validTypes: validEntityTypes
+        validTypes: validEntityTypes,
+        received: normalizedData.entityType
       })
     }
 
@@ -426,44 +482,58 @@ router.post('/definitions', async (req, res) => {
       'text', 'number', 'email', 'phone', 'url', 'date', 'datetime',
       'textarea', 'select', 'multiselect', 'checkbox', 'radio'
     ]
-    if (!validFieldTypes.includes(fieldType)) {
+    if (!validFieldTypes.includes(normalizedData.fieldType)) {
+      console.error('❌ Invalid field type:', normalizedData.fieldType)
       return res.status(400).json({
         error: 'Invalid field type',
-        validTypes: validFieldTypes
+        validTypes: validFieldTypes,
+        received: normalizedData.fieldType
       })
     }
 
     // Validate field options for select/multiselect/radio
-    if (['select', 'multiselect', 'radio'].includes(fieldType)) {
-      if (!fieldOptions || !Array.isArray(fieldOptions) || fieldOptions.length === 0) {
+    if (['select', 'multiselect', 'radio'].includes(normalizedData.fieldType)) {
+      console.log('🔍 Validating field options for', normalizedData.fieldType)
+      console.log('Field options received:', normalizedData.fieldOptions)
+
+      if (!normalizedData.fieldOptions || !Array.isArray(normalizedData.fieldOptions) || normalizedData.fieldOptions.length === 0) {
+        console.error('❌ Missing or invalid field options for select/multiselect/radio field')
         return res.status(400).json({
-          error: 'Field options are required for select, multiselect, and radio field types'
+          error: 'Field options are required for select, multiselect, and radio field types',
+          fieldType: normalizedData.fieldType,
+          received: normalizedData.fieldOptions
         })
       }
+      console.log('✅ Field options valid:', normalizedData.fieldOptions.length, 'options')
     }
 
     const fieldData = {
       organizationId,
-      fieldName,
-      fieldLabel,
-      fieldDescription,
-      entityType,
-      fieldType,
-      isRequired,
-      isSearchable,
-      isFilterable,
-      displayOrder,
-      showInListView,
-      showInDetailView,
-      showInCreateForm,
-      showInEditForm,
-      validationRules,
-      fieldOptions,
-      defaultValue,
-      placeholder,
-      fieldGroup,
+      fieldName: normalizedData.fieldName,
+      fieldLabel: normalizedData.fieldLabel,
+      fieldDescription: normalizedData.fieldDescription,
+      entityType: normalizedData.entityType,
+      fieldType: normalizedData.fieldType,
+      isRequired: normalizedData.isRequired,
+      isSearchable: normalizedData.isSearchable,
+      isFilterable: normalizedData.isFilterable,
+      displayOrder: normalizedData.displayOrder,
+      showInListView: normalizedData.showInListView,
+      showInDetailView: normalizedData.showInDetailView,
+      showInCreateForm: normalizedData.showInCreateForm,
+      showInEditForm: normalizedData.showInEditForm,
+      validationRules: normalizedData.validationRules,
+      fieldOptions: normalizedData.fieldOptions,
+      defaultValue: normalizedData.defaultValue,
+      placeholder: normalizedData.placeholder,
+      fieldGroup: normalizedData.fieldGroup,
       createdBy: userId
     }
+
+    console.log('💾 Calling CustomField.createFieldDefinition with:', {
+      ...fieldData,
+      fieldOptions: fieldData.fieldOptions?.length || 0
+    })
 
     const field = await CustomField.createFieldDefinition(fieldData)
 
@@ -476,17 +546,33 @@ router.post('/definitions', async (req, res) => {
     })
   } catch (error) {
     console.error('❌ Error creating field definition:', error)
+    console.error('Error name:', error.name)
+    console.error('Error message:', error.message)
+    console.error('Error code:', error.code)
+    console.error('Error stack:', error.stack)
 
     // Handle unique constraint violation
     if (error.code === '23505') {
       return res.status(409).json({
-        error: 'A field with this name already exists for this entity type'
+        error: 'A field with this name already exists for this entity type',
+        details: error.message
+      })
+    }
+
+    // Handle database errors
+    if (error.code) {
+      return res.status(500).json({
+        error: 'Database error',
+        code: error.code,
+        details: error.message,
+        hint: error.hint
       })
     }
 
     res.status(500).json({
       error: 'Failed to create field definition',
-      details: error.message
+      details: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     })
   }
 })
