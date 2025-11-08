@@ -1,4 +1,4 @@
-const db = require('../config/database')
+const db = require('../database/connection')
 
 class CustomField {
   // ========================================
@@ -170,6 +170,15 @@ class CustomField {
         RETURNING *
       `
 
+      // CRITICAL: Log types and values before passing to database
+      console.log('🔍 DETAILED INSPECTION BEFORE DB INSERT:')
+      console.log('  fieldOptions type:', typeof fieldOptions)
+      console.log('  fieldOptions isArray:', Array.isArray(fieldOptions))
+      console.log('  fieldOptions value:', JSON.stringify(fieldOptions, null, 2))
+      console.log('  fieldOptions raw:', fieldOptions)
+      console.log('  validationRules type:', typeof validationRules)
+      console.log('  validationRules value:', JSON.stringify(validationRules, null, 2))
+
       const values = [
         organizationId,
         fieldName,
@@ -195,14 +204,16 @@ class CustomField {
         createdBy
       ]
 
-      console.log('📊 Inserting field with values:', {
-        fieldName,
-        fieldType,
-        fieldOptions: fieldOptions || [],
-        validationRules: validationRules || {}
-      })
+      console.log('📊 Inserting field with values:')
+      console.log('  fieldName:', fieldName)
+      console.log('  fieldType:', fieldType)
+      console.log('  fieldOptions param 15:', values[15])
+      console.log('  validationRules param 14:', values[14])
+      console.log('  organizationId:', organizationId)
 
+      console.log('🚀 Executing database query...')
       const result = await db.query(query, values)
+      console.log('✅ Database query successful!')
 
       console.log('✅ Field created in database:', result.rows[0].id)
 
