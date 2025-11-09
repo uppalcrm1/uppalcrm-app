@@ -47,10 +47,26 @@ const LeadDetail = () => {
   const [showConversionModal, setShowConversionModal] = useState(false)
   const [isConverting, setIsConverting] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [customFields, setCustomFields] = useState([])
 
   useEffect(() => {
     fetchLeadDetail()
+    fetchCustomFields()
   }, [id, refreshKey])
+
+  const fetchCustomFields = async () => {
+    try {
+      const response = await api.get('/custom-fields/form-config')
+      // Filter to only show fields marked for detail view
+      const fieldsForDetailView = (response.data.customFields || []).filter(
+        f => f.is_enabled && f.show_in_detail_view !== false
+      )
+      setCustomFields(fieldsForDetailView)
+    } catch (err) {
+      console.error('Error fetching custom fields:', err)
+      // Don't show error to user, just continue without custom fields
+    }
+  }
 
   const fetchLeadDetail = async () => {
     try {
@@ -515,6 +531,42 @@ const LeadDetailsPanel = ({ lead }) => {
             <div className="md:col-span-2">
               <h3 className="text-sm font-medium text-gray-900 mb-3">Notes</h3>
               <div className="mt-1 text-sm text-gray-900 whitespace-pre-wrap">{lead.notes}</div>
+            </div>
+          )}
+
+          {/* Custom Fields */}
+          {customFields.length > 0 && (
+            <div className="md:col-span-2">
+              <h3 className="text-sm font-medium text-gray-900 mb-3">Custom Fields</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {customFields.map(field => {
+                  const fieldValue = lead.custom_fields?.[field.field_name]
+                  if (!fieldValue && fieldValue !== 0) return null
+
+                  return (
+                    <div key={field.field_name}>
+                      <label className="block text-sm font-medium text-gray-700">
+                        {field.field_label}
+                      </label>
+                      <div className="mt-1 text-sm text-gray-900">
+                        {field.field_type === 'select' && field.field_options ? (
+                          // For select fields, show the label if it's an object option
+                          (() => {
+                            const option = field.field_options.find(
+                              opt => (typeof opt === 'string' ? opt : opt.value) === fieldValue
+                            )
+                            return option
+                              ? (typeof option === 'string' ? option : option.label)
+                              : fieldValue
+                          })()
+                        ) : (
+                          fieldValue || 'Not provided'
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           )}
         </div>

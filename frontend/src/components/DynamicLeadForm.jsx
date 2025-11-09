@@ -421,7 +421,23 @@ const DynamicLeadForm = ({
   }
 
   const enabledSystemFields = getEnabledSystemFields();
-  const enabledCustomFields = (formConfig.customFields || []).filter(f => f.is_enabled);
+
+  // Filter custom fields based on mode and visibility flags
+  const enabledCustomFields = (formConfig.customFields || []).filter(f => {
+    if (!f.is_enabled) return false;
+
+    // For create mode, check show_in_create_form
+    if (mode === 'create' || mode !== 'edit') {
+      return f.show_in_create_form !== false; // Default to true if not set
+    }
+
+    // For edit mode, check show_in_edit_form
+    if (mode === 'edit') {
+      return f.show_in_edit_form !== false; // Default to true if not set
+    }
+
+    return true;
+  });
 
   // Determine if this should be rendered as a modal
   const isModalMode = isOpen !== undefined;

@@ -1216,13 +1216,26 @@ router.get('/form-config', async (req, res) => {
 
     console.log('🔍 Form config request for organization:', req.organizationId);
 
-    // Get custom fields (without is_enabled filter for schema compatibility)
+    // Get custom fields with all visibility columns
     let customFields = { rows: [] };
     try {
       customFields = await db.query(`
-        SELECT field_name, field_label, field_type, field_options, is_required, created_at
+        SELECT
+          field_name,
+          field_label,
+          field_type,
+          field_options,
+          is_required,
+          is_enabled,
+          show_in_create_form,
+          show_in_edit_form,
+          show_in_detail_view,
+          entity_type,
+          created_at
         FROM custom_field_definitions
         WHERE organization_id = $1
+          AND entity_type = 'leads'
+          AND is_enabled = true
         ORDER BY created_at ASC
       `, [req.organizationId]);
     } catch (error) {
