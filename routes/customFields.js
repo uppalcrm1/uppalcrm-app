@@ -739,6 +739,13 @@ router.post('/', fieldCreationLimit, async (req, res) => {
     console.log('=== FILE: routes/customFields.js (OLD FILE WITH DIRECT DB.QUERY) ===')
     console.log('='.repeat(80))
 
+    // DEBUG: Log raw request body
+    console.log('🔍 DEBUG RAW REQUEST BODY:')
+    console.log('  req.body.field_options type:', typeof req.body.field_options)
+    console.log('  req.body.field_options is array?:', Array.isArray(req.body.field_options))
+    console.log('  req.body.field_options:', req.body.field_options)
+    console.log('  Full req.body:', JSON.stringify(req.body, null, 2))
+
     // Ensure tables exist before attempting to insert
     await ensureTablesExist();
 
@@ -746,6 +753,12 @@ router.post('/', fieldCreationLimit, async (req, res) => {
     if (error) {
       return res.status(400).json({ error: error.details[0].message });
     }
+
+    // DEBUG: Log what Joi validation returned
+    console.log('🔍 DEBUG AFTER JOI VALIDATION:')
+    console.log('  value.field_options type:', typeof value.field_options)
+    console.log('  value.field_options is array?:', Array.isArray(value.field_options))
+    console.log('  value.field_options:', value.field_options)
 
     const { field_name, field_label, field_type, field_options, is_required, entity_type = 'leads' } = value;
 
@@ -772,6 +785,17 @@ router.post('/', fieldCreationLimit, async (req, res) => {
     const systemFields = ['firstName', 'lastName', 'email', 'phone', 'company', 'source', 'status', 'priority'];
     if (systemFields.includes(field_name)) {
       return res.status(400).json({ error: 'Field name conflicts with system field' });
+    }
+
+    // CRITICAL DEBUG: Log field_options before INSERT
+    console.log('🔍 DEBUG BEFORE INSERT (routes/customFields.js line 777):')
+    console.log('  field_options type:', typeof field_options)
+    console.log('  field_options is array?:', Array.isArray(field_options))
+    console.log('  field_options value:', field_options)
+    console.log('  field_options stringified:', JSON.stringify(field_options))
+    if (Array.isArray(field_options) && field_options.length > 0) {
+      console.log('  field_options[0]:', field_options[0])
+      console.log('  field_options[0] type:', typeof field_options[0])
     }
 
     const result = await db.query(`
