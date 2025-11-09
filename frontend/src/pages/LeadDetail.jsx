@@ -311,7 +311,7 @@ const LeadDetail = () => {
           {/* Main Content */}
           <div className="lg:col-span-2">
             {activeTab === 'details' && (
-              <LeadDetailsPanel lead={lead} />
+              <LeadDetailsPanel lead={lead} customFields={customFields} />
             )}
 
             {activeTab === 'activities' && (
@@ -444,7 +444,7 @@ const LeadDetail = () => {
 }
 
 // Lead Details Panel Component
-const LeadDetailsPanel = ({ lead }) => {
+const LeadDetailsPanel = ({ lead, customFields = [] }) => {
   return (
     <div className="bg-white rounded-lg shadow">
       <div className="p-6">
