@@ -734,6 +734,11 @@ router.get('/', async (req, res) => {
 // Create new custom field
 router.post('/', fieldCreationLimit, async (req, res) => {
   try {
+    console.log('='.repeat(80))
+    console.log('=== CODE VERSION: routes/customFields.js - 2025-11-08-v6 ===')
+    console.log('=== FILE: routes/customFields.js (OLD FILE WITH DIRECT DB.QUERY) ===')
+    console.log('='.repeat(80))
+
     // Ensure tables exist before attempting to insert
     await ensureTablesExist();
 

@@ -97,6 +97,10 @@ router.get('/', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
+    console.log('='.repeat(80))
+    console.log('=== CODE VERSION: backend/routes/customFields.js - 2025-11-08-v6 ===')
+    console.log('=== FILE: backend/routes/customFields.js (NEW FILE WITH CustomField MODEL) ===')
+    console.log('='.repeat(80))
     console.log('================================================================================')
     console.log('📥 POST /api/custom-fields - ROUTE HANDLER START')
     console.log('================================================================================')
