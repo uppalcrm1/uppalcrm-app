@@ -234,11 +234,13 @@ const ensureTablesExist = async () => {
           if (exists.rows.length === 0) {
             // Create the field for this entity type
             try {
+              // Stringify field_options for JSONB column
+              const fieldOptionsJson = field.field_options ? JSON.stringify(field.field_options) : null
               await db.query(`
                 INSERT INTO custom_field_definitions
                 (organization_id, entity_type, field_name, field_label, field_type, field_options, is_required)
-                VALUES ($1, $2, $3, $4, $5, $6, $7)
-              `, [field.organization_id, entityType, field.field_name, field.field_label, field.field_type, field.field_options, field.is_required]);
+                VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)
+              `, [field.organization_id, entityType, field.field_name, field.field_label, field.field_type, fieldOptionsJson, field.is_required]);
               console.log(`✅ Duplicated field '${field.field_name}' for ${entityType}`);
             } catch (err) {
               console.log(`⚠️ Could not duplicate field '${field.field_name}' for ${entityType}:`, err.message);
@@ -798,12 +800,17 @@ router.post('/', fieldCreationLimit, async (req, res) => {
       console.log('  field_options[0] type:', typeof field_options[0])
     }
 
+    // CRITICAL FIX: For JSONB columns, pg driver requires JSON.stringify + ::jsonb cast
+    const fieldOptionsJson = field_options ? JSON.stringify(field_options) : null
+    console.log('  fieldOptionsJson (stringified for ::jsonb):', fieldOptionsJson)
+    console.log('  fieldOptionsJson type:', typeof fieldOptionsJson)
+
     const result = await db.query(`
       INSERT INTO custom_field_definitions
       (organization_id, entity_type, field_name, field_label, field_type, field_options, is_required, created_by)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8)
       RETURNING id, entity_type, field_name, field_label, field_type, field_options, is_required, is_enabled, created_at
-    `, [req.organizationId, entity_type, field_name, field_label, field_type, field_options, is_required, req.userId]);
+    `, [req.organizationId, entity_type, field_name, field_label, field_type, fieldOptionsJson, is_required, req.userId]);
 
     res.status(201).json({
       message: 'Custom field created successfully',
@@ -837,9 +844,14 @@ router.put('/:fieldId', async (req, res) => {
 
     Object.entries(value).forEach(([key, val]) => {
       if (val !== undefined) {
-        // pg driver handles JSONB conversion automatically - no cast needed
-        updates.push(`${key} = $${paramCount++}`);
-        values.push(val);
+        // For JSONB columns, stringify and use ::jsonb cast
+        if (key === 'field_options') {
+          updates.push(`${key} = $${paramCount++}::jsonb`);
+          values.push(JSON.stringify(val));
+        } else {
+          updates.push(`${key} = $${paramCount++}`);
+          values.push(val);
+        }
       }
     });
 
