@@ -25,16 +25,21 @@ import InlineEditCell from './InlineEditCell'
 import api from '../services/api'
 import { leadsAPI } from '../services/api'
 
-// Define available columns with metadata
-const COLUMN_DEFINITIONS = [
+// Define system columns with metadata (comprehensive list)
+const SYSTEM_COLUMN_DEFINITIONS = [
   { key: 'name', label: 'Name', description: 'Contact name and title', required: true },
-  { key: 'email', label: 'Email', description: 'Email and phone contact info', required: false },
+  { key: 'email', label: 'Email', description: 'Email address', required: false },
+  { key: 'phone', label: 'Phone', description: 'Phone number', required: false },
   { key: 'company', label: 'Company', description: 'Company name', required: false },
+  { key: 'source', label: 'Source', description: 'Lead source', required: false },
   { key: 'status', label: 'Status', description: 'Lead status', required: false },
   { key: 'priority', label: 'Priority', description: 'Lead priority level', required: false },
   { key: 'value', label: 'Value', description: 'Estimated value', required: false },
   { key: 'assigned_to', label: 'Assigned To', description: 'Assigned team member', required: false },
-  { key: 'created_at', label: 'Created', description: 'Creation date', required: false }
+  { key: 'next_follow_up', label: 'Next Follow Up', description: 'Next follow up date', required: false },
+  { key: 'notes', label: 'Notes', description: 'Lead notes', required: false },
+  { key: 'created_at', label: 'Created', description: 'Creation date', required: false },
+  { key: 'updated_at', label: 'Updated', description: 'Last update date', required: false }
 ]
 
 // Default visible columns
@@ -65,6 +70,7 @@ const LeadListTable = ({
   const [selectedLeads, setSelectedLeads] = useState([])
   const [showBulkActions, setShowBulkActions] = useState(false)
   const [fieldLabels, setFieldLabels] = useState({})
+  const [columnDefinitions, setColumnDefinitions] = useState(SYSTEM_COLUMN_DEFINITIONS)
 
   // Load column visibility from localStorage or use defaults
   const [visibleColumns, setVisibleColumns] = useState(() => {
@@ -80,7 +86,7 @@ const LeadListTable = ({
     setLocalLeads(leads)
   }, [leads])
 
-  // Fetch field configuration to get dynamic column labels
+  // Fetch field configuration to get dynamic column labels AND build column definitions
   useEffect(() => {
     const loadFieldConfiguration = async () => {
       try {
@@ -102,10 +108,31 @@ const LeadListTable = ({
 
         setFieldLabels(labelMap)
         console.log('📋 Field labels loaded for leads:', labelMap)
+
+        // Build dynamic column definitions with custom fields
+        const customFieldColumns = (response.data.customFields || [])
+          .filter(f => f.is_enabled && (f.show_in_list_view !== false))
+          .map(field => ({
+            key: field.field_name,
+            label: field.field_label,
+            description: field.field_description || `Custom ${field.field_type} field`,
+            required: false,
+            isCustom: true,
+            fieldType: field.field_type,
+            fieldOptions: field.field_options
+          }))
+
+        // Combine system and custom field columns
+        const allColumns = [...SYSTEM_COLUMN_DEFINITIONS, ...customFieldColumns]
+        setColumnDefinitions(allColumns)
+        console.log('📋 Column definitions updated:', allColumns.length, 'total columns')
+        console.log('   - System columns:', SYSTEM_COLUMN_DEFINITIONS.length)
+        console.log('   - Custom columns:', customFieldColumns.length)
       } catch (error) {
         console.error('❌ Error loading field configuration:', error)
-        // Use default labels if API fails
+        // Use default labels and system columns only if API fails
         setFieldLabels({})
+        setColumnDefinitions(SYSTEM_COLUMN_DEFINITIONS)
       }
     }
 
@@ -349,7 +376,7 @@ const LeadListTable = ({
         </div>
         <div className="flex items-center gap-2">
           <ColumnSelector
-            columns={COLUMN_DEFINITIONS}
+            columns={columnDefinitions}
             visibleColumns={visibleColumns}
             onColumnToggle={handleColumnToggle}
             onReset={handleResetColumns}
