@@ -26,6 +26,7 @@ const InlineEditCell = React.memo(({
   users = [],            // For user-select
   prefix = '',           // For number fields (e.g., "$")
   validation = null,     // Custom validation function
+  isCustomField = false, // Whether this is a custom field
 
   // Callbacks
   onSave,
@@ -118,7 +119,7 @@ const InlineEditCell = React.memo(({
 
     try {
       // Call the onSave callback (should return a promise)
-      await onSave(recordId, fieldName, saveValue)
+      await onSave(recordId, fieldName, saveValue, isCustomField)
 
       // Show success indicator briefly
       setShowSuccess(true)
@@ -143,7 +144,7 @@ const InlineEditCell = React.memo(({
     } finally {
       setIsSaving(false)
     }
-  }, [currentValue, fieldType, validation, recordId, fieldName, onSave, onError])
+  }, [currentValue, fieldType, validation, recordId, fieldName, onSave, onError, isCustomField])
 
   const handleKeyDown = useCallback((e) => {
     if (e.key === 'Enter') {

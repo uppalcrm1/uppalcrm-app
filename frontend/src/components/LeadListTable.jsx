@@ -222,21 +222,48 @@ const LeadListTable = ({
   }
 
   // Inline edit handler with optimistic updates
-  const handleFieldUpdate = async (recordId, fieldName, newValue) => {
-    console.log(`📝 Updating lead ${recordId}: ${fieldName} = ${newValue}`)
+  const handleFieldUpdate = async (recordId, fieldName, newValue, isCustomField = false) => {
+    console.log(`📝 Updating lead ${recordId}: ${fieldName} = ${newValue}${isCustomField ? ' (custom field)' : ''}`)
+
+    // Check if this is a custom field by looking at columnDefinitions
+    const isCustom = isCustomField || columnDefinitions.some(col => col.key === fieldName && col.isCustom)
 
     // Optimistic update: immediately update local state
     setLocalLeads(prevLeads =>
-      prevLeads.map(lead =>
-        lead.id === recordId
-          ? { ...lead, [fieldName]: newValue }
-          : lead
-      )
+      prevLeads.map(lead => {
+        if (lead.id !== recordId) return lead
+
+        if (isCustom) {
+          // For custom fields, update the custom_fields object
+          return {
+            ...lead,
+            custom_fields: {
+              ...lead.custom_fields,
+              [fieldName]: newValue
+            }
+          }
+        } else {
+          // For regular fields, update directly
+          return { ...lead, [fieldName]: newValue }
+        }
+      })
     )
 
     // Save to server
     try {
-      await leadsAPI.updateLead(recordId, { [fieldName]: newValue })
+      if (isCustom) {
+        // For custom fields, update the custom_fields object
+        const currentLead = localLeads.find(l => l.id === recordId)
+        await leadsAPI.updateLead(recordId, {
+          custom_fields: {
+            ...(currentLead?.custom_fields || {}),
+            [fieldName]: newValue
+          }
+        })
+      } else {
+        // For regular fields, update directly
+        await leadsAPI.updateLead(recordId, { [fieldName]: newValue })
+      }
       console.log(`✅ Successfully updated lead ${recordId}`)
     } catch (error) {
       console.error(`❌ Failed to update lead ${recordId}:`, error)
@@ -436,6 +463,17 @@ const LeadListTable = ({
               {visibleColumns.value && <SortableHeader sortKey="value">{getFieldLabel('value', 'Value')}</SortableHeader>}
               {visibleColumns.assigned_to && <SortableHeader sortKey="assigned_to">{getFieldLabel('assigned_to', 'Assigned To')}</SortableHeader>}
               {visibleColumns.created_at && <SortableHeader sortKey="created_at">{getFieldLabel('created_at', 'Created')}</SortableHeader>}
+              {visibleColumns.phone && <SortableHeader sortKey="phone">{getFieldLabel('phone', 'Phone')}</SortableHeader>}
+              {visibleColumns.source && <SortableHeader sortKey="source">{getFieldLabel('source', 'Source')}</SortableHeader>}
+              {visibleColumns.next_follow_up && <SortableHeader sortKey="next_follow_up">{getFieldLabel('next_follow_up', 'Next Follow Up')}</SortableHeader>}
+              {visibleColumns.notes && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{getFieldLabel('notes', 'Notes')}</th>}
+              {visibleColumns.updated_at && <SortableHeader sortKey="updated_at">{getFieldLabel('updated_at', 'Updated')}</SortableHeader>}
+              {/* Custom Fields */}
+              {columnDefinitions.filter(col => col.isCustom && visibleColumns[col.key]).map(col => (
+                <th key={col.key} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  {col.label}
+                </th>
+              ))}
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Actions
               </th>
@@ -618,6 +656,151 @@ const LeadListTable = ({
                       </div>
                     </td>
                   )}
+
+                  {/* Phone */}
+                  {visibleColumns.phone && (
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <InlineEditCell
+                        value={lead.phone}
+                        fieldName="phone"
+                        fieldType="text"
+                        recordId={lead.id}
+                        entityType="leads"
+                        onSave={handleFieldUpdate}
+                        placeholder="Add phone..."
+                        icon={<Phone className="w-3 h-3 text-gray-400" />}
+                        className="text-sm"
+                      />
+                    </td>
+                  )}
+
+                  {/* Source */}
+                  {visibleColumns.source && (
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <InlineEditCell
+                        value={lead.source}
+                        fieldName="source"
+                        fieldType="select"
+                        recordId={lead.id}
+                        entityType="leads"
+                        onSave={handleFieldUpdate}
+                        options={[
+                          { value: 'website', label: 'Website' },
+                          { value: 'referral', label: 'Referral' },
+                          { value: 'social', label: 'Social Media' },
+                          { value: 'cold-call', label: 'Cold Call' },
+                          { value: 'email', label: 'Email' },
+                          { value: 'advertisement', label: 'Advertisement' },
+                          { value: 'trade-show', label: 'Trade Show' },
+                          { value: 'other', label: 'Other' }
+                        ]}
+                        className="text-sm"
+                      />
+                    </td>
+                  )}
+
+                  {/* Next Follow Up */}
+                  {visibleColumns.next_follow_up && (
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <InlineEditCell
+                        value={lead.next_follow_up}
+                        fieldName="next_follow_up"
+                        fieldType="date"
+                        recordId={lead.id}
+                        entityType="leads"
+                        onSave={handleFieldUpdate}
+                        placeholder="Set date..."
+                        icon={<Calendar className="w-3 h-3 text-blue-600" />}
+                        className="text-sm"
+                      />
+                    </td>
+                  )}
+
+                  {/* Notes */}
+                  {visibleColumns.notes && (
+                    <td className="px-6 py-4 max-w-xs">
+                      <InlineEditCell
+                        value={lead.notes}
+                        fieldName="notes"
+                        fieldType="textarea"
+                        recordId={lead.id}
+                        entityType="leads"
+                        onSave={handleFieldUpdate}
+                        placeholder="Add notes..."
+                        className="text-sm text-gray-600 truncate"
+                      />
+                    </td>
+                  )}
+
+                  {/* Updated */}
+                  {visibleColumns.updated_at && (
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-1 text-sm text-gray-600">
+                        <Calendar className="w-3 h-3" />
+                        {format(new Date(lead.updated_at), 'MMM d, yyyy')}
+                      </div>
+                    </td>
+                  )}
+
+                  {/* Custom Fields */}
+                  {columnDefinitions.filter(col => col.isCustom && visibleColumns[col.key]).map(col => {
+                    const customValue = lead.custom_fields?.[col.key]
+
+                    return (
+                      <td key={col.key} className="px-6 py-4 whitespace-nowrap">
+                        {col.fieldType === 'select' && col.fieldOptions ? (
+                          <InlineEditCell
+                            value={customValue}
+                            fieldName={col.key}
+                            fieldType="select"
+                            recordId={lead.id}
+                            entityType="leads"
+                            onSave={handleFieldUpdate}
+                            options={col.fieldOptions.map(opt =>
+                              typeof opt === 'string'
+                                ? { value: opt, label: opt }
+                                : opt
+                            )}
+                            className="text-sm"
+                            isCustomField={true}
+                          />
+                        ) : col.fieldType === 'date' ? (
+                          <InlineEditCell
+                            value={customValue}
+                            fieldName={col.key}
+                            fieldType="date"
+                            recordId={lead.id}
+                            entityType="leads"
+                            onSave={handleFieldUpdate}
+                            className="text-sm"
+                            isCustomField={true}
+                          />
+                        ) : col.fieldType === 'number' ? (
+                          <InlineEditCell
+                            value={customValue}
+                            fieldName={col.key}
+                            fieldType="number"
+                            recordId={lead.id}
+                            entityType="leads"
+                            onSave={handleFieldUpdate}
+                            className="text-sm"
+                            isCustomField={true}
+                          />
+                        ) : (
+                          <InlineEditCell
+                            value={customValue}
+                            fieldName={col.key}
+                            fieldType="text"
+                            recordId={lead.id}
+                            entityType="leads"
+                            onSave={handleFieldUpdate}
+                            className="text-sm"
+                            isCustomField={true}
+                          />
+                        )}
+                      </td>
+                    )
+                  })}
 
                   {/* Actions */}
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
