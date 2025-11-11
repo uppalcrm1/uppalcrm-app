@@ -449,6 +449,30 @@ async function setupSuperAdmin() {
       console.log('⚠️  Lead trigger fix skipped (may not exist yet):', triggerError.message);
     }
 
+    // Add custom_fields column to leads table if it doesn't exist
+    console.log('🔧 Adding custom_fields column to leads table...');
+    try {
+      await client.query(`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = 'leads'
+            AND column_name = 'custom_fields'
+          ) THEN
+            ALTER TABLE leads ADD COLUMN custom_fields JSONB DEFAULT '{}'::jsonb;
+            CREATE INDEX IF NOT EXISTS idx_leads_custom_fields ON leads USING gin(custom_fields);
+            RAISE NOTICE 'Added custom_fields column to leads table';
+          ELSE
+            RAISE NOTICE 'custom_fields column already exists in leads table';
+          END IF;
+        END $$;
+      `);
+      console.log('✅ Custom fields column ensured in leads table');
+    } catch (customFieldsError) {
+      console.log('⚠️  Custom fields column setup error:', customFieldsError.message);
+    }
+
     console.log('🎉 Production super admin setup complete!');
 
   } catch (error) {
