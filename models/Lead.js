@@ -361,7 +361,7 @@ class Lead {
     const allowedFields = [
       'title', 'company', 'first_name', 'last_name', 'email', 'phone',
       'source', 'status', 'priority', 'value', 'notes', 'assigned_to',
-      'last_contact_date', 'next_follow_up'
+      'last_contact_date', 'next_follow_up', 'custom_fields'
     ];
 
     const updateFields = Object.keys(updates).filter(key => allowedFields.includes(key));
@@ -370,17 +370,31 @@ class Lead {
       throw new Error('No valid fields to update');
     }
 
-    const setClause = updateFields.map((field, index) => `${field} = $${index + 3}`).join(', ');
-    const values = [id, organizationId, ...updateFields.map(field => {
-      if (field === 'value') {
-        return parseFloat(updates[field]) || 0;
+    // Build SET clause with special handling for custom_fields
+    const setClauses = [];
+    const values = [id, organizationId];
+    let paramIndex = 3;
+
+    updateFields.forEach(field => {
+      if (field === 'custom_fields') {
+        // For custom_fields JSONB column, merge with existing data
+        setClauses.push(`custom_fields = COALESCE(custom_fields, '{}'::jsonb) || $${paramIndex}::jsonb`);
+        values.push(JSON.stringify(updates[field]));
+        paramIndex++;
+      } else {
+        setClauses.push(`${field} = $${paramIndex}`);
+        if (field === 'value') {
+          values.push(parseFloat(updates[field]) || 0);
+        } else if ((field === 'assigned_to' || field === 'next_follow_up' || field === 'last_contact_date') && updates[field] === '') {
+          values.push(null);
+        } else {
+          values.push(updates[field]);
+        }
+        paramIndex++;
       }
-      // Convert empty strings to null for UUID and date fields
-      if ((field === 'assigned_to' || field === 'next_follow_up' || field === 'last_contact_date') && updates[field] === '') {
-        return null;
-      }
-      return updates[field];
-    })];
+    });
+
+    const setClause = setClauses.join(', ');
 
     // If userId is provided, use a transaction to set the user context for the trigger
     if (userId) {
