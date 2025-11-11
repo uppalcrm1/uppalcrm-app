@@ -345,7 +345,8 @@ async function buildDynamicLeadSchema(organizationId, isUpdate = false) {
     next_follow_up: Joi.date().iso().allow(null, '').optional(),
     value: Joi.number().min(0).allow(null).optional(),
     potential_value: Joi.number().min(0).allow(null).optional(),
-    customFields: Joi.object().optional()
+    customFields: Joi.object().optional(),
+    custom_fields: Joi.object().optional() // snake_case version for inline edits
   };
 
   // Dynamic validation for source field
