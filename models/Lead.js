@@ -358,6 +358,12 @@ class Lead {
    * @returns {Lead|null} Updated lead
    */
   static async update(id, updates, organizationId, userId = null) {
+    console.log('🔍 ===== Lead.update() DEBUG START =====');
+    console.log('🔍 Lead ID:', id);
+    console.log('🔍 Updates received:', JSON.stringify(updates, null, 2));
+    console.log('🔍 Organization ID:', organizationId);
+    console.log('🔍 User ID:', userId);
+
     const allowedFields = [
       'title', 'company', 'first_name', 'last_name', 'email', 'phone',
       'source', 'status', 'priority', 'value', 'notes', 'assigned_to',
@@ -365,8 +371,11 @@ class Lead {
     ];
 
     const updateFields = Object.keys(updates).filter(key => allowedFields.includes(key));
+    console.log('🔍 Fields to update after filtering:', updateFields);
+    console.log('🔍 Has custom_fields:', updateFields.includes('custom_fields'));
 
     if (updateFields.length === 0) {
+      console.log('❌ No valid fields to update!');
       throw new Error('No valid fields to update');
     }
 
@@ -396,6 +405,12 @@ class Lead {
 
     const setClause = setClauses.join(', ');
 
+    console.log('🔍 SET clause:', setClause);
+    console.log('🔍 Values for query:', JSON.stringify(values, null, 2));
+
+    const fullQuery = `UPDATE leads SET ${setClause}, updated_at = NOW() WHERE id = $1 AND organization_id = $2 RETURNING *`;
+    console.log('🔍 Full SQL query:', fullQuery);
+
     // If userId is provided, use a transaction to set the user context for the trigger
     if (userId) {
       const db = require('../database/connection');
@@ -416,10 +431,19 @@ class Lead {
 
         await client.query('COMMIT');
 
+        console.log('🔍 Update result rows:', result.rows.length);
+        if (result.rows.length > 0) {
+          console.log('🔍 Updated lead data:', JSON.stringify(result.rows[0], null, 2));
+          console.log('🔍 custom_fields in result:', result.rows[0].custom_fields);
+        }
+
         if (result.rows.length === 0) {
+          console.log('❌ No rows returned from update!');
           return null;
         }
 
+        console.log('✅ Lead.update() completed successfully');
+        console.log('🔍 ===== Lead.update() DEBUG END =====');
         return new Lead(result.rows[0]);
       } catch (error) {
         await client.query('ROLLBACK');
@@ -429,6 +453,7 @@ class Lead {
       }
     } else {
       // Fallback to regular query if no userId provided
+      console.log('🔍 Using fallback query (no userId)');
       const result = await query(`
         UPDATE leads
         SET ${setClause}, updated_at = NOW()
@@ -436,10 +461,19 @@ class Lead {
         RETURNING *
       `, values, organizationId);
 
+      console.log('🔍 Update result rows:', result.rows.length);
+      if (result.rows.length > 0) {
+        console.log('🔍 Updated lead data:', JSON.stringify(result.rows[0], null, 2));
+        console.log('🔍 custom_fields in result:', result.rows[0].custom_fields);
+      }
+
       if (result.rows.length === 0) {
+        console.log('❌ No rows returned from update!');
         return null;
       }
 
+      console.log('✅ Lead.update() completed successfully');
+      console.log('🔍 ===== Lead.update() DEBUG END =====');
       return new Lead(result.rows[0]);
     }
   }

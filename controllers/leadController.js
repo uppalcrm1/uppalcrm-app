@@ -8,6 +8,10 @@ class LeadController {
       const { id } = req.params;
       const { organization_id, id: user_id } = req.user;
 
+      console.log('🔍 ===== GET /leads/:id/detail DEBUG START =====');
+      console.log('🔍 Lead ID:', id);
+      console.log('🔍 Organization ID:', organization_id);
+
       // Start with basic lead query
       let leadQuery = `
         SELECT
@@ -20,13 +24,19 @@ class LeadController {
         WHERE l.id = $1 AND l.organization_id = $2
       `;
 
+      console.log('🔍 Executing SELECT query');
       const leadResult = await db.query(leadQuery, [id, organization_id]);
+      console.log('🔍 Query returned rows:', leadResult.rows.length);
 
       if (leadResult.rows.length === 0) {
+        console.log('❌ Lead not found!');
         return res.status(404).json({ message: 'Lead not found' });
       }
 
       const lead = leadResult.rows[0];
+      console.log('🔍 Lead data from DB:', JSON.stringify(lead, null, 2));
+      console.log('🔍 custom_fields value:', lead.custom_fields);
+      console.log('🔍 custom_fields type:', typeof lead.custom_fields);
 
       // Initialize response data with defaults
       let activityStats = [];
@@ -72,13 +82,17 @@ class LeadController {
         console.log('Duplicates not available (table may not exist):', duplicatesError.message);
       }
 
+      console.log('🔍 Response data - lead.custom_fields:', lead.custom_fields);
+      console.log('🔍 Sending response to client');
+      console.log('🔍 ===== GET /leads/:id/detail DEBUG END =====');
+
       res.json({
         lead,
         activityStats,
         duplicates
       });
     } catch (error) {
-      console.error('Error fetching lead detail:', error);
+      console.error('❌ Error fetching lead detail:', error);
       res.status(500).json({ message: 'Internal server error' });
     }
   }
