@@ -290,7 +290,143 @@ router.get('/debug/tables', async (req, res) => {
   }
 });
 
-// Lead validation schemas
+/**
+ * Fetch field configurations from database
+ * This makes validation dynamic based on Field Configuration settings
+ */
+async function getFieldConfigurations(organizationId) {
+  try {
+    const result = await db.query(`
+      SELECT field_name, field_options, is_enabled, is_required
+      FROM default_field_configurations
+      WHERE organization_id = $1
+    `, [organizationId]);
+
+    return result.rows;
+  } catch (error) {
+    console.error('Error fetching field configurations:', error);
+    return [];
+  }
+}
+
+/**
+ * Build dynamic Joi schema based on field configurations
+ */
+async function buildDynamicLeadSchema(organizationId, isUpdate = false) {
+  const fieldConfigs = await getFieldConfigurations(organizationId);
+  const configMap = {};
+
+  fieldConfigs.forEach(config => {
+    configMap[config.field_name] = config;
+  });
+
+  // Helper to get allowed values for select fields
+  const getAllowedValues = (fieldName, fallbackValues = []) => {
+    const config = configMap[fieldName];
+    if (config && config.field_options && Array.isArray(config.field_options)) {
+      return config.field_options.map(opt =>
+        typeof opt === 'string' ? opt : opt.value
+      );
+    }
+    return fallbackValues;
+  };
+
+  // Build schema fields
+  const schemaFields = {
+    title: Joi.string().max(100).allow('', null).optional(),
+    company: Joi.string().max(255).allow('', null).optional(),
+    first_name: Joi.string().min(1).max(100).allow(null).optional(),
+    last_name: Joi.string().min(1).max(100).allow(null).optional(),
+    email: Joi.string().email().allow('', null).optional(),
+    phone: Joi.string().max(50).allow('', null).optional(),
+    notes: Joi.string().allow('', null).optional(),
+    assigned_to: Joi.string().guid({ version: 'uuidv4' }).allow(null, '').optional(),
+    last_contact_date: Joi.date().iso().allow(null, '').optional(),
+    next_follow_up: Joi.date().iso().allow(null, '').optional(),
+    value: Joi.number().min(0).allow(null).optional(),
+    potential_value: Joi.number().min(0).allow(null).optional(),
+    customFields: Joi.object().optional()
+  };
+
+  // Dynamic validation for source field
+  const sourceValues = getAllowedValues('source', ['website', 'referral', 'social', 'cold-call', 'email', 'advertisement', 'trade-show', 'other']);
+  schemaFields.source = Joi.string().valid(...sourceValues, '', null).optional();
+
+  // Dynamic validation for status field
+  const statusValues = getAllowedValues('status', ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'converted', 'lost']);
+  if (isUpdate) {
+    schemaFields.status = Joi.string().valid(...statusValues, null).optional();
+  } else {
+    schemaFields.status = Joi.string().valid(...statusValues).default('new');
+  }
+
+  // Dynamic validation for priority field
+  const priorityValues = getAllowedValues('priority', ['low', 'medium', 'high']);
+  if (isUpdate) {
+    schemaFields.priority = Joi.string().valid(...priorityValues, null).optional();
+  } else {
+    schemaFields.priority = Joi.string().valid(...priorityValues).default('medium');
+  }
+
+  if (isUpdate) {
+    // Additional fields allowed in update requests
+    schemaFields.id = Joi.string().guid({ version: 'uuidv4' }).optional();
+    schemaFields.created_at = Joi.date().optional();
+    schemaFields.updated_at = Joi.date().optional();
+    schemaFields.organization_id = Joi.string().guid({ version: 'uuidv4' }).optional();
+    schemaFields.created_by = Joi.string().guid({ version: 'uuidv4' }).optional();
+    schemaFields.linked_contact_id = Joi.string().guid({ version: 'uuidv4' }).allow(null).optional();
+    schemaFields.relationship_type = Joi.string().allow(null).optional();
+    schemaFields.interest_type = Joi.string().allow(null).optional();
+    schemaFields.converted_date = Joi.date().iso().allow(null).optional();
+    schemaFields.owner_first_name = Joi.string().allow(null).optional();
+    schemaFields.owner_last_name = Joi.string().allow(null).optional();
+    schemaFields.owner_email = Joi.string().allow(null).optional();
+
+    return Joi.object(schemaFields).unknown(true);
+  } else {
+    // For create, make first_name and last_name required
+    schemaFields.first_name = Joi.string().min(1).max(100).required();
+    schemaFields.last_name = Joi.string().min(1).max(100).required();
+
+    return Joi.object(schemaFields);
+  }
+}
+
+/**
+ * Dynamic validation middleware
+ */
+function validateLeadDynamic(isUpdate = false) {
+  return async (req, res, next) => {
+    try {
+      const schema = await buildDynamicLeadSchema(req.organizationId, isUpdate);
+      const { error, value } = schema.validate(req.body, { abortEarly: false });
+
+      if (error) {
+        const errors = error.details.map(detail => ({
+          field: detail.path.join('.'),
+          message: detail.message
+        }));
+
+        return res.status(400).json({
+          error: 'Request data is invalid',
+          details: errors
+        });
+      }
+
+      req.body = value; // Use validated/sanitized data
+      next();
+    } catch (err) {
+      console.error('Validation error:', err);
+      return res.status(500).json({
+        error: 'Validation failed',
+        message: err.message
+      });
+    }
+  };
+}
+
+// Lead validation schemas (LEGACY - kept for backward compatibility)
 const leadSchemas = {
   createLead: {
     body: Joi.object({
@@ -693,8 +829,9 @@ router.get('/:id',
 /**
  * POST /leads
  * Create new lead with custom fields support
+ * Uses dynamic validation based on Field Configuration settings
  */
-router.post('/', async (req, res) => {
+router.post('/', validateLeadDynamic(false), async (req, res) => {
   try {
     console.log('🔍 Creating lead with data:', req.body);
     console.log('🔍 Organization ID:', req.organizationId);
@@ -827,9 +964,10 @@ router.post('/', async (req, res) => {
 /**
  * PUT /leads/:id
  * Update lead information
+ * Uses dynamic validation based on Field Configuration settings
  */
 router.put('/:id',
-  validate(leadSchemas.updateLead),
+  validateLeadDynamic(true),
   async (req, res) => {
     try {
       // Pass user ID for audit trail tracking
@@ -948,8 +1086,17 @@ router.patch('/:id/status',
     try {
       const { status } = req.body;
 
-      // Validate status
-      const validStatuses = ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'converted', 'lost'];
+      // Validate status dynamically based on field configuration
+      const fieldConfigs = await getFieldConfigurations(req.organizationId);
+      const statusConfig = fieldConfigs.find(f => f.field_name === 'status');
+
+      let validStatuses = ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'converted', 'lost']; // Fallback
+      if (statusConfig && statusConfig.field_options && Array.isArray(statusConfig.field_options)) {
+        validStatuses = statusConfig.field_options.map(opt =>
+          typeof opt === 'string' ? opt : opt.value
+        );
+      }
+
       if (!validStatuses.includes(status)) {
         return res.status(400).json({
           error: 'Invalid status',
