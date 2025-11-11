@@ -291,10 +291,10 @@ router.get('/debug/tables', async (req, res) => {
 });
 
 /**
- * Fetch field configurations from database
+ * Fetch system field configurations from database
  * This makes validation dynamic based on Field Configuration settings
  */
-async function getFieldConfigurations(organizationId) {
+async function getSystemFieldConfigurations(organizationId) {
   try {
     const result = await db.query(`
       SELECT field_name, field_options, is_enabled, is_required
@@ -304,7 +304,7 @@ async function getFieldConfigurations(organizationId) {
 
     return result.rows;
   } catch (error) {
-    console.error('Error fetching field configurations:', error);
+    console.error('Error fetching system field configurations:', error);
     return [];
   }
 }
@@ -313,7 +313,7 @@ async function getFieldConfigurations(organizationId) {
  * Build dynamic Joi schema based on field configurations
  */
 async function buildDynamicLeadSchema(organizationId, isUpdate = false) {
-  const fieldConfigs = await getFieldConfigurations(organizationId);
+  const fieldConfigs = await getSystemFieldConfigurations(organizationId);
   const configMap = {};
 
   fieldConfigs.forEach(config => {
@@ -1087,7 +1087,7 @@ router.patch('/:id/status',
       const { status } = req.body;
 
       // Validate status dynamically based on field configuration
-      const fieldConfigs = await getFieldConfigurations(req.organizationId);
+      const fieldConfigs = await getSystemFieldConfigurations(req.organizationId);
       const statusConfig = fieldConfigs.find(f => f.field_name === 'status');
 
       let validStatuses = ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'converted', 'lost']; // Fallback
