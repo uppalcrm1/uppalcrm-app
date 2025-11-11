@@ -159,8 +159,14 @@ const DynamicLeadForm = ({
             }
             break;
           case 'select':
-            if (field.field_options && !field.field_options.includes(value)) {
-              newErrors[`custom_${field.field_name}`] = `${field.field_label} must be a valid option`;
+            if (field.field_options) {
+              // Handle both string array and {value, label} object array formats
+              const validOptions = field.field_options.map(opt =>
+                typeof opt === 'string' ? opt : opt.value
+              );
+              if (!validOptions.includes(value)) {
+                newErrors[`custom_${field.field_name}`] = `${field.field_label} must be a valid option`;
+              }
             }
             break;
         }
@@ -178,24 +184,33 @@ const DynamicLeadForm = ({
 
     setSubmitting(true);
     try {
-      // Map form field names back to API field names
+      // Build submitData with ONLY editable fields
+      // DO NOT spread formData as it contains read-only fields like created_at, updated_at, etc.
       const submitData = {
-        ...formData,
-        // Map camelCase back to snake_case for API
-        first_name: formData.firstName || formData.first_name,
-        last_name: formData.lastName || formData.last_name,
-        potential_value: formData.potentialValue || formData.potential_value || 0,
-        assigned_to: formData.assignedTo || formData.assigned_to,
-        next_follow_up: formData.nextFollowUp || formData.next_follow_up,
-        customFields: formData.customFields
-      };
+        // Basic contact info
+        first_name: formData.firstName || formData.first_name || '',
+        last_name: formData.lastName || formData.last_name || '',
+        title: formData.title || '',
+        email: formData.email || '',
+        phone: formData.phone || '',
+        company: formData.company || '',
 
-      // Remove the camelCase versions to avoid sending both
-      delete submitData.firstName;
-      delete submitData.lastName;
-      delete submitData.potentialValue;
-      delete submitData.assignedTo;
-      delete submitData.nextFollowUp;
+        // Lead qualification
+        source: formData.source || '',
+        status: formData.status || 'new',
+        priority: formData.priority || 'medium',
+        potential_value: formData.potentialValue || formData.potential_value || formData.value || 0,
+
+        // Assignment and follow-up
+        assigned_to: formData.assignedTo || formData.assigned_to || null,
+        next_follow_up: formData.nextFollowUp || formData.next_follow_up || null,
+
+        // Additional info
+        notes: formData.notes || '',
+
+        // Custom fields
+        customFields: formData.customFields || {}
+      };
 
       let response;
       if (mode === 'edit' && actualInitialData?.id) {
@@ -393,14 +408,35 @@ const DynamicLeadForm = ({
       return systemField.field_options;
     }
 
-    // Fallback to defaults
+    // Fallback to defaults (matching backend validation)
     switch (fieldName) {
       case 'source':
-        return ['Website', 'Referral', 'Social', 'Cold-call', 'Email', 'Advertisement', 'Trade-show', 'Other'];
+        return [
+          { value: 'website', label: 'Website' },
+          { value: 'referral', label: 'Referral' },
+          { value: 'social', label: 'Social Media' },
+          { value: 'cold-call', label: 'Cold Call' },
+          { value: 'email', label: 'Email' },
+          { value: 'advertisement', label: 'Advertisement' },
+          { value: 'trade-show', label: 'Trade Show' },
+          { value: 'other', label: 'Other' }
+        ];
       case 'status':
-        return ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'converted', 'lost'];
+        return [
+          { value: 'new', label: 'New' },
+          { value: 'contacted', label: 'Contacted' },
+          { value: 'qualified', label: 'Qualified' },
+          { value: 'proposal', label: 'Proposal' },
+          { value: 'negotiation', label: 'Negotiation' },
+          { value: 'converted', label: 'Converted' },
+          { value: 'lost', label: 'Lost' }
+        ];
       case 'priority':
-        return ['low', 'medium', 'high'];
+        return [
+          { value: 'low', label: 'Low' },
+          { value: 'medium', label: 'Medium' },
+          { value: 'high', label: 'High' }
+        ];
       default:
         return [];
     }

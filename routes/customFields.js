@@ -932,21 +932,42 @@ router.put('/default/:fieldName', async (req, res) => {
         type: 'select',
         required: false,
         editable: true,
-        options: ['Website', 'Referral', 'Social', 'Cold-call', 'Email', 'Advertisement', 'Trade-show', 'Other']
+        options: [
+          { value: 'website', label: 'Website' },
+          { value: 'referral', label: 'Referral' },
+          { value: 'social', label: 'Social Media' },
+          { value: 'cold-call', label: 'Cold Call' },
+          { value: 'email', label: 'Email' },
+          { value: 'advertisement', label: 'Advertisement' },
+          { value: 'trade-show', label: 'Trade Show' },
+          { value: 'other', label: 'Other' }
+        ]
       },
       status: {
         label: 'Status',
         type: 'select',
         required: false,
         editable: true,
-        options: ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'converted', 'lost']
+        options: [
+          { value: 'new', label: 'New' },
+          { value: 'contacted', label: 'Contacted' },
+          { value: 'qualified', label: 'Qualified' },
+          { value: 'proposal', label: 'Proposal' },
+          { value: 'negotiation', label: 'Negotiation' },
+          { value: 'converted', label: 'Converted' },
+          { value: 'lost', label: 'Lost' }
+        ]
       },
       priority: {
         label: 'Priority',
         type: 'select',
         required: false,
         editable: true,
-        options: ['low', 'medium', 'high']
+        options: [
+          { value: 'low', label: 'Low' },
+          { value: 'medium', label: 'Medium' },
+          { value: 'high', label: 'High' }
+        ]
       },
       potentialValue: { label: 'Potential Value ($)', type: 'number', required: false, editable: true },
       assignedTo: { label: 'Assign To', type: 'user_select', required: false, editable: true },
@@ -1254,21 +1275,42 @@ router.get('/form-config', async (req, res) => {
         type: 'select',
         required: false,
         editable: true,
-        options: ['Website', 'Referral', 'Social', 'Cold-call', 'Email', 'Advertisement', 'Trade-show', 'Other']
+        options: [
+          { value: 'website', label: 'Website' },
+          { value: 'referral', label: 'Referral' },
+          { value: 'social', label: 'Social Media' },
+          { value: 'cold-call', label: 'Cold Call' },
+          { value: 'email', label: 'Email' },
+          { value: 'advertisement', label: 'Advertisement' },
+          { value: 'trade-show', label: 'Trade Show' },
+          { value: 'other', label: 'Other' }
+        ]
       },
       status: {
         label: 'Status',
         type: 'select',
         required: false,
         editable: true,
-        options: ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'converted', 'lost']
+        options: [
+          { value: 'new', label: 'New' },
+          { value: 'contacted', label: 'Contacted' },
+          { value: 'qualified', label: 'Qualified' },
+          { value: 'proposal', label: 'Proposal' },
+          { value: 'negotiation', label: 'Negotiation' },
+          { value: 'converted', label: 'Converted' },
+          { value: 'lost', label: 'Lost' }
+        ]
       },
       priority: {
         label: 'Priority',
         type: 'select',
         required: false,
         editable: true,
-        options: ['low', 'medium', 'high']
+        options: [
+          { value: 'low', label: 'Low' },
+          { value: 'medium', label: 'Medium' },
+          { value: 'high', label: 'High' }
+        ]
       },
       potentialValue: { label: 'Potential Value ($)', type: 'number', required: false, editable: true },
       assignedTo: { label: 'Assign To', type: 'user_select', required: false, editable: true },
