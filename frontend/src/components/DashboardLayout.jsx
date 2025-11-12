@@ -5,56 +5,35 @@ import {
   LayoutDashboard,
   Users,
   UserCheck,
-  UserPlus,
+  Building2,
+  DollarSign,
   Settings,
   LogOut,
   Menu,
   X,
   Bell,
   Search,
-  Building2,
   ChevronDown,
-  ChevronRight,
-  Zap,
-  Puzzle,
-  Plus,
-  Sliders,
+  UserCircle2,
   CreditCard,
-  Download,
-  DollarSign,
-  Plug,
-  Upload,
-  Package,
 } from 'lucide-react'
 import LoadingSpinner from './LoadingSpinner'
-import TrialBanner from './TrialBanner'
 
-// Main navigation - Core business operations (sidebar)
-const mainNavigation = [
+const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Leads', href: '/leads', icon: Users },
-  { name: 'Contacts', href: '/contacts', icon: UserCheck },
-  { name: 'Accounts', href: '/accounts', icon: CreditCard },
+  { name: 'Contacts', href: '/contacts', icon: UserCircle2 },
+  { name: 'Accounts', href: '/accounts', icon: Building2 },
   { name: 'Transactions', href: '/transactions', icon: DollarSign },
-]
-
-// Admin navigation - System administration (dropdown)
-const adminNavigation = [
-  { name: 'User Management', href: '/admin/users', icon: Users },
-  { name: 'Subscription', href: '/admin/subscription', icon: CreditCard },
-  { name: 'Integrations', href: '/admin/integrations', icon: Plug },
-  { name: 'Import', href: '/admin/import', icon: Upload },
-  { name: 'Field Configuration', href: '/admin/fields', icon: Sliders },
-  { name: 'Products', href: '/admin/products', icon: Package },
-  { name: 'Settings', href: '/admin/settings', icon: Settings },
+  { name: 'Billing', href: '/billing', icon: CreditCard },
+  { name: 'Team', href: '/team', icon: UserCheck },
+  { name: 'Settings', href: '/settings', icon: Settings },
 ]
 
 const DashboardLayout = () => {
   const { user, organization, logout, isLoading } = useAuth()
-  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
-  const [adminMenuOpen, setAdminMenuOpen] = useState(false)
-  const [submenuOpen, setSubmenuOpen] = useState({})
   const location = useLocation()
 
   if (isLoading) {
@@ -65,293 +44,176 @@ const DashboardLayout = () => {
     await logout()
   }
 
-  const toggleSubmenu = (itemName) => {
-    setSubmenuOpen(prev => ({
-      ...prev,
-      [itemName]: !prev[itemName]
-    }))
-  }
-
-  const isSubmenuItemActive = (children) => {
-    return children?.some(child => location.pathname === child.href)
-  }
-
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      {/* Mobile sidebar overlay */}
-      {sidebarOpen && (
-        <div 
-          className="fixed inset-0 z-40 bg-gray-600 bg-opacity-75 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      {/* Sidebar */}
-      <div className={`
-        fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0
-        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-      `}>
-        <div className="flex flex-col h-full">
-          {/* Logo */}
-          <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
-            <div className="flex items-center">
-              <Building2 className="h-8 w-8 text-primary-600" />
-              <div className="ml-3">
-                <h1 className="text-lg font-semibold text-gray-900">{organization?.name}</h1>
-                <p className="text-xs text-gray-500">CRM Dashboard</p>
-              </div>
-            </div>
-            <button
-              className="lg:hidden"
-              onClick={() => setSidebarOpen(false)}
-            >
-              <X size={20} className="text-gray-500" />
-            </button>
-          </div>
-
-          {/* Navigation */}
-          <nav className="flex-1 px-4 py-6 space-y-1">
-            {mainNavigation.map((item) => {
-              const Icon = item.icon
-              
-              // Handle items with submenus
-              if (item.hasSubmenu && item.children) {
-                const isAnyChildActive = isSubmenuItemActive(item.children)
-                const isSubmenuExpanded = submenuOpen[item.name] || isAnyChildActive
-                
-                return (
-                  <div key={item.name}>
-                    {/* Parent menu item */}
-                    <button
-                      onClick={() => toggleSubmenu(item.name)}
-                      className={`
-                        w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium rounded-lg transition-colors
-                        ${isAnyChildActive 
-                          ? 'bg-primary-50 text-primary-700' 
-                          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                        }
-                      `}
-                    >
-                      <div className="flex items-center">
-                        <Icon size={20} className="mr-3" />
-                        {item.name}
-                      </div>
-                      <ChevronRight 
-                        size={16} 
-                        className={`transition-transform ${isSubmenuExpanded ? 'rotate-90' : ''}`}
-                      />
-                    </button>
-                    
-                    {/* Submenu items */}
-                    {isSubmenuExpanded && (
-                      <div className="ml-6 mt-1 space-y-1">
-                        {item.children.map((child) => {
-                          const ChildIcon = child.icon
-                          const isChildActive = location.pathname === child.href
-                          
-                          return (
-                            <NavLink
-                              key={child.name}
-                              to={child.href}
-                              className={`
-                                flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors
-                                ${isChildActive 
-                                  ? 'bg-primary-100 text-primary-700 border-r-2 border-primary-600' 
-                                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                                }
-                              `}
-                              onClick={() => setSidebarOpen(false)}
-                            >
-                              <ChildIcon size={18} className="mr-3" />
-                              {child.name}
-                            </NavLink>
-                          )
-                        })}
-                      </div>
-                    )}
-                  </div>
-                )
-              }
-              
-              // Handle regular menu items
-              const isActive = location.pathname === item.href
-              
-              return (
-                <NavLink
-                  key={item.name}
-                  to={item.href}
-                  className={`
-                    flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-colors
-                    ${isActive 
-                      ? 'bg-primary-50 text-primary-700 border-r-2 border-primary-600' 
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                    }
-                  `}
-                  onClick={() => setSidebarOpen(false)}
-                >
-                  <Icon size={20} className="mr-3" />
-                  {item.name}
-                </NavLink>
-              )
-            })}
-          </nav>
-
-          {/* User Profile */}
-          <div className="border-t border-gray-200 p-4">
-            <div className="relative">
-              <button
-                className="w-full flex items-center p-2 text-sm text-gray-700 rounded-lg hover:bg-gray-100"
-                onClick={() => setUserMenuOpen(!userMenuOpen)}
-              >
-                <div className="flex-shrink-0 w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center">
-                  <span className="text-white text-sm font-medium">
-                    {user?.first_name?.[0]}{user?.last_name?.[0]}
-                  </span>
-                </div>
-                <div className="ml-3 flex-1 text-left">
-                  <p className="font-medium">{user?.first_name} {user?.last_name}</p>
-                  <p className="text-xs text-gray-500">{user?.email}</p>
-                </div>
-                <ChevronDown size={16} className="text-gray-400" />
-              </button>
-
-              {userMenuOpen && (
-                <div className="absolute bottom-full left-0 right-0 mb-2 bg-white rounded-lg shadow-lg border border-gray-200">
-                  <div className="py-1">
-                    <button
-                      onClick={handleLogout}
-                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center"
-                    >
-                      <LogOut size={16} className="mr-3" />
-                      Sign out
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="flex-1 lg:ml-0">
-        {/* Top Header */}
-        <header className="bg-white shadow-sm border-b border-gray-200">
-          <div className="flex items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gray-50">
+      {/* Top Header Bar */}
+      <header className="bg-white border-b border-gray-200 fixed w-full top-0 z-50">
+        {/* Top Row - Brand & User */}
+        <div className="px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            {/* Left - Brand */}
             <div className="flex items-center">
               <button
-                className="lg:hidden mr-4"
-                onClick={() => setSidebarOpen(true)}
+                className="lg:hidden mr-3 p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               >
-                <Menu size={20} className="text-gray-600" />
+                {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
               </button>
-              
-              <div className="hidden sm:block">
-                <h2 className="text-lg font-semibold text-gray-900">
-                  {(() => {
-                    // Check main navigation items
-                    const mainItem = mainNavigation.find(item => item.href === location.pathname)
-                    if (mainItem) return mainItem.name
 
-                    // Check admin navigation items
-                    const adminItem = adminNavigation.find(item => item.href === location.pathname)
-                    if (adminItem) return adminItem.name
-
-                    // Check submenu items
-                    for (const item of mainNavigation) {
-                      if (item.children) {
-                        const childItem = item.children.find(child => child.href === location.pathname)
-                        if (childItem) return childItem.name
-                      }
-                    }
-
-                    return 'Dashboard'
-                  })()}
-                </h2>
+              <div className="flex items-center">
+                <Building2 className="h-8 w-8 text-primary-600" />
+                <div className="ml-3">
+                  <h1 className="text-lg font-semibold text-gray-900">
+                    {organization?.name || 'UppalTV'}
+                  </h1>
+                  <p className="text-xs text-gray-500">CRM Dashboard</p>
+                </div>
               </div>
             </div>
 
-            <div className="flex items-center space-x-4">
+            {/* Right - Search, Notifications, User */}
+            <div className="flex items-center gap-4">
               {/* Search */}
-              <div className="hidden md:block relative">
-                <Search size={16} className="absolute left-3 top-3 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search..."
-                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
-                />
+              <div className="hidden md:flex items-center">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                  <input
+                    type="text"
+                    placeholder="Search..."
+                    className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  />
+                </div>
               </div>
 
               {/* Notifications */}
-              <button className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg">
+              <button className="p-2 rounded-lg text-gray-400 hover:text-gray-500 hover:bg-gray-100 relative">
                 <Bell size={20} />
+                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
               </button>
 
-              {/* Admin Dropdown */}
+              {/* User Menu */}
               <div className="relative">
                 <button
-                  onClick={() => setAdminMenuOpen(!adminMenuOpen)}
-                  className="flex items-center p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
+                  className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-100"
+                  onClick={() => setUserMenuOpen(!userMenuOpen)}
                 >
-                  <Settings size={20} className="mr-2" />
-                  <span className="hidden sm:inline text-sm font-medium">Admin</span>
-                  <ChevronDown size={16} className="ml-1" />
+                  <div className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center">
+                    <span className="text-white text-sm font-medium">
+                      {user?.first_name?.[0]}{user?.last_name?.[0]}
+                    </span>
+                  </div>
+                  <ChevronDown size={16} className="text-gray-400 hidden sm:block" />
                 </button>
 
-                {adminMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-                    <div className="py-2">
-                      {adminNavigation.map((item) => {
-                        const Icon = item.icon
-                        const isActive = location.pathname === item.href
-
-                        return (
-                          <NavLink
-                            key={item.name}
-                            to={item.href}
-                            onClick={() => setAdminMenuOpen(false)}
-                            className={`
-                              flex items-center px-4 py-2 text-sm transition-colors
-                              ${isActive
-                                ? 'bg-primary-50 text-primary-700 font-medium'
-                                : 'text-gray-700 hover:bg-gray-50'
-                              }
-                            `}
-                          >
-                            <Icon size={16} className="mr-3" />
-                            {item.name}
-                          </NavLink>
-                        )
-                      })}
+                {/* User Dropdown */}
+                {userMenuOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-10"
+                      onClick={() => setUserMenuOpen(false)}
+                    />
+                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-20">
+                      <div className="px-4 py-3 border-b border-gray-200">
+                        <p className="text-sm font-medium text-gray-900">
+                          {user?.first_name} {user?.last_name}
+                        </p>
+                        <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                      </div>
+                      <button
+                        onClick={handleLogout}
+                        className="w-full flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                      >
+                        <LogOut size={16} className="mr-3" />
+                        Sign out
+                      </button>
                     </div>
-                  </div>
+                  </>
                 )}
               </div>
             </div>
           </div>
-        </header>
+        </div>
 
-        {/* Trial Banner */}
-        <TrialBanner />
+        {/* Navigation Tabs - Horizontal */}
+        <nav className="hidden lg:block border-t border-gray-200 bg-white">
+          <div className="px-4 sm:px-6 lg:px-8">
+            <div className="flex space-x-8 overflow-x-auto">
+              {navigation.map((item) => {
+                const Icon = item.icon
+                const isActive = location.pathname === item.href
 
-        {/* Page Content */}
-        <main className="flex-1">
-          <div className="px-4 py-6 sm:px-6 lg:px-8">
-            <Outlet />
+                return (
+                  <NavLink
+                    key={item.name}
+                    to={item.href}
+                    className={`
+                      flex items-center px-1 py-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors
+                      ${isActive
+                        ? 'border-primary-600 text-primary-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      }
+                    `}
+                  >
+                    <Icon size={18} className="mr-2" />
+                    {item.name}
+                  </NavLink>
+                )
+              })}
+            </div>
           </div>
-        </main>
-      </div>
+        </nav>
+      </header>
 
-      {/* Click outside to close menus */}
-      {(userMenuOpen || adminMenuOpen) && (
-        <div
-          className="fixed inset-0 z-30"
-          onClick={() => {
-            setUserMenuOpen(false)
-            setAdminMenuOpen(false)
-          }}
-        />
+      {/* Mobile Navigation Menu */}
+      {mobileMenuOpen && (
+        <>
+          <div
+            className="fixed inset-0 z-40 bg-gray-600 bg-opacity-75 lg:hidden"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+          <div className="fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg lg:hidden">
+            <div className="flex flex-col h-full">
+              <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200">
+                <h2 className="text-lg font-semibold text-gray-900">Menu</h2>
+                <button onClick={() => setMobileMenuOpen(false)}>
+                  <X size={24} className="text-gray-500" />
+                </button>
+              </div>
+              <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
+                {navigation.map((item) => {
+                  const Icon = item.icon
+                  const isActive = location.pathname === item.href
+
+                  return (
+                    <NavLink
+                      key={item.name}
+                      to={item.href}
+                      className={`
+                        flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-colors
+                        ${isActive
+                          ? 'bg-primary-50 text-primary-700'
+                          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                        }
+                      `}
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      <Icon size={20} className="mr-3" />
+                      {item.name}
+                    </NavLink>
+                  )
+                })}
+              </nav>
+            </div>
+          </div>
+        </>
       )}
+
+      {/* Main Content - Now has full width */}
+      <main className="pt-32 lg:pt-28">
+        <div className="mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <Outlet />
+        </div>
+      </main>
     </div>
   )
 }
