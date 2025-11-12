@@ -364,6 +364,13 @@ class Lead {
     console.log('🔍 Organization ID:', organizationId);
     console.log('🔍 User ID:', userId);
 
+    // Normalize customFields (camelCase) to custom_fields (snake_case)
+    if (updates.customFields && !updates.custom_fields) {
+      console.log('🔍 Converting customFields (camelCase) to custom_fields (snake_case)');
+      updates.custom_fields = updates.customFields;
+      delete updates.customFields;
+    }
+
     const allowedFields = [
       'title', 'company', 'first_name', 'last_name', 'email', 'phone',
       'source', 'status', 'priority', 'value', 'notes', 'assigned_to',
