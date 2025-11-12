@@ -125,3 +125,20 @@ table td:hover {
 .inline-edit-cell * {
   cursor: pointer !important;
 }
+
+/* ========================================
+   MAXIMIZE CONTENT WIDTH FOR LIST VIEWS
+   ======================================== */
+
+/* Maximize content width for list views */
+main > div {
+  max-width: 100% !important;
+  padding-left: 1rem !important;
+  padding-right: 1rem !important;
+}
+
+/* Make tables full width */
+.leads-container,
+[class*="space-y-6"] {
+  max-width: 100% !important;
+}

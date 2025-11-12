@@ -178,7 +178,7 @@ const LeadsPage = () => {
   const pagination = leadsData?.pagination || {}
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -308,8 +308,9 @@ const LeadsPage = () => {
       </div>
 
       {/* Leads List */}
-      <div className="card">
-        {leads.length === 0 ? (
+      <div className="w-full">
+        <div className="card">
+          {leads.length === 0 ? (
           <div className="text-center py-12">
             <UserPlus className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No leads found</h3>
@@ -492,6 +493,7 @@ const LeadsPage = () => {
             )}
           </>
         )}
+        </div>
       </div>
 
       {/* Create Lead Modal */}
