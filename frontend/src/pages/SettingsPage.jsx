@@ -21,6 +21,7 @@ import LoadingSpinner from '../components/LoadingSpinner'
 import toast from 'react-hot-toast'
 import { useForm } from 'react-hook-form'
 import { useAuth } from '../contexts/AuthContext'
+import AdminFields from './admin/AdminFields'
 
 const SettingsPage = () => {
   const { user } = useAuth()
@@ -437,27 +438,7 @@ const ImportSettings = () => {
 
 // Field Configuration Settings Component
 const FieldConfigurationSettings = () => {
-  return (
-    <div>
-      <h3 className="text-lg font-semibold text-gray-900 mb-6">Field Configuration</h3>
-
-      <div className="space-y-4">
-        <p className="text-gray-600">Customize fields for leads, contacts, and accounts</p>
-
-        <div className="flex justify-end mb-4">
-          <button className="btn btn-primary btn-sm">
-            <Sliders size={16} className="mr-2" />
-            Add Custom Field
-          </button>
-        </div>
-
-        <div className="border border-gray-200 rounded-lg p-4">
-          <p className="text-sm text-gray-600">Field configuration interface coming soon...</p>
-          <p className="text-xs text-gray-500 mt-2">You'll be able to add custom fields, set validation rules, and control permissions</p>
-        </div>
-      </div>
-    </div>
-  )
+  return <AdminFields />
 }
 
 // Products Settings Component
