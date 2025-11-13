@@ -27,16 +27,28 @@ const SettingsPage = () => {
   const queryClient = useQueryClient()
   const location = useLocation()
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState('organization')
+
+  const [activeTab, setActiveTab] = useState(() => {
+    const path = location.pathname
+    if (path.includes('/user-management')) return 'user-management'
+    if (path.includes('/subscription')) return 'subscription'
+    if (path.includes('/integrations')) return 'integrations'
+    if (path.includes('/import')) return 'import'
+    if (path.includes('/field-configuration')) return 'field-configuration'
+    if (path.includes('/products')) return 'products'
+    return 'organization'
+  })
 
   // Handle direct navigation from Admin dropdown
   useEffect(() => {
     const path = location.pathname
-    // Extract tab from path like /settings/field-configuration
-    if (path.startsWith('/settings/')) {
-      const tab = path.replace('/settings/', '')
-      setActiveTab(tab)
-    }
+    if (path.includes('/user-management')) setActiveTab('user-management')
+    else if (path.includes('/subscription')) setActiveTab('subscription')
+    else if (path.includes('/integrations')) setActiveTab('integrations')
+    else if (path.includes('/import')) setActiveTab('import')
+    else if (path.includes('/field-configuration')) setActiveTab('field-configuration')
+    else if (path.includes('/products')) setActiveTab('products')
+    else setActiveTab('organization')
   }, [location.pathname])
 
   // Fetch organization data
