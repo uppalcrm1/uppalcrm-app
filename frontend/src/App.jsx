@@ -107,7 +107,7 @@ function App() {
         <Route path="leads" element={<Leads />} />
         <Route path="leads/:id" element={<LeadDetail />} />
         <Route path="contacts" element={<ContactsPage />} />
-        <Route path="settings" element={<SettingsPage />} />
+        <Route path="settings/*" element={<SettingsPage />} />
         <Route path="integrations/zapier" element={<ZapierIntegrationPage />} />
         <Route path="leads/new" element={<DynamicLeadForm />} />
         <Route path="leads/import" element={<ImportLeads />} />
