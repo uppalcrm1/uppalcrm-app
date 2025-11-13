@@ -4,9 +4,11 @@ import { useAuth } from '../contexts/AuthContext'
 import {
   LayoutDashboard,
   Users,
-  UserCheck,
+  UserCircle2,
   Building2,
   DollarSign,
+  CreditCard,
+  UserCheck,
   Settings,
   LogOut,
   Menu,
@@ -14,11 +16,14 @@ import {
   Bell,
   Search,
   ChevronDown,
-  UserCircle2,
-  CreditCard,
+  Plug,
+  Upload,
+  Sliders,
+  Package,
 } from 'lucide-react'
 import LoadingSpinner from './LoadingSpinner'
 
+// COMPLETE navigation with all your CRM sections
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Leads', href: '/leads', icon: Users },
@@ -34,6 +39,7 @@ const DashboardLayout = () => {
   const { user, organization, logout, isLoading } = useAuth()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [adminMenuOpen, setAdminMenuOpen] = useState(false)
   const location = useLocation()
 
   if (isLoading) {
@@ -80,7 +86,7 @@ const DashboardLayout = () => {
                   <input
                     type="text"
                     placeholder="Search..."
-                    className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent w-64"
                   />
                 </div>
               </div>
@@ -90,6 +96,87 @@ const DashboardLayout = () => {
                 <Bell size={20} />
                 <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
               </button>
+
+              {/* Admin Dropdown */}
+              <div className="relative">
+                <button
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 text-gray-700"
+                  onClick={() => setAdminMenuOpen(!adminMenuOpen)}
+                >
+                  <Settings size={18} />
+                  <span className="hidden sm:inline text-sm font-medium">Admin</span>
+                  <ChevronDown size={16} className="text-gray-400" />
+                </button>
+
+                {/* Admin Dropdown Menu */}
+                {adminMenuOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-10"
+                      onClick={() => setAdminMenuOpen(false)}
+                    />
+                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-20">
+                      <NavLink
+                        to="/settings/user-management"
+                        className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                        onClick={() => setAdminMenuOpen(false)}
+                      >
+                        <UserCheck size={16} className="mr-3" />
+                        User Management
+                      </NavLink>
+                      <NavLink
+                        to="/settings/subscription"
+                        className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                        onClick={() => setAdminMenuOpen(false)}
+                      >
+                        <CreditCard size={16} className="mr-3" />
+                        Subscription
+                      </NavLink>
+                      <NavLink
+                        to="/settings/integrations"
+                        className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                        onClick={() => setAdminMenuOpen(false)}
+                      >
+                        <Plug size={16} className="mr-3" />
+                        Integrations
+                      </NavLink>
+                      <NavLink
+                        to="/settings/import"
+                        className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                        onClick={() => setAdminMenuOpen(false)}
+                      >
+                        <Upload size={16} className="mr-3" />
+                        Import
+                      </NavLink>
+                      <NavLink
+                        to="/settings/field-configuration"
+                        className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                        onClick={() => setAdminMenuOpen(false)}
+                      >
+                        <Sliders size={16} className="mr-3" />
+                        Field Configuration
+                      </NavLink>
+                      <NavLink
+                        to="/settings/products"
+                        className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                        onClick={() => setAdminMenuOpen(false)}
+                      >
+                        <Package size={16} className="mr-3" />
+                        Products
+                      </NavLink>
+                      <div className="border-t border-gray-200 my-2"></div>
+                      <NavLink
+                        to="/settings"
+                        className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                        onClick={() => setAdminMenuOpen(false)}
+                      >
+                        <Settings size={16} className="mr-3" />
+                        Settings
+                      </NavLink>
+                    </div>
+                  </>
+                )}
+              </div>
 
               {/* User Menu */}
               <div className="relative">
@@ -101,6 +188,12 @@ const DashboardLayout = () => {
                     <span className="text-white text-sm font-medium">
                       {user?.first_name?.[0]}{user?.last_name?.[0]}
                     </span>
+                  </div>
+                  <div className="hidden sm:block text-left">
+                    <p className="text-sm font-medium text-gray-900">
+                      {user?.first_name} {user?.last_name}
+                    </p>
+                    <p className="text-xs text-gray-500">{organization?.name}</p>
                   </div>
                   <ChevronDown size={16} className="text-gray-400 hidden sm:block" />
                 </button>
@@ -134,7 +227,7 @@ const DashboardLayout = () => {
           </div>
         </div>
 
-        {/* Navigation Tabs - Horizontal */}
+        {/* Navigation Tabs - Horizontal (Salesforce Style) */}
         <nav className="hidden lg:block border-t border-gray-200 bg-white">
           <div className="px-4 sm:px-6 lg:px-8">
             <div className="flex space-x-8 overflow-x-auto">
@@ -171,7 +264,7 @@ const DashboardLayout = () => {
             className="fixed inset-0 z-40 bg-gray-600 bg-opacity-75 lg:hidden"
             onClick={() => setMobileMenuOpen(false)}
           />
-          <div className="fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg lg:hidden">
+          <div className="fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg lg:hidden overflow-y-auto">
             <div className="flex flex-col h-full">
               <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200">
                 <h2 className="text-lg font-semibold text-gray-900">Menu</h2>
@@ -179,7 +272,7 @@ const DashboardLayout = () => {
                   <X size={24} className="text-gray-500" />
                 </button>
               </div>
-              <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
+              <nav className="flex-1 px-4 py-6 space-y-1">
                 {navigation.map((item) => {
                   const Icon = item.icon
                   const isActive = location.pathname === item.href
@@ -208,7 +301,7 @@ const DashboardLayout = () => {
         </>
       )}
 
-      {/* Main Content - Now has full width */}
+      {/* Main Content - Full Width with optimized padding */}
       <main className="pt-32 lg:pt-28">
         <div className="mx-auto px-4 sm:px-6 lg:px-8 py-4 max-w-full">
           <Outlet />

@@ -1,5 +1,6 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Settings,
   Building,
@@ -24,7 +25,19 @@ import { useAuth } from '../contexts/AuthContext'
 const SettingsPage = () => {
   const { user } = useAuth()
   const queryClient = useQueryClient()
+  const location = useLocation()
+  const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('organization')
+
+  // Handle direct navigation from Admin dropdown
+  useEffect(() => {
+    const path = location.pathname
+    // Extract tab from path like /settings/field-configuration
+    if (path.startsWith('/settings/')) {
+      const tab = path.replace('/settings/', '')
+      setActiveTab(tab)
+    }
+  }, [location.pathname])
 
   // Fetch organization data
   const { data: orgData, isLoading } = useQuery({
@@ -69,7 +82,10 @@ const SettingsPage = () => {
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => {
+                    setActiveTab(tab.id)
+                    navigate(`/settings/${tab.id}`)
+                  }}
                   className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                     activeTab === tab.id
                       ? 'bg-primary-50 text-primary-700 border-r-2 border-primary-500'
