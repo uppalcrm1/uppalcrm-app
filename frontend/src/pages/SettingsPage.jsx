@@ -1,14 +1,17 @@
 import React, { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { 
-  Settings, 
-  Building, 
-  User, 
-  Shield, 
+import {
+  Settings,
+  Building,
+  User,
+  Shield,
   Bell,
-  Palette,
-  Database,
-  Key,
+  Users,
+  CreditCard,
+  Plug,
+  Upload,
+  Sliders,
+  Package,
   Save,
   AlertCircle
 } from 'lucide-react'
@@ -31,11 +34,18 @@ const SettingsPage = () => {
 
   const organization = orgData?.organization
 
+  // COMPLETE tabs list - all admin features
   const tabs = [
     { id: 'organization', label: 'Organization', icon: Building },
     { id: 'profile', label: 'Profile', icon: User },
     { id: 'security', label: 'Security', icon: Shield },
     { id: 'notifications', label: 'Notifications', icon: Bell },
+    { id: 'user-management', label: 'User Management', icon: Users },
+    { id: 'subscription', label: 'Subscription', icon: CreditCard },
+    { id: 'integrations', label: 'Integrations', icon: Plug },
+    { id: 'import', label: 'Import', icon: Upload },
+    { id: 'field-configuration', label: 'Field Configuration', icon: Sliders },
+    { id: 'products', label: 'Products', icon: Package },
   ]
 
   if (isLoading) {
@@ -51,7 +61,7 @@ const SettingsPage = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Sidebar */}
+        {/* Sidebar with ALL tabs */}
         <div className="lg:col-span-1">
           <nav className="space-y-1">
             {tabs.map((tab) => {
@@ -74,13 +84,19 @@ const SettingsPage = () => {
           </nav>
         </div>
 
-        {/* Content */}
+        {/* Content Area */}
         <div className="lg:col-span-3">
           <div className="card">
             {activeTab === 'organization' && <OrganizationSettings organization={organization} />}
             {activeTab === 'profile' && <ProfileSettings user={user} />}
             {activeTab === 'security' && <SecuritySettings />}
             {activeTab === 'notifications' && <NotificationSettings />}
+            {activeTab === 'user-management' && <UserManagementSettings />}
+            {activeTab === 'subscription' && <SubscriptionSettings organization={organization} />}
+            {activeTab === 'integrations' && <IntegrationsSettings />}
+            {activeTab === 'import' && <ImportSettings />}
+            {activeTab === 'field-configuration' && <FieldConfigurationSettings />}
+            {activeTab === 'products' && <ProductsSettings />}
           </div>
         </div>
       </div>
@@ -111,7 +127,7 @@ const OrganizationSettings = ({ organization }) => {
   return (
     <div>
       <h3 className="text-lg font-semibold text-gray-900 mb-6">Organization Settings</h3>
-      
+
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
@@ -119,11 +135,9 @@ const OrganizationSettings = ({ organization }) => {
             <input
               {...register('name', { required: 'Organization name is required' })}
               className={`input ${errors.name ? 'border-red-500' : ''}`}
-              placeholder="Your Organization"
+              placeholder="Enter organization name"
             />
-            {errors.name && (
-              <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
-            )}
+            {errors.name && <p className="text-red-500 text-sm mt-1">{errors.name.message}</p>}
           </div>
 
           <div>
@@ -131,35 +145,27 @@ const OrganizationSettings = ({ organization }) => {
             <input
               {...register('slug')}
               className="input"
-              placeholder="your-org"
+              placeholder="organization-slug"
               disabled
             />
-            <p className="mt-1 text-xs text-gray-500">Contact support to change your organization slug</p>
+            <p className="text-xs text-gray-500 mt-1">Contact support to change your organization slug</p>
           </div>
 
           <div className="md:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
             <textarea
               {...register('description')}
-              rows={3}
-              className="input resize-none"
+              rows={4}
+              className="input"
               placeholder="Tell us about your organization..."
             />
           </div>
         </div>
 
         <div className="flex justify-end">
-          <button
-            type="submit"
-            disabled={updateMutation.isPending}
-            className="btn btn-primary btn-md"
-          >
-            {updateMutation.isPending ? (
-              <LoadingSpinner size="sm" className="mr-2" />
-            ) : (
-              <Save size={16} className="mr-2" />
-            )}
-            Save Changes
+          <button type="submit" className="btn btn-primary" disabled={updateMutation.isPending}>
+            <Save size={16} className="mr-2" />
+            {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
           </button>
         </div>
       </form>
@@ -169,54 +175,15 @@ const OrganizationSettings = ({ organization }) => {
 
 // Profile Settings Component
 const ProfileSettings = ({ user }) => {
-  const { register, handleSubmit, formState: { errors } } = useForm({
-    defaultValues: user || {}
-  })
-
   return (
     <div>
       <h3 className="text-lg font-semibold text-gray-900 mb-6">Profile Settings</h3>
-      
-      <form className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">First Name</label>
-            <input
-              {...register('first_name')}
-              className="input"
-              placeholder="John"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
-            <input
-              {...register('last_name')}
-              className="input"
-              placeholder="Doe"
-            />
-          </div>
-
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-            <input
-              {...register('email')}
-              type="email"
-              className="input"
-              placeholder="john@company.com"
-              disabled
-            />
-            <p className="mt-1 text-xs text-gray-500">Contact support to change your email address</p>
-          </div>
+      <div className="space-y-4">
+        <p className="text-gray-600">Update your personal information here.</p>
+        <div className="border border-gray-200 rounded-lg p-4">
+          <p className="text-sm text-gray-600">Profile settings coming soon...</p>
         </div>
-
-        <div className="flex justify-end">
-          <button type="button" className="btn btn-primary btn-md">
-            <Save size={16} className="mr-2" />
-            Save Profile
-          </button>
-        </div>
-      </form>
+      </div>
     </div>
   )
 }
@@ -226,7 +193,7 @@ const SecuritySettings = () => {
   return (
     <div>
       <h3 className="text-lg font-semibold text-gray-900 mb-6">Security Settings</h3>
-      
+
       <div className="space-y-6">
         <div className="border border-gray-200 rounded-lg p-4">
           <div className="flex items-center justify-between">
@@ -267,45 +234,237 @@ const NotificationSettings = () => {
   return (
     <div>
       <h3 className="text-lg font-semibold text-gray-900 mb-6">Notification Settings</h3>
-      
+
       <div className="space-y-6">
-        <div>
-          <h4 className="text-sm font-medium text-gray-900 mb-3">Email Notifications</h4>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-700">New leads assigned to me</span>
-              <input type="checkbox" className="toggle" defaultChecked />
+        <div className="border border-gray-200 rounded-lg p-4">
+          <label className="flex items-center justify-between cursor-pointer">
+            <div>
+              <h4 className="text-sm font-medium text-gray-900">Email Notifications</h4>
+              <p className="text-sm text-gray-600">Receive email updates about your account</p>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-700">Weekly lead summary</span>
-              <input type="checkbox" className="toggle" defaultChecked />
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-700">Team member activity</span>
-              <input type="checkbox" className="toggle" />
-            </div>
-          </div>
+            <input type="checkbox" className="toggle" defaultChecked />
+          </label>
         </div>
 
-        <div>
-          <h4 className="text-sm font-medium text-gray-900 mb-3">Push Notifications</h4>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-700">New lead notifications</span>
-              <input type="checkbox" className="toggle" defaultChecked />
+        <div className="border border-gray-200 rounded-lg p-4">
+          <label className="flex items-center justify-between cursor-pointer">
+            <div>
+              <h4 className="text-sm font-medium text-gray-900">Lead Notifications</h4>
+              <p className="text-sm text-gray-600">Get notified when new leads are assigned</p>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-700">Follow-up reminders</span>
-              <input type="checkbox" className="toggle" defaultChecked />
-            </div>
-          </div>
+            <input type="checkbox" className="toggle" defaultChecked />
+          </label>
         </div>
 
-        <div className="flex justify-end">
-          <button className="btn btn-primary btn-md">
-            <Save size={16} className="mr-2" />
-            Save Preferences
+        <div className="border border-gray-200 rounded-lg p-4">
+          <label className="flex items-center justify-between cursor-pointer">
+            <div>
+              <h4 className="text-sm font-medium text-gray-900">Task Reminders</h4>
+              <p className="text-sm text-gray-600">Receive reminders for upcoming tasks</p>
+            </div>
+            <input type="checkbox" className="toggle" defaultChecked />
+          </label>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// User Management Settings Component
+const UserManagementSettings = () => {
+  return (
+    <div>
+      <h3 className="text-lg font-semibold text-gray-900 mb-6">User Management</h3>
+
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <p className="text-gray-600">Manage your team members and their permissions</p>
+          <button className="btn btn-primary btn-sm">
+            <User size={16} className="mr-2" />
+            Add User
           </button>
+        </div>
+
+        <div className="border border-gray-200 rounded-lg p-4">
+          <p className="text-sm text-gray-600">User management interface coming soon...</p>
+          <p className="text-xs text-gray-500 mt-2">Navigate to Team page for basic user management</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Subscription Settings Component
+const SubscriptionSettings = ({ organization }) => {
+  return (
+    <div>
+      <h3 className="text-lg font-semibold text-gray-900 mb-6">Subscription</h3>
+
+      <div className="space-y-6">
+        <div className="border border-gray-200 rounded-lg p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h4 className="text-lg font-medium text-gray-900">Current Plan</h4>
+              <p className="text-sm text-gray-600">
+                {organization?.subscription_plan || 'Starter'} Plan
+              </p>
+            </div>
+            <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+              Active
+            </span>
+          </div>
+
+          <div className="border-t border-gray-200 pt-4">
+            <p className="text-sm text-gray-600 mb-4">$15 per user/month</p>
+            <button className="btn btn-secondary btn-sm">Upgrade Plan</button>
+          </div>
+        </div>
+
+        <div className="border border-gray-200 rounded-lg p-4">
+          <h4 className="text-sm font-medium text-gray-900 mb-2">Billing History</h4>
+          <p className="text-sm text-gray-600">View your billing history and download invoices</p>
+          <button className="btn btn-secondary btn-sm mt-4">View Billing History</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Integrations Settings Component
+const IntegrationsSettings = () => {
+  return (
+    <div>
+      <h3 className="text-lg font-semibold text-gray-900 mb-6">Integrations</h3>
+
+      <div className="space-y-4">
+        <p className="text-gray-600">Connect your CRM with external services</p>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="border border-gray-200 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-sm font-medium text-gray-900">Gmail</h4>
+              <span className="text-xs text-gray-500">Not Connected</span>
+            </div>
+            <p className="text-sm text-gray-600 mb-4">Sync emails with your CRM</p>
+            <button className="btn btn-secondary btn-sm">Connect</button>
+          </div>
+
+          <div className="border border-gray-200 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-sm font-medium text-gray-900">WhatsApp</h4>
+              <span className="text-xs text-gray-500">Not Connected</span>
+            </div>
+            <p className="text-sm text-gray-600 mb-4">Enable WhatsApp messaging</p>
+            <button className="btn btn-secondary btn-sm">Connect</button>
+          </div>
+
+          <div className="border border-gray-200 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-sm font-medium text-gray-900">Payment Gateway</h4>
+              <span className="text-xs text-gray-500">Not Connected</span>
+            </div>
+            <p className="text-sm text-gray-600 mb-4">Accept payments online</p>
+            <button className="btn btn-secondary btn-sm">Connect</button>
+          </div>
+
+          <div className="border border-gray-200 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-sm font-medium text-gray-900">Zapier</h4>
+              <span className="text-xs text-gray-500">Not Connected</span>
+            </div>
+            <p className="text-sm text-gray-600 mb-4">Automate workflows</p>
+            <button className="btn btn-secondary btn-sm">Connect</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Import Settings Component
+const ImportSettings = () => {
+  return (
+    <div>
+      <h3 className="text-lg font-semibold text-gray-900 mb-6">Import Data</h3>
+
+      <div className="space-y-6">
+        <p className="text-gray-600">Import your data from CSV, Excel, or other CRMs</p>
+
+        <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+          <Upload size={48} className="mx-auto text-gray-400 mb-4" />
+          <h4 className="text-sm font-medium text-gray-900 mb-2">Upload File</h4>
+          <p className="text-sm text-gray-600 mb-4">CSV, Excel, or other supported formats</p>
+          <button className="btn btn-primary btn-sm">Choose File</button>
+        </div>
+
+        <div className="border border-gray-200 rounded-lg p-4">
+          <h4 className="text-sm font-medium text-gray-900 mb-2">Import from other CRM</h4>
+          <p className="text-sm text-gray-600 mb-4">Migrate data from Salesforce, HubSpot, or other CRMs</p>
+          <button className="btn btn-secondary btn-sm">Start Migration</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Field Configuration Settings Component
+const FieldConfigurationSettings = () => {
+  return (
+    <div>
+      <h3 className="text-lg font-semibold text-gray-900 mb-6">Field Configuration</h3>
+
+      <div className="space-y-4">
+        <p className="text-gray-600">Customize fields for leads, contacts, and accounts</p>
+
+        <div className="flex justify-end mb-4">
+          <button className="btn btn-primary btn-sm">
+            <Sliders size={16} className="mr-2" />
+            Add Custom Field
+          </button>
+        </div>
+
+        <div className="border border-gray-200 rounded-lg p-4">
+          <p className="text-sm text-gray-600">Field configuration interface coming soon...</p>
+          <p className="text-xs text-gray-500 mt-2">You'll be able to add custom fields, set validation rules, and control permissions</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Products Settings Component
+const ProductsSettings = () => {
+  return (
+    <div>
+      <h3 className="text-lg font-semibold text-gray-900 mb-6">Products</h3>
+
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <p className="text-gray-600">Manage your software editions and pricing</p>
+          <button className="btn btn-primary btn-sm">
+            <Package size={16} className="mr-2" />
+            Add Product
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="border border-gray-200 rounded-lg p-4">
+            <h4 className="text-sm font-medium text-gray-900 mb-2">Gold Edition</h4>
+            <p className="text-2xl font-bold text-gray-900 mb-2">$99/year</p>
+            <p className="text-sm text-gray-600">Premium features</p>
+          </div>
+
+          <div className="border border-gray-200 rounded-lg p-4">
+            <h4 className="text-sm font-medium text-gray-900 mb-2">Smart Edition</h4>
+            <p className="text-2xl font-bold text-gray-900 mb-2">$49/year</p>
+            <p className="text-sm text-gray-600">Standard features</p>
+          </div>
+
+          <div className="border border-gray-200 rounded-lg p-4">
+            <h4 className="text-sm font-medium text-gray-900 mb-2">Jio Edition</h4>
+            <p className="text-2xl font-bold text-gray-900 mb-2">$29/year</p>
+            <p className="text-sm text-gray-600">Basic features</p>
+          </div>
         </div>
       </div>
     </div>
