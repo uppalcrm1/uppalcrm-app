@@ -23,6 +23,7 @@ import { useForm } from 'react-hook-form'
 import { useAuth } from '../contexts/AuthContext'
 import AdminFields from './admin/AdminFields'
 import AdminUsers from './admin/AdminUsers'
+import AdminProducts from './admin/AdminProducts'
 
 const SettingsPage = () => {
   const { user } = useAuth()
@@ -425,41 +426,7 @@ const FieldConfigurationSettings = () => {
 
 // Products Settings Component
 const ProductsSettings = () => {
-  return (
-    <div>
-      <h3 className="text-lg font-semibold text-gray-900 mb-6">Products</h3>
-
-      <div className="space-y-4">
-        <div className="flex justify-between items-center">
-          <p className="text-gray-600">Manage your software editions and pricing</p>
-          <button className="btn btn-primary btn-sm">
-            <Package size={16} className="mr-2" />
-            Add Product
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="border border-gray-200 rounded-lg p-4">
-            <h4 className="text-sm font-medium text-gray-900 mb-2">Gold Edition</h4>
-            <p className="text-2xl font-bold text-gray-900 mb-2">$99/year</p>
-            <p className="text-sm text-gray-600">Premium features</p>
-          </div>
-
-          <div className="border border-gray-200 rounded-lg p-4">
-            <h4 className="text-sm font-medium text-gray-900 mb-2">Smart Edition</h4>
-            <p className="text-2xl font-bold text-gray-900 mb-2">$49/year</p>
-            <p className="text-sm text-gray-600">Standard features</p>
-          </div>
-
-          <div className="border border-gray-200 rounded-lg p-4">
-            <h4 className="text-sm font-medium text-gray-900 mb-2">Jio Edition</h4>
-            <p className="text-2xl font-bold text-gray-900 mb-2">$29/year</p>
-            <p className="text-sm text-gray-600">Basic features</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
+  return <AdminProducts />
 }
 
 export default SettingsPage
