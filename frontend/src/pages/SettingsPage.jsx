@@ -22,6 +22,7 @@ import toast from 'react-hot-toast'
 import { useForm } from 'react-hook-form'
 import { useAuth } from '../contexts/AuthContext'
 import AdminFields from './admin/AdminFields'
+import AdminUsers from './admin/AdminUsers'
 
 const SettingsPage = () => {
   const { user } = useAuth()
@@ -301,26 +302,7 @@ const NotificationSettings = () => {
 
 // User Management Settings Component
 const UserManagementSettings = () => {
-  return (
-    <div>
-      <h3 className="text-lg font-semibold text-gray-900 mb-6">User Management</h3>
-
-      <div className="space-y-4">
-        <div className="flex justify-between items-center">
-          <p className="text-gray-600">Manage your team members and their permissions</p>
-          <button className="btn btn-primary btn-sm">
-            <User size={16} className="mr-2" />
-            Add User
-          </button>
-        </div>
-
-        <div className="border border-gray-200 rounded-lg p-4">
-          <p className="text-sm text-gray-600">User management interface coming soon...</p>
-          <p className="text-xs text-gray-500 mt-2">Navigate to Team page for basic user management</p>
-        </div>
-      </div>
-    </div>
-  )
+  return <AdminUsers />
 }
 
 // Subscription Settings Component
