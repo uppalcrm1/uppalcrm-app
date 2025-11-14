@@ -178,9 +178,9 @@ const LeadsPage = () => {
   const pagination = leadsData?.pagination || {}
 
   return (
-    <div className="space-y-6 -mx-2 sm:-mx-4 lg:-mx-6">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+      <div className="px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Leads</h1>
           <p className="text-gray-600">Manage your sales pipeline and convert prospects</p>
@@ -195,7 +195,7 @@ const LeadsPage = () => {
       </div>
 
       {/* Filters & Search */}
-      <div className="card">
+      <div className="px-4 sm:px-6 lg:px-8 mb-4">
         <div className="flex flex-col sm:flex-row gap-4">
           {/* Search */}
           <div className="flex-1">
@@ -309,7 +309,7 @@ const LeadsPage = () => {
 
       {/* Leads List */}
       <div className="w-full">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div className="bg-white border-t border-gray-200">
           {leads.length === 0 ? (
           <div className="text-center py-12">
             <UserPlus className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -332,9 +332,9 @@ const LeadsPage = () => {
           <>
             {/* Table Header */}
             <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-gray-200">
+              <table className="w-full table-fixed">
+                <thead className="bg-gray-50">
+                  <tr className="border-b-2 border-gray-200">
                     <th className="text-left py-3 px-4 font-medium text-gray-900">Lead</th>
                     <th className="text-left py-3 px-4 font-medium text-gray-900">Company</th>
                     <th className="text-left py-3 px-4 font-medium text-gray-900">Status</th>
