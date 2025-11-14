@@ -303,7 +303,7 @@ const DashboardLayout = () => {
 
       {/* Main Content - Full Width with optimized padding */}
       <main className="pt-32 lg:pt-28">
-        <div className="mx-auto px-4 sm:px-6 lg:px-8 py-4 max-w-full">
+        <div className="mx-auto px-2 sm:px-4 lg:px-6 py-4">
           <Outlet />
         </div>
       </main>

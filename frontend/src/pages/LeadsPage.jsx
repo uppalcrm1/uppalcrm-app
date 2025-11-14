@@ -178,7 +178,7 @@ const LeadsPage = () => {
   const pagination = leadsData?.pagination || {}
 
   return (
-    <div className="space-y-6 w-full">
+    <div className="space-y-6 -mx-2 sm:-mx-4 lg:-mx-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -309,7 +309,7 @@ const LeadsPage = () => {
 
       {/* Leads List */}
       <div className="w-full">
-        <div className="card">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
           {leads.length === 0 ? (
           <div className="text-center py-12">
             <UserPlus className="h-12 w-12 text-gray-400 mx-auto mb-4" />
