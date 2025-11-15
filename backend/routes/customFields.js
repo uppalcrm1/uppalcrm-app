@@ -34,7 +34,7 @@ router.get('/', async (req, res) => {
     // If entityType is provided, filter by it
     if (entityType) {
       // Validate entity type
-      const validEntityTypes = ['leads', 'contacts', 'accounts', 'transactions']
+      const validEntityTypes = ['leads', 'contacts', 'accounts', 'transactions', 'product']
       if (!validEntityTypes.includes(entityType)) {
         return res.status(400).json({
           error: 'Invalid entity type',
@@ -61,7 +61,7 @@ router.get('/', async (req, res) => {
     // If no entityType, return all fields grouped by entity type
     console.log('🔍 Fetching all fields for all entity types')
     const allFields = {}
-    const entityTypes = ['leads', 'contacts', 'accounts', 'transactions']
+    const entityTypes = ['leads', 'contacts', 'accounts', 'transactions', 'product']
 
     for (const type of entityTypes) {
       const fields = await CustomField.getFieldDefinitions(
@@ -211,7 +211,7 @@ router.post('/', async (req, res) => {
     }
 
     // Validate entity type
-    const validEntityTypes = ['leads', 'contacts', 'accounts', 'transactions']
+    const validEntityTypes = ['leads', 'contacts', 'accounts', 'transactions', 'product']
     if (!validEntityTypes.includes(normalizedData.entityType)) {
       console.error('❌ Invalid entity type:', normalizedData.entityType)
       return res.status(400).json({
@@ -350,7 +350,7 @@ router.get('/definitions/:entityType', async (req, res) => {
     console.log(`📥 GET /api/custom-fields/definitions/${entityType}`)
 
     // Validate entity type
-    const validEntityTypes = ['leads', 'contacts', 'accounts', 'transactions']
+    const validEntityTypes = ['leads', 'contacts', 'accounts', 'transactions', 'product']
     if (!validEntityTypes.includes(entityType)) {
       return res.status(400).json({
         error: 'Invalid entity type',
@@ -508,7 +508,7 @@ router.post('/definitions', async (req, res) => {
     }
 
     // Validate entity type
-    const validEntityTypes = ['leads', 'contacts', 'accounts', 'transactions']
+    const validEntityTypes = ['leads', 'contacts', 'accounts', 'transactions', 'product']
     if (!validEntityTypes.includes(normalizedData.entityType)) {
       console.error('❌ Invalid entity type:', normalizedData.entityType)
       return res.status(400).json({

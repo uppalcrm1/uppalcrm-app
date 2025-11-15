@@ -26,6 +26,7 @@ const webhooksRoutes = require('./routes/webhooks');
 const apiKeysRoutes = require('./routes/api-keys');
 const aiSettingsRoutes = require('./routes/ai-settings');
 const customFieldsRoutes = require('./routes/customFields');
+const productFieldCustomizationRoutes = require('./routes/productFieldCustomization');
 const productsRoutes = require('./routes/products');
 const subscriptionRoutes = require('./routes/subscription');
 const platformAdminRoutes = require('./routes/platformAdmin');
@@ -209,6 +210,9 @@ app.use('/api/organizations/current', rateLimiters.general, aiSettingsRoutes);
 // Custom Fields management routes
 app.use('/api/custom-fields', rateLimiters.general, customFieldsRoutes);
 
+// Product Field Customization routes
+app.use('/api/organizations/:organizationId/field-customization/product', rateLimiters.general, productFieldCustomizationRoutes);
+
 // Products management routes
 app.use('/api/products', rateLimiters.general, productsRoutes);
 
@@ -329,6 +333,12 @@ app.get('/api', (req, res) => {
         'PUT /api/custom-fields/:fieldId': 'Update custom field',
         'DELETE /api/custom-fields/:fieldId': 'Delete custom field',
         'PUT /api/custom-fields/default/:fieldName': 'Update default field configuration'
+      },
+      'product-field-customization': {
+        'GET /api/organizations/:organizationId/field-customization/product': 'Get all product custom fields (admin only)',
+        'POST /api/organizations/:organizationId/field-customization/product': 'Create new product custom field (admin only)',
+        'PATCH /api/organizations/:organizationId/field-customization/product/:fieldId': 'Update product custom field (admin only)',
+        'DELETE /api/organizations/:organizationId/field-customization/product/:fieldId': 'Delete product custom field (admin only)'
       }
     },
     authentication: 'Bearer token required for authenticated endpoints',

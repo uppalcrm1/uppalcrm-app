@@ -12,7 +12,8 @@ import {
   Settings,
   CheckCircle,
   AlertCircle,
-  Move
+  Move,
+  ShieldAlert
 } from 'lucide-react'
 import api from '../../services/api'
 
@@ -20,7 +21,8 @@ const ENTITY_TYPES = [
   { id: 'leads', label: 'Leads', icon: '👤' },
   { id: 'contacts', label: 'Contacts', icon: '✉️' },
   { id: 'accounts', label: 'Accounts', icon: '💼' },
-  { id: 'transactions', label: 'Transactions', icon: '💰' }
+  { id: 'transactions', label: 'Transactions', icon: '💰' },
+  { id: 'product', label: 'Products', icon: '📦' }  // Added Products tab
 ]
 
 const FIELD_TYPES = [
@@ -37,6 +39,25 @@ const FIELD_TYPES = [
   { value: 'checkbox', label: 'Checkbox', description: 'True/false toggle' },
   { value: 'radio', label: 'Radio Buttons', description: 'Single choice from options' }
 ]
+
+/**
+ * Helper function to check if a field is the protected "Product Name" field
+ */
+const isProductNameField = (field, entityType) => {
+  if (entityType !== 'product') return false
+  if (!field) return false
+
+  const fieldName = (field.field_name || '').toLowerCase()
+  const fieldLabel = (field.field_label || '').toLowerCase()
+
+  return (
+    fieldName === 'product_name' ||
+    fieldName === 'productname' ||
+    fieldName === 'name' ||
+    fieldLabel === 'product name' ||
+    fieldLabel === 'name'
+  )
+}
 
 const AdminFields = () => {
   const [activeTab, setActiveTab] = useState('leads')
@@ -120,6 +141,13 @@ const AdminFields = () => {
           is_required: formData.is_required
         }
 
+        // Check if trying to make Product Name field optional
+        if (isProductNameField(editingField, activeTab) && !formData.is_required) {
+          setError('The "Product Name" field must always be required and cannot be made optional')
+          setLoading(false)
+          return
+        }
+
         // Check if this is a system field or custom field
         if (editingField.isSystemField) {
           // System fields use field_name as identifier and different endpoint
@@ -167,7 +195,7 @@ const AdminFields = () => {
       resetForm()
     } catch (err) {
       console.error('Error saving field:', err)
-      setError(err.response?.data?.error || 'Failed to save field')
+      setError(err.response?.data?.error || err.response?.data?.message || 'Failed to save field')
     } finally {
       setLoading(false)
     }
@@ -204,16 +232,24 @@ const AdminFields = () => {
     setIsCreating(true)
   }
 
-  const handleDeleteField = async (fieldId) => {
+  const handleDeleteField = async (field) => {
+    // Check if this is the protected Product Name field
+    if (isProductNameField(field, activeTab)) {
+      setError('The "Product Name" field is a core field and cannot be deleted')
+      return
+    }
+
     if (confirm('Are you sure you want to delete this field? This action cannot be undone.')) {
       try {
         setLoading(true)
         setError(null)
-        await api.delete(`/custom-fields/${fieldId}`)
-        setFields(prev => prev.filter(f => f.id !== fieldId))
+        await api.delete(`/custom-fields/${field.id}`)
+        setFields(prev => prev.filter(f => f.id !== field.id))
+        setSuccessMessage(`Field "${field.field_label}" deleted successfully`)
+        setTimeout(() => setSuccessMessage(null), 5000)
       } catch (err) {
         console.error('Error deleting field:', err)
-        setError(err.response?.data?.error || 'Failed to delete field')
+        setError(err.response?.data?.error || err.response?.data?.message || 'Failed to delete field')
       } finally {
         setLoading(false)
       }
@@ -309,7 +345,7 @@ const AdminFields = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Field Configuration</h1>
-          <p className="text-gray-600 mt-1">Customize fields for leads, contacts, accounts, and transactions</p>
+          <p className="text-gray-600 mt-1">Customize fields for leads, contacts, accounts, transactions, and products</p>
         </div>
         {!isCreating && (
           <button
@@ -384,6 +420,19 @@ const AdminFields = () => {
         </div>
       </div>
 
+      {/* Product Name Protection Notice (only show for Products tab) */}
+      {activeTab === 'product' && !isCreating && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
+          <ShieldAlert size={20} className="text-blue-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-blue-800">Protected Field</p>
+            <p className="text-sm text-blue-700 mt-1">
+              The "Product Name" field is a core field that is always required and cannot be deleted or made optional.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Create/Edit Form */}
       {isCreating && (
         <div className="card">
@@ -399,6 +448,13 @@ const AdminFields = () => {
               {editingField?.isSystemField && (
                 <p className="text-xs text-blue-600 mt-1">
                   System fields have limited editing options
+                </p>
+              )}
+              {/* Product Name field protection warning */}
+              {editingField && isProductNameField(editingField, activeTab) && (
+                <p className="text-xs text-orange-600 mt-1 flex items-center gap-1">
+                  <ShieldAlert size={14} />
+                  This is a protected field - it must always be required
                 </p>
               )}
             </div>
@@ -573,9 +629,15 @@ const AdminFields = () => {
                     type="checkbox"
                     checked={formData.is_required}
                     onChange={(e) => handleInputChange('is_required', e.target.checked)}
+                    disabled={editingField && isProductNameField(editingField, activeTab)}
                     className="mr-2 h-4 w-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
                   />
-                  <span className="text-sm text-gray-700">Required field</span>
+                  <span className={`text-sm ${editingField && isProductNameField(editingField, activeTab) ? 'text-gray-400' : 'text-gray-700'}`}>
+                    Required field
+                    {editingField && isProductNameField(editingField, activeTab) && (
+                      <span className="ml-2 text-xs text-orange-600">(always required)</span>
+                    )}
+                  </span>
                 </label>
 
                 <label className="flex items-center">
@@ -714,94 +776,109 @@ const AdminFields = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredFields.map((field) => (
-                    <tr
-                      key={field.id}
-                      className={`border-b border-gray-100 hover:bg-gray-50 transition-all ${
-                        !field.is_enabled ? 'bg-gray-50 opacity-60' : ''
-                      }`}
-                    >
-                      <td className="py-4 px-4">
-                        <div className="flex items-center gap-2">
-                          <span className={`font-medium ${field.is_enabled ? 'text-gray-900' : 'text-gray-500 line-through'}`}>
-                            {field.field_label}
-                          </span>
-                          {!field.is_enabled && (
-                            <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Hidden</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="py-4 px-4">
-                        <code className={`text-sm px-2 py-1 rounded ${
-                          field.is_enabled ? 'text-gray-600 bg-gray-100' : 'text-gray-400 bg-gray-50'
-                        }`}>
-                          {field.field_name}
-                        </code>
-                      </td>
-                      <td className="py-4 px-4">
-                        <span className={`badge ${field.is_enabled ? 'badge-gray' : 'badge-gray opacity-60'}`}>
-                          {FIELD_TYPES.find(t => t.value === field.field_type)?.label || field.field_type}
-                        </span>
-                      </td>
-                      <td className="py-4 px-4">
-                        {field.is_required ? (
-                          <CheckCircle size={16} className={field.is_enabled ? 'text-green-600' : 'text-gray-400'} />
-                        ) : (
-                          <span className="text-gray-400">—</span>
-                        )}
-                      </td>
-                      <td className="py-4 px-4">
-                        <button
-                          onClick={() => handleToggleVisibility(field)}
-                          className={`relative group flex items-center gap-2 px-3 py-2 rounded-lg transition-all font-medium ${
-                            field.is_enabled
-                              ? 'bg-green-50 text-green-700 hover:bg-green-100 border border-green-200'
-                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-300'
-                          }`}
-                          title={field.is_enabled ? 'Click to hide this field from forms' : 'Click to show this field in forms'}
-                        >
-                          {field.is_enabled ? (
-                            <>
-                              <Eye size={18} />
-                              <span className="text-sm">Visible</span>
-                            </>
-                          ) : (
-                            <>
-                              <EyeOff size={18} />
-                              <span className="text-sm">Hidden</span>
-                            </>
-                          )}
-                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-                            {field.is_enabled ? 'Click to hide from forms' : 'Click to show in forms'}
-                            <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900"></div>
+                  {filteredFields.map((field) => {
+                    const isProtectedField = isProductNameField(field, activeTab)
+                    return (
+                      <tr
+                        key={field.id}
+                        className={`border-b border-gray-100 hover:bg-gray-50 transition-all ${
+                          !field.is_enabled ? 'bg-gray-50 opacity-60' : ''
+                        } ${isProtectedField ? 'bg-blue-50' : ''}`}
+                      >
+                        <td className="py-4 px-4">
+                          <div className="flex items-center gap-2">
+                            <span className={`font-medium ${field.is_enabled ? 'text-gray-900' : 'text-gray-500 line-through'}`}>
+                              {field.field_label}
+                            </span>
+                            {!field.is_enabled && (
+                              <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Hidden</span>
+                            )}
+                            {isProtectedField && (
+                              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                <ShieldAlert size={12} />
+                                Protected
+                              </span>
+                            )}
                           </div>
-                        </button>
-                      </td>
-                      <td className="py-4 px-4">
-                        <div className="flex items-center gap-2">
+                        </td>
+                        <td className="py-4 px-4">
+                          <code className={`text-sm px-2 py-1 rounded ${
+                            field.is_enabled ? 'text-gray-600 bg-gray-100' : 'text-gray-400 bg-gray-50'
+                          }`}>
+                            {field.field_name}
+                          </code>
+                        </td>
+                        <td className="py-4 px-4">
+                          <span className={`badge ${field.is_enabled ? 'badge-gray' : 'badge-gray opacity-60'}`}>
+                            {FIELD_TYPES.find(t => t.value === field.field_type)?.label || field.field_type}
+                          </span>
+                        </td>
+                        <td className="py-4 px-4">
+                          {field.is_required ? (
+                            <CheckCircle size={16} className={field.is_enabled ? 'text-green-600' : 'text-gray-400'} />
+                          ) : (
+                            <span className="text-gray-400">—</span>
+                          )}
+                        </td>
+                        <td className="py-4 px-4">
                           <button
-                            onClick={() => handleEditField(field)}
-                            className="btn btn-sm btn-outline"
-                            title="Edit field"
+                            onClick={() => handleToggleVisibility(field)}
+                            className={`relative group flex items-center gap-2 px-3 py-2 rounded-lg transition-all font-medium ${
+                              field.is_enabled
+                                ? 'bg-green-50 text-green-700 hover:bg-green-100 border border-green-200'
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-300'
+                            }`}
+                            title={field.is_enabled ? 'Click to hide this field from forms' : 'Click to show this field in forms'}
                           >
-                            <Edit2 size={14} />
+                            {field.is_enabled ? (
+                              <>
+                                <Eye size={18} />
+                                <span className="text-sm">Visible</span>
+                              </>
+                            ) : (
+                              <>
+                                <EyeOff size={18} />
+                                <span className="text-sm">Hidden</span>
+                              </>
+                            )}
+                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+                              {field.is_enabled ? 'Click to hide from forms' : 'Click to show in forms'}
+                              <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900"></div>
+                            </div>
                           </button>
-                          {!field.isSystemField && (
+                        </td>
+                        <td className="py-4 px-4">
+                          <div className="flex items-center gap-2">
                             <button
-                              onClick={() => handleDeleteField(field.id)}
-                              className="btn btn-sm btn-outline text-red-600 hover:bg-red-50"
-                              title="Delete field"
+                              onClick={() => handleEditField(field)}
+                              className="btn btn-sm btn-outline"
+                              title="Edit field"
                             >
-                              <Trash2 size={14} />
+                              <Edit2 size={14} />
                             </button>
-                          )}
-                          {field.isSystemField && (
-                            <span className="text-xs text-gray-400 px-2">System Field</span>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                            {!field.isSystemField && !isProtectedField && (
+                              <button
+                                onClick={() => handleDeleteField(field)}
+                                className="btn btn-sm btn-outline text-red-600 hover:bg-red-50"
+                                title="Delete field"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
+                            {field.isSystemField && (
+                              <span className="text-xs text-gray-400 px-2">System Field</span>
+                            )}
+                            {isProtectedField && !field.isSystemField && (
+                              <span className="text-xs text-blue-400 px-2 flex items-center gap-1">
+                                <ShieldAlert size={12} />
+                                Protected
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
