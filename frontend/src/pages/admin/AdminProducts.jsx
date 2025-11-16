@@ -164,18 +164,18 @@ const AdminProducts = () => {
     }
 
     try {
-      // Build product data, only including visible fields with valid values
+      // Build product data, only including fields with valid values
       const productData = { ...formData }
 
-      // Handle price field - only include if visible and has a value
-      if (isFieldVisible('price') && formData.price !== '' && formData.price != null) {
+      // Handle price field - only include if it has a valid value
+      if (formData.price && formData.price !== '' && !isNaN(parseFloat(formData.price))) {
         productData.price = parseFloat(formData.price)
-      } else if (!isFieldVisible('price')) {
-        // Remove price from data if field is hidden
+      } else {
+        // Remove price if empty, null, or invalid (handles both hidden and empty cases)
         delete productData.price
       }
 
-      // Remove empty/null values for optional fields that aren't visible
+      // Remove hidden fields
       if (!isFieldVisible('description')) {
         delete productData.description
       }
