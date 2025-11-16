@@ -258,6 +258,7 @@ const ensureTablesExist = async () => {
       CREATE TABLE IF NOT EXISTS default_field_configurations (
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
         organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+        entity_type VARCHAR(50) DEFAULT 'leads',
         field_name VARCHAR(50) NOT NULL,
         field_options JSONB,
         is_enabled BOOLEAN DEFAULT TRUE,
@@ -265,8 +266,14 @@ const ensureTablesExist = async () => {
         sort_order INTEGER DEFAULT 0,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
-        UNIQUE(organization_id, field_name)
+        UNIQUE(organization_id, field_name, entity_type)
       );
+    `);
+
+    // Add entity_type column if it doesn't exist (for existing tables)
+    await db.query(`
+      ALTER TABLE default_field_configurations
+      ADD COLUMN IF NOT EXISTS entity_type VARCHAR(50) DEFAULT 'leads';
     `);
 
     // Add field_options column if it doesn't exist (for existing tables)
@@ -636,7 +643,7 @@ router.get('/', async (req, res) => {
       product: {
         name: { label: 'Product Name', type: 'text', required: true, editable: false },
         description: { label: 'Description', type: 'textarea', required: false, editable: true },
-        price: { label: 'Price', type: 'number', required: true, editable: true },
+        price: { label: 'Price', type: 'number', required: false, editable: true },
         currency: {
           label: 'Currency',
           type: 'select',
@@ -1009,7 +1016,7 @@ router.put('/default/:fieldName', async (req, res) => {
         product_name: { label: 'Product Name', type: 'text', required: true, editable: false },
         name: { label: 'Product Name', type: 'text', required: true, editable: false },
         description: { label: 'Description', type: 'textarea', required: false, editable: true },
-        price: { label: 'Price', type: 'number', required: true, editable: true },
+        price: { label: 'Price', type: 'number', required: false, editable: true },
         sku: { label: 'SKU', type: 'text', required: false, editable: true },
         manufacturer: { label: 'Manufacturer', type: 'text', required: false, editable: true },
         stock_quantity: { label: 'Stock Quantity', type: 'number', required: false, editable: true },
