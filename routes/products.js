@@ -9,7 +9,7 @@ const productSchemas = {
   createProduct: Joi.object({
     name: Joi.string().required().max(100),
     description: Joi.string().allow('', null),
-    price: Joi.number().required().min(0),
+    price: Joi.number().min(0).allow(null),
     currency: Joi.string().default('USD').max(3),
     allowed_billing_cycles: Joi.array().items(
       Joi.string().valid('monthly', 'quarterly', 'semi-annual', 'annual')
