@@ -950,64 +950,106 @@ router.put('/default/:fieldName', async (req, res) => {
       return res.status(400).json({ error: 'entity_type is required' });
     }
 
-    // Define system field defaults
-    const systemFieldDefaults = {
-      firstName: { label: 'First Name', type: 'text', required: true, editable: false },
-      lastName: { label: 'Last Name', type: 'text', required: true, editable: false },
-      email: { label: 'Email', type: 'email', required: false, editable: true },
-      phone: { label: 'Phone', type: 'tel', required: false, editable: true },
-      company: { label: 'Company', type: 'text', required: false, editable: true },
-      source: {
-        label: 'Source',
-        type: 'select',
-        required: false,
-        editable: true,
-        options: [
-          { value: 'website', label: 'Website' },
-          { value: 'referral', label: 'Referral' },
-          { value: 'social', label: 'Social Media' },
-          { value: 'cold-call', label: 'Cold Call' },
-          { value: 'email', label: 'Email' },
-          { value: 'advertisement', label: 'Advertisement' },
-          { value: 'trade-show', label: 'Trade Show' },
-          { value: 'other', label: 'Other' }
-        ]
+    // Define entity-specific system field defaults
+    const systemFieldDefaultsByEntity = {
+      leads: {
+        firstName: { label: 'First Name', type: 'text', required: true, editable: false },
+        lastName: { label: 'Last Name', type: 'text', required: true, editable: false },
+        email: { label: 'Email', type: 'email', required: false, editable: true },
+        phone: { label: 'Phone', type: 'tel', required: false, editable: true },
+        company: { label: 'Company', type: 'text', required: false, editable: true },
+        source: {
+          label: 'Source',
+          type: 'select',
+          required: false,
+          editable: true,
+          options: [
+            { value: 'website', label: 'Website' },
+            { value: 'referral', label: 'Referral' },
+            { value: 'social', label: 'Social Media' },
+            { value: 'cold-call', label: 'Cold Call' },
+            { value: 'email', label: 'Email' },
+            { value: 'advertisement', label: 'Advertisement' },
+            { value: 'trade-show', label: 'Trade Show' },
+            { value: 'other', label: 'Other' }
+          ]
+        },
+        status: {
+          label: 'Status',
+          type: 'select',
+          required: false,
+          editable: true,
+          options: [
+            { value: 'new', label: 'New' },
+            { value: 'contacted', label: 'Contacted' },
+            { value: 'qualified', label: 'Qualified' },
+            { value: 'proposal', label: 'Proposal' },
+            { value: 'negotiation', label: 'Negotiation' },
+            { value: 'converted', label: 'Converted' },
+            { value: 'lost', label: 'Lost' }
+          ]
+        },
+        priority: {
+          label: 'Priority',
+          type: 'select',
+          required: false,
+          editable: true,
+          options: [
+            { value: 'low', label: 'Low' },
+            { value: 'medium', label: 'Medium' },
+            { value: 'high', label: 'High' }
+          ]
+        },
+        potentialValue: { label: 'Potential Value ($)', type: 'number', required: false, editable: true },
+        assignedTo: { label: 'Assign To', type: 'user_select', required: false, editable: true },
+        nextFollowUp: { label: 'Next Follow Up', type: 'date', required: false, editable: true },
+        notes: { label: 'Notes', type: 'textarea', required: false, editable: true }
       },
-      status: {
-        label: 'Status',
-        type: 'select',
-        required: false,
-        editable: true,
-        options: [
-          { value: 'new', label: 'New' },
-          { value: 'contacted', label: 'Contacted' },
-          { value: 'qualified', label: 'Qualified' },
-          { value: 'proposal', label: 'Proposal' },
-          { value: 'negotiation', label: 'Negotiation' },
-          { value: 'converted', label: 'Converted' },
-          { value: 'lost', label: 'Lost' }
-        ]
-      },
-      priority: {
-        label: 'Priority',
-        type: 'select',
-        required: false,
-        editable: true,
-        options: [
-          { value: 'low', label: 'Low' },
-          { value: 'medium', label: 'Medium' },
-          { value: 'high', label: 'High' }
-        ]
-      },
-      potentialValue: { label: 'Potential Value ($)', type: 'number', required: false, editable: true },
-      assignedTo: { label: 'Assign To', type: 'user_select', required: false, editable: true },
-      nextFollowUp: { label: 'Next Follow Up', type: 'date', required: false, editable: true },
-      notes: { label: 'Notes', type: 'textarea', required: false, editable: true }
+      product: {
+        product_name: { label: 'Product Name', type: 'text', required: true, editable: false },
+        name: { label: 'Product Name', type: 'text', required: true, editable: false },
+        description: { label: 'Description', type: 'textarea', required: false, editable: true },
+        price: { label: 'Price', type: 'number', required: true, editable: true },
+        sku: { label: 'SKU', type: 'text', required: false, editable: true },
+        manufacturer: { label: 'Manufacturer', type: 'text', required: false, editable: true },
+        stock_quantity: { label: 'Stock Quantity', type: 'number', required: false, editable: true },
+        currency: {
+          label: 'Currency',
+          type: 'select',
+          required: false,
+          editable: true,
+          options: ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'INR']
+        },
+        allowed_billing_cycles: {
+          label: 'Allowed Billing Cycles',
+          type: 'multiselect',
+          required: false,
+          editable: true,
+          options: ['monthly', 'quarterly', 'semi-annual', 'annual']
+        },
+        color: {
+          label: 'Color',
+          type: 'select',
+          required: false,
+          editable: true,
+          options: ['blue', 'green', 'purple', 'orange', 'red', 'yellow', 'pink', 'gray']
+        },
+        display_order: { label: 'Display Order', type: 'number', required: false, editable: true },
+        features: { label: 'Features', type: 'text', required: false, editable: true },
+        is_active: { label: 'Active', type: 'checkbox', required: false, editable: true },
+        is_default: { label: 'Default Product', type: 'checkbox', required: false, editable: true }
+      }
     };
+
+    // Get the system fields for the specified entity type (default to leads)
+    const systemFieldDefaults = systemFieldDefaultsByEntity[entity_type] || systemFieldDefaultsByEntity.leads;
 
     const fieldDefault = systemFieldDefaults[fieldName];
     if (!fieldDefault) {
-      return res.status(400).json({ error: 'Invalid system field name' });
+      return res.status(400).json({
+        error: 'Invalid system field name',
+        details: `Field "${fieldName}" is not a valid system field for entity type "${entity_type}"`
+      });
     }
 
     // Prevent editing of core required fields
