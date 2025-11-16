@@ -13,7 +13,6 @@ const LeadConversionModal = ({ lead, onClose, onConvert, isConverting }) => {
     macAddress: '',
     billingCycle: 'monthly',
     price: '',
-    isTrial: false,
     productId: ''
   })
 
@@ -63,7 +62,6 @@ const LeadConversionModal = ({ lead, onClose, onConvert, isConverting }) => {
         macAddress: formData.macAddress,
         billingCycle: formData.billingCycle,
         price: parseFloat(formData.price) || 0,
-        isTrial: formData.isTrial,
         productId: formData.productId || defaultProduct?.id || null
       } : undefined
     }
@@ -250,21 +248,6 @@ const LeadConversionModal = ({ lead, onClose, onConvert, isConverting }) => {
                         />
                       </div>
                     </div>
-                  </div>
-
-                  {/* Trial Toggle */}
-                  <div className="flex items-center">
-                    <input
-                      id="isTrial"
-                      type="checkbox"
-                      name="isTrial"
-                      checked={formData.isTrial}
-                      onChange={handleInputChange}
-                      className="focus:ring-primary-500 h-4 w-4 text-primary-600 border-gray-300 rounded"
-                    />
-                    <label htmlFor="isTrial" className="ml-2 text-sm text-gray-700">
-                      This is a trial account (30-day trial period)
-                    </label>
                   </div>
                 </div>
               )}
