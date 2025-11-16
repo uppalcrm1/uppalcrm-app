@@ -17,10 +17,14 @@ const LeadConversionModal = ({ lead, onClose, onConvert, isConverting }) => {
     productId: ''
   })
 
-  // Fetch active products
+  // Fetch active products - always fresh data, no caching
   const { data: productsData, isLoading: productsLoading } = useQuery({
     queryKey: ['products', { active: true }],
-    queryFn: () => productsAPI.getProducts(false) // false = only active products
+    queryFn: () => productsAPI.getProducts(false), // false = only active products
+    staleTime: 0, // Data is immediately stale - always refetch
+    cacheTime: 0, // Don't cache the data
+    refetchOnMount: 'always', // Always refetch when modal opens
+    refetchOnWindowFocus: true // Refetch when window gains focus
   })
 
   const products = productsData?.products || []
