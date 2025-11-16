@@ -373,7 +373,7 @@ const fieldCreationLimit = rateLimit({
 // Validation schemas
 const createFieldSchema = Joi.object({
   entity_type: Joi.string()
-    .valid('leads', 'contacts', 'accounts', 'transactions')
+    .valid('leads', 'contacts', 'accounts', 'transactions', 'product')
     .default('leads'),
   field_name: Joi.string()
     .max(50)
