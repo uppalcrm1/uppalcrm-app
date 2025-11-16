@@ -3,6 +3,7 @@ import { Plus, Edit, Trash2, DollarSign, Package, Check, X } from 'lucide-react'
 import { productsAPI } from '../../services/api'
 import toast from 'react-hot-toast'
 import LoadingSpinner from '../../components/LoadingSpinner'
+import axios from 'axios'
 
 const AdminProducts = () => {
   const [products, setProducts] = useState([])
@@ -10,6 +11,7 @@ const AdminProducts = () => {
   const [showModal, setShowModal] = useState(false)
   const [editingProduct, setEditingProduct] = useState(null)
   const [includeInactive, setIncludeInactive] = useState(false)
+  const [fieldConfig, setFieldConfig] = useState({ systemFields: [] })
 
   const [formData, setFormData] = useState({
     name: '',
@@ -28,7 +30,33 @@ const AdminProducts = () => {
 
   useEffect(() => {
     fetchProducts()
+    fetchFieldConfiguration()
   }, [includeInactive])
+
+  const fetchFieldConfiguration = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const organizationSlug = localStorage.getItem('organizationSlug')
+
+      const response = await axios.get(
+        `${import.meta.env.VITE_API_URL}/api/custom-fields?entity_type=product`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'x-organization-slug': organizationSlug
+          }
+        }
+      )
+
+      if (response.data) {
+        setFieldConfig(response.data)
+        console.log('Product field configuration loaded:', response.data)
+      }
+    } catch (error) {
+      console.error('Error fetching field configuration:', error)
+      // Continue with default hardcoded fields if API fails
+    }
+  }
 
   const fetchProducts = async () => {
     try {
@@ -119,8 +147,14 @@ const AdminProducts = () => {
   const handleSubmit = async (e) => {
     e.preventDefault()
 
-    if (!formData.name || !formData.price) {
-      toast.error('Name and price are required')
+    // Validate required fields based on field configuration
+    if (isFieldRequired('name') && !formData.name) {
+      toast.error('Product Name is required')
+      return
+    }
+
+    if (isFieldRequired('price') && !formData.price) {
+      toast.error('Price is required')
       return
     }
 
@@ -164,6 +198,32 @@ const AdminProducts = () => {
       console.error('Error deleting product:', error)
       toast.error(error.response?.data?.message || 'Failed to delete product')
     }
+  }
+
+  // Helper functions to check field configuration
+  const isFieldVisible = (fieldName) => {
+    if (!fieldConfig || !fieldConfig.systemFields) return true // Show by default if config not loaded
+
+    const field = fieldConfig.systemFields.find(f =>
+      f.field_name === fieldName || f.field_name === fieldName.toLowerCase()
+    )
+
+    // If field not in config, show it (for backward compatibility)
+    // If field is in config, check is_enabled (true means visible, false means hidden)
+    return !field || field.is_enabled !== false
+  }
+
+  const isFieldRequired = (fieldName) => {
+    if (!fieldConfig || !fieldConfig.systemFields) {
+      // Default required fields if config not loaded
+      return fieldName === 'name' || fieldName === 'product_name'
+    }
+
+    const field = fieldConfig.systemFields.find(f =>
+      f.field_name === fieldName || f.field_name === fieldName.toLowerCase()
+    )
+
+    return field ? field.is_required === true : false
   }
 
   const billingCycleOptions = [
@@ -333,65 +393,75 @@ const AdminProducts = () => {
                 </div>
 
                 <div className="bg-white px-6 py-4 space-y-4 max-h-[70vh] overflow-y-auto">
-                  {/* Name */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Product Name *
-                    </label>
-                    <input
-                      type="text"
-                      name="name"
-                      value={formData.name}
-                      onChange={handleInputChange}
-                      className="input w-full"
-                      required
-                    />
-                  </div>
-
-                  {/* Description */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Description
-                    </label>
-                    <textarea
-                      name="description"
-                      value={formData.description}
-                      onChange={handleInputChange}
-                      className="input w-full"
-                      rows="3"
-                    />
-                  </div>
-
-                  {/* Price and Currency */}
-                  <div className="grid grid-cols-2 gap-4">
+                  {/* Name - Always visible (core field) */}
+                  {isFieldVisible('name') && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Price *
-                      </label>
-                      <input
-                        type="number"
-                        name="price"
-                        value={formData.price}
-                        onChange={handleInputChange}
-                        className="input w-full"
-                        step="0.01"
-                        min="0"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Currency
+                        Product Name {isFieldRequired('name') && '*'}
                       </label>
                       <input
                         type="text"
-                        name="currency"
-                        value={formData.currency}
+                        name="name"
+                        value={formData.name}
                         onChange={handleInputChange}
                         className="input w-full"
-                        maxLength="3"
+                        required={isFieldRequired('name')}
                       />
                     </div>
+                  )}
+
+                  {/* Description */}
+                  {isFieldVisible('description') && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Description {isFieldRequired('description') && '*'}
+                      </label>
+                      <textarea
+                        name="description"
+                        value={formData.description}
+                        onChange={handleInputChange}
+                        className="input w-full"
+                        rows="3"
+                        required={isFieldRequired('description')}
+                      />
+                    </div>
+                  )}
+
+                  {/* Price and Currency */}
+                  <div className="grid grid-cols-2 gap-4">
+                    {isFieldVisible('price') && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Price {isFieldRequired('price') && '*'}
+                        </label>
+                        <input
+                          type="number"
+                          name="price"
+                          value={formData.price}
+                          onChange={handleInputChange}
+                          className="input w-full"
+                          step="0.01"
+                          min="0"
+                          required={isFieldRequired('price')}
+                        />
+                      </div>
+                    )}
+                    {isFieldVisible('currency') && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Currency {isFieldRequired('currency') && '*'}
+                        </label>
+                        <input
+                          type="text"
+                          name="currency"
+                          value={formData.currency}
+                          onChange={handleInputChange}
+                          className="input w-full"
+                          maxLength="3"
+                          required={isFieldRequired('currency')}
+                        />
+                      </div>
+                    )}
                   </div>
 
                   {/* Billing Cycles */}
@@ -448,47 +518,49 @@ const AdminProducts = () => {
                   </div>
 
                   {/* Features */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Features
-                    </label>
-                    <div className="space-y-2">
-                      {formData.features.map((feature, index) => (
-                        <div key={index} className="flex items-center gap-2">
+                  {isFieldVisible('features') && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Features {isFieldRequired('features') && '*'}
+                      </label>
+                      <div className="space-y-2">
+                        {formData.features.map((feature, index) => (
+                          <div key={index} className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={feature}
+                              readOnly
+                              className="input flex-1"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveFeature(index)}
+                              className="btn btn-outline btn-sm text-red-600"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        ))}
+                        <div className="flex items-center gap-2">
                           <input
                             type="text"
-                            value={feature}
-                            readOnly
+                            value={newFeature}
+                            onChange={(e) => setNewFeature(e.target.value)}
+                            onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddFeature())}
+                            placeholder="Add a feature..."
                             className="input flex-1"
                           />
                           <button
                             type="button"
-                            onClick={() => handleRemoveFeature(index)}
-                            className="btn btn-outline btn-sm text-red-600"
+                            onClick={handleAddFeature}
+                            className="btn btn-outline btn-sm"
                           >
-                            <Trash2 size={16} />
+                            <Plus size={16} />
                           </button>
                         </div>
-                      ))}
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={newFeature}
-                          onChange={(e) => setNewFeature(e.target.value)}
-                          onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddFeature())}
-                          placeholder="Add a feature..."
-                          className="input flex-1"
-                        />
-                        <button
-                          type="button"
-                          onClick={handleAddFeature}
-                          className="btn btn-outline btn-sm"
-                        >
-                          <Plus size={16} />
-                        </button>
                       </div>
                     </div>
-                  </div>
+                  )}
 
                   {/* Checkboxes */}
                   <div className="space-y-2">
