@@ -480,7 +480,7 @@ router.get('/', async (req, res) => {
     }
 
     // Validate entity_type
-    const validEntityTypes = ['leads', 'contacts', 'accounts', 'transactions'];
+    const validEntityTypes = ['leads', 'contacts', 'accounts', 'transactions', 'product'];
     if (!validEntityTypes.includes(entity_type)) {
       return res.status(400).json({
         error: 'Invalid entity type',
@@ -765,7 +765,7 @@ router.post('/', fieldCreationLimit, async (req, res) => {
     const { field_name, field_label, field_type, field_options, is_required, entity_type = 'leads' } = value;
 
     // Validate entity_type
-    const validEntityTypes = ['leads', 'contacts', 'accounts', 'transactions'];
+    const validEntityTypes = ['leads', 'contacts', 'accounts', 'transactions', 'product'];
     if (!validEntityTypes.includes(entity_type)) {
       return res.status(400).json({
         error: 'Invalid entity type',
