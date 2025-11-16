@@ -634,7 +634,34 @@ router.get('/', async (req, res) => {
         notes: { label: 'Notes', type: 'textarea', required: false, editable: true }
       },
       product: {
-        productName: { label: 'Product Name', type: 'text', required: true, editable: false }
+        name: { label: 'Product Name', type: 'text', required: true, editable: false },
+        description: { label: 'Description', type: 'textarea', required: false, editable: true },
+        price: { label: 'Price', type: 'number', required: true, editable: true },
+        currency: {
+          label: 'Currency',
+          type: 'select',
+          required: false,
+          editable: true,
+          options: ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'INR']
+        },
+        allowed_billing_cycles: {
+          label: 'Allowed Billing Cycles',
+          type: 'multiselect',
+          required: false,
+          editable: true,
+          options: ['monthly', 'quarterly', 'semi-annual', 'annual']
+        },
+        color: {
+          label: 'Color',
+          type: 'select',
+          required: false,
+          editable: true,
+          options: ['blue', 'green', 'purple', 'orange', 'red', 'yellow', 'pink', 'gray']
+        },
+        display_order: { label: 'Display Order', type: 'number', required: false, editable: true },
+        features: { label: 'Features', type: 'text', required: false, editable: true },
+        is_active: { label: 'Active', type: 'checkbox', required: false, editable: true },
+        is_default: { label: 'Default Product', type: 'checkbox', required: false, editable: true }
       }
     };
 
