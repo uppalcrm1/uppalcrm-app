@@ -282,6 +282,34 @@ const ensureTablesExist = async () => {
       ADD COLUMN IF NOT EXISTS field_options JSONB;
     `);
 
+    // Migrate UNIQUE constraint to include entity_type
+    // Drop old constraint if it exists, add new one
+    await db.query(`
+      DO $$
+      BEGIN
+        -- Drop the old unique constraint if it exists
+        IF EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conname = 'default_field_configurations_organization_id_field_name_key'
+          AND conrelid = 'default_field_configurations'::regclass
+        ) THEN
+          ALTER TABLE default_field_configurations
+          DROP CONSTRAINT default_field_configurations_organization_id_field_name_key;
+        END IF;
+
+        -- Add new unique constraint if it doesn't exist
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conname = 'default_field_configurations_org_field_entity_key'
+          AND conrelid = 'default_field_configurations'::regclass
+        ) THEN
+          ALTER TABLE default_field_configurations
+          ADD CONSTRAINT default_field_configurations_org_field_entity_key
+          UNIQUE(organization_id, field_name, entity_type);
+        END IF;
+      END $$;
+    `);
+
     // Create organization usage tracking table
     await db.query(`
       CREATE TABLE IF NOT EXISTS organization_usage (
