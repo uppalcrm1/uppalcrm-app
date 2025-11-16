@@ -632,6 +632,9 @@ router.get('/', async (req, res) => {
         },
         assignedTo: { label: 'Deal Owner', type: 'user_select', required: false, editable: true },
         notes: { label: 'Notes', type: 'textarea', required: false, editable: true }
+      },
+      product: {
+        productName: { label: 'Product Name', type: 'text', required: true, editable: false }
       }
     };
 
