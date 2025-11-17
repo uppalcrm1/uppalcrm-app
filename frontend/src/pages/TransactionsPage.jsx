@@ -128,6 +128,19 @@ const TransactionsPage = () => {
     setLocalTransactions(transactions)
   }, [transactions])
 
+  // Fetch transactions on component mount
+  React.useEffect(() => {
+    const fetchTransactions = async () => {
+      try {
+        const response = await transactionsAPI.getTransactions()
+        setTransactions(response.transactions || [])
+      } catch (error) {
+        console.error('Error fetching transactions:', error)
+      }
+    }
+    fetchTransactions()
+  }, [])
+
   // Calculate statistics
   const stats = {
     totalRevenue: displayTransactions

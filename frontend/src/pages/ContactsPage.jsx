@@ -109,6 +109,19 @@ const ContactsPage = () => {
     setLocalContacts(contacts)
   }, [contacts])
 
+  // Fetch contacts on component mount
+  React.useEffect(() => {
+    const fetchContacts = async () => {
+      try {
+        const response = await contactsAPI.getContacts()
+        setContacts(response.contacts || [])
+      } catch (error) {
+        console.error('Error fetching contacts:', error)
+      }
+    }
+    fetchContacts()
+  }, [])
+
   const getStatusBadge = (status) => {
     const badges = {
       active: 'badge badge-success',

@@ -128,6 +128,19 @@ const AccountsPage = () => {
     setLocalAccounts(accounts)
   }, [accounts])
 
+  // Fetch accounts on component mount
+  React.useEffect(() => {
+    const fetchAccounts = async () => {
+      try {
+        const response = await accountsAPI.getAccounts()
+        setAccounts(response.accounts || [])
+      } catch (error) {
+        console.error('Error fetching accounts:', error)
+      }
+    }
+    fetchAccounts()
+  }, [])
+
   // Calculate statistics
   const stats = {
     totalRevenue: displayAccounts.reduce((sum, acc) => {
