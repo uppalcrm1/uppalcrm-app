@@ -1449,6 +1449,13 @@ router.post('/:id/convert',
         isTrial: Joi.boolean().default(false).optional(),
         productId: Joi.string().guid({ version: 'uuidv4' }).optional()
       }).optional(),
+      transactionDetails: Joi.object({
+        paymentMethod: Joi.string().max(50).default('Credit Card'),
+        term: Joi.string().max(50).optional(),
+        amount: Joi.number().min(0).required(),
+        currency: Joi.string().max(10).default('USD'),
+        status: Joi.string().valid('completed', 'pending', 'failed', 'refunded').default('completed')
+      }).optional(),
       existingContactId: Joi.string().guid({ version: 'uuidv4' }).optional(),
       relationshipType: Joi.string().valid('new_customer', 'existing_customer', 'additional_device').default('new_customer').optional(),
       interestType: Joi.string().valid('first_account', 'additional_device', 'upgrade').optional()
@@ -1674,6 +1681,33 @@ router.post('/:id/convert',
              WHERE id = $3`,
             [trialStart, trialEnd, account.id]
           );
+        }
+
+        // 6. Create transaction if transactionDetails are provided
+        if (req.body.transactionDetails) {
+          console.log('💳 Creating transaction...');
+          const txnDetails = req.body.transactionDetails;
+
+          await client.query(
+            `INSERT INTO transactions (
+              organization_id, account_id, contact_id, product_id,
+              payment_method, term, amount, currency, status,
+              transaction_date, created_by
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), $10)`,
+            [
+              req.organizationId,
+              account.id,
+              contact.id,
+              productId, // Use the same productId we determined for the account
+              txnDetails.paymentMethod || 'Credit Card',
+              txnDetails.term,
+              txnDetails.amount,
+              txnDetails.currency || 'USD',
+              txnDetails.status || 'completed',
+              req.userId
+            ]
+          );
+          console.log('✅ Transaction created successfully');
         }
       }
 

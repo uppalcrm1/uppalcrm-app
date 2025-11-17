@@ -31,6 +31,7 @@ const productsRoutes = require('./routes/products');
 const subscriptionRoutes = require('./routes/subscription');
 const platformAdminRoutes = require('./routes/platformAdmin');
 const adminFixTrialsRoutes = require('./routes/admin-fix-trials');
+const transactionsRoutes = require('./routes/transactions');
 
 // Import scheduled jobs
 const scheduledJobs = require('./services/scheduledJobs');
@@ -189,6 +190,7 @@ app.use('/api/platform/admin', rateLimiters.general, adminFixTrialsRoutes);
 
 // Account Management API routes
 app.use('/api/accounts', rateLimiters.general, accountRoutes);
+app.use('/api/transactions', rateLimiters.general, transactionsRoutes);
 // Legacy License Management API routes (for backward compatibility)
 app.use('/api/licenses', rateLimiters.general, licenseRoutes);
 app.use('/api/devices', rateLimiters.general, deviceRoutes);

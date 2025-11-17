@@ -487,6 +487,11 @@ export const transactionsAPI = {
     return response.data
   },
 
+  getAccountTransactions: async (accountId) => {
+    const response = await api.get(`/transactions/accounts/${accountId}`)
+    return response.data
+  },
+
   updateTransaction: async (id, transactionData) => {
     const response = await api.put(`/transactions/${id}`, transactionData)
     return response.data

@@ -13,7 +13,11 @@ const LeadConversionModal = ({ lead, onClose, onConvert, isConverting }) => {
     macAddress: '',
     billingCycle: 'monthly',
     price: '',
-    productId: ''
+    productId: '',
+    // Transaction fields
+    paymentMethod: 'Credit Card',
+    term: 'Monthly',
+    amount: ''
   })
 
   // Fetch active products - always fresh data, no caching
@@ -45,7 +49,25 @@ const LeadConversionModal = ({ lead, onClose, onConvert, isConverting }) => {
       ...prev,
       productId,
       price: selectedProduct?.price || '',
-      edition: selectedProduct?.name || ''
+      edition: selectedProduct?.name || '',
+      amount: selectedProduct?.price || '' // Auto-fill transaction amount
+    }))
+  }
+
+  const handleBillingCycleChange = (e) => {
+    const billingCycle = e.target.value
+    // Map billing cycle to term
+    const termMap = {
+      'monthly': 'Monthly',
+      'quarterly': 'Quarterly',
+      'semi-annual': 'Semi-Annual',
+      'annual': 'Annual'
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      billingCycle,
+      term: termMap[billingCycle] || 'Monthly'
     }))
   }
 
@@ -63,6 +85,13 @@ const LeadConversionModal = ({ lead, onClose, onConvert, isConverting }) => {
         billingCycle: formData.billingCycle,
         price: parseFloat(formData.price) || 0,
         productId: formData.productId || defaultProduct?.id || null
+      } : undefined,
+      transactionDetails: createAccount ? {
+        paymentMethod: formData.paymentMethod,
+        term: formData.term,
+        amount: parseFloat(formData.amount) || 0,
+        currency: 'USD',
+        status: 'completed'
       } : undefined
     }
 
@@ -221,7 +250,7 @@ const LeadConversionModal = ({ lead, onClose, onConvert, isConverting }) => {
                       <select
                         name="billingCycle"
                         value={formData.billingCycle}
-                        onChange={handleInputChange}
+                        onChange={handleBillingCycleChange}
                         className="select w-full"
                       >
                         <option value="monthly">Monthly</option>
@@ -246,6 +275,81 @@ const LeadConversionModal = ({ lead, onClose, onConvert, isConverting }) => {
                           min="0"
                           className="input w-full pl-9"
                         />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Payment Details Section */}
+                  <div className="pt-4 border-t border-gray-200">
+                    <div className="flex items-center text-sm font-medium text-gray-700 mb-4">
+                      <CreditCard size={16} className="mr-2" />
+                      Payment Details
+                    </div>
+
+                    <div className="space-y-4">
+                      {/* Payment Method */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Payment Method <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          name="paymentMethod"
+                          value={formData.paymentMethod}
+                          onChange={handleInputChange}
+                          className="select w-full"
+                          required
+                        >
+                          <option value="Credit Card">Credit Card</option>
+                          <option value="Debit Card">Debit Card</option>
+                          <option value="Bank Transfer">Bank Transfer</option>
+                          <option value="Cash">Cash</option>
+                          <option value="Check">Check</option>
+                          <option value="PayPal">PayPal</option>
+                          <option value="Stripe">Stripe</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </div>
+
+                      {/* Term and Amount */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Term
+                          </label>
+                          <input
+                            type="text"
+                            name="term"
+                            value={formData.term}
+                            readOnly
+                            className="input w-full bg-gray-50"
+                            placeholder="Auto-filled from billing cycle"
+                          />
+                          <p className="mt-1 text-xs text-gray-500">
+                            Auto-set from billing cycle
+                          </p>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Amount <span className="text-red-500">*</span>
+                          </label>
+                          <div className="relative">
+                            <DollarSign size={16} className="absolute left-3 top-3 text-gray-400" />
+                            <input
+                              type="number"
+                              name="amount"
+                              value={formData.amount}
+                              onChange={handleInputChange}
+                              placeholder="0.00"
+                              step="0.01"
+                              min="0"
+                              className="input w-full pl-9"
+                              required
+                            />
+                          </div>
+                          <p className="mt-1 text-xs text-gray-500">
+                            Auto-filled from product price
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </div>
