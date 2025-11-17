@@ -37,7 +37,8 @@ const transactionsRoutes = require('./routes/transactions');
 const scheduledJobs = require('./services/scheduledJobs');
 
 // Account Management Routes
-const accountRoutes = require('./routes/accounts');
+const accountRoutes = require('./routes/accounts-simple'); // Simple accounts for CRM
+const accountSubscriptionRoutes = require('./routes/accounts'); // Legacy licensing system
 const licenseRoutes = require('./routes/licenses'); // Legacy support
 const deviceRoutes = require('./routes/devices');
 const softwareEditionRoutes = require('./routes/softwareEditions');

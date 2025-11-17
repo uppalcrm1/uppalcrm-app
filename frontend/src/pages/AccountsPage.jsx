@@ -145,7 +145,7 @@ const AccountsPage = () => {
   const stats = {
     totalRevenue: displayAccounts.reduce((sum, acc) => {
       if (acc.status === 'active' || acc.status === 'expiring_soon') {
-        return sum + acc.monthly_cost
+        return sum + (parseFloat(acc.price) || 0)
       }
       return sum
     }, 0),

@@ -145,12 +145,12 @@ const TransactionsPage = () => {
   const stats = {
     totalRevenue: displayTransactions
       .filter(t => t.status === 'completed')
-      .reduce((sum, t) => sum + t.amount, 0),
+      .reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0),
     completedTransactions: displayTransactions.filter(t => t.status === 'completed').length,
     pendingTransactions: displayTransactions.filter(t => t.status === 'pending').length,
     failedTransactions: displayTransactions.filter(t => t.status === 'failed').length,
     avgTransaction: displayTransactions.filter(t => t.status === 'completed').length > 0
-      ? displayTransactions.filter(t => t.status === 'completed').reduce((sum, t) => sum + t.amount, 0) /
+      ? displayTransactions.filter(t => t.status === 'completed').reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0) /
         displayTransactions.filter(t => t.status === 'completed').length
       : 0
   }
