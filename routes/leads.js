@@ -1622,6 +1622,18 @@ router.post('/:id/convert',
       // 5. Optionally create an account
       let account = null;
       if (req.body.createAccount && req.body.accountDetails) {
+        console.log('📝 Creating account...');
+        console.log('Contact ID:', contact?.id);
+        console.log('Contact object:', contact);
+
+        if (!contact || !contact.id) {
+          await client.query('ROLLBACK');
+          return res.status(500).json({
+            error: 'Contact creation failed',
+            message: 'Contact was not properly created before account creation'
+          });
+        }
+
         const details = req.body.accountDetails;
 
         // Get product_id: use provided value or get organization's default product
@@ -1644,6 +1656,12 @@ router.post('/:id/convert',
             console.log('⚠️ No default product found, account will have NULL product_id');
           }
         }
+
+        console.log('📝 Account insert values:');
+        console.log('  organization_id:', req.organizationId);
+        console.log('  contact_id:', contact.id);
+        console.log('  accountName:', details.accountName || `${contact.first_name} ${contact.last_name}'s Account`);
+        console.log('  productId:', productId);
 
         const accountResult = await client.query(
           `INSERT INTO accounts (
