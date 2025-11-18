@@ -37,8 +37,8 @@ router.post('/config', authenticateToken, async (req, res) => {
     }
 
     const { accountSid, authToken, phoneNumber } = req.body;
-    const organizationId = req.user.organizationId;
-    const userId = req.user.userId;
+    const organizationId = req.organizationId;
+    const userId = req.userId;
 
     // Verify Twilio credentials by testing
     const twilio = require('twilio');
@@ -84,7 +84,7 @@ router.post('/config', authenticateToken, async (req, res) => {
  */
 router.get('/config', authenticateToken, async (req, res) => {
   try {
-    const organizationId = req.user.organizationId;
+    const organizationId = req.organizationId;
 
     const query = `
       SELECT id, phone_number, sms_enabled, voice_enabled, is_active, verified_at
@@ -119,8 +119,8 @@ router.post('/sms/send', authenticateToken, async (req, res) => {
     }
 
     const { to, body, leadId, contactId, templateId } = req.body;
-    const organizationId = req.user.organizationId;
-    const userId = req.user.userId;
+    const organizationId = req.organizationId;
+    const userId = req.userId;
 
     const message = await twilioService.sendSMS({
       organizationId,
@@ -147,7 +147,7 @@ router.post('/sms/send', authenticateToken, async (req, res) => {
  */
 router.get('/sms', authenticateToken, async (req, res) => {
   try {
-    const organizationId = req.user.organizationId;
+    const organizationId = req.organizationId;
     const { leadId, contactId, direction, limit = 50, offset = 0 } = req.query;
 
     let query = `
@@ -227,8 +227,8 @@ router.post('/call/make', authenticateToken, async (req, res) => {
     }
 
     const { to, leadId, contactId } = req.body;
-    const organizationId = req.user.organizationId;
-    const userId = req.user.userId;
+    const organizationId = req.organizationId;
+    const userId = req.userId;
 
     const call = await twilioService.makeCall({
       organizationId,
@@ -253,7 +253,7 @@ router.post('/call/make', authenticateToken, async (req, res) => {
  */
 router.get('/call', authenticateToken, async (req, res) => {
   try {
-    const organizationId = req.user.organizationId;
+    const organizationId = req.organizationId;
     const { leadId, contactId, direction, limit = 50, offset = 0 } = req.query;
 
     let query = `
@@ -317,7 +317,7 @@ router.get('/call', authenticateToken, async (req, res) => {
  */
 router.get('/templates', authenticateToken, async (req, res) => {
   try {
-    const organizationId = req.user.organizationId;
+    const organizationId = req.organizationId;
     const { category } = req.query;
 
     let query = `
@@ -349,8 +349,8 @@ router.get('/templates', authenticateToken, async (req, res) => {
 router.post('/templates', authenticateToken, async (req, res) => {
   try {
     const { name, category, body } = req.body;
-    const organizationId = req.user.organizationId;
-    const userId = req.user.userId;
+    const organizationId = req.organizationId;
+    const userId = req.userId;
 
     const query = `
       INSERT INTO sms_templates (organization_id, name, category, body, created_by)
@@ -377,7 +377,7 @@ router.put('/templates/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const { name, category, body, is_active } = req.body;
-    const organizationId = req.user.organizationId;
+    const organizationId = req.organizationId;
 
     const query = `
       UPDATE sms_templates
@@ -412,7 +412,7 @@ router.put('/templates/:id', authenticateToken, async (req, res) => {
 router.delete('/templates/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const organizationId = req.user.organizationId;
+    const organizationId = req.organizationId;
 
     const query = `
       DELETE FROM sms_templates
@@ -519,7 +519,7 @@ router.post('/webhook/call-status', async (req, res) => {
  */
 router.get('/stats', authenticateToken, async (req, res) => {
   try {
-    const organizationId = req.user.organizationId;
+    const organizationId = req.organizationId;
 
     // SMS stats
     const smsQuery = `
