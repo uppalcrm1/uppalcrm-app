@@ -32,6 +32,7 @@ const subscriptionRoutes = require('./routes/subscription');
 const platformAdminRoutes = require('./routes/platformAdmin');
 const adminFixTrialsRoutes = require('./routes/admin-fix-trials');
 const transactionsRoutes = require('./routes/transactions');
+const twilioRoutes = require('./routes/twilio');
 
 // Import scheduled jobs
 const scheduledJobs = require('./services/scheduledJobs');
@@ -221,6 +222,9 @@ app.use('/api/products', rateLimiters.general, productsRoutes);
 
 // Subscription management routes
 app.use('/api/subscription', rateLimiters.general, subscriptionRoutes);
+
+// Twilio integration routes
+app.use('/api/twilio', twilioRoutes);
 
 // Public routes (no authentication required)
 console.log('🔍 DEBUG: publicLeadRoutes type:', typeof publicLeadRoutes, 'value:', !!publicLeadRoutes);

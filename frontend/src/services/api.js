@@ -732,4 +732,74 @@ export const productsAPI = {
   }
 }
 
+// Twilio API
+export const twilioAPI = {
+  // Get Twilio configuration
+  getConfig: async () => {
+    const response = await api.get('/twilio/config')
+    return response.data
+  },
+
+  // Configure Twilio
+  saveConfig: async (configData) => {
+    const response = await api.post('/twilio/config', configData)
+    return response.data
+  },
+
+  // Send SMS
+  sendSMS: async (smsData) => {
+    const response = await api.post('/twilio/sms/send', smsData)
+    return response.data
+  },
+
+  // Get SMS history
+  getSMSHistory: async (params = {}) => {
+    const response = await api.get('/twilio/sms', { params })
+    return response.data
+  },
+
+  // Make phone call
+  makeCall: async (callData) => {
+    const response = await api.post('/twilio/call/make', callData)
+    return response.data
+  },
+
+  // Get call history
+  getCallHistory: async (params = {}) => {
+    const response = await api.get('/twilio/call', { params })
+    return response.data
+  },
+
+  // Get SMS templates
+  getTemplates: async (category = null) => {
+    const params = category ? { category } : {}
+    const response = await api.get('/twilio/templates', { params })
+    return response.data
+  },
+
+  // Create SMS template
+  createTemplate: async (templateData) => {
+    const response = await api.post('/twilio/templates', templateData)
+    return response.data
+  },
+
+  // Update SMS template
+  updateTemplate: async (id, templateData) => {
+    const response = await api.put(`/twilio/templates/${id}`, templateData)
+    return response.data
+  },
+
+  // Delete SMS template
+  deleteTemplate: async (id) => {
+    const response = await api.delete(`/twilio/templates/${id}`)
+    return response.data
+  },
+
+  // Get statistics
+  getStats: async () => {
+    const response = await api.get('/twilio/stats')
+    return response.data
+  }
+}
+
 export default api

@@ -39,6 +39,7 @@ import AdminFields from './pages/admin/AdminFields'
 import AdminSettings from './pages/admin/AdminSettings'
 import AdminAISettings from './pages/admin/AdminAISettings'
 import AdminProducts from './pages/admin/AdminProducts'
+import CommunicationsPage from './pages/CommunicationsPage'
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuth()
@@ -118,6 +119,7 @@ function App() {
         <Route path="integrations" element={<IntegrationsPage />} />
         <Route path="import" element={<ImportPage />} />
         <Route path="field-configuration" element={<FieldConfigurationPage />} />
+        <Route path="communications" element={<CommunicationsPage />} />
 
         {/* Admin Routes */}
         <Route path="admin/users" element={<AdminUsers />} />

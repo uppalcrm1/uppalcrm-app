@@ -20,6 +20,7 @@ import {
   Upload,
   Sliders,
   Package,
+  MessageSquare,
 } from 'lucide-react'
 import LoadingSpinner from './LoadingSpinner'
 
@@ -30,6 +31,7 @@ const navigation = [
   { name: 'Contacts', href: '/contacts', icon: UserCircle2 },
   { name: 'Accounts', href: '/accounts', icon: Building2 },
   { name: 'Transactions', href: '/transactions', icon: DollarSign },
+  { name: 'Communications', href: '/communications', icon: MessageSquare },
   { name: 'Billing', href: '/billing', icon: CreditCard },
   { name: 'Team', href: '/team', icon: UserCheck },
   { name: 'Settings', href: '/settings', icon: Settings },
