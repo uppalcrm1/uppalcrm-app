@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { MessageSquare, Phone, Send, Settings } from 'lucide-react';
 import { twilioAPI } from '../services/api';
+import { useNotifications } from '../context/NotificationContext';
 import SendSMSModal from '../components/SendSMSModal';
 import ConversationList from '../components/ConversationList';
 import ConversationView from '../components/ConversationView';
@@ -15,6 +16,12 @@ const CommunicationsPage = () => {
   const [showConfig, setShowConfig] = useState(false);
   const [selectedPhone, setSelectedPhone] = useState(null);
   const queryClient = useQueryClient();
+  const { clearUnread } = useNotifications();
+
+  // Clear unread count when viewing Communications page
+  useEffect(() => {
+    clearUnread();
+  }, [clearUnread]);
 
   // Check Twilio configuration
   const { data: config, isLoading: configLoading } = useQuery({

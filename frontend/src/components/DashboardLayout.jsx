@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Outlet, NavLink, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { useNotifications } from '../context/NotificationContext'
 import {
   LayoutDashboard,
   Users,
@@ -39,10 +40,22 @@ const navigation = [
 
 const DashboardLayout = () => {
   const { user, organization, logout, isLoading } = useAuth()
+  const { unreadCount, requestBrowserPermission, browserPermission } = useNotifications()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [adminMenuOpen, setAdminMenuOpen] = useState(false)
   const location = useLocation()
+
+  // Request browser notification permission on first visit
+  React.useEffect(() => {
+    if (browserPermission === 'default') {
+      // Wait a bit before requesting permission
+      const timer = setTimeout(() => {
+        requestBrowserPermission()
+      }, 5000)
+      return () => clearTimeout(timer)
+    }
+  }, [browserPermission, requestBrowserPermission])
 
   if (isLoading) {
     return <LoadingSpinner />
@@ -242,7 +255,7 @@ const DashboardLayout = () => {
                     key={item.name}
                     to={item.href}
                     className={`
-                      flex items-center px-1 py-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors
+                      flex items-center px-1 py-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors relative
                       ${isActive
                         ? 'border-primary-600 text-primary-600'
                         : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -251,6 +264,11 @@ const DashboardLayout = () => {
                   >
                     <Icon size={18} className="mr-2" />
                     {item.name}
+                    {item.name === 'Communications' && unreadCount > 0 && (
+                      <span className="ml-2 inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold leading-none text-white bg-red-500 rounded-full">
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </span>
+                    )}
                   </NavLink>
                 )
               })}
@@ -294,6 +312,11 @@ const DashboardLayout = () => {
                     >
                       <Icon size={20} className="mr-3" />
                       {item.name}
+                      {item.name === 'Communications' && unreadCount > 0 && (
+                        <span className="ml-auto inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold leading-none text-white bg-red-500 rounded-full">
+                          {unreadCount > 9 ? '9+' : unreadCount}
+                        </span>
+                      )}
                     </NavLink>
                   )
                 })}

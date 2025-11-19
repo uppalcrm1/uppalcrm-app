@@ -7,6 +7,7 @@ import App from './App'
 import './index.css'
 import { AuthProvider } from './contexts/AuthContext'
 import { SuperAdminProvider } from './contexts/SuperAdminContext'
+import { NotificationProvider } from './context/NotificationContext'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -26,7 +27,9 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <SuperAdminProvider>
-            <App />
+            <NotificationProvider>
+              <App />
+            </NotificationProvider>
             <Toaster
               position="top-right"
               toastOptions={{
