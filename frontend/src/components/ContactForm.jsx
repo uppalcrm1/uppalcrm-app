@@ -73,28 +73,22 @@ const ContactForm = ({ contact = null, onClose, onSubmit, users = [], isLoading 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* First Name */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">First Name *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">First Name</label>
                 <input
-                  {...register('first_name', { required: 'First name is required' })}
-                  className={`input ${errors.first_name ? 'border-red-500' : ''}`}
+                  {...register('first_name')}
+                  className="input"
                   placeholder="John"
                 />
-                {errors.first_name && (
-                  <p className="mt-1 text-sm text-red-600">{errors.first_name.message}</p>
-                )}
               </div>
 
               {/* Last Name */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Last Name *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
                 <input
-                  {...register('last_name', { required: 'Last name is required' })}
-                  className={`input ${errors.last_name ? 'border-red-500' : ''}`}
+                  {...register('last_name')}
+                  className="input"
                   placeholder="Doe"
                 />
-                {errors.last_name && (
-                  <p className="mt-1 text-sm text-red-600">{errors.last_name.message}</p>
-                )}
               </div>
 
               {/* Title */}

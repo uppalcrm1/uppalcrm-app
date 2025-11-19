@@ -164,10 +164,10 @@ const webhookParamsSchema = Joi.object({
 });
 
 const leadCreationSchema = Joi.object({
-  // Core lead fields
-  first_name: Joi.string().min(1).max(100).required(),
-  last_name: Joi.string().min(1).max(100).required(),
-  email: Joi.string().email().max(255).required(),
+  // Core lead fields - all optional for flexibility
+  first_name: Joi.string().min(1).max(100).allow('', null).optional(),
+  last_name: Joi.string().min(1).max(100).allow('', null).optional(),
+  email: Joi.string().email().max(255).allow('', null).optional(),
   phone: Joi.string().max(20).allow(null, ''),
   company: Joi.string().max(255).allow(null, ''),
   

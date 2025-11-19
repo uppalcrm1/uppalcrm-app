@@ -23,8 +23,8 @@ const FieldMapper = ({
   // Available database fields for mapping
   const availableFields = {
     leads: [
-      { key: 'first_name', label: 'First Name', required: true },
-      { key: 'last_name', label: 'Last Name', required: true },
+      { key: 'first_name', label: 'First Name', required: false },
+      { key: 'last_name', label: 'Last Name', required: false },
       { key: 'email', label: 'Email', required: false },
       { key: 'phone', label: 'Phone', required: false },
       { key: 'company', label: 'Company', required: false },
@@ -40,8 +40,8 @@ const FieldMapper = ({
       { key: 'country', label: 'Country', required: false }
     ],
     contacts: [
-      { key: 'first_name', label: 'First Name', required: true },
-      { key: 'last_name', label: 'Last Name', required: true },
+      { key: 'first_name', label: 'First Name', required: false },
+      { key: 'last_name', label: 'Last Name', required: false },
       { key: 'email', label: 'Email', required: false },
       { key: 'phone', label: 'Phone', required: false },
       { key: 'company', label: 'Company', required: false },

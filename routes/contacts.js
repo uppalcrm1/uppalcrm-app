@@ -23,8 +23,8 @@ const contactSchemas = {
     body: Joi.object({
       title: Joi.string().max(100).optional(),
       company: Joi.string().max(255).optional(),
-      first_name: Joi.string().min(1).max(100).required(),
-      last_name: Joi.string().min(1).max(100).required(),
+      first_name: Joi.string().min(1).max(100).allow('', null).optional(),
+      last_name: Joi.string().min(1).max(100).allow('', null).optional(),
       email: Joi.string().email().optional(),
       phone: Joi.string().max(50).optional(),
       status: Joi.string().valid('active', 'inactive', 'prospect', 'customer').default('active'),

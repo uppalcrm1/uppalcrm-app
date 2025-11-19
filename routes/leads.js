@@ -386,9 +386,9 @@ async function buildDynamicLeadSchema(organizationId, isUpdate = false) {
 
     return Joi.object(schemaFields).unknown(true);
   } else {
-    // For create, make first_name and last_name required
-    schemaFields.first_name = Joi.string().min(1).max(100).required();
-    schemaFields.last_name = Joi.string().min(1).max(100).required();
+    // For create, first_name and last_name are optional for flexibility
+    schemaFields.first_name = Joi.string().min(1).max(100).allow('', null).optional();
+    schemaFields.last_name = Joi.string().min(1).max(100).allow('', null).optional();
 
     return Joi.object(schemaFields);
   }
