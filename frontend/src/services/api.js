@@ -97,9 +97,17 @@ api.interceptors.response.use(
     } else if (error.response?.status === 401) {
       // Don't interfere with super admin authentication
       if (!isSupedAdminRoute) {
+        // Don't show error or redirect for auth check requests (like /auth/me)
+        // or if we're already on the login page
+        const isAuthCheckRequest = error.config?.url?.includes('/auth/me')
+        const isOnLoginPage = window.location.pathname === '/login' || window.location.pathname === '/register'
+
         clearAuth()
-        window.location.href = '/login'
-        toast.error('Session expired. Please log in again.')
+
+        if (!isAuthCheckRequest && !isOnLoginPage) {
+          window.location.href = '/login'
+          toast.error('Session expired. Please log in again.')
+        }
       }
     } else if (error.response?.status >= 500) {
       toast.error('Server error. Please try again later.')
