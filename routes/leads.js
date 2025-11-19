@@ -349,9 +349,8 @@ async function buildDynamicLeadSchema(organizationId, isUpdate = false) {
     custom_fields: Joi.object().optional() // snake_case version for inline edits
   };
 
-  // Dynamic validation for source field
-  const sourceValues = getAllowedValues('source', ['website', 'referral', 'social', 'cold-call', 'email', 'advertisement', 'trade-show', 'other']);
-  schemaFields.source = Joi.string().valid(...sourceValues, '', null).optional();
+  // Source field - accept any string for flexibility
+  schemaFields.source = Joi.string().max(100).allow('', null).optional();
 
   // Dynamic validation for status field
   const statusValues = getAllowedValues('status', ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'converted', 'lost']);
