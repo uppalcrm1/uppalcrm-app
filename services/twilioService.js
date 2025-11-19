@@ -139,9 +139,23 @@ class TwilioService {
    * Process incoming SMS
    */
   async processIncomingSMS(data) {
-    const { From, To, Body, MessageSid, NumMedia, MediaUrl0 } = data;
+    const { From, To, Body, MessageSid, NumMedia } = data;
 
-    console.log('Processing incoming SMS:', { From, To, MessageSid });
+    console.log('Processing incoming SMS:', { From, To, MessageSid, NumMedia });
+
+    // Collect all media URLs (Twilio sends MediaUrl0, MediaUrl1, etc.)
+    const mediaUrls = [];
+    const numMedia = parseInt(NumMedia || 0);
+    for (let i = 0; i < numMedia; i++) {
+      const mediaUrl = data[`MediaUrl${i}`];
+      if (mediaUrl) {
+        mediaUrls.push(mediaUrl);
+      }
+    }
+
+    if (mediaUrls.length > 0) {
+      console.log('MMS media received:', mediaUrls);
+    }
 
     // Normalize phone number (remove any non-digit characters except +)
     const normalizedTo = To.replace(/[^\d+]/g, '');
@@ -197,8 +211,6 @@ class TwilioService {
     }
 
     // Save SMS message
-    const mediaUrls = NumMedia > 0 ? [MediaUrl0] : null;
-
     const insertQuery = `
       INSERT INTO sms_messages (
         organization_id, lead_id, contact_id,
@@ -212,7 +224,7 @@ class TwilioService {
     const result = await db.query(insertQuery, [
       organizationId, leadId, contactId,
       'inbound', From, To, Body,
-      MessageSid, 'received', parseInt(NumMedia || 0), JSON.stringify(mediaUrls)
+      MessageSid, 'received', numMedia, mediaUrls.length > 0 ? JSON.stringify(mediaUrls) : null
     ]);
 
     // Check for auto-responses

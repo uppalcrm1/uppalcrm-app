@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { format } from 'date-fns';
-import { Send, ArrowLeft, User, Phone, Check, CheckCheck, Clock, AlertCircle } from 'lucide-react';
+import { Send, ArrowLeft, User, Phone, Check, CheckCheck, Clock, AlertCircle, Image } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { twilioAPI } from '../services/api';
 
@@ -125,7 +125,63 @@ export default function ConversationView({
                           : 'bg-white text-gray-900 rounded-bl-md shadow-sm'
                       }`}
                     >
-                      <p className="text-sm whitespace-pre-wrap break-words">{message.body}</p>
+                      {/* Display media/images */}
+                      {message.media_urls && (() => {
+                        try {
+                          const urls = typeof message.media_urls === 'string'
+                            ? JSON.parse(message.media_urls)
+                            : message.media_urls;
+
+                          if (Array.isArray(urls) && urls.length > 0) {
+                            return (
+                              <div className="mb-2 space-y-2">
+                                {urls.map((url, idx) => (
+                                  <a
+                                    key={idx}
+                                    href={url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="block"
+                                  >
+                                    <img
+                                      src={url}
+                                      alt={`Media ${idx + 1}`}
+                                      className="rounded-lg max-w-full h-auto cursor-pointer hover:opacity-90 transition-opacity"
+                                      style={{ maxHeight: '200px' }}
+                                      onError={(e) => {
+                                        e.target.style.display = 'none';
+                                        e.target.nextSibling.style.display = 'flex';
+                                      }}
+                                    />
+                                    <div
+                                      className="hidden items-center justify-center p-4 bg-gray-100 rounded-lg"
+                                    >
+                                      <Image className="h-8 w-8 text-gray-400 mr-2" />
+                                      <span className="text-sm text-gray-500">Media attachment</span>
+                                    </div>
+                                  </a>
+                                ))}
+                              </div>
+                            );
+                          }
+                        } catch (e) {
+                          console.log('Error parsing media_urls:', e);
+                        }
+                        return null;
+                      })()}
+
+                      {message.body && (
+                        <p className="text-sm whitespace-pre-wrap break-words">{message.body}</p>
+                      )}
+
+                      {/* Show media count indicator if no body */}
+                      {!message.body && message.num_media > 0 && (
+                        <p className="text-sm opacity-70">
+                          <Image className="inline h-4 w-4 mr-1" />
+                          {message.num_media} media attachment{message.num_media > 1 ? 's' : ''}
+                        </p>
+                      )}
+
                       <div className={`flex items-center justify-end mt-1 space-x-1 ${
                         isOutbound ? 'text-indigo-200' : 'text-gray-400'
                       }`}>
