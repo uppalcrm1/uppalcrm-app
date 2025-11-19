@@ -9,15 +9,15 @@ const Joi = require('joi');
 const sendSMSSchema = Joi.object({
   to: Joi.string().required(),
   body: Joi.string().required().max(1600),
-  leadId: Joi.string().uuid().optional(),
-  contactId: Joi.string().uuid().optional(),
-  templateId: Joi.string().uuid().optional()
+  leadId: Joi.string().uuid().optional().allow(null, ''),
+  contactId: Joi.string().uuid().optional().allow(null, ''),
+  templateId: Joi.string().uuid().optional().allow(null, '')
 });
 
 const makeCallSchema = Joi.object({
   to: Joi.string().required(),
-  leadId: Joi.string().uuid().optional(),
-  contactId: Joi.string().uuid().optional()
+  leadId: Joi.string().uuid().optional().allow(null, ''),
+  contactId: Joi.string().uuid().optional().allow(null, '')
 });
 
 const twilioConfigSchema = Joi.object({
