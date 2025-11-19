@@ -1,6 +1,9 @@
 const twilio = require('twilio');
 const db = require('../database/connection');
 
+// Fallback to production URL if API_BASE_URL not set
+const API_BASE_URL = process.env.API_BASE_URL || 'https://uppalcrm-api.onrender.com';
+
 class TwilioService {
   constructor() {
     this.clients = new Map(); // Cache Twilio clients per organization
@@ -49,7 +52,7 @@ class TwilioService {
         body,
         from: phoneNumber,
         to,
-        statusCallback: `${process.env.API_BASE_URL}/api/twilio/webhook/sms-status`
+        statusCallback: `${API_BASE_URL}/api/twilio/webhook/sms-status`
       });
 
       // Save to database
@@ -88,11 +91,11 @@ class TwilioService {
       const { client, phoneNumber } = await this.getClient(organizationId);
 
       const call = await client.calls.create({
-        url: `${process.env.API_BASE_URL}/api/twilio/webhook/voice`,
+        url: `${API_BASE_URL}/api/twilio/webhook/voice`,
         to,
         from: phoneNumber,
         record: true,
-        statusCallback: `${process.env.API_BASE_URL}/api/twilio/webhook/call-status`,
+        statusCallback: `${API_BASE_URL}/api/twilio/webhook/call-status`,
         statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed']
       });
 
