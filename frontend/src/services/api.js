@@ -758,6 +758,18 @@ export const twilioAPI = {
     return response.data
   },
 
+  // Get SMS conversations (grouped by phone number)
+  getConversations: async () => {
+    const response = await api.get('/twilio/sms/conversations')
+    return response.data
+  },
+
+  // Get messages for a specific conversation
+  getConversation: async (phoneNumber, params = {}) => {
+    const response = await api.get(`/twilio/sms/conversation/${encodeURIComponent(phoneNumber)}`, { params })
+    return response.data
+  },
+
   // Make phone call
   makeCall: async (callData) => {
     const response = await api.post('/twilio/call/make', callData)

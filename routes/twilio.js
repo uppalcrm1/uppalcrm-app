@@ -217,6 +217,154 @@ router.get('/sms', authenticateToken, async (req, res) => {
 });
 
 /**
+ * Get SMS conversations (grouped by phone number)
+ */
+router.get('/sms/conversations', authenticateToken, async (req, res) => {
+  try {
+    const organizationId = req.organizationId;
+
+    const query = `
+      WITH conversation_stats AS (
+        SELECT
+          CASE
+            WHEN direction = 'outbound' THEN to_number
+            ELSE from_number
+          END as phone_number,
+          MAX(created_at) as last_message_at,
+          COUNT(*) as message_count,
+          COUNT(*) FILTER (WHERE direction = 'inbound') as inbound_count,
+          COUNT(*) FILTER (WHERE direction = 'outbound') as outbound_count
+        FROM sms_messages
+        WHERE organization_id = $1
+        GROUP BY CASE WHEN direction = 'outbound' THEN to_number ELSE from_number END
+      ),
+      last_messages AS (
+        SELECT DISTINCT ON (
+          CASE WHEN direction = 'outbound' THEN to_number ELSE from_number END
+        )
+          CASE WHEN direction = 'outbound' THEN to_number ELSE from_number END as phone_number,
+          body as last_message,
+          direction as last_direction,
+          lead_id,
+          contact_id
+        FROM sms_messages
+        WHERE organization_id = $1
+        ORDER BY
+          CASE WHEN direction = 'outbound' THEN to_number ELSE from_number END,
+          created_at DESC
+      )
+      SELECT
+        cs.phone_number,
+        cs.last_message_at,
+        cs.message_count,
+        cs.inbound_count,
+        cs.outbound_count,
+        lm.last_message,
+        lm.last_direction,
+        lm.lead_id,
+        lm.contact_id,
+        l.first_name as lead_first_name,
+        l.last_name as lead_last_name,
+        c.first_name as contact_first_name,
+        c.last_name as contact_last_name
+      FROM conversation_stats cs
+      JOIN last_messages lm ON cs.phone_number = lm.phone_number
+      LEFT JOIN leads l ON lm.lead_id = l.id
+      LEFT JOIN contacts c ON lm.contact_id = c.id
+      ORDER BY cs.last_message_at DESC
+    `;
+
+    const result = await db.query(query, [organizationId]);
+
+    res.json({
+      conversations: result.rows.map(row => ({
+        phoneNumber: row.phone_number,
+        lastMessageAt: row.last_message_at,
+        messageCount: parseInt(row.message_count),
+        inboundCount: parseInt(row.inbound_count),
+        outboundCount: parseInt(row.outbound_count),
+        lastMessage: row.last_message,
+        lastDirection: row.last_direction,
+        leadId: row.lead_id,
+        contactId: row.contact_id,
+        contactName: row.contact_first_name
+          ? `${row.contact_first_name} ${row.contact_last_name || ''}`.trim()
+          : row.lead_first_name
+            ? `${row.lead_first_name} ${row.lead_last_name || ''}`.trim()
+            : null
+      }))
+    });
+  } catch (error) {
+    console.error('Error fetching conversations:', error);
+    res.status(500).json({ error: 'Failed to fetch conversations' });
+  }
+});
+
+/**
+ * Get messages for a specific conversation (by phone number)
+ */
+router.get('/sms/conversation/:phoneNumber', authenticateToken, async (req, res) => {
+  try {
+    const organizationId = req.organizationId;
+    const { phoneNumber } = req.params;
+    const { limit = 100, offset = 0 } = req.query;
+
+    const query = `
+      SELECT
+        sm.*,
+        l.first_name as lead_first_name,
+        l.last_name as lead_last_name,
+        c.first_name as contact_first_name,
+        c.last_name as contact_last_name,
+        u.first_name as user_first_name,
+        u.last_name as user_last_name
+      FROM sms_messages sm
+      LEFT JOIN leads l ON sm.lead_id = l.id
+      LEFT JOIN contacts c ON sm.contact_id = c.id
+      LEFT JOIN users u ON sm.user_id = u.id
+      WHERE sm.organization_id = $1
+        AND (sm.to_number = $2 OR sm.from_number = $2)
+      ORDER BY sm.created_at ASC
+      LIMIT $3 OFFSET $4
+    `;
+
+    const result = await db.query(query, [organizationId, phoneNumber, limit, offset]);
+
+    // Get contact/lead info for this conversation
+    let contactInfo = null;
+    if (result.rows.length > 0) {
+      const firstMsg = result.rows[0];
+      if (firstMsg.contact_first_name) {
+        contactInfo = {
+          type: 'contact',
+          id: firstMsg.contact_id,
+          name: `${firstMsg.contact_first_name} ${firstMsg.contact_last_name || ''}`.trim()
+        };
+      } else if (firstMsg.lead_first_name) {
+        contactInfo = {
+          type: 'lead',
+          id: firstMsg.lead_id,
+          name: `${firstMsg.lead_first_name} ${firstMsg.lead_last_name || ''}`.trim()
+        };
+      }
+    }
+
+    res.json({
+      phoneNumber,
+      contactInfo,
+      messages: result.rows,
+      pagination: {
+        limit: parseInt(limit),
+        offset: parseInt(offset)
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching conversation:', error);
+    res.status(500).json({ error: 'Failed to fetch conversation' });
+  }
+});
+
+/**
  * Make phone call
  */
 router.post('/call/make', authenticateToken, async (req, res) => {

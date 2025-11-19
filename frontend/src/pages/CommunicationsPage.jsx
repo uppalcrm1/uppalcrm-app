@@ -1,17 +1,19 @@
 import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { MessageSquare, Phone, Send, Settings, Plus } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { MessageSquare, Phone, Send, Settings } from 'lucide-react';
 import { twilioAPI } from '../services/api';
 import SendSMSModal from '../components/SendSMSModal';
-import SMSHistoryList from '../components/SMSHistoryList';
+import ConversationList from '../components/ConversationList';
+import ConversationView from '../components/ConversationView';
 import CallHistoryList from '../components/CallHistoryList';
 import TwilioConfigModal from '../components/TwilioConfigModal';
 import LoadingSpinner from '../components/LoadingSpinner';
 
 const CommunicationsPage = () => {
-  const [activeTab, setActiveTab] = useState('sms'); // 'sms', 'calls', 'templates'
+  const [activeTab, setActiveTab] = useState('sms');
   const [showSendSMS, setShowSendSMS] = useState(false);
   const [showConfig, setShowConfig] = useState(false);
+  const [selectedPhone, setSelectedPhone] = useState(null);
   const queryClient = useQueryClient();
 
   // Check Twilio configuration
@@ -25,6 +27,22 @@ const CommunicationsPage = () => {
     queryKey: ['twilioStats'],
     queryFn: twilioAPI.getStats,
     enabled: config?.configured
+  });
+
+  // Get conversations
+  const { data: conversationsData, isLoading: conversationsLoading } = useQuery({
+    queryKey: ['conversations'],
+    queryFn: twilioAPI.getConversations,
+    enabled: config?.configured && activeTab === 'sms',
+    refetchInterval: 30000 // Refresh every 30 seconds
+  });
+
+  // Get selected conversation messages
+  const { data: conversationData, isLoading: conversationLoading } = useQuery({
+    queryKey: ['conversation', selectedPhone],
+    queryFn: () => twilioAPI.getConversation(selectedPhone),
+    enabled: !!selectedPhone,
+    refetchInterval: 10000 // Refresh every 10 seconds when viewing
   });
 
   if (configLoading) {
@@ -85,7 +103,7 @@ const CommunicationsPage = () => {
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
           >
             <Send className="w-4 h-4 inline mr-2" />
-            Send SMS
+            New Message
           </button>
         </div>
       </div>
@@ -158,7 +176,10 @@ const CommunicationsPage = () => {
         <div className="border-b border-gray-200">
           <nav className="flex -mb-px">
             <button
-              onClick={() => setActiveTab('sms')}
+              onClick={() => {
+                setActiveTab('sms');
+                setSelectedPhone(null);
+              }}
               className={`px-6 py-4 text-sm font-medium border-b-2 ${
                 activeTab === 'sms'
                   ? 'border-blue-600 text-blue-600'
@@ -166,7 +187,7 @@ const CommunicationsPage = () => {
               }`}
             >
               <MessageSquare className="w-4 h-4 inline mr-2" />
-              SMS Messages
+              Messages
             </button>
             <button
               onClick={() => setActiveTab('calls')}
@@ -183,10 +204,54 @@ const CommunicationsPage = () => {
         </div>
 
         {/* Tab Content */}
-        <div className="p-6">
-          {activeTab === 'sms' && <SMSHistoryList />}
-          {activeTab === 'calls' && <CallHistoryList />}
-        </div>
+        {activeTab === 'sms' && (
+          <div className="flex h-[600px]">
+            {/* Conversation List */}
+            <div className={`${selectedPhone ? 'hidden md:block' : ''} w-full md:w-1/3 border-r border-gray-200 overflow-y-auto`}>
+              <div className="p-4 border-b border-gray-200">
+                <h3 className="text-sm font-medium text-gray-700">Conversations</h3>
+              </div>
+              <ConversationList
+                conversations={conversationsData?.conversations}
+                selectedPhone={selectedPhone}
+                onSelectConversation={setSelectedPhone}
+                isLoading={conversationsLoading}
+              />
+            </div>
+
+            {/* Conversation View */}
+            <div className={`${selectedPhone ? '' : 'hidden md:flex'} flex-1 ${!selectedPhone ? 'items-center justify-center' : ''}`}>
+              {selectedPhone ? (
+                <ConversationView
+                  phoneNumber={selectedPhone}
+                  messages={conversationData?.messages}
+                  contactInfo={conversationData?.contactInfo}
+                  isLoading={conversationLoading}
+                  onBack={() => setSelectedPhone(null)}
+                  onSendMessage={() => {
+                    queryClient.invalidateQueries(['conversation', selectedPhone]);
+                    queryClient.invalidateQueries(['conversations']);
+                    queryClient.invalidateQueries(['twilioStats']);
+                  }}
+                />
+              ) : (
+                <div className="text-center">
+                  <MessageSquare className="mx-auto h-12 w-12 text-gray-400" />
+                  <h3 className="mt-2 text-sm font-medium text-gray-900">Select a conversation</h3>
+                  <p className="mt-1 text-sm text-gray-500">
+                    Choose a conversation from the list to view messages
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'calls' && (
+          <div className="p-6">
+            <CallHistoryList />
+          </div>
+        )}
       </div>
 
       {/* Modals */}
@@ -194,7 +259,7 @@ const CommunicationsPage = () => {
         <SendSMSModal
           onClose={() => setShowSendSMS(false)}
           onSuccess={() => {
-            queryClient.invalidateQueries(['smsHistory']);
+            queryClient.invalidateQueries(['conversations']);
             queryClient.invalidateQueries(['twilioStats']);
           }}
         />
