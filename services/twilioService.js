@@ -141,14 +141,22 @@ class TwilioService {
   async processIncomingSMS(data) {
     const { From, To, Body, MessageSid, NumMedia, MediaUrl0 } = data;
 
-    // Find organization by phone number
+    console.log('Processing incoming SMS:', { From, To, MessageSid });
+
+    // Normalize phone number (remove any non-digit characters except +)
+    const normalizedTo = To.replace(/[^\d+]/g, '');
+
+    // Find organization by phone number (flexible matching)
     const orgQuery = `
-      SELECT organization_id FROM twilio_config WHERE phone_number = $1
+      SELECT organization_id FROM twilio_config
+      WHERE phone_number = $1
+         OR phone_number = $2
+         OR REPLACE(REPLACE(phone_number, '-', ''), ' ', '') = $3
     `;
-    const orgResult = await db.query(orgQuery, [To]);
+    const orgResult = await db.query(orgQuery, [To, normalizedTo, normalizedTo]);
 
     if (orgResult.rows.length === 0) {
-      console.error('No organization found for phone number:', To);
+      console.error('No organization found for phone number:', To, '(normalized:', normalizedTo, ')');
       return;
     }
 
@@ -178,12 +186,13 @@ class TwilioService {
       } else {
         // Create new lead from incoming SMS
         const createLeadQuery = `
-          INSERT INTO leads (organization_id, phone, source, status, first_contact_date)
-          VALUES ($1, $2, 'SMS', 'new', NOW())
+          INSERT INTO leads (organization_id, phone, source, status, last_contact_date, first_name)
+          VALUES ($1, $2, 'SMS', 'new', NOW(), 'SMS Lead')
           RETURNING id
         `;
         const newLead = await db.query(createLeadQuery, [organizationId, From]);
         leadId = newLead.rows[0].id;
+        console.log('Created new lead from SMS:', leadId);
       }
     }
 
