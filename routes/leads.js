@@ -519,7 +519,7 @@ router.get('/by-status', async (req, res) => {
     const leads = await db.query(`
       SELECT id, first_name, last_name, email, phone, company, source, status,
              priority, ${valueColumnName}, assigned_to, next_follow_up, notes,
-             created_at, updated_at, custom_fields
+             created_at, updated_at
       FROM leads
       WHERE organization_id = $1
       ORDER BY created_at DESC
@@ -652,11 +652,11 @@ router.get('/',
       // Add pagination parameters
       queryParams.push(limit, offset);
 
-      // Query leads WITH custom_fields column
+      // Query leads WITHOUT custom_fields column (for database compatibility)
       const leads = await db.query(`
         SELECT id, first_name, last_name, email, phone, company, source, status,
                priority, ${valueColumnName}, assigned_to, next_follow_up, notes,
-               created_at, updated_at, custom_fields
+               created_at, updated_at
         FROM leads
         WHERE ${whereClause}
         ORDER BY ${sortColumn} ${orderDirection}
