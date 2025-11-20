@@ -8,6 +8,7 @@ import './index.css'
 import { AuthProvider } from './contexts/AuthContext'
 import { SuperAdminProvider } from './contexts/SuperAdminContext'
 import { NotificationProvider } from './context/NotificationContext'
+import { CallProvider } from './context/CallContext'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -28,7 +29,9 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         <AuthProvider>
           <SuperAdminProvider>
             <NotificationProvider>
-              <App />
+              <CallProvider>
+                <App />
+              </CallProvider>
             </NotificationProvider>
             <Toaster
               position="top-right"

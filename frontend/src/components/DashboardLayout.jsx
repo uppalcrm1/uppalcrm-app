@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Outlet, NavLink, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useNotifications } from '../context/NotificationContext'
+import { useCall } from '../context/CallContext'
 import {
   LayoutDashboard,
   Users,
@@ -24,6 +25,7 @@ import {
   MessageSquare,
 } from 'lucide-react'
 import LoadingSpinner from './LoadingSpinner'
+import IncomingCallNotification from './IncomingCallNotification'
 
 // COMPLETE navigation with all your CRM sections
 const navigation = [
@@ -41,6 +43,7 @@ const navigation = [
 const DashboardLayout = () => {
   const { user, organization, logout, isLoading } = useAuth()
   const { unreadCount, requestBrowserPermission, browserPermission } = useNotifications()
+  const { incomingCall, acceptCall, declineCall } = useCall()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [adminMenuOpen, setAdminMenuOpen] = useState(false)
@@ -67,6 +70,16 @@ const DashboardLayout = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Incoming Call Notification */}
+      {incomingCall && (
+        <IncomingCallNotification
+          callerNumber={incomingCall.from}
+          callerName={incomingCall.callerName}
+          onAccept={acceptCall}
+          onDecline={declineCall}
+        />
+      )}
+
       {/* Top Header Bar */}
       <header className="bg-white border-b border-gray-200 fixed w-full top-0 z-50">
         {/* Top Row - Brand & User */}

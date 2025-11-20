@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { MessageSquare, Phone, Send, Settings } from 'lucide-react';
+import { MessageSquare, Phone, Send, Settings, PhoneCall } from 'lucide-react';
 import { twilioAPI } from '../services/api';
 import { useNotifications } from '../context/NotificationContext';
 import SendSMSModal from '../components/SendSMSModal';
@@ -8,12 +8,14 @@ import ConversationList from '../components/ConversationList';
 import ConversationView from '../components/ConversationView';
 import CallHistoryList from '../components/CallHistoryList';
 import TwilioConfigModal from '../components/TwilioConfigModal';
+import Dialpad from '../components/Dialpad';
 import LoadingSpinner from '../components/LoadingSpinner';
 
 const CommunicationsPage = () => {
   const [activeTab, setActiveTab] = useState('sms');
   const [showSendSMS, setShowSendSMS] = useState(false);
   const [showConfig, setShowConfig] = useState(false);
+  const [showDialpad, setShowDialpad] = useState(false);
   const [selectedPhone, setSelectedPhone] = useState(null);
   const queryClient = useQueryClient();
   const { clearUnread } = useNotifications();
@@ -104,6 +106,13 @@ const CommunicationsPage = () => {
           >
             <Settings className="w-4 h-4 inline mr-2" />
             Settings
+          </button>
+          <button
+            onClick={() => setShowDialpad(true)}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+          >
+            <PhoneCall className="w-4 h-4 inline mr-2" />
+            New Call
           </button>
           <button
             onClick={() => setShowSendSMS(true)}
@@ -256,6 +265,16 @@ const CommunicationsPage = () => {
 
         {activeTab === 'calls' && (
           <div className="p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-lg font-semibold text-gray-900">Call History</h3>
+              <button
+                onClick={() => setShowDialpad(true)}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center"
+              >
+                <PhoneCall className="w-4 h-4 mr-2" />
+                Open Dialpad
+              </button>
+            </div>
             <CallHistoryList />
           </div>
         )}
@@ -276,6 +295,12 @@ const CommunicationsPage = () => {
         <TwilioConfigModal
           onClose={() => setShowConfig(false)}
           onSuccess={() => queryClient.invalidateQueries(['twilioConfig'])}
+        />
+      )}
+
+      {showDialpad && (
+        <Dialpad
+          onClose={() => setShowDialpad(false)}
         />
       )}
     </div>

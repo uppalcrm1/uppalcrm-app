@@ -619,25 +619,149 @@ router.post('/webhook/sms-status', async (req, res) => {
 });
 
 /**
- * Twilio Webhooks - Voice (TwiML for calls)
+ * Twilio Webhooks - Voice (TwiML for incoming calls)
  */
 router.post('/webhook/voice', async (req, res) => {
   try {
-    // Return TwiML to connect call
-    const twiml = `<?xml version="1.0" encoding="UTF-8"?>
-      <Response>
-        <Say>Please wait while we connect your call.</Say>
-        <Dial record="record-from-answer">
-          <!-- Forward to user's phone or SIP endpoint -->
-          <Number>${process.env.FORWARD_CALLS_TO || '+1234567890'}</Number>
-        </Dial>
-      </Response>`;
+    const { From, To, CallSid, Direction } = req.body;
+
+    console.log('Incoming voice call:', { From, To, CallSid, Direction });
+
+    // Find organization by Twilio phone number
+    const orgQuery = `
+      SELECT organization_id FROM twilio_config
+      WHERE phone_number = $1
+         OR phone_number = $2
+         OR REPLACE(REPLACE(phone_number, '-', ''), ' ', '') = $3
+    `;
+    const normalizedTo = To.replace(/[^\d+]/g, '');
+    const orgResult = await db.query(orgQuery, [To, normalizedTo, normalizedTo]);
+
+    if (orgResult.rows.length > 0) {
+      const organizationId = orgResult.rows[0].organization_id;
+
+      // Check if caller is a known lead or contact
+      const contactQuery = `
+        SELECT 'lead' as type, id, first_name, last_name FROM leads
+        WHERE organization_id = $1 AND phone = $2
+        UNION ALL
+        SELECT 'contact' as type, id, first_name, last_name FROM contacts
+        WHERE organization_id = $1 AND phone = $2
+        LIMIT 1
+      `;
+      const contactResult = await db.query(contactQuery, [organizationId, From]);
+      const contactInfo = contactResult.rows[0] || null;
+
+      // Save incoming call to database
+      const insertQuery = `
+        INSERT INTO phone_calls (
+          organization_id, lead_id, contact_id,
+          direction, from_number, to_number,
+          twilio_call_sid, twilio_status, started_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'ringing', NOW())
+        RETURNING *
+      `;
+
+      await db.query(insertQuery, [
+        organizationId,
+        contactInfo?.type === 'lead' ? contactInfo.id : null,
+        contactInfo?.type === 'contact' ? contactInfo.id : null,
+        'inbound',
+        From,
+        To,
+        CallSid
+      ]);
+
+      // Store pending incoming call for frontend notification
+      const cacheKey = `incoming_call:${organizationId}`;
+      if (!global.incomingCalls) {
+        global.incomingCalls = {};
+      }
+      global.incomingCalls[cacheKey] = {
+        callSid: CallSid,
+        from: From,
+        to: To,
+        callerName: contactInfo ? `${contactInfo.first_name || ''} ${contactInfo.last_name || ''}`.trim() : null,
+        timestamp: new Date().toISOString()
+      };
+
+      // Clear after 30 seconds if not answered
+      setTimeout(() => {
+        if (global.incomingCalls && global.incomingCalls[cacheKey]?.callSid === CallSid) {
+          delete global.incomingCalls[cacheKey];
+        }
+      }, 30000);
+    }
+
+    // Return TwiML to handle the call
+    const forwardTo = process.env.FORWARD_CALLS_TO;
+    let twiml;
+
+    if (forwardTo) {
+      twiml = `<?xml version="1.0" encoding="UTF-8"?>
+        <Response>
+          <Say voice="alice">Connecting your call. Please hold.</Say>
+          <Dial record="record-from-answer" timeout="30" action="/api/twilio/webhook/call-complete">
+            <Number>${forwardTo}</Number>
+          </Dial>
+          <Say voice="alice">We're sorry, but no one is available to take your call. Please leave a message after the beep.</Say>
+          <Record maxLength="120" transcribe="true" />
+        </Response>`;
+    } else {
+      twiml = `<?xml version="1.0" encoding="UTF-8"?>
+        <Response>
+          <Say voice="alice">Thank you for calling. We have received your call and will get back to you shortly.</Say>
+          <Hangup />
+        </Response>`;
+    }
 
     res.type('text/xml');
     res.send(twiml);
   } catch (error) {
     console.error('Error handling voice webhook:', error);
-    res.status(500).send('Error');
+    // Return a basic TwiML response even on error
+    res.type('text/xml');
+    res.send(`<?xml version="1.0" encoding="UTF-8"?>
+      <Response>
+        <Say>We're sorry, but we cannot take your call at this time.</Say>
+        <Hangup />
+      </Response>`);
+  }
+});
+
+/**
+ * Get pending incoming calls (for frontend polling)
+ */
+router.get('/incoming-calls/pending', authenticateToken, async (req, res) => {
+  try {
+    const organizationId = req.organizationId;
+    const cacheKey = `incoming_call:${organizationId}`;
+
+    const incomingCall = global.incomingCalls?.[cacheKey] || null;
+
+    res.json({ incomingCall });
+  } catch (error) {
+    console.error('Error getting pending calls:', error);
+    res.status(500).json({ error: 'Failed to get pending calls' });
+  }
+});
+
+/**
+ * Clear pending incoming call (when answered/declined)
+ */
+router.post('/incoming-calls/clear', authenticateToken, async (req, res) => {
+  try {
+    const organizationId = req.organizationId;
+    const cacheKey = `incoming_call:${organizationId}`;
+
+    if (global.incomingCalls) {
+      delete global.incomingCalls[cacheKey];
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error clearing pending call:', error);
+    res.status(500).json({ error: 'Failed to clear pending call' });
   }
 });
 
