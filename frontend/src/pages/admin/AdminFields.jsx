@@ -13,8 +13,25 @@ import {
   CheckCircle,
   AlertCircle,
   Move,
-  ShieldAlert
+  ShieldAlert,
+  GripVertical
 } from 'lucide-react'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import api from '../../services/api'
 
 const ENTITY_TYPES = [
@@ -59,6 +76,46 @@ const isProductNameField = (field, entityType) => {
   )
 }
 
+/**
+ * Sortable Row Component for drag-and-drop functionality
+ */
+const SortableRow = ({ field, entityType, isReorderMode, onEdit, onDelete, onToggleVisibility, children }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: field.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  const isProtectedField = isProductNameField(field, entityType)
+
+  return (
+    <tr
+      ref={setNodeRef}
+      style={style}
+      className={`border-b border-gray-100 hover:bg-gray-50 transition-all ${
+        !field.is_enabled ? 'bg-gray-50 opacity-60' : ''
+      } ${isProtectedField ? 'bg-blue-50' : ''} ${isDragging ? 'shadow-lg' : ''}`}
+    >
+      {/* Drag Handle Column */}
+      {isReorderMode && (
+        <td className="py-4 px-4 cursor-move" {...attributes} {...listeners}>
+          <GripVertical size={20} className="text-gray-400" />
+        </td>
+      )}
+      {children}
+    </tr>
+  )
+}
+
 const AdminFields = () => {
   const [activeTab, setActiveTab] = useState('leads')
   const [fields, setFields] = useState([])
@@ -69,6 +126,7 @@ const AdminFields = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [successMessage, setSuccessMessage] = useState(null)
+  const [isReorderMode, setIsReorderMode] = useState(false)
   const [formData, setFormData] = useState({
     field_name: '',
     field_label: '',
@@ -318,6 +376,79 @@ const AdminFields = () => {
       field_options: [],
       validation_rules: {}
     })
+  }
+
+  // Drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
+
+  // Handle drag end - reorder fields
+  const handleDragEnd = async (event) => {
+    const { active, over } = event
+
+    if (!over || active.id === over.id) {
+      return
+    }
+
+    const allFields = filteredFields
+    const oldIndex = allFields.findIndex(f => f.id === active.id)
+    const newIndex = allFields.findIndex(f => f.id === over.id)
+
+    if (oldIndex === -1 || newIndex === -1) {
+      return
+    }
+
+    // Reorder locally first for immediate feedback
+    const reorderedFields = arrayMove(allFields, oldIndex, newIndex)
+
+    // Update the appropriate state
+    if (searchQuery) {
+      // If filtering, we need to update both system and custom fields
+      const reorderedSystemFields = reorderedFields.filter(f => f.isSystemField)
+      const reorderedCustomFields = reorderedFields.filter(f => !f.isSystemField)
+      setSystemFields(reorderedSystemFields)
+      setFields(reorderedCustomFields)
+    } else {
+      // Update the full lists
+      const reorderedSystemFields = reorderedFields.filter(f => f.isSystemField)
+      const reorderedCustomFields = reorderedFields.filter(f => !f.isSystemField)
+      setSystemFields(reorderedSystemFields)
+      setFields(reorderedCustomFields)
+    }
+
+    // Save new order to backend
+    try {
+      const updates = reorderedFields.map((field, index) => ({
+        field,
+        sort_order: index + 1
+      }))
+
+      // Update each field's sort_order
+      for (const { field, sort_order } of updates) {
+        if (field.isSystemField) {
+          await api.put(`/custom-fields/default/${field.field_name}`, {
+            sort_order,
+            entity_type: activeTab
+          })
+        } else {
+          await api.put(`/custom-fields/${field.id}`, {
+            sort_order
+          })
+        }
+      }
+
+      setSuccessMessage('Field order updated successfully')
+      setTimeout(() => setSuccessMessage(null), 3000)
+    } catch (err) {
+      console.error('Error updating field order:', err)
+      setError('Failed to save field order')
+      // Reload fields to restore correct order
+      loadFields(activeTab)
+    }
   }
 
   const handleCancel = () => {
@@ -723,18 +854,27 @@ const AdminFields = () => {
       {/* Fields List */}
       {!isCreating && (
         <div className="card">
-          {/* Search */}
-          <div className="mb-6">
-            <div className="relative">
-              <Search size={16} className="absolute left-3 top-3 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search fields..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="input pl-10"
-              />
+          {/* Header with Reorder Button */}
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex-1">
+              <div className="relative">
+                <Search size={16} className="absolute left-3 top-3 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search fields..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="input pl-10"
+                />
+              </div>
             </div>
+            <button
+              onClick={() => setIsReorderMode(!isReorderMode)}
+              className={`ml-4 btn ${isReorderMode ? 'btn-primary' : 'btn-outline'} flex items-center gap-2`}
+            >
+              <Move size={16} />
+              {isReorderMode ? 'Done Reordering' : 'Reorder Fields'}
+            </button>
           </div>
 
           {/* Fields Table */}
@@ -758,33 +898,53 @@ const AdminFields = () => {
               )}
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-gray-200 bg-gray-50">
-                    <th className="text-left py-3 px-4 font-medium text-gray-900">Field Label</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-900">Field Name</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-900">Type</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-900">Required</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-900">
-                      <div className="flex items-center gap-2">
-                        <Eye size={16} className="text-gray-600" />
-                        <span>Show in Forms</span>
-                      </div>
-                    </th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-900">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredFields.map((field) => {
-                    const isProtectedField = isProductNameField(field, activeTab)
-                    return (
-                      <tr
-                        key={field.id}
-                        className={`border-b border-gray-100 hover:bg-gray-50 transition-all ${
-                          !field.is_enabled ? 'bg-gray-50 opacity-60' : ''
-                        } ${isProtectedField ? 'bg-blue-50' : ''}`}
-                      >
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <div className="overflow-x-auto">
+                {isReorderMode && (
+                  <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-center gap-2 text-blue-800">
+                      <Move size={16} />
+                      <span className="text-sm font-medium">Drag and drop fields to reorder them</span>
+                    </div>
+                  </div>
+                )}
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-gray-200 bg-gray-50">
+                      {isReorderMode && (
+                        <th className="text-left py-3 px-4 font-medium text-gray-900 w-12"></th>
+                      )}
+                      <th className="text-left py-3 px-4 font-medium text-gray-900">Field Label</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-900">Field Name</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-900">Type</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-900">Required</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-900">
+                        <div className="flex items-center gap-2">
+                          <Eye size={16} className="text-gray-600" />
+                          <span>Show in Forms</span>
+                        </div>
+                      </th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-900">Actions</th>
+                    </tr>
+                  </thead>
+                  <SortableContext
+                    items={filteredFields.map(f => f.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <tbody>
+                      {filteredFields.map((field) => {
+                        const isProtectedField = isProductNameField(field, activeTab)
+                        return (
+                          <SortableRow
+                            key={field.id}
+                            field={field}
+                            entityType={activeTab}
+                            isReorderMode={isReorderMode}
+                          >
                         <td className="py-4 px-4">
                           <div className="flex items-center gap-2">
                             <span className={`font-medium ${field.is_enabled ? 'text-gray-900' : 'text-gray-500 line-through'}`}>
@@ -876,12 +1036,14 @@ const AdminFields = () => {
                             )}
                           </div>
                         </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
+                          </SortableRow>
+                        )
+                      })}
+                    </tbody>
+                  </SortableContext>
+                </table>
+              </div>
+            </DndContext>
           )}
         </div>
       )}

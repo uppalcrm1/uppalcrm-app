@@ -774,9 +774,22 @@ router.get('/', async (req, res) => {
       console.log('Usage table not found, using defaults');
     }
 
+    // Sort fields by sort_order to allow custom field ordering per organization
+    const sortedSystemFields = systemFields.rows.sort((a, b) => {
+      const orderA = a.sort_order !== undefined ? a.sort_order : 999;
+      const orderB = b.sort_order !== undefined ? b.sort_order : 999;
+      return orderA - orderB;
+    });
+
+    const sortedCustomFields = customFields.rows.sort((a, b) => {
+      const orderA = a.sort_order !== undefined ? a.sort_order : 999;
+      const orderB = b.sort_order !== undefined ? b.sort_order : 999;
+      return orderA - orderB;
+    });
+
     const response = {
-      customFields: customFields.rows,
-      systemFields: systemFields.rows,
+      customFields: sortedCustomFields,
+      systemFields: sortedSystemFields,
       defaultFields: defaultFields.rows, // Keep for backward compatibility
       usage: usage.rows[0] || { custom_fields_count: 0, contacts_count: 0 },
       limits: {

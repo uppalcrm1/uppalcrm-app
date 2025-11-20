@@ -504,24 +504,39 @@ const DynamicLeadForm = ({
 
         <div className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* System Fields (excluding Notes - will render at bottom) */}
+            {/* System Fields (excluding full-width fields like notes, description, textarea) */}
             {enabledSystemFields
-              .filter(field => field.field_name !== 'notes')
+              .filter(field => {
+                // Filter out full-width fields (notes, description, or textarea types)
+                return field.field_name !== 'notes' &&
+                       field.field_name !== 'description' &&
+                       field.field_type !== 'textarea'
+              })
               .map(field => renderField(field, false))}
 
-            {/* Custom Fields (excluding notes fields) */}
+            {/* Custom Fields (excluding full-width textarea fields) */}
             {enabledCustomFields
-              .filter(field => field.field_name !== 'notes' && !field.field_name.includes('note'))
+              .filter(field => {
+                // Filter out textarea fields - they should be full-width
+                return field.field_type !== 'textarea'
+              })
               .map(field => renderField(field, true))}
           </div>
 
-          {/* Notes Field - Always at bottom, full width */}
-          <div className="mt-6">
+          {/* Full-Width Fields (Notes, Description, Textarea) - Always at bottom */}
+          <div className="mt-6 space-y-4">
+            {/* System textarea fields */}
             {enabledSystemFields
-              .filter(field => field.field_name === 'notes')
+              .filter(field =>
+                field.field_name === 'notes' ||
+                field.field_name === 'description' ||
+                field.field_type === 'textarea'
+              )
               .map(field => renderField(field, false))}
+
+            {/* Custom textarea fields */}
             {enabledCustomFields
-              .filter(field => field.field_name === 'notes' || field.field_name.includes('note'))
+              .filter(field => field.field_type === 'textarea')
               .map(field => renderField(field, true))}
           </div>
 
