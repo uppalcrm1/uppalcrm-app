@@ -577,8 +577,8 @@ router.get('/', async (req, res) => {
     // Define entity-specific system fields
     const systemFieldsByEntity = {
       leads: {
-        firstName: { label: 'First Name', type: 'text', required: true, editable: false },
-        lastName: { label: 'Last Name', type: 'text', required: true, editable: false },
+        firstName: { label: 'First Name', type: 'text', required: false, editable: true },
+        lastName: { label: 'Last Name', type: 'text', required: false, editable: true },
         email: { label: 'Email', type: 'email', required: false, editable: true },
         phone: { label: 'Phone', type: 'tel', required: false, editable: true },
         company: { label: 'Company', type: 'text', required: false, editable: true },
@@ -609,8 +609,8 @@ router.get('/', async (req, res) => {
         notes: { label: 'Notes', type: 'textarea', required: false, editable: true }
       },
       contacts: {
-        firstName: { label: 'First Name', type: 'text', required: true, editable: false },
-        lastName: { label: 'Last Name', type: 'text', required: true, editable: false },
+        firstName: { label: 'First Name', type: 'text', required: false, editable: true },
+        lastName: { label: 'Last Name', type: 'text', required: false, editable: true },
         email: { label: 'Email', type: 'email', required: false, editable: true },
         phone: { label: 'Phone', type: 'tel', required: false, editable: true },
         company: { label: 'Company', type: 'text', required: false, editable: true },
@@ -988,8 +988,8 @@ router.put('/default/:fieldName', async (req, res) => {
     // Define entity-specific system field defaults
     const systemFieldDefaultsByEntity = {
       leads: {
-        firstName: { label: 'First Name', type: 'text', required: true, editable: false },
-        lastName: { label: 'Last Name', type: 'text', required: true, editable: false },
+        firstName: { label: 'First Name', type: 'text', required: false, editable: true },
+        lastName: { label: 'Last Name', type: 'text', required: false, editable: true },
         email: { label: 'Email', type: 'email', required: false, editable: true },
         phone: { label: 'Phone', type: 'tel', required: false, editable: true },
         company: { label: 'Company', type: 'text', required: false, editable: true },

@@ -48,8 +48,8 @@ const FieldManager = () => {
           name: 'firstName',
           label: 'First Name',
           type: 'text',
-          required: true,
-          editable: false,
+          required: false,
+          editable: true,
           deletable: false,
           options: null
         },
@@ -57,8 +57,8 @@ const FieldManager = () => {
           name: 'lastName',
           label: 'Last Name',
           type: 'text',
-          required: true,
-          editable: false,
+          required: false,
+          editable: true,
           deletable: false,
           options: null
         },
@@ -318,7 +318,8 @@ const FieldManager = () => {
         is_enabled: editingSystemField.is_enabled,
         is_required: editingSystemField.is_required,
         field_label: editingSystemField.label,
-        field_type: editingSystemField.type
+        field_type: editingSystemField.type,
+        entity_type: 'leads'
       };
 
       // If it's a select field, include options
