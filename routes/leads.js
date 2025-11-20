@@ -844,13 +844,7 @@ router.post('/', validateLeadDynamic(false), async (req, res) => {
       customFields = {} // Accept custom fields
     } = req.body;
 
-    // Validate required fields
-    if (!firstName || !lastName) {
-      return res.status(400).json({
-        error: 'Validation failed',
-        message: 'First name and last name are required'
-      });
-    }
+    // Note: firstName and lastName are now optional fields (no validation required)
 
     // Validate authentication context
     if (!req.organizationId || !req.userId) {

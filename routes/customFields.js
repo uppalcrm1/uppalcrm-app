@@ -1175,14 +1175,7 @@ router.post('/create-lead', async (req, res) => {
     const finalAssignedTo = assigned_to || assignedTo;
     const finalNextFollowUp = next_follow_up || nextFollowUp;
 
-    // Validate required fields
-    if (!finalFirstName || !finalLastName) {
-      return res.status(400).json({
-        error: 'Validation failed',
-        message: 'First name and last name are required',
-        received: req.body
-      });
-    }
+    // Note: firstName and lastName are now optional fields (no validation required)
 
     console.log('🔍 Creating lead with:', {
       organizationId: req.organizationId,
