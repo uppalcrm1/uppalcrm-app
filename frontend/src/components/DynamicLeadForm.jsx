@@ -504,11 +504,25 @@ const DynamicLeadForm = ({
 
         <div className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* System Fields */}
-            {enabledSystemFields.map(field => renderField(field, false))}
+            {/* System Fields (excluding Notes - will render at bottom) */}
+            {enabledSystemFields
+              .filter(field => field.field_name !== 'notes')
+              .map(field => renderField(field, false))}
 
-            {/* Custom Fields */}
-            {enabledCustomFields.map(field => renderField(field, true))}
+            {/* Custom Fields (excluding notes fields) */}
+            {enabledCustomFields
+              .filter(field => field.field_name !== 'notes' && !field.field_name.includes('note'))
+              .map(field => renderField(field, true))}
+          </div>
+
+          {/* Notes Field - Always at bottom, full width */}
+          <div className="mt-6">
+            {enabledSystemFields
+              .filter(field => field.field_name === 'notes')
+              .map(field => renderField(field, false))}
+            {enabledCustomFields
+              .filter(field => field.field_name === 'notes' || field.field_name.includes('note'))
+              .map(field => renderField(field, true))}
           </div>
 
           {/* Submit Button */}
