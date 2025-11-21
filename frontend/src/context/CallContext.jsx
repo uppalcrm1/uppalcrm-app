@@ -98,6 +98,17 @@ export const CallProvider = ({ children }) => {
     if (!incomingCall) return
 
     try {
+      // Clear the pending call from backend
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3004/api'
+      await fetch(`${API_URL}/twilio/incoming-calls/clear`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+          'X-Organization-Slug': localStorage.getItem('organizationSlug'),
+          'Content-Type': 'application/json'
+        }
+      })
+
       // In a real implementation, this would connect the call
       setActiveCall({
         ...incomingCall,
@@ -105,7 +116,7 @@ export const CallProvider = ({ children }) => {
         startTime: new Date()
       })
       setIncomingCall(null)
-      toast.success('Call connected')
+      toast.success('Call accepted')
     } catch (error) {
       console.error('Error accepting call:', error)
       toast.error('Failed to accept call')
@@ -117,11 +128,24 @@ export const CallProvider = ({ children }) => {
     if (!incomingCall) return
 
     try {
+      // Clear the pending call from backend
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3004/api'
+      await fetch(`${API_URL}/twilio/incoming-calls/clear`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+          'X-Organization-Slug': localStorage.getItem('organizationSlug'),
+          'Content-Type': 'application/json'
+        }
+      })
+
       setMissedCallCount(prev => prev + 1)
       setIncomingCall(null)
       toast.info('Call declined')
     } catch (error) {
       console.error('Error declining call:', error)
+      // Still clear the call locally even if backend fails
+      setIncomingCall(null)
     }
   }
 
