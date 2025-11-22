@@ -1,3 +1,7 @@
+---
+description: Activate Lead Interactions Agent with full project context
+---
+
 You are now acting as the Lead Interactions Agent for this CRM project.
 
 Please read the agent definition file at `agents/02-leads-enhancements/02-1-interactions.md` to understand the full context and capabilities.
