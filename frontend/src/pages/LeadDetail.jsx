@@ -48,23 +48,41 @@ const LeadDetail = () => {
   const [isConverting, setIsConverting] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
   const [customFields, setCustomFields] = useState([])
+  const [fieldConfig, setFieldConfig] = useState({ systemFields: [], customFields: [] })
+  const [loadingFieldConfig, setLoadingFieldConfig] = useState(true)
 
   useEffect(() => {
     fetchLeadDetail()
-    fetchCustomFields()
+    fetchFieldConfig()
   }, [id, refreshKey])
 
-  const fetchCustomFields = async () => {
+  const fetchFieldConfig = async () => {
     try {
+      setLoadingFieldConfig(true)
       const response = await api.get('/custom-fields/form-config')
-      // Filter to only show fields marked for detail view
-      const fieldsForDetailView = (response.data.customFields || []).filter(
+
+      // Filter system fields to only show enabled ones that should be shown in forms
+      const visibleSystemFields = (response.data.systemFields || []).filter(
+        f => f.is_enabled && f.show_in_forms !== false && !f.hidden
+      )
+
+      // Filter custom fields to only show enabled ones that should be shown in detail view
+      const visibleCustomFields = (response.data.customFields || []).filter(
         f => f.is_enabled && f.show_in_detail_view !== false
       )
-      setCustomFields(fieldsForDetailView)
+
+      setFieldConfig({
+        systemFields: visibleSystemFields,
+        customFields: visibleCustomFields
+      })
+      setCustomFields(visibleCustomFields)
     } catch (err) {
-      console.error('Error fetching custom fields:', err)
-      // Don't show error to user, just continue without custom fields
+      console.error('Error fetching field config:', err)
+      // On error, show default fields to prevent breaking the UI
+      setFieldConfig({ systemFields: [], customFields: [] })
+      setCustomFields([])
+    } finally {
+      setLoadingFieldConfig(false)
     }
   }
 
@@ -311,7 +329,12 @@ const LeadDetail = () => {
           {/* Main Content */}
           <div className="lg:col-span-2">
             {activeTab === 'details' && (
-              <LeadDetailsPanel lead={lead} customFields={customFields} />
+              <LeadDetailsPanel
+                lead={lead}
+                customFields={customFields}
+                fieldConfig={fieldConfig}
+                loadingFieldConfig={loadingFieldConfig}
+              />
             )}
 
             {activeTab === 'activities' && (
@@ -444,12 +467,56 @@ const LeadDetail = () => {
 }
 
 // Lead Details Panel Component
-const LeadDetailsPanel = ({ lead, customFields = [] }) => {
+const LeadDetailsPanel = ({ lead, customFields = [], fieldConfig = { systemFields: [], customFields: [] }, loadingFieldConfig = false }) => {
+  // Helper to check if a field should be visible
+  const isFieldVisible = (fieldName) => {
+    // During loading, show all fields to prevent layout shift
+    if (loadingFieldConfig) {
+      return true
+    }
+
+    // If no config loaded (error case), show all fields
+    if (!fieldConfig.systemFields || fieldConfig.systemFields.length === 0) {
+      return true
+    }
+
+    // Check if field is in the visible system fields list
+    const field = fieldConfig.systemFields.find(f => f.field_name === fieldName)
+    if (!field) {
+      // Field not in config, default to hidden (field might be newly hidden)
+      return false
+    }
+
+    // Field must be enabled, show_in_forms must be true, and not hidden
+    return field.is_enabled && field.show_in_forms !== false && !field.hidden
+  }
+
+  // Map field names to lead object keys
+  const fieldMapping = {
+    firstName: 'first_name',
+    lastName: 'last_name',
+    email: 'email',
+    phone: 'phone',
+    company: 'company',
+    source: 'source',
+    potentialValue: 'lead_value',
+    priority: 'priority',
+    title: 'title',
+    notes: 'notes',
+    address: 'address',
+    city: 'city',
+    state: 'state',
+    postalCode: 'postal_code'
+  }
+
   return (
     <div className="bg-white rounded-lg shadow">
       <div className="p-6">
         <div className="mb-6">
           <h2 className="text-lg font-semibold">Lead Information</h2>
+          {loadingFieldConfig && (
+            <p className="text-xs text-gray-500 mt-1">Loading field configuration...</p>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -457,22 +524,36 @@ const LeadDetailsPanel = ({ lead, customFields = [] }) => {
           <div>
             <h3 className="text-sm font-medium text-gray-900 mb-3">Contact Information</h3>
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">First Name</label>
-                <div className="mt-1 text-sm text-gray-900">{lead.first_name}</div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Last Name</label>
-                <div className="mt-1 text-sm text-gray-900">{lead.last_name}</div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Email</label>
-                <div className="mt-1 text-sm text-gray-900">{lead.email}</div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Phone</label>
-                <div className="mt-1 text-sm text-gray-900">{lead.phone || 'Not provided'}</div>
-              </div>
+              {isFieldVisible('firstName') && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">First Name</label>
+                  <div className="mt-1 text-sm text-gray-900">{lead.first_name}</div>
+                </div>
+              )}
+              {isFieldVisible('lastName') && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Last Name</label>
+                  <div className="mt-1 text-sm text-gray-900">{lead.last_name}</div>
+                </div>
+              )}
+              {isFieldVisible('email') && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Email</label>
+                  <div className="mt-1 text-sm text-gray-900">{lead.email}</div>
+                </div>
+              )}
+              {isFieldVisible('phone') && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Phone</label>
+                  <div className="mt-1 text-sm text-gray-900">{lead.phone || 'Not provided'}</div>
+                </div>
+              )}
+              {isFieldVisible('title') && lead.title && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Title</label>
+                  <div className="mt-1 text-sm text-gray-900">{lead.title}</div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -480,54 +561,71 @@ const LeadDetailsPanel = ({ lead, customFields = [] }) => {
           <div>
             <h3 className="text-sm font-medium text-gray-900 mb-3">Lead Details</h3>
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Company</label>
-                <div className="mt-1 text-sm text-gray-900">{lead.company || 'Not provided'}</div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Source</label>
-                <div className="mt-1 text-sm text-gray-900">{lead.source_name || lead.lead_source || 'Not specified'}</div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Lead Value</label>
-                <div className="mt-1 text-sm text-gray-900">
-                  {lead.lead_value ? `$${lead.lead_value.toLocaleString()}` : 'Not specified'}
+              {isFieldVisible('company') && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Company</label>
+                  <div className="mt-1 text-sm text-gray-900">{lead.company || 'Not provided'}</div>
                 </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Priority</label>
-                <div className="mt-1 text-sm text-gray-900 capitalize">{lead.priority || 'Medium'}</div>
-              </div>
+              )}
+              {isFieldVisible('source') && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Source</label>
+                  <div className="mt-1 text-sm text-gray-900">{lead.source_name || lead.lead_source || 'Not specified'}</div>
+                </div>
+              )}
+              {isFieldVisible('potentialValue') && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Potential Value</label>
+                  <div className="mt-1 text-sm text-gray-900">
+                    {lead.lead_value ? `$${lead.lead_value.toLocaleString()}` : 'Not specified'}
+                  </div>
+                </div>
+              )}
+              {isFieldVisible('priority') && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Priority</label>
+                  <div className="mt-1 text-sm text-gray-900 capitalize">{lead.priority || 'Medium'}</div>
+                </div>
+              )}
             </div>
           </div>
 
           {/* Address Information */}
-          {(lead.address || lead.city || lead.state || lead.postal_code) && (
+          {(isFieldVisible('address') || isFieldVisible('city') || isFieldVisible('state') || isFieldVisible('postalCode')) &&
+           (lead.address || lead.city || lead.state || lead.postal_code) && (
             <div className="md:col-span-2">
               <h3 className="text-sm font-medium text-gray-900 mb-3">Address Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Address</label>
-                  <div className="mt-1 text-sm text-gray-900">{lead.address || 'Not provided'}</div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">City</label>
-                  <div className="mt-1 text-sm text-gray-900">{lead.city || 'Not provided'}</div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">State</label>
-                  <div className="mt-1 text-sm text-gray-900">{lead.state || 'Not provided'}</div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Postal Code</label>
-                  <div className="mt-1 text-sm text-gray-900">{lead.postal_code || 'Not provided'}</div>
-                </div>
+                {isFieldVisible('address') && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Address</label>
+                    <div className="mt-1 text-sm text-gray-900">{lead.address || 'Not provided'}</div>
+                  </div>
+                )}
+                {isFieldVisible('city') && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">City</label>
+                    <div className="mt-1 text-sm text-gray-900">{lead.city || 'Not provided'}</div>
+                  </div>
+                )}
+                {isFieldVisible('state') && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">State</label>
+                    <div className="mt-1 text-sm text-gray-900">{lead.state || 'Not provided'}</div>
+                  </div>
+                )}
+                {isFieldVisible('postalCode') && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Postal Code</label>
+                    <div className="mt-1 text-sm text-gray-900">{lead.postal_code || 'Not provided'}</div>
+                  </div>
+                )}
               </div>
             </div>
           )}
 
           {/* Notes */}
-          {lead.notes && (
+          {isFieldVisible('notes') && lead.notes && (
             <div className="md:col-span-2">
               <h3 className="text-sm font-medium text-gray-900 mb-3">Notes</h3>
               <div className="mt-1 text-sm text-gray-900 whitespace-pre-wrap">{lead.notes}</div>
