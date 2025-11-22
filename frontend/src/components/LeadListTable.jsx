@@ -517,30 +517,20 @@ const LeadListTable = ({
                     </td>
                   )}
 
-                  {/* Contact */}
+                  {/* Email */}
                   {visibleColumns.email && (
-                    <td className="px-6 py-4">
-                      <div className="space-y-1">
-                        <InlineEditCell
-                          value={lead.email}
-                          fieldName="email"
-                          fieldType="email"
-                          recordId={lead.id}
-                          entityType="leads"
-                          onSave={handleFieldUpdate}
-                          placeholder="Add email..."
-                          icon={<Mail className="w-3 h-3" />}
-                          className="text-sm"
-                        />
-                        {lead.phone && (
-                          <div className="flex items-center gap-1 text-xs text-gray-600">
-                            <Phone className="w-3 h-3" />
-                            <a href={`tel:${lead.phone}`} className="hover:text-blue-600">
-                              {lead.phone}
-                            </a>
-                          </div>
-                        )}
-                      </div>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <InlineEditCell
+                        value={lead.email}
+                        fieldName="email"
+                        fieldType="email"
+                        recordId={lead.id}
+                        entityType="leads"
+                        onSave={handleFieldUpdate}
+                        placeholder="Add email..."
+                        icon={<Mail className="w-3 h-3" />}
+                        className="text-sm"
+                      />
                     </td>
                   )}
 
