@@ -332,10 +332,12 @@ const LeadsPage = () => {
           <>
             {/* Table Header */}
             <div className="overflow-x-auto">
-              <table className="w-full table-fixed">
+              <table className="w-full table-auto">
                 <thead className="bg-gray-50">
                   <tr className="border-b-2 border-gray-200">
-                    <th className="text-left py-3 px-4 font-medium text-gray-900">Lead</th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-900">Name</th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-900">Email</th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-900">Phone</th>
                     <th className="text-left py-3 px-4 font-medium text-gray-900">Company</th>
                     <th className="text-left py-3 px-4 font-medium text-gray-900">Status</th>
                     <th className="text-left py-3 px-4 font-medium text-gray-900">Priority</th>
@@ -348,25 +350,40 @@ const LeadsPage = () => {
                 <tbody>
                   {leads.map((lead) => (
                     <tr key={lead.id} className="border-b border-gray-100 hover:bg-gray-50">
+                      {/* Name Column */}
                       <td className="py-4 px-4">
-                        <div>
-                          <p className="font-medium text-gray-900">{lead.full_name}</p>
-                          <div className="flex items-center space-x-2 text-sm text-gray-600">
-                            {lead.email && (
-                              <div className="flex items-center">
-                                <Mail size={12} className="mr-1" />
-                                {lead.email}
-                              </div>
-                            )}
-                            {lead.phone && (
-                              <div className="flex items-center">
-                                <Phone size={12} className="mr-1" />
-                                {lead.phone}
-                              </div>
-                            )}
-                          </div>
-                        </div>
+                        <p className="font-medium text-gray-900">{lead.full_name}</p>
                       </td>
+
+                      {/* Email Column */}
+                      <td className="py-4 px-4">
+                        {lead.email ? (
+                          <div className="flex items-center text-sm text-gray-900">
+                            <Mail size={14} className="mr-2 text-gray-400" />
+                            <a href={`mailto:${lead.email}`} className="hover:text-primary-600">
+                              {lead.email}
+                            </a>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 text-sm">—</span>
+                        )}
+                      </td>
+
+                      {/* Phone Column */}
+                      <td className="py-4 px-4">
+                        {lead.phone ? (
+                          <div className="flex items-center text-sm text-gray-900">
+                            <Phone size={14} className="mr-2 text-gray-400" />
+                            <a href={`tel:${lead.phone}`} className="hover:text-primary-600">
+                              {lead.phone}
+                            </a>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 text-sm">—</span>
+                        )}
+                      </td>
+
+                      {/* Company Column */}
                       <td className="py-4 px-4">
                         <div className="flex items-center text-gray-900">
                           {lead.company && (
