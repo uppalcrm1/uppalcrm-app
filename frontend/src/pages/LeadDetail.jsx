@@ -17,7 +17,9 @@ import {
   DollarSign,
   Clock,
   MoreVertical,
-  Plus
+  Plus,
+  User,
+  FileText
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import api from '../services/api'
@@ -220,58 +222,69 @@ const LeadDetail = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
+      <div className="bg-white border-b border-gray-200 shadow-sm">
+        <div className="px-6 py-5">
+          <div className="flex items-start justify-between">
+            <div className="flex items-start space-x-4">
               <button
                 onClick={() => navigate('/leads')}
-                className="p-2 hover:bg-gray-100 rounded-lg"
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors mt-1"
+                title="Back to Leads"
               >
-                <ArrowLeft size={20} />
+                <ArrowLeft size={20} className="text-gray-600" />
               </button>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">
                   {lead.first_name} {lead.last_name}
                 </h1>
-                <div className="flex items-center space-x-4 mt-1">
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(lead.status)}`}>
+                <div className="flex items-center flex-wrap gap-3">
+                  <span className={`px-3 py-1.5 rounded-full text-sm font-semibold ${getStatusColor(lead.status)}`}>
                     {lead.status_name || lead.status}
                   </span>
-                  <span className="text-sm text-gray-500">
-                    {lead.company && `${lead.company} • `}
-                    Owner: {lead.owner_first_name} {lead.owner_last_name}
-                  </span>
+                  {lead.company && (
+                    <div className="flex items-center gap-1.5 text-sm text-gray-600">
+                      <Building2 size={14} className="text-gray-400" />
+                      <span className="font-medium">{lead.company}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-1.5 text-sm text-gray-600">
+                    <User size={14} className="text-gray-400" />
+                    <span>Owner: {lead.owner_first_name} {lead.owner_last_name}</span>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center gap-2">
               <button
                 onClick={handleToggleFollow}
-                className={`btn ${isFollowing ? 'btn-secondary' : 'btn-outline'}`}
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                  isFollowing
+                    ? 'bg-yellow-50 text-yellow-700 border border-yellow-200 hover:bg-yellow-100'
+                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                }`}
               >
-                {isFollowing ? <Star size={16} className="mr-2" /> : <StarOff size={16} className="mr-2" />}
+                {isFollowing ? <Star size={16} className="fill-current" /> : <StarOff size={16} />}
                 {isFollowing ? 'Following' : 'Follow'}
               </button>
 
               <button
                 onClick={() => setShowEditModal(true)}
-                className="btn btn-outline"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg font-medium text-sm hover:bg-gray-50 transition-all"
               >
-                <Edit size={16} className="mr-2" />
+                <Edit size={16} />
                 Edit
               </button>
 
               <button
                 onClick={handleConvertToContact}
-                className="btn btn-primary"
+                className="inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg font-semibold text-sm hover:from-blue-700 hover:to-indigo-700 transition-all shadow-md hover:shadow-lg"
               >
-                <UserPlus size={16} className="mr-2" />
-                Convert
+                <UserPlus size={16} />
+                Convert to Contact
               </button>
 
-              <button className="btn btn-outline p-2">
+              <button className="p-2 bg-white text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-all">
                 <MoreVertical size={16} />
               </button>
             </div>
@@ -296,23 +309,26 @@ const LeadDetail = () => {
       {/* Tabs */}
       <div className="bg-white border-b border-gray-200">
         <div className="px-6">
-          <nav className="flex space-x-8">
+          <nav className="flex space-x-1">
             {tabs.map((tab) => {
               const Icon = tab.icon
+              const isActive = activeTab === tab.id
               return (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm ${
-                    activeTab === tab.id
-                      ? 'border-primary-500 text-primary-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  className={`flex items-center gap-2 py-4 px-6 border-b-3 font-medium text-sm transition-all ${
+                    isActive
+                      ? 'border-b-blue-600 text-blue-600 bg-blue-50/50'
+                      : 'border-b-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                   }`}
                 >
-                  <Icon size={16} className="mr-2" />
-                  {tab.label}
+                  <Icon size={18} />
+                  <span>{tab.label}</span>
                   {tab.id === 'activities' && activityStats.length > 0 && (
-                    <span className="ml-2 bg-gray-100 text-gray-600 py-1 px-2 rounded-full text-xs">
+                    <span className={`py-0.5 px-2 rounded-full text-xs font-semibold ${
+                      isActive ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
+                    }`}>
                       {activityStats.reduce((sum, stat) => sum + parseInt(stat.count), 0)}
                     </span>
                   )}
@@ -324,7 +340,7 @@ const LeadDetail = () => {
       </div>
 
       {/* Content */}
-      <div className="flex-1 px-6 py-6">
+      <div className="flex-1 px-6 py-8 bg-gray-50">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Content */}
           <div className="lg:col-span-2">
@@ -364,56 +380,92 @@ const LeadDetail = () => {
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Lead Summary */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-semibold mb-4">Lead Summary</h3>
-
-              <div className="space-y-4">
-                <div className="flex items-center text-sm">
-                  <Mail size={16} className="text-gray-400 mr-3" />
-                  <span className="text-gray-600">{lead.email}</span>
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+              <div className="bg-gradient-to-r from-slate-50 to-gray-50 px-5 py-4 border-b border-gray-200">
+                <h3 className="text-base font-semibold text-gray-900">Quick Info</h3>
+              </div>
+              <div className="p-5 space-y-4">
+                <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                  <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                    <Mail size={16} className="text-blue-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs text-gray-500 mb-0.5">Email</div>
+                    <a href={`mailto:${lead.email}`} className="text-sm font-medium text-blue-600 hover:text-blue-700 truncate block">
+                      {lead.email}
+                    </a>
+                  </div>
                 </div>
 
                 {lead.phone && (
-                  <div className="flex items-center text-sm">
-                    <Phone size={16} className="text-gray-400 mr-3" />
-                    <span className="text-gray-600">{lead.phone}</span>
+                  <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg border border-green-100">
+                    <div className="flex-shrink-0 w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                      <Phone size={16} className="text-green-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs text-gray-500 mb-0.5">Phone</div>
+                      <a href={`tel:${lead.phone}`} className="text-sm font-medium text-green-600 hover:text-green-700">
+                        {lead.phone}
+                      </a>
+                    </div>
                   </div>
                 )}
 
                 {lead.company && (
-                  <div className="flex items-center text-sm">
-                    <Building2 size={16} className="text-gray-400 mr-3" />
-                    <span className="text-gray-600">{lead.company}</span>
+                  <div className="flex items-center gap-3 p-3 bg-purple-50 rounded-lg border border-purple-100">
+                    <div className="flex-shrink-0 w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                      <Building2 size={16} className="text-purple-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs text-gray-500 mb-0.5">Company</div>
+                      <div className="text-sm font-medium text-gray-900 truncate">{lead.company}</div>
+                    </div>
                   </div>
                 )}
 
                 {lead.lead_value && (
-                  <div className="flex items-center text-sm">
-                    <DollarSign size={16} className="text-gray-400 mr-3" />
-                    <span className="text-gray-600">${lead.lead_value.toLocaleString()}</span>
+                  <div className="flex items-center gap-3 p-3 bg-amber-50 rounded-lg border border-amber-100">
+                    <div className="flex-shrink-0 w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center">
+                      <DollarSign size={16} className="text-amber-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs text-gray-500 mb-0.5">Value</div>
+                      <div className="text-sm font-semibold text-amber-700">${lead.lead_value.toLocaleString()}</div>
+                    </div>
                   </div>
                 )}
 
-                <div className="flex items-center text-sm">
-                  <Calendar size={16} className="text-gray-400 mr-3" />
-                  <span className="text-gray-600">
-                    Created {new Date(lead.created_at).toLocaleDateString()}
-                  </span>
+                <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="flex-shrink-0 w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
+                    <Calendar size={16} className="text-gray-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs text-gray-500 mb-0.5">Created</div>
+                    <div className="text-sm font-medium text-gray-900">
+                      {new Date(lead.created_at).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                      })}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* Activity Stats */}
             {activityStats.length > 0 && (
-              <div className="bg-white rounded-lg shadow p-6">
-                <h3 className="text-lg font-semibold mb-4">Activity Overview</h3>
-                <div className="space-y-3">
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                <div className="bg-gradient-to-r from-indigo-50 to-purple-50 px-5 py-4 border-b border-gray-200">
+                  <h3 className="text-base font-semibold text-gray-900">Activity Stats</h3>
+                </div>
+                <div className="p-5 space-y-3">
                   {activityStats.map((stat) => (
-                    <div key={stat.interaction_type} className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600 capitalize">
+                    <div key={stat.interaction_type} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
+                      <span className="text-sm font-medium text-gray-700 capitalize">
                         {stat.interaction_type}s
                       </span>
-                      <span className="text-sm font-medium">{stat.count}</span>
+                      <span className="text-lg font-bold text-indigo-600">{stat.count}</span>
                     </div>
                   ))}
                 </div>
@@ -510,165 +562,240 @@ const LeadDetailsPanel = ({ lead, customFields = [], fieldConfig = { systemField
   }
 
   return (
-    <div className="bg-white rounded-lg shadow">
-      <div className="p-6">
-        <div className="mb-6">
-          <h2 className="text-lg font-semibold">Lead Information</h2>
-          {loadingFieldConfig && (
-            <p className="text-xs text-gray-500 mt-1">Loading field configuration...</p>
-          )}
+    <div className="space-y-6">
+      {loadingFieldConfig && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+          <p className="text-sm text-blue-700">Loading field configuration...</p>
         </div>
+      )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Contact Information */}
-          <div>
-            <h3 className="text-sm font-medium text-gray-900 mb-3">Contact Information</h3>
-            <div className="space-y-4">
-              {isFieldVisible('firstName') && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">First Name</label>
-                  <div className="mt-1 text-sm text-gray-900">{lead.first_name}</div>
-                </div>
-              )}
-              {isFieldVisible('lastName') && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Last Name</label>
-                  <div className="mt-1 text-sm text-gray-900">{lead.last_name}</div>
-                </div>
-              )}
-              {isFieldVisible('email') && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Email</label>
-                  <div className="mt-1 text-sm text-gray-900">{lead.email}</div>
-                </div>
-              )}
-              {isFieldVisible('phone') && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Phone</label>
-                  <div className="mt-1 text-sm text-gray-900">{lead.phone || 'Not provided'}</div>
-                </div>
-              )}
-              {isFieldVisible('title') && lead.title && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Title</label>
-                  <div className="mt-1 text-sm text-gray-900">{lead.title}</div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Lead Information */}
-          <div>
-            <h3 className="text-sm font-medium text-gray-900 mb-3">Lead Details</h3>
-            <div className="space-y-4">
-              {isFieldVisible('company') && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Company</label>
-                  <div className="mt-1 text-sm text-gray-900">{lead.company || 'Not provided'}</div>
-                </div>
-              )}
-              {isFieldVisible('source') && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Source</label>
-                  <div className="mt-1 text-sm text-gray-900">{lead.source_name || lead.lead_source || 'Not specified'}</div>
-                </div>
-              )}
-              {isFieldVisible('potentialValue') && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Potential Value</label>
-                  <div className="mt-1 text-sm text-gray-900">
-                    {lead.lead_value ? `$${lead.lead_value.toLocaleString()}` : 'Not specified'}
-                  </div>
-                </div>
-              )}
-              {isFieldVisible('priority') && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Priority</label>
-                  <div className="mt-1 text-sm text-gray-900 capitalize">{lead.priority || 'Medium'}</div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Address Information */}
-          {(isFieldVisible('address') || isFieldVisible('city') || isFieldVisible('state') || isFieldVisible('postalCode')) &&
-           (lead.address || lead.city || lead.state || lead.postal_code) && (
-            <div className="md:col-span-2">
-              <h3 className="text-sm font-medium text-gray-900 mb-3">Address Information</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {isFieldVisible('address') && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Address</label>
-                    <div className="mt-1 text-sm text-gray-900">{lead.address || 'Not provided'}</div>
-                  </div>
-                )}
-                {isFieldVisible('city') && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">City</label>
-                    <div className="mt-1 text-sm text-gray-900">{lead.city || 'Not provided'}</div>
-                  </div>
-                )}
-                {isFieldVisible('state') && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">State</label>
-                    <div className="mt-1 text-sm text-gray-900">{lead.state || 'Not provided'}</div>
-                  </div>
-                )}
-                {isFieldVisible('postalCode') && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Postal Code</label>
-                    <div className="mt-1 text-sm text-gray-900">{lead.postal_code || 'Not provided'}</div>
-                  </div>
-                )}
+      {/* Contact Information Card */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4 border-b border-gray-200">
+          <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+            <User className="w-5 h-5 text-blue-600" />
+            Contact Information
+          </h3>
+        </div>
+        <div className="p-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            {isFieldVisible('firstName') && (
+              <div>
+                <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">First Name</div>
+                <div className="text-base font-semibold text-gray-900">{lead.first_name}</div>
               </div>
-            </div>
-          )}
-
-          {/* Notes */}
-          {isFieldVisible('notes') && lead.notes && (
-            <div className="md:col-span-2">
-              <h3 className="text-sm font-medium text-gray-900 mb-3">Notes</h3>
-              <div className="mt-1 text-sm text-gray-900 whitespace-pre-wrap">{lead.notes}</div>
-            </div>
-          )}
-
-          {/* Custom Fields */}
-          {customFields.length > 0 && (
-            <div className="md:col-span-2">
-              <h3 className="text-sm font-medium text-gray-900 mb-3">Custom Fields</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {customFields.map(field => {
-                  const fieldValue = lead.custom_fields?.[field.field_name]
-                  if (!fieldValue && fieldValue !== 0) return null
-
-                  return (
-                    <div key={field.field_name}>
-                      <label className="block text-sm font-medium text-gray-700">
-                        {field.field_label}
-                      </label>
-                      <div className="mt-1 text-sm text-gray-900">
-                        {field.field_type === 'select' && field.field_options ? (
-                          // For select fields, show the label if it's an object option
-                          (() => {
-                            const option = field.field_options.find(
-                              opt => (typeof opt === 'string' ? opt : opt.value) === fieldValue
-                            )
-                            return option
-                              ? (typeof option === 'string' ? option : option.label)
-                              : fieldValue
-                          })()
-                        ) : (
-                          fieldValue || 'Not provided'
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
+            )}
+            {isFieldVisible('lastName') && (
+              <div>
+                <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Last Name</div>
+                <div className="text-base font-semibold text-gray-900">{lead.last_name}</div>
               </div>
-            </div>
-          )}
+            )}
+            {isFieldVisible('email') && (
+              <div>
+                <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Email</div>
+                <div className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                  <Mail className="w-4 h-4 text-gray-400" />
+                  <a href={`mailto:${lead.email}`} className="text-blue-600 hover:text-blue-700 hover:underline">
+                    {lead.email}
+                  </a>
+                </div>
+              </div>
+            )}
+            {isFieldVisible('phone') && (
+              <div>
+                <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Phone</div>
+                <div className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                  {lead.phone ? (
+                    <>
+                      <Phone className="w-4 h-4 text-gray-400" />
+                      <a href={`tel:${lead.phone}`} className="text-blue-600 hover:text-blue-700 hover:underline">
+                        {lead.phone}
+                      </a>
+                    </>
+                  ) : (
+                    <span className="text-gray-400 italic">Not provided</span>
+                  )}
+                </div>
+              </div>
+            )}
+            {isFieldVisible('title') && lead.title && (
+              <div>
+                <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Title</div>
+                <div className="text-base font-semibold text-gray-900">{lead.title}</div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Lead Details Card */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div className="bg-gradient-to-r from-purple-50 to-pink-50 px-6 py-4 border-b border-gray-200">
+          <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+            <Building2 className="w-5 h-5 text-purple-600" />
+            Lead Details
+          </h3>
+        </div>
+        <div className="p-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            {isFieldVisible('company') && (
+              <div>
+                <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Company</div>
+                <div className="text-base font-semibold text-gray-900">
+                  {lead.company || <span className="text-gray-400 italic font-normal">Not provided</span>}
+                </div>
+              </div>
+            )}
+            {isFieldVisible('source') && (
+              <div>
+                <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Source</div>
+                <div className="text-base font-semibold text-gray-900">
+                  {lead.source_name || lead.lead_source || <span className="text-gray-400 italic font-normal">Not specified</span>}
+                </div>
+              </div>
+            )}
+            {isFieldVisible('potentialValue') && (
+              <div>
+                <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Potential Value</div>
+                <div className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                  {lead.lead_value ? (
+                    <>
+                      <DollarSign className="w-4 h-4 text-green-600" />
+                      <span className="text-green-600">${lead.lead_value.toLocaleString()}</span>
+                    </>
+                  ) : (
+                    <span className="text-gray-400 italic font-normal">Not specified</span>
+                  )}
+                </div>
+              </div>
+            )}
+            {isFieldVisible('priority') && (
+              <div>
+                <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Priority</div>
+                <div className="text-base font-semibold">
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                    lead.priority === 'high' ? 'bg-red-100 text-red-800' :
+                    lead.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-green-100 text-green-800'
+                  }`}>
+                    {lead.priority || 'Medium'}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Address Information Card */}
+      {(isFieldVisible('address') || isFieldVisible('city') || isFieldVisible('state') || isFieldVisible('postalCode')) &&
+       (lead.address || lead.city || lead.state || lead.postal_code) && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <div className="bg-gradient-to-r from-green-50 to-teal-50 px-6 py-4 border-b border-gray-200">
+            <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+              <MapPin className="w-5 h-5 text-green-600" />
+              Address Information
+            </h3>
+          </div>
+          <div className="p-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              {isFieldVisible('address') && (
+                <div className="sm:col-span-2">
+                  <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Street Address</div>
+                  <div className="text-base font-semibold text-gray-900">
+                    {lead.address || <span className="text-gray-400 italic font-normal">Not provided</span>}
+                  </div>
+                </div>
+              )}
+              {isFieldVisible('city') && (
+                <div>
+                  <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">City</div>
+                  <div className="text-base font-semibold text-gray-900">
+                    {lead.city || <span className="text-gray-400 italic font-normal">Not provided</span>}
+                  </div>
+                </div>
+              )}
+              {isFieldVisible('state') && (
+                <div>
+                  <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">State</div>
+                  <div className="text-base font-semibold text-gray-900">
+                    {lead.state || <span className="text-gray-400 italic font-normal">Not provided</span>}
+                  </div>
+                </div>
+              )}
+              {isFieldVisible('postalCode') && (
+                <div>
+                  <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Postal Code</div>
+                  <div className="text-base font-semibold text-gray-900">
+                    {lead.postal_code || <span className="text-gray-400 italic font-normal">Not provided</span>}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Notes Card */}
+      {isFieldVisible('notes') && lead.notes && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <div className="bg-gradient-to-r from-orange-50 to-amber-50 px-6 py-4 border-b border-gray-200">
+            <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+              <FileText className="w-5 h-5 text-orange-600" />
+              Notes
+            </h3>
+          </div>
+          <div className="p-6">
+            <div className="text-base text-gray-700 whitespace-pre-wrap leading-relaxed bg-gray-50 rounded-lg p-4 border border-gray-200">
+              {lead.notes}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Fields Card */}
+      {customFields.length > 0 && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <div className="bg-gradient-to-r from-cyan-50 to-blue-50 px-6 py-4 border-b border-gray-200">
+            <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+              <Star className="w-5 h-5 text-cyan-600" />
+              Custom Fields
+            </h3>
+          </div>
+          <div className="p-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              {customFields.map(field => {
+                const fieldValue = lead.custom_fields?.[field.field_name]
+                if (!fieldValue && fieldValue !== 0) return null
+
+                return (
+                  <div key={field.field_name}>
+                    <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                      {field.field_label}
+                    </div>
+                    <div className="text-base font-semibold text-gray-900">
+                      {field.field_type === 'select' && field.field_options ? (
+                        // For select fields, show the label if it's an object option
+                        (() => {
+                          const option = field.field_options.find(
+                            opt => (typeof opt === 'string' ? opt : opt.value) === fieldValue
+                          )
+                          return option
+                            ? (typeof option === 'string' ? option : option.label)
+                            : fieldValue
+                        })()
+                      ) : (
+                        fieldValue || <span className="text-gray-400 italic font-normal">Not provided</span>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
