@@ -964,26 +964,39 @@ router.put('/:id',
   validateLeadDynamic(true),
   async (req, res) => {
     try {
+      console.log('📝 PUT /leads/:id - Update request received');
+      console.log('📝 Lead ID:', req.params.id);
+      console.log('📝 Organization ID:', req.organizationId);
+      console.log('📝 Request body:', JSON.stringify(req.body, null, 2));
+
       // Pass user ID for audit trail tracking
       const userId = req.user?.id || null;
       const lead = await Lead.update(req.params.id, req.body, req.organizationId, userId);
 
       if (!lead) {
+        console.log('❌ Lead not found:', req.params.id);
         return res.status(404).json({
           error: 'Lead not found',
           message: 'Lead does not exist in this organization'
         });
       }
 
+      console.log('✅ Lead updated successfully:', lead.id);
       res.json({
         message: 'Lead updated successfully',
         lead: lead.toJSON()
       });
     } catch (error) {
-      console.error('Update lead error:', error);
+      console.error('❌ Update lead error:', error);
+      console.error('❌ Error stack:', error.stack);
+      console.error('❌ Error message:', error.message);
+      console.error('❌ Error code:', error.code);
+      console.error('❌ Error detail:', error.detail);
+
       res.status(500).json({
         error: 'Lead update failed',
-        message: 'Unable to update lead'
+        message: error.message || 'Unable to update lead',
+        detail: error.detail || 'Internal server error'
       });
     }
   }
