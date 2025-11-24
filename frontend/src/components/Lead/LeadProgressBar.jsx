@@ -171,13 +171,21 @@ const LeadProgressBar = ({ currentStatus, onStatusChange, timeInCurrentStage }) 
 
   return (
     <div className="w-full">
-      {/* Salesforce-Style Progress Bar */}
+      {/* Compact Chevron Progress Bar */}
       <div className="relative">
-        {/* Progress Path Container */}
-        <div className="flex items-stretch gap-2">
+        {/* Chevron Steps */}
+        <div className="flex items-center -space-x-2">
           {stages.map((stage, index) => {
             const status = getStageStatus(index)
             const isClickable = index === getCurrentStageIndex() + 1 || index === getCurrentStageIndex() || currentStatus === 'new'
+
+            // Determine background color
+            let bgColor = 'bg-gray-300 text-gray-700'
+            if (status === 'completed') {
+              bgColor = 'bg-gray-400 text-white'
+            } else if (status === 'current') {
+              bgColor = 'bg-green-500 text-white'
+            }
 
             return (
               <button
@@ -185,20 +193,25 @@ const LeadProgressBar = ({ currentStatus, onStatusChange, timeInCurrentStage }) 
                 onClick={() => handleStageClick(stage, index)}
                 disabled={!isClickable}
                 className={`
-                  flex-1 min-h-[48px] px-3 py-2 rounded-full border-2
-                  flex items-center justify-center text-center
-                  font-medium transition-all duration-200
-                  ${getSalesforcePillClasses(status)}
-                  ${isClickable ? 'cursor-pointer' : 'cursor-default opacity-80'}
-                  ${status === 'current' ? 'ring-2 ring-blue-300 ring-offset-2' : ''}
+                  relative flex-1 h-10 px-3 flex items-center justify-center
+                  font-medium text-xs transition-all duration-200
+                  ${bgColor}
+                  ${isClickable ? 'cursor-pointer hover:brightness-110' : 'cursor-default'}
+                  ${index === 0 ? 'rounded-l' : ''}
+                  ${index === stages.length - 1 ? 'rounded-r' : ''}
                 `}
                 style={{
-                  fontSize: stage.label.length > 15 ? '0.7rem' : stage.label.length > 10 ? '0.75rem' : '0.875rem'
+                  clipPath: index === stages.length - 1
+                    ? 'polygon(10% 0%, 100% 0%, 100% 100%, 10% 100%, 0% 50%)'
+                    : index === 0
+                    ? 'polygon(0% 0%, 90% 0%, 100% 50%, 90% 100%, 0% 100%)'
+                    : 'polygon(10% 0%, 90% 0%, 100% 50%, 90% 100%, 10% 100%, 0% 50%)',
+                  minWidth: '100px'
                 }}
-                title={stage.label}
+                title={`${stage.label}${status === 'current' && timeInCurrentStage ? ` - ${formatTimeInStage(timeInCurrentStage)}` : ''}`}
               >
-                <span className="leading-tight">
-                  {status === 'completed' && <Check size={14} className="inline mr-1" />}
+                <span className="truncate px-2">
+                  {status === 'completed' && <Check size={12} className="inline mr-1" />}
                   {stage.label}
                 </span>
               </button>
@@ -206,63 +219,28 @@ const LeadProgressBar = ({ currentStatus, onStatusChange, timeInCurrentStage }) 
           })}
         </div>
 
-        {/* Time in Current Stage */}
-        {timeInCurrentStage && (
-          <div className="text-center mt-2 text-sm text-gray-600">
-            Time in current stage: <span className="font-medium">{formatTimeInStage(timeInCurrentStage)}</span>
-          </div>
-        )}
-
-        {/* Lost Status Indicator */}
-        {currentStatus === 'lost' && (
-          <div className="mt-4">
-            <div className="flex items-center justify-center bg-red-50 rounded-lg px-4 py-3 border-2 border-red-200">
-              <div className="text-sm font-medium text-red-700">
-                ✕ Lead Marked as Lost
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Converted Status Indicator */}
-        {currentStatus === 'converted' && (
-          <div className="mt-4">
-            <div className="flex items-center justify-center bg-green-50 rounded-lg px-4 py-3 border-2 border-green-200">
-              <Check size={16} className="text-green-700 mr-2" />
-              <div className="text-sm font-medium text-green-800">
-                Lead Successfully Converted
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Status Change Actions */}
-      <div className="mt-6 flex justify-center space-x-2">
+        {/* Quick Action Buttons (Compact) */}
         {currentStatus !== 'converted' && currentStatus !== 'lost' && (
-          <>
+          <div className="mt-2 flex justify-end gap-2">
             <button
               onClick={() => {
                 setSelectedStatus('lost')
                 setShowConfirmModal(true)
               }}
-              className="btn btn-outline btn-sm text-red-600 border-red-300 hover:bg-red-50"
+              className="text-xs px-3 py-1 text-red-600 hover:bg-red-50 rounded border border-red-300"
             >
-              Mark as Lost
+              Mark Lost
             </button>
-
-            {currentStatus !== stages[stages.length - 1].key && (
-              <button
-                onClick={() => {
-                  setSelectedStatus('converted')
-                  setShowConfirmModal(true)
-                }}
-                className="btn btn-primary btn-sm"
-              >
-                Mark as Converted
-              </button>
-            )}
-          </>
+            <button
+              onClick={() => {
+                setSelectedStatus('converted')
+                setShowConfirmModal(true)
+              }}
+              className="text-xs px-3 py-1 bg-green-600 text-white hover:bg-green-700 rounded"
+            >
+              Convert
+            </button>
+          </div>
         )}
       </div>
 
