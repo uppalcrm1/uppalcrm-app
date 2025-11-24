@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
-const db = require('../database/db');
+const db = require('../database/connection');
 const Joi = require('joi');
 
 // Validation schema
