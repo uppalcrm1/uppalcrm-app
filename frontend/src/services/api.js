@@ -822,4 +822,32 @@ export const twilioAPI = {
   }
 }
 
+// Lead Interactions API
+export const leadInteractionsAPI = {
+  getInteractions: async (leadId) => {
+    const response = await api.get(`/leads/${leadId}/interactions`)
+    return response.data
+  },
+
+  createInteraction: async (leadId, data) => {
+    const response = await api.post(`/leads/${leadId}/interactions`, data)
+    return response.data
+  },
+
+  updateInteraction: async (leadId, interactionId, data) => {
+    const response = await api.put(`/leads/${leadId}/interactions/${interactionId}`, data)
+    return response.data
+  },
+
+  deleteInteraction: async (leadId, interactionId) => {
+    const response = await api.delete(`/leads/${leadId}/interactions/${interactionId}`)
+    return response.data
+  },
+
+  completeInteraction: async (leadId, interactionId, data) => {
+    const response = await api.patch(`/leads/${leadId}/interactions/${interactionId}/complete`, data)
+    return response.data
+  }
+}
+
 export default api

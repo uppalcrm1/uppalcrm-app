@@ -1,10 +1,10 @@
 import React, { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
-import { 
-  Plus, 
-  Search, 
-  Filter, 
+import {
+  Plus,
+  Search,
+  Filter,
   MoreVertical,
   Edit,
   Trash2,
@@ -17,12 +17,14 @@ import {
   AlertCircle,
   CheckCircle,
   Clock,
-  X
+  X,
+  MessageSquare
 } from 'lucide-react'
 import { leadsAPI, usersAPI, contactsAPI } from '../services/api'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ConvertLeadModal from '../components/ConvertLeadModal'
 import DynamicLeadForm from '../components/DynamicLeadForm'
+import InteractionsTimeline from '../components/InteractionsTimeline'
 import toast from 'react-hot-toast'
 import { useForm } from 'react-hook-form'
 import { format } from 'date-fns'
@@ -59,6 +61,7 @@ const LeadsPage = () => {
   const [showEditModal, setShowEditModal] = useState(false)
   const [showAssignModal, setShowAssignModal] = useState(false)
   const [showConvertModal, setShowConvertModal] = useState(false)
+  const [showInteractions, setShowInteractions] = useState(null)
   const [selectedLead, setSelectedLead] = useState(null)
   const [showFilters, setShowFilters] = useState(false)
 
@@ -450,6 +453,13 @@ const LeadsPage = () => {
                           >
                             <Edit size={16} />
                           </button>
+                          <button
+                            onClick={() => setShowInteractions(lead.id)}
+                            className="p-1 text-gray-600 hover:text-blue-600"
+                            title="View Interactions"
+                          >
+                            <MessageSquare size={16} />
+                          </button>
                           {(lead.status === 'qualified' || lead.status === 'converted') && (
                             <button
                               onClick={() => {
@@ -833,6 +843,27 @@ const AssignLeadModal = ({ lead, onClose, onSubmit, users, isLoading }) => {
           </form>
         </div>
       </div>
+    </div>
+
+      {/* Interactions Modal */}
+      {showInteractions && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h2 className="text-xl font-semibold text-gray-900">Lead Interactions</h2>
+              <button
+                onClick={() => setShowInteractions(null)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6">
+              <InteractionsTimeline leadId={showInteractions} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
