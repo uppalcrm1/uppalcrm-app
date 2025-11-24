@@ -551,10 +551,13 @@ const LeadDetailsPanel = ({ lead, customFields = [], fieldConfig = { systemField
     phone: 'phone',
     company: 'company',
     source: 'source',
+    status: 'status',
     potentialValue: 'lead_value',
     priority: 'priority',
     title: 'title',
     notes: 'notes',
+    assignedTo: 'assigned_to',
+    nextFollowUp: 'next_follow_up',
     address: 'address',
     city: 'city',
     state: 'state',
@@ -651,7 +654,26 @@ const LeadDetailsPanel = ({ lead, customFields = [], fieldConfig = { systemField
               <div>
                 <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Source</div>
                 <div className="text-base font-semibold text-gray-900">
-                  {lead.source_name || lead.lead_source || <span className="text-gray-400 italic font-normal">Not specified</span>}
+                  {lead.source_name || lead.source || lead.lead_source || <span className="text-gray-400 italic font-normal">Not specified</span>}
+                </div>
+              </div>
+            )}
+            {isFieldVisible('status') && (
+              <div>
+                <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Status</div>
+                <div className="text-base font-semibold">
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                    lead.status === 'new' ? 'bg-gray-100 text-gray-800' :
+                    lead.status === 'contacted' ? 'bg-blue-100 text-blue-800' :
+                    lead.status === 'qualified' ? 'bg-purple-100 text-purple-800' :
+                    lead.status === 'proposal' ? 'bg-orange-100 text-orange-800' :
+                    lead.status === 'negotiation' ? 'bg-pink-100 text-pink-800' :
+                    lead.status === 'converted' ? 'bg-green-100 text-green-800' :
+                    lead.status === 'lost' ? 'bg-red-100 text-red-800' :
+                    'bg-gray-100 text-gray-800'
+                  }`}>
+                    {lead.status_name || lead.status || 'New'}
+                  </span>
                 </div>
               </div>
             )}
@@ -659,10 +681,10 @@ const LeadDetailsPanel = ({ lead, customFields = [], fieldConfig = { systemField
               <div>
                 <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Potential Value</div>
                 <div className="text-base font-semibold text-gray-900 flex items-center gap-2">
-                  {lead.lead_value ? (
+                  {lead.lead_value || lead.potential_value ? (
                     <>
                       <DollarSign className="w-4 h-4 text-green-600" />
-                      <span className="text-green-600">${lead.lead_value.toLocaleString()}</span>
+                      <span className="text-green-600">${(lead.lead_value || lead.potential_value).toLocaleString()}</span>
                     </>
                   ) : (
                     <span className="text-gray-400 italic font-normal">Not specified</span>
@@ -681,6 +703,40 @@ const LeadDetailsPanel = ({ lead, customFields = [], fieldConfig = { systemField
                   }`}>
                     {lead.priority || 'Medium'}
                   </span>
+                </div>
+              </div>
+            )}
+            {isFieldVisible('assignedTo') && (
+              <div>
+                <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Assigned To</div>
+                <div className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                  <User className="w-4 h-4 text-gray-400" />
+                  {lead.owner_first_name && lead.owner_last_name ? (
+                    <span>{lead.owner_first_name} {lead.owner_last_name}</span>
+                  ) : (
+                    <span className="text-gray-400 italic font-normal">Not assigned</span>
+                  )}
+                </div>
+              </div>
+            )}
+            {isFieldVisible('nextFollowUp') && (
+              <div>
+                <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Next Follow-up</div>
+                <div className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-gray-400" />
+                  {lead.next_follow_up ? (
+                    <span className="text-blue-600">
+                      {new Date(lead.next_follow_up).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </span>
+                  ) : (
+                    <span className="text-gray-400 italic font-normal">Not scheduled</span>
+                  )}
                 </div>
               </div>
             )}
