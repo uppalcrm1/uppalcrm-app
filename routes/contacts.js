@@ -1,9 +1,10 @@
 const express = require('express');
 const Contact = require('../models/Contact');
-const { 
+const { findByOrganizationSafe } = require('../models/Contact-Safe');
+const {
   validateUuidParam,
   validate,
-  schemas 
+  schemas
 } = require('../middleware/validation');
 const { 
   authenticateToken, 
@@ -232,7 +233,7 @@ router.get('/',
 
       const offset = (page - 1) * limit;
       
-      const result = await Contact.findByOrganization(req.organizationId, {
+      const result = await findByOrganizationSafe(req.organizationId, {
         limit: parseInt(limit),
         offset: parseInt(offset),
         status,
@@ -248,7 +249,7 @@ router.get('/',
       console.log(`Found ${result.contacts.length} contacts out of ${result.pagination.total} total`);
 
       res.json({
-        contacts: result.contacts.map(contact => contact.toJSON()),
+        contacts: result.contacts,
         pagination: result.pagination
       });
     } catch (error) {
