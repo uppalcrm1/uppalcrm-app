@@ -264,14 +264,13 @@ router.get('/',
 
 /**
  * GET /contacts/stats
- * Get contact statistics for the organization
+ * Get contact statistics for the organization with aggregated data
  */
 router.get('/stats',
   async (req, res) => {
     try {
       console.log('Getting contact stats for organization:', req.organizationId);
-      console.log('User details:', { id: req.user?.id, organization_id: req.user?.organization_id });
-      
+
       if (!req.organizationId) {
         console.error('Missing organization context - req.organizationId is null/undefined');
         return res.status(400).json({
@@ -280,70 +279,44 @@ router.get('/stats',
         });
       }
 
-      // Ensure contacts table exists before getting stats
       const { query } = require('../database/connection');
-      
-      console.log('🔧 Ensuring contacts table exists...');
-      
-      // Enable UUID extension if not exists
-      await query(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`, [], req.organizationId);
-      
-      await query(`
-        CREATE TABLE IF NOT EXISTS contacts (
-          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-          organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-          title VARCHAR(255),
-          company VARCHAR(255),
-          first_name VARCHAR(100) NOT NULL,
-          last_name VARCHAR(100) NOT NULL,
-          email VARCHAR(255),
-          phone VARCHAR(50),
-          status VARCHAR(50) DEFAULT 'active',
-          type VARCHAR(50) DEFAULT 'customer',
-          source VARCHAR(100),
-          priority VARCHAR(20) DEFAULT 'medium',
-          value DECIMAL(10,2) DEFAULT 0,
-          notes TEXT,
-          assigned_to UUID REFERENCES users(id),
-          created_by UUID REFERENCES users(id),
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-          last_contact_date TIMESTAMP WITH TIME ZONE,
-          next_follow_up TIMESTAMP WITH TIME ZONE,
-          converted_from_lead_id UUID REFERENCES leads(id)
-        )
-      `, [], req.organizationId);
-      
-      await query(`
-        CREATE INDEX IF NOT EXISTS idx_contacts_organization_id ON contacts(organization_id);
-        CREATE INDEX IF NOT EXISTS idx_contacts_email ON contacts(email);
-        CREATE INDEX IF NOT EXISTS idx_contacts_status ON contacts(status);
-      `, [], req.organizationId);
-      
-      // Add missing columns if they don't exist
-      try {
-        await query(`ALTER TABLE contacts ADD COLUMN IF NOT EXISTS type VARCHAR(50) DEFAULT 'customer'`, [], req.organizationId);
-        await query(`ALTER TABLE contacts ADD COLUMN IF NOT EXISTS converted_from_lead_id UUID REFERENCES leads(id)`, [], req.organizationId);
-        await query(`CREATE INDEX IF NOT EXISTS idx_contacts_type ON contacts(type)`, [], req.organizationId);
-        await query(`CREATE INDEX IF NOT EXISTS idx_contacts_converted_from_lead ON contacts(converted_from_lead_id)`, [], req.organizationId);
-        console.log('✅ Added missing columns and indexes');
-      } catch (error) {
-        console.log('Note: Some columns may already exist or cannot be added:', error.message);
-      }
-      
-      console.log('✅ Contacts table ready');
 
-      const stats = await Contact.getStats(req.organizationId);
-      console.log('Raw stats from database:', stats);
-      
+      // Get aggregated stats with JOINs to accounts and transactions
+      const statsQuery = `
+        SELECT
+          COUNT(DISTINCT c.id)::integer as total_contacts,
+          COUNT(DISTINCT CASE
+            WHEN COALESCE(c.contact_status, c.status) = 'active'
+            THEN c.id
+          END)::integer as active_contacts,
+          COUNT(DISTINCT a.id)::integer as total_accounts,
+          COALESCE(SUM(
+            CASE
+              WHEN t.status IS NULL OR t.status != 'cancelled' THEN t.amount
+              ELSE 0
+            END
+          ), 0)::numeric as total_revenue
+        FROM contacts c
+        LEFT JOIN accounts a
+          ON a.contact_id = c.id
+          AND a.organization_id = c.organization_id
+        LEFT JOIN transactions t
+          ON (t.contact_id = c.id OR t.account_id = a.id)
+          AND t.organization_id = c.organization_id
+        WHERE c.organization_id = $1
+      `;
+
+      const result = await query(statsQuery, [req.organizationId], req.organizationId);
+      const stats = result.rows[0];
+
+      console.log('Aggregated stats from database:', stats);
+
       res.json({
         stats: {
-          ...stats,
-          total_value: parseFloat(stats.total_value) || 0,
-          average_value: parseFloat(stats.average_value) || 0,
-          conversion_rate: stats.total_contacts > 0 
-            ? ((parseInt(stats.converted_from_leads) / parseInt(stats.total_contacts)) * 100).toFixed(2)
-            : 0
+          total_contacts: parseInt(stats.total_contacts) || 0,
+          active_contacts: parseInt(stats.active_contacts) || 0,
+          total_accounts: parseInt(stats.total_accounts) || 0,
+          total_revenue: parseFloat(stats.total_revenue) || 0
         }
       });
     } catch (error) {
@@ -351,25 +324,13 @@ router.get('/stats',
       console.error('Error context:', {
         organizationId: req.organizationId,
         userId: req.user?.id,
-        userOrgId: req.user?.organization_id,
-        hasUser: !!req.user,
         timestamp: new Date().toISOString()
       });
-      
-      // Return detailed error information for debugging
+
       res.status(500).json({
         error: 'Failed to retrieve statistics',
         message: 'Unable to get contact statistics',
-        details: {
-          message: error.message,
-          stack: error.stack,
-          code: error.code,
-          name: error.name,
-          organizationId: req.organizationId,
-          userId: req.user?.id,
-          userOrgId: req.user?.organization_id,
-          timestamp: new Date().toISOString()
-        }
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }
   }

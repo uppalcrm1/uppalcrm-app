@@ -152,10 +152,10 @@ class Contact {
   }
 
   /**
-   * Get contacts with full-text search and pagination
+   * Get contacts with full-text search, pagination, and aggregated data
    * @param {string} organizationId - Organization ID
    * @param {Object} options - Query options
-   * @returns {Object} Contacts with pagination info
+   * @returns {Object} Contacts with pagination info and calculated fields
    */
   static async findByOrganization(organizationId, options = {}) {
     try {
@@ -182,109 +182,206 @@ class Contact {
         order = 'desc'
       } = options;
 
-      let query_text = `
-        SELECT c.*
-        FROM contacts c
-        WHERE c.organization_id = $1
-      `;
-
+      // Build WHERE conditions
+      let whereConditions = ['c.organization_id = $1'];
       const params = [organizationId];
       let paramCount = 1;
 
       if (status) {
-        query_text += ` AND c.status = $${++paramCount}`;
+        whereConditions.push(`c.contact_status = $${++paramCount}`);
         params.push(status);
       }
 
       if (type) {
-        query_text += ` AND c.contact_type = $${++paramCount}`;
+        whereConditions.push(`c.type = $${++paramCount}`);
         params.push(type);
       }
 
-      // Note: priority and assigned_to columns don't exist in the migration schema
-      // Commenting out until schema is updated
-      // if (priority) {
-      //   query_text += ` AND c.priority = $${++paramCount}`;
-      //   params.push(priority);
-      // }
+      if (priority) {
+        whereConditions.push(`c.priority = $${++paramCount}`);
+        params.push(priority);
+      }
 
-      // if (assigned_to) {
-      //   query_text += ` AND c.assigned_to = $${++paramCount}`;
-      //   params.push(assigned_to);
-      // }
+      if (assigned_to) {
+        whereConditions.push(`c.assigned_to = $${++paramCount}`);
+        params.push(assigned_to);
+      }
 
       if (source) {
-        query_text += ` AND c.source ILIKE $${++paramCount}`;
+        whereConditions.push(`c.contact_source ILIKE $${++paramCount}`);
         params.push(`%${source}%`);
       }
 
       if (search) {
-        query_text += ` AND (
-          c.first_name ILIKE $${++paramCount} OR 
-          c.last_name ILIKE $${++paramCount} OR 
-          c.company ILIKE $${++paramCount} OR 
-          c.email ILIKE $${++paramCount} OR
-          c.phone ILIKE $${++paramCount} OR
-          c.notes ILIKE $${++paramCount}
-        )`;
-        const searchPattern = `%${search}%`;
-        params.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
+        whereConditions.push(`(
+          c.first_name ILIKE $${++paramCount} OR
+          c.last_name ILIKE $${paramCount} OR
+          c.name ILIKE $${paramCount} OR
+          c.company ILIKE $${paramCount} OR
+          c.email ILIKE $${paramCount} OR
+          c.phone ILIKE $${paramCount} OR
+          c.notes ILIKE $${paramCount}
+        )`);
+        params.push(`%${search}%`);
       }
 
-      // Only include columns that exist in the migration schema
-      const validSorts = ['created_at', 'updated_at', 'first_name', 'last_name', 'company', 'status'];
-      const sortField = validSorts.includes(sort) ? sort : 'created_at';
+      const whereClause = whereConditions.join(' AND ');
+
+      // Valid sort fields
+      const validSorts = ['created_at', 'updated_at', 'first_name', 'last_name', 'company', 'status', 'name'];
+      const sortField = validSorts.includes(sort) ? `c.${sort}` : 'c.created_at';
       const sortOrder = order.toLowerCase() === 'asc' ? 'ASC' : 'DESC';
 
-      query_text += ` ORDER BY c.${sortField} ${sortOrder}`;
-      query_text += ` LIMIT $${++paramCount} OFFSET $${++paramCount}`;
+      // Main query with aggregations and JOINs
+      const query_text = `
+        SELECT
+          c.id,
+          c.organization_id,
+          c.first_name,
+          c.last_name,
+          COALESCE(c.name, c.first_name || ' ' || c.last_name) as name,
+          c.email,
+          c.phone,
+          c.company,
+          c.title,
+          c.website,
+          COALESCE(c.contact_status, c.status) as status,
+          c.type,
+          COALESCE(c.contact_source, c.source) as source,
+          c.priority,
+          c.lifetime_value as value,
+          c.notes,
+          c.assigned_to,
+          c.created_by,
+          c.created_at,
+          c.updated_at,
+          c.last_contact_date,
+          c.next_follow_up,
+          c.converted_from_lead_id,
+          c.first_purchase_date,
+          c.last_purchase_date,
+
+          -- Calculated fields: Accounts count
+          COUNT(DISTINCT a.id)::integer as accounts_count,
+
+          -- Calculated fields: Transactions count (from both contact_id and account_id)
+          COUNT(DISTINCT t.id)::integer as transactions_count,
+
+          -- Calculated fields: Total revenue (sum of all non-cancelled transactions)
+          COALESCE(SUM(
+            CASE
+              WHEN t.status IS NULL OR t.status != 'cancelled' THEN t.amount
+              ELSE 0
+            END
+          ), 0)::numeric as total_revenue,
+
+          -- Calculated fields: Customer since (earliest transaction or account date)
+          LEAST(
+            MIN(t.transaction_date),
+            MIN(a.created_at),
+            c.first_purchase_date
+          ) as customer_since,
+
+          -- Calculated fields: Last interaction date
+          c.last_contact_date as last_interaction_date,
+
+          -- Calculated fields: Next renewal (earliest future expiry date)
+          MIN(
+            CASE
+              WHEN a.next_renewal_date > NOW() THEN a.next_renewal_date
+              ELSE NULL
+            END
+          ) as next_renewal_date,
+
+          -- Calculated fields: Days until renewal
+          EXTRACT(
+            DAY FROM (
+              MIN(
+                CASE
+                  WHEN a.next_renewal_date > NOW() THEN a.next_renewal_date
+                  ELSE NULL
+                END
+              ) - NOW()
+            )
+          )::integer as days_until_renewal
+
+        FROM contacts c
+
+        LEFT JOIN accounts a
+          ON a.contact_id = c.id
+          AND a.organization_id = c.organization_id
+
+        LEFT JOIN transactions t
+          ON (t.contact_id = c.id OR t.account_id = a.id)
+          AND t.organization_id = c.organization_id
+
+        WHERE ${whereClause}
+
+        GROUP BY
+          c.id, c.organization_id, c.first_name, c.last_name, c.name,
+          c.email, c.phone, c.company, c.title, c.website,
+          c.contact_status, c.status, c.type, c.contact_source, c.source,
+          c.priority, c.lifetime_value, c.notes, c.assigned_to,
+          c.created_by, c.created_at, c.updated_at, c.last_contact_date,
+          c.next_follow_up, c.converted_from_lead_id, c.first_purchase_date,
+          c.last_purchase_date
+
+        ORDER BY ${sortField} ${sortOrder}
+        LIMIT $${++paramCount} OFFSET $${++paramCount}
+      `;
+
       params.push(limit, offset);
 
       const result = await query(query_text, params, organizationId);
 
       const contacts = result.rows.map(row => {
-        const contact = new Contact(row);
-        return contact;
+        // Return raw row data with all calculated fields
+        return {
+          id: row.id,
+          organization_id: row.organization_id,
+          first_name: row.first_name,
+          last_name: row.last_name,
+          name: row.name,
+          email: row.email,
+          phone: row.phone,
+          company: row.company,
+          title: row.title,
+          website: row.website,
+          status: row.status,
+          type: row.type,
+          source: row.source,
+          priority: row.priority,
+          value: parseFloat(row.value) || 0,
+          notes: row.notes,
+          assigned_to: row.assigned_to,
+          created_by: row.created_by,
+          created_at: row.created_at,
+          updated_at: row.updated_at,
+          last_contact_date: row.last_contact_date,
+          next_follow_up: row.next_follow_up,
+          converted_from_lead_id: row.converted_from_lead_id,
+          first_purchase_date: row.first_purchase_date,
+          last_purchase_date: row.last_purchase_date,
+          // Calculated fields
+          accounts_count: parseInt(row.accounts_count) || 0,
+          transactions_count: parseInt(row.transactions_count) || 0,
+          total_revenue: parseFloat(row.total_revenue) || 0,
+          customer_since: row.customer_since,
+          last_interaction_date: row.last_interaction_date,
+          next_renewal_date: row.next_renewal_date,
+          days_until_renewal: row.days_until_renewal ? parseInt(row.days_until_renewal) : null
+        };
       });
 
-      let countQuery = `SELECT COUNT(*) as total FROM contacts WHERE organization_id = $1`;
-      const countParams = [organizationId];
-      let countParamCount = 1;
+      // Count query (without aggregations for performance)
+      let countQuery = `
+        SELECT COUNT(DISTINCT c.id) as total
+        FROM contacts c
+        WHERE ${whereClause}
+      `;
 
-      if (status) {
-        countQuery += ` AND status = $${++countParamCount}`;
-        countParams.push(status);
-      }
-      if (type) {
-        countQuery += ` AND contact_type = $${++countParamCount}`;
-        countParams.push(type);
-      }
-      // Note: priority and assigned_to columns don't exist in the migration schema
-      // if (priority) {
-      //   countQuery += ` AND priority = $${++countParamCount}`;
-      //   countParams.push(priority);
-      // }
-      // if (assigned_to) {
-      //   countQuery += ` AND assigned_to = $${++countParamCount}`;
-      //   countParams.push(assigned_to);
-      // }
-      if (source) {
-        countQuery += ` AND source ILIKE $${++countParamCount}`;
-        countParams.push(`%${source}%`);
-      }
-      if (search) {
-        countQuery += ` AND (
-          first_name ILIKE $${++countParamCount} OR 
-          last_name ILIKE $${++countParamCount} OR 
-          company ILIKE $${++countParamCount} OR 
-          email ILIKE $${++countParamCount} OR
-          phone ILIKE $${++countParamCount} OR
-          notes ILIKE $${++countParamCount}
-        )`;
-        const searchPattern = `%${search}%`;
-        countParams.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
-      }
-
+      // Remove limit/offset params for count
+      const countParams = params.slice(0, -2);
       const countResult = await query(countQuery, countParams, organizationId);
       const total = parseInt(countResult.rows[0].total);
 
