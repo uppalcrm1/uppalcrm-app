@@ -18,22 +18,28 @@ import { contactsAPI } from '../services/api'
 
 // Define available columns with metadata
 const COLUMN_DEFINITIONS = [
-  { key: 'contact', label: 'Contact', description: 'Contact name and email', required: true },
-  { key: 'company', label: 'Company', description: 'Company name', required: false },
-  { key: 'status', label: 'Status', description: 'Contact status', required: false },
-  { key: 'accounts', label: 'Accounts', description: 'Number of accounts', required: false },
-  { key: 'spent', label: 'Total Spent', description: 'Total amount spent', required: false },
-  { key: 'last_contact', label: 'Last Contact', description: 'Last contact date', required: false }
+  { key: 'name', label: 'Name', description: 'Customer full name', required: true },
+  { key: 'email', label: 'Email', description: 'Customer email address', required: false },
+  { key: 'phone', label: 'Phone', description: 'Customer phone number', required: false },
+  { key: 'accounts', label: 'Accounts', description: 'Number of software licenses', required: false },
+  { key: 'transactions', label: 'Transactions', description: 'Total number of purchases', required: false },
+  { key: 'total_revenue', label: 'Total Revenue', description: 'Lifetime customer value', required: false },
+  { key: 'customer_since', label: 'Customer Since', description: 'First purchase date', required: false },
+  { key: 'last_contact', label: 'Last Contact', description: 'Last interaction date', required: false },
+  { key: 'next_renewal', label: 'Next Renewal', description: 'Upcoming license expiry', required: false }
 ]
 
 // Default visible columns
 const DEFAULT_VISIBLE_COLUMNS = {
-  contact: true,
-  company: true,
-  status: true,
+  name: true,
+  email: true,
+  phone: true,
   accounts: true,
-  spent: true,
-  last_contact: true
+  transactions: true,
+  total_revenue: true,
+  customer_since: true,
+  last_contact: true,
+  next_renewal: true
 }
 
 // Status options for dropdown
@@ -49,6 +55,7 @@ const ContactsPage = () => {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
+  const [stats, setStats] = useState(null) // Statistics from backend
 
   // Load column visibility from localStorage or use defaults
   const [visibleColumns, setVisibleColumns] = useState(() => {
@@ -122,6 +129,19 @@ const ContactsPage = () => {
     fetchContacts()
   }, [])
 
+  // Fetch stats on component mount
+  React.useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const response = await contactsAPI.getStats()
+        setStats(response.stats)
+      } catch (error) {
+        console.error('Error fetching stats:', error)
+      }
+    }
+    fetchStats()
+  }, [])
+
   const getStatusBadge = (status) => {
     const badges = {
       active: 'badge badge-success',
@@ -163,7 +183,9 @@ const ContactsPage = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600 mb-1">Total Contacts</p>
-              <p className="text-2xl font-bold text-gray-900">{displayContacts.length}</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {stats?.total_contacts || displayContacts.length}
+              </p>
             </div>
             <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center">
               <UserCheck className="text-primary-600" size={24} />
@@ -176,7 +198,7 @@ const ContactsPage = () => {
             <div>
               <p className="text-sm text-gray-600 mb-1">Active Contacts</p>
               <p className="text-2xl font-bold text-gray-900">
-                {displayContacts.filter(c => c.status === 'active').length}
+                {stats?.active_contacts || displayContacts.filter(c => c.status === 'active').length}
               </p>
             </div>
             <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
@@ -190,7 +212,7 @@ const ContactsPage = () => {
             <div>
               <p className="text-sm text-gray-600 mb-1">Total Accounts</p>
               <p className="text-2xl font-bold text-gray-900">
-                {displayContacts.reduce((sum, c) => sum + c.total_accounts, 0)}
+                {stats?.total_accounts || 0}
               </p>
             </div>
             <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -204,7 +226,13 @@ const ContactsPage = () => {
             <div>
               <p className="text-sm text-gray-600 mb-1">Total Revenue</p>
               <p className="text-2xl font-bold text-gray-900">
-                ${displayContacts.reduce((sum, c) => sum + c.total_spent, 0)}
+                {stats?.total_revenue
+                  ? `$${parseFloat(stats.total_revenue).toLocaleString('en-US', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2
+                    })}`
+                  : '$0.00'
+                }
               </p>
             </div>
             <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
@@ -277,123 +305,166 @@ const ContactsPage = () => {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-200">
-                  {visibleColumns.contact && <th className="text-left py-3 px-4 font-medium text-gray-900">Contact</th>}
-                  {visibleColumns.company && <th className="text-left py-3 px-4 font-medium text-gray-900">Company</th>}
-                  {visibleColumns.status && <th className="text-left py-3 px-4 font-medium text-gray-900">Status</th>}
+                  {visibleColumns.name && <th className="text-left py-3 px-4 font-medium text-gray-900">Name</th>}
+                  {visibleColumns.email && <th className="text-left py-3 px-4 font-medium text-gray-900">Email</th>}
+                  {visibleColumns.phone && <th className="text-left py-3 px-4 font-medium text-gray-900">Phone</th>}
                   {visibleColumns.accounts && <th className="text-left py-3 px-4 font-medium text-gray-900">Accounts</th>}
-                  {visibleColumns.spent && <th className="text-left py-3 px-4 font-medium text-gray-900">Total Spent</th>}
+                  {visibleColumns.transactions && <th className="text-left py-3 px-4 font-medium text-gray-900">Transactions</th>}
+                  {visibleColumns.total_revenue && <th className="text-left py-3 px-4 font-medium text-gray-900">Total Revenue</th>}
+                  {visibleColumns.customer_since && <th className="text-left py-3 px-4 font-medium text-gray-900">Customer Since</th>}
                   {visibleColumns.last_contact && <th className="text-left py-3 px-4 font-medium text-gray-900">Last Contact</th>}
+                  {visibleColumns.next_renewal && <th className="text-left py-3 px-4 font-medium text-gray-900">Next Renewal</th>}
                   <th className="text-left py-3 px-4 font-medium text-gray-900">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {displayContacts.map((contact) => (
-                  <tr key={contact.id} className="border-b border-gray-100">
-                    {visibleColumns.contact && (
-                      <td className="py-4 px-4">
-                        <div className="flex items-center">
-                          <div className="w-10 h-10 bg-primary-600 rounded-full flex items-center justify-center mr-3">
-                            <span className="text-white font-medium">
-                              {contact.first_name[0]}{contact.last_name[0]}
-                            </span>
-                          </div>
-                          <div className="flex-1">
-                            <p className="font-medium text-gray-900 mb-1">
-                              {contact.first_name} {contact.last_name}
-                            </p>
-                            <div className="flex items-center gap-1">
-                              <Mail className="w-3 h-3 text-gray-400 flex-shrink-0" />
-                              <InlineEditCell
-                                value={contact.email}
-                                fieldName="email"
-                                fieldType="email"
-                                recordId={contact.id}
-                                entityType="contacts"
-                                onSave={handleFieldUpdate}
-                                placeholder="Add email..."
-                                className="text-xs"
-                              />
+                {displayContacts.map((contact) => {
+                  // Helper functions for formatting
+                  const formatCurrency = (amount) => {
+                    if (!amount || isNaN(amount)) return '$0.00';
+                    return parseFloat(amount).toLocaleString('en-US', {
+                      style: 'currency',
+                      currency: 'USD'
+                    });
+                  };
+
+                  const formatCustomerSince = (date) => {
+                    if (!date) return 'N/A';
+                    return new Date(date).toLocaleDateString('en-US', {
+                      month: 'short',
+                      year: 'numeric'
+                    });
+                  };
+
+                  const formatRelativeTime = (date) => {
+                    if (!date) return 'Never';
+                    const now = new Date();
+                    const past = new Date(date);
+                    const diffMs = now - past;
+                    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+                    if (diffDays === 0) return 'Today';
+                    if (diffDays === 1) return '1 day ago';
+                    if (diffDays < 7) return `${diffDays} days ago`;
+                    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+                    if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;
+                    return `${Math.floor(diffDays / 365)} years ago`;
+                  };
+
+                  const getRenewalColor = (days) => {
+                    if (!days || days < 0) return 'text-gray-500';
+                    if (days <= 14) return 'text-red-600 font-bold';
+                    if (days <= 30) return 'text-yellow-600 font-semibold';
+                    return 'text-green-600';
+                  };
+
+                  const formatRenewal = (days) => {
+                    if (!days || days < 0) return 'N/A';
+                    if (days === 0) return 'Today';
+                    if (days === 1) return '1 day';
+                    return `${days} days`;
+                  };
+
+                  return (
+                    <tr key={contact.id} className="border-b border-gray-100 hover:bg-gray-50">
+                      {visibleColumns.name && (
+                        <td className="py-4 px-4">
+                          <div className="flex items-center">
+                            <div className="w-10 h-10 bg-primary-600 rounded-full flex items-center justify-center mr-3">
+                              <span className="text-white font-medium text-sm">
+                                {contact.first_name?.[0]}{contact.last_name?.[0]}
+                              </span>
                             </div>
-                            {contact.phone && (
-                              <div className="flex items-center gap-1 text-xs text-gray-600 mt-0.5">
-                                <Phone className="w-3 h-3" />
-                                <a href={`tel:${contact.phone}`} className="hover:text-blue-600">
-                                  {contact.phone}
-                                </a>
-                              </div>
-                            )}
+                            <div>
+                              <p className="font-medium text-gray-900">
+                                {contact.first_name} {contact.last_name}
+                              </p>
+                            </div>
                           </div>
+                        </td>
+                      )}
+
+                      {visibleColumns.email && (
+                        <td className="py-4 px-4">
+                          <div className="flex items-center gap-1 text-sm text-gray-600">
+                            <Mail className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                            {contact.email || 'N/A'}
+                          </div>
+                        </td>
+                      )}
+
+                      {visibleColumns.phone && (
+                        <td className="py-4 px-4">
+                          <div className="flex items-center gap-1 text-sm text-gray-600">
+                            <Phone className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                            {contact.phone || 'N/A'}
+                          </div>
+                        </td>
+                      )}
+
+                      {visibleColumns.accounts && (
+                        <td className="py-4 px-4">
+                          <span className="text-gray-900 font-medium">
+                            {contact.accounts_count || 0}
+                          </span>
+                        </td>
+                      )}
+
+                      {visibleColumns.transactions && (
+                        <td className="py-4 px-4">
+                          <span className="text-gray-900 font-medium">
+                            {contact.transactions_count || 0}
+                          </span>
+                        </td>
+                      )}
+
+                      {visibleColumns.total_revenue && (
+                        <td className="py-4 px-4">
+                          <span className="text-gray-900 font-semibold">
+                            {formatCurrency(contact.total_revenue)}
+                          </span>
+                        </td>
+                      )}
+
+                      {visibleColumns.customer_since && (
+                        <td className="py-4 px-4 text-sm text-gray-600">
+                          {formatCustomerSince(contact.customer_since)}
+                        </td>
+                      )}
+
+                      {visibleColumns.last_contact && (
+                        <td className="py-4 px-4">
+                          <div className="flex items-center text-sm text-gray-600">
+                            <Calendar size={14} className="mr-1 text-gray-400 flex-shrink-0" />
+                            {formatRelativeTime(contact.last_interaction_date)}
+                          </div>
+                        </td>
+                      )}
+
+                      {visibleColumns.next_renewal && (
+                        <td className="py-4 px-4">
+                          <span className={getRenewalColor(contact.days_until_renewal)}>
+                            {formatRenewal(contact.days_until_renewal)}
+                          </span>
+                        </td>
+                      )}
+
+                      <td className="py-4 px-4">
+                        <div className="flex items-center gap-2">
+                          <button className="p-2 text-gray-600 hover:text-primary-600 hover:bg-gray-100 rounded-lg">
+                            <Eye size={16} />
+                          </button>
+                          <button className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg">
+                            <Edit2 size={16} />
+                          </button>
+                          <button className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg">
+                            <Trash2 size={16} />
+                          </button>
                         </div>
                       </td>
-                    )}
-                    {visibleColumns.company && (
-                      <td className="py-4 px-4">
-                        <div className="flex items-center gap-1">
-                          <Building2 size={14} className="text-gray-400 flex-shrink-0" />
-                          <InlineEditCell
-                            value={contact.company}
-                            fieldName="company"
-                            fieldType="text"
-                            recordId={contact.id}
-                            entityType="contacts"
-                            onSave={handleFieldUpdate}
-                            placeholder="Add company..."
-                            className="text-sm"
-                          />
-                        </div>
-                      </td>
-                    )}
-                    {visibleColumns.status && (
-                      <td className="py-4 px-4">
-                        <InlineEditCell
-                          value={contact.status}
-                          fieldName="status"
-                          fieldType="select"
-                          recordId={contact.id}
-                          entityType="contacts"
-                          onSave={handleFieldUpdate}
-                          options={STATUS_OPTIONS}
-                          displayValue={
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(contact.status)}`}>
-                              {STATUS_OPTIONS.find(s => s.value === contact.status)?.label || contact.status}
-                            </span>
-                          }
-                        />
-                      </td>
-                    )}
-                    {visibleColumns.accounts && (
-                      <td className="py-4 px-4">
-                        <span className="text-gray-900 font-medium">{contact.total_accounts}</span>
-                      </td>
-                    )}
-                    {visibleColumns.spent && (
-                      <td className="py-4 px-4">
-                        <span className="text-gray-900 font-medium">${contact.total_spent}</span>
-                      </td>
-                    )}
-                    {visibleColumns.last_contact && (
-                      <td className="py-4 px-4">
-                        <div className="flex items-center text-sm text-gray-600">
-                          <Calendar size={12} className="mr-1" />
-                          {contact.last_contact}
-                        </div>
-                      </td>
-                    )}
-                    <td className="py-4 px-4">
-                      <div className="flex items-center gap-2">
-                        <button className="p-2 text-gray-600 hover:text-primary-600 hover:bg-gray-100 rounded-lg">
-                          <Eye size={16} />
-                        </button>
-                        <button className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg">
-                          <Edit2 size={16} />
-                        </button>
-                        <button className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg">
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
