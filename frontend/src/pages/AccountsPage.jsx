@@ -134,9 +134,11 @@ const AccountsPage = () => {
       try {
         const response = await accountsAPI.getAccounts()
         console.log('API Response:', response)
-        console.log('Subscriptions:', response.subscriptions)
-        console.log('Subscriptions length:', response.subscriptions?.length)
-        setAccounts(response.subscriptions || [])  // Backend returns 'subscriptions', not 'accounts'
+        // Backend can return either 'accounts' or 'subscriptions' depending on endpoint
+        const accountsData = response.accounts || response.subscriptions || []
+        console.log('Accounts data:', accountsData)
+        console.log('Accounts length:', accountsData.length)
+        setAccounts(accountsData)
       } catch (error) {
         console.error('Error fetching accounts:', error)
       }
