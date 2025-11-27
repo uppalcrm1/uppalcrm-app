@@ -143,6 +143,9 @@ class AccountController {
       const subscriptions = subscriptionsResult.rows;
       const total = parseInt(countResult.rows[0].total);
 
+      console.log(`[Accounts API] Returning ${subscriptions.length} subscriptions for org ${req.user.organization_id}`);
+      console.log('[Accounts API] Sample data:', subscriptions.length > 0 ? subscriptions[0] : 'No data');
+
       res.json({
         subscriptions,
         pagination: {

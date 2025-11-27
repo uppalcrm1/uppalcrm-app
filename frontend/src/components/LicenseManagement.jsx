@@ -519,7 +519,7 @@ const TransferLicenseModal = ({ license, onClose, onSubmit, isLoading }) => {
             <div className="p-4 bg-gray-50 rounded-lg">
               <h4 className="font-medium text-gray-900 mb-2">License Details</h4>
               <div className="text-sm text-gray-600 space-y-1">
-                <p><strong>Edition:</strong> {license.edition_name}</p>
+                <p><strong>Product:</strong> {license.edition_name}</p>
                 <p><strong>Key:</strong> {license.license_key}</p>
                 <p><strong>Expires:</strong> {format(new Date(license.expires_at), 'MMM d, yyyy')}</p>
               </div>
