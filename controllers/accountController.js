@@ -20,95 +20,100 @@ class AccountController {
       } = req.query;
 
       const offset = (page - 1) * limit;
-      let whereConditions = ['s.organization_id = $1'];
+      let whereConditions = ['a.organization_id = $1'];
       let queryParams = [req.user.organization_id];
       let paramCount = 1;
 
       // Add filters
       if (status) {
         paramCount++;
-        whereConditions.push(`s.status = $${paramCount}`);
+        whereConditions.push(`a.license_status = $${paramCount}`);
         queryParams.push(status);
       }
 
       if (contact_id) {
         paramCount++;
-        whereConditions.push(`s.contact_id = $${paramCount}`);
+        whereConditions.push(`a.contact_id = $${paramCount}`);
         queryParams.push(contact_id);
       }
 
       if (software_edition_id) {
         paramCount++;
-        whereConditions.push(`s.software_edition_id = $${paramCount}`);
+        whereConditions.push(`a.product_id = $${paramCount}`);
         queryParams.push(software_edition_id);
       }
 
       if (device_id) {
         paramCount++;
-        whereConditions.push(`s.device_registration_id = $${paramCount}`);
+        whereConditions.push(`a.id = $${paramCount}`);
         queryParams.push(device_id);
       }
 
       if (billing_cycle) {
         paramCount++;
-        whereConditions.push(`s.billing_cycle = $${paramCount}`);
+        whereConditions.push(`a.billing_cycle = $${paramCount}`);
         queryParams.push(billing_cycle);
       }
 
       if (search) {
         paramCount++;
         whereConditions.push(`(
-          s.subscription_key ILIKE $${paramCount} OR
+          a.account_name ILIKE $${paramCount} OR
+          a.mac_address ILIKE $${paramCount} OR
           c.first_name ILIKE $${paramCount} OR
           c.last_name ILIKE $${paramCount} OR
           c.email ILIKE $${paramCount} OR
-          se.name ILIKE $${paramCount}
+          a.edition ILIKE $${paramCount}
         )`);
         queryParams.push(`%${search}%`);
       }
 
       const whereClause = whereConditions.join(' AND ');
 
-      // Main query
+      // Main query - Query from 'accounts' table (where lead conversions create records)
       const query = `
         SELECT
-          s.*,
+          a.*,
           c.first_name,
           c.last_name,
           CONCAT(c.first_name, ' ', c.last_name) as contact_name,
           c.email,
           c.email as contact_email,
           c.company,
-          se.name as edition_name,
-          se.version as edition_version,
-          dr.mac_address,
-          dr.device_name,
-          dr.device_type,
+          a.edition as edition_name,
+          a.mac_address,
+          a.device_name,
           -- Calculate monthly cost based on billing cycle
           CASE
-            WHEN s.billing_cycle = 'monthly' THEN s.purchase_price
-            WHEN s.billing_cycle = 'quarterly' THEN s.purchase_price / 3
-            WHEN s.billing_cycle = 'semi_annual' THEN s.purchase_price / 6
-            WHEN s.billing_cycle = 'annual' THEN s.purchase_price / 12
-            ELSE s.purchase_price
+            WHEN a.billing_cycle = 'monthly' THEN a.price
+            WHEN a.billing_cycle = 'quarterly' THEN a.price / 3
+            WHEN a.billing_cycle = 'semi-annual' THEN a.price / 6
+            WHEN a.billing_cycle = 'annual' THEN a.price / 12
+            ELSE a.price
           END as monthly_cost,
-          -- Add next renewal date
-          s.end_date as next_renewal_date,
-          -- Calculate days until expiry
-          EXTRACT(DAY FROM (s.end_date - NOW())) as days_until_expiry,
-          -- Computed status
+          -- Add next renewal date (trial_end_date for trials, otherwise calculate from created_at)
           CASE
-            WHEN s.end_date < NOW() THEN 'expired'
-            WHEN s.end_date <= NOW() + INTERVAL '30 days' THEN 'expiring_soon'
-            ELSE s.status
-          END as computed_status,
-          (s.end_date - NOW()) as time_remaining
-        FROM account_subscriptions s
-        JOIN contacts c ON s.contact_id = c.id
-        JOIN software_editions se ON s.software_edition_id = se.id
-        JOIN device_registrations dr ON s.device_registration_id = dr.id
+            WHEN a.is_trial = true THEN a.trial_end_date
+            WHEN a.billing_cycle = 'monthly' THEN a.created_at + INTERVAL '1 month'
+            WHEN a.billing_cycle = 'quarterly' THEN a.created_at + INTERVAL '3 months'
+            WHEN a.billing_cycle = 'semi-annual' THEN a.created_at + INTERVAL '6 months'
+            WHEN a.billing_cycle = 'annual' THEN a.created_at + INTERVAL '12 months'
+          END as next_renewal_date,
+          -- Calculate days until expiry
+          CASE
+            WHEN a.is_trial = true THEN EXTRACT(DAY FROM (a.trial_end_date - NOW()))
+            WHEN a.billing_cycle = 'monthly' THEN EXTRACT(DAY FROM ((a.created_at + INTERVAL '1 month') - NOW()))
+            WHEN a.billing_cycle = 'quarterly' THEN EXTRACT(DAY FROM ((a.created_at + INTERVAL '3 months') - NOW()))
+            WHEN a.billing_cycle = 'semi-annual' THEN EXTRACT(DAY FROM ((a.created_at + INTERVAL '6 months') - NOW()))
+            WHEN a.billing_cycle = 'annual' THEN EXTRACT(DAY FROM ((a.created_at + INTERVAL '12 months') - NOW()))
+          END as days_until_expiry,
+          -- Computed status
+          a.account_type as computed_status,
+          a.license_status as status
+        FROM accounts a
+        JOIN contacts c ON a.contact_id = c.id
         WHERE ${whereClause}
-        ORDER BY s.${sort_by} ${sort_order.toUpperCase()}
+        ORDER BY a.${sort_by} ${sort_order.toUpperCase()}
         LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}
       `;
 
@@ -117,10 +122,8 @@ class AccountController {
       // Count query
       const countQuery = `
         SELECT COUNT(*) as total
-        FROM account_subscriptions s
-        JOIN contacts c ON s.contact_id = c.id
-        JOIN software_editions se ON s.software_edition_id = se.id
-        JOIN device_registrations dr ON s.device_registration_id = dr.id
+        FROM accounts a
+        JOIN contacts c ON a.contact_id = c.id
         WHERE ${whereClause}
       `;
 
