@@ -1,10 +1,12 @@
-const pool = require('../database/connection');
+const db = require('../database/connection');
 const { v4: uuidv4 } = require('uuid');
 const crypto = require('crypto');
 
 class AccountController {
   // Get all account subscriptions with filtering and pagination
   async getAccountSubscriptions(req, res) {
+    const client = await db.pool.connect();
+
     try {
       const {
         page = 1,
@@ -18,6 +20,12 @@ class AccountController {
         sort_by = 'created_at',
         sort_order = 'desc'
       } = req.query;
+
+      // Set RLS context for organization isolation
+      await client.query('SELECT set_config($1, $2, true)', [
+        'app.current_organization_id',
+        req.user.organization_id
+      ]);
 
       const offset = (page - 1) * limit;
       let whereConditions = ['a.organization_id = $1'];
@@ -128,8 +136,8 @@ class AccountController {
       `;
 
       const [subscriptionsResult, countResult] = await Promise.all([
-        pool.query(query, queryParams),
-        pool.query(countQuery, queryParams.slice(0, -2))
+        client.query(query, queryParams),
+        client.query(countQuery, queryParams.slice(0, -2))
       ]);
 
       const subscriptions = subscriptionsResult.rows;
@@ -147,6 +155,8 @@ class AccountController {
     } catch (error) {
       console.error('Error fetching account subscriptions:', error);
       res.status(500).json({ message: 'Internal server error' });
+    } finally {
+      client.release();
     }
   }
 
