@@ -212,9 +212,9 @@ const ContactStats = ({ className = '', showCharts = true }) => {
             </div>
           </div>
 
-          {/* Software Editions */}
+          {/* Products */}
           <div className="card">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Software Editions</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Products</h3>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={editionData}>

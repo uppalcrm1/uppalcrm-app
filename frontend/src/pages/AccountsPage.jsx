@@ -21,7 +21,7 @@ import { accountsAPI } from '../services/api'
 const COLUMN_DEFINITIONS = [
   { key: 'account_id', label: 'Account ID', description: 'Account identifier', required: true },
   { key: 'contact', label: 'Contact', description: 'Contact name and email', required: false },
-  { key: 'software', label: 'Software Edition', description: 'Software edition', required: false },
+  { key: 'software', label: 'Product', description: 'Product type (Gold, Jio, Smart)', required: false },
   { key: 'device', label: 'Device', description: 'Device name and MAC', required: false },
   { key: 'status', label: 'Status', description: 'Account status', required: false },
   { key: 'cost', label: 'Monthly Cost', description: 'Monthly cost and billing cycle', required: false },
@@ -39,11 +39,11 @@ const DEFAULT_VISIBLE_COLUMNS = {
   renewal: true
 }
 
-// Software edition options
+// Product options (internal variable name can stay as SOFTWARE_EDITION_OPTIONS for database compatibility)
 const SOFTWARE_EDITION_OPTIONS = [
-  { value: 'gold', label: 'Gold Edition' },
-  { value: 'smart', label: 'Smart Edition' },
-  { value: 'jio', label: 'Jio Edition' }
+  { value: 'gold', label: 'Gold' },
+  { value: 'smart', label: 'Smart' },
+  { value: 'jio', label: 'Jio' }
 ]
 
 // Status options
@@ -133,7 +133,7 @@ const AccountsPage = () => {
     const fetchAccounts = async () => {
       try {
         const response = await accountsAPI.getAccounts()
-        setAccounts(response.accounts || [])
+        setAccounts(response.subscriptions || [])  // Backend returns 'subscriptions', not 'accounts'
       } catch (error) {
         console.error('Error fetching accounts:', error)
       }
@@ -304,7 +304,7 @@ const AccountsPage = () => {
                 <tr className="border-b border-gray-200">
                   {visibleColumns.account_id && <th className="text-left py-3 px-4 font-medium text-gray-900">Account ID</th>}
                   {visibleColumns.contact && <th className="text-left py-3 px-4 font-medium text-gray-900">Contact</th>}
-                  {visibleColumns.software && <th className="text-left py-3 px-4 font-medium text-gray-900">Software Edition</th>}
+                  {visibleColumns.software && <th className="text-left py-3 px-4 font-medium text-gray-900">Product</th>}
                   {visibleColumns.device && <th className="text-left py-3 px-4 font-medium text-gray-900">Device</th>}
                   {visibleColumns.status && <th className="text-left py-3 px-4 font-medium text-gray-900">Status</th>}
                   {visibleColumns.cost && <th className="text-left py-3 px-4 font-medium text-gray-900">Monthly Cost</th>}
@@ -335,7 +335,7 @@ const AccountsPage = () => {
                       {visibleColumns.software && (
                         <td className="py-4 px-4">
                           <InlineEditCell
-                            value={account.software_edition}
+                            value={account.edition_name}
                             fieldName="software_edition"
                             fieldType="select"
                             recordId={account.id}
@@ -343,7 +343,7 @@ const AccountsPage = () => {
                             onSave={handleFieldUpdate}
                             options={SOFTWARE_EDITION_OPTIONS}
                             displayValue={
-                              <span className="badge badge-info">{account.software_edition}</span>
+                              <span className="badge badge-info">{account.edition_name || 'N/A'}</span>
                             }
                           />
                         </td>
@@ -408,7 +408,13 @@ const AccountsPage = () => {
                         <td className="py-4 px-4">
                           <div className="flex items-center text-sm text-gray-900">
                             <Calendar size={12} className="mr-1" />
-                            {account.next_renewal_date}
+                            {account.next_renewal_date
+                              ? new Date(account.next_renewal_date).toLocaleDateString('en-US', {
+                                  year: 'numeric',
+                                  month: 'short',
+                                  day: 'numeric'
+                                })
+                              : 'N/A'}
                           </div>
                         </td>
                       )}

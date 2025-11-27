@@ -75,13 +75,28 @@ class AccountController {
           s.*,
           c.first_name,
           c.last_name,
+          CONCAT(c.first_name, ' ', c.last_name) as contact_name,
           c.email,
+          c.email as contact_email,
           c.company,
           se.name as edition_name,
           se.version as edition_version,
           dr.mac_address,
           dr.device_name,
           dr.device_type,
+          -- Calculate monthly cost based on billing cycle
+          CASE
+            WHEN s.billing_cycle = 'monthly' THEN s.purchase_price
+            WHEN s.billing_cycle = 'quarterly' THEN s.purchase_price / 3
+            WHEN s.billing_cycle = 'semi_annual' THEN s.purchase_price / 6
+            WHEN s.billing_cycle = 'annual' THEN s.purchase_price / 12
+            ELSE s.purchase_price
+          END as monthly_cost,
+          -- Add next renewal date
+          s.end_date as next_renewal_date,
+          -- Calculate days until expiry
+          EXTRACT(DAY FROM (s.end_date - NOW())) as days_until_expiry,
+          -- Computed status
           CASE
             WHEN s.end_date < NOW() THEN 'expired'
             WHEN s.end_date <= NOW() + INTERVAL '30 days' THEN 'expiring_soon'

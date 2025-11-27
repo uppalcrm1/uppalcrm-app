@@ -61,13 +61,13 @@ const AccountDetailsModal = ({ contactName, onClose, onSubmit, isLoading }) => {
         {/* Body */}
         <form onSubmit={handleSubmit} className="px-6 py-4">
           <div className="space-y-4">
-            {/* Edition Selection */}
+            {/* Product Selection */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Software Edition <span className="text-red-500">*</span>
+                Product <span className="text-red-500">*</span>
               </label>
               {editionsLoading ? (
-                <div className="text-sm text-gray-500">Loading editions...</div>
+                <div className="text-sm text-gray-500">Loading products...</div>
               ) : (
                 <select
                   name="edition_id"
@@ -76,7 +76,7 @@ const AccountDetailsModal = ({ contactName, onClose, onSubmit, isLoading }) => {
                   required
                   className="select"
                 >
-                  <option value="">Select Edition</option>
+                  <option value="">Select Product</option>
                   {editions.map((edition) => (
                     <option key={edition.id} value={edition.id}>
                       {edition.name} - {edition.version}

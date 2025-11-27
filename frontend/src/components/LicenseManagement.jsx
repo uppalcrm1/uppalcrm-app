@@ -404,14 +404,14 @@ const GenerateLicenseModal = ({ onClose, onSubmit, editions, isLoading }) => {
           </div>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            {/* Software Edition */}
+            {/* Product */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Software Edition *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Product *</label>
               <select
-                {...register('edition_id', { required: 'Please select a software edition' })}
+                {...register('edition_id', { required: 'Please select a product' })}
                 className={`select ${errors.edition_id ? 'border-red-500' : ''}`}
               >
-                <option value="">Select edition...</option>
+                <option value="">Select product...</option>
                 {editions.map(edition => (
                   <option key={edition.id} value={edition.id}>
                     {edition.name} - {edition.version}
