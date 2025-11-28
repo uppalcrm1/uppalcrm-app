@@ -15,6 +15,7 @@ const transactionSchemas = {
     contact_id: Joi.string().uuid().allow(null),
     product_id: Joi.string().uuid().allow(null),
     payment_method: Joi.string().max(50).default('Credit Card'),
+    source: Joi.string().max(50).allow('', null), // Payment source (website, phone, referral, etc.)
     term: Joi.string().max(50).allow('', null),
     amount: Joi.number().min(0).required(),
     currency: Joi.string().max(10).default('USD'),
@@ -25,6 +26,7 @@ const transactionSchemas = {
 
   update: Joi.object({
     payment_method: Joi.string().max(50),
+    source: Joi.string().max(50).allow('', null),
     term: Joi.string().max(50).allow('', null),
     amount: Joi.number().min(0),
     currency: Joi.string().max(10),
@@ -51,7 +53,7 @@ const validate = (schema) => {
 
 /**
  * GET /api/transactions
- * Get all transactions for the organization
+ * Get all transactions for the organization with 8 required columns
  */
 router.get('/', async (req, res) => {
   try {
@@ -60,13 +62,47 @@ router.get('/', async (req, res) => {
 
     let query = `
       SELECT
-        t.*,
-        c.first_name || ' ' || c.last_name as contact_name,
+        t.id,
+        t.amount,
+        t.currency,
+        t.payment_method,
+        t.source,
+        t.term,
+        t.status,
+        t.transaction_reference,
+        t.notes,
+        -- Payment date in YYYY-MM-DD format
+        CAST(t.transaction_date AS DATE) as payment_date,
+        t.created_at,
+        t.updated_at,
+
+        -- Account information
+        t.account_id,
         a.account_name,
-        p.name as product_name
+
+        -- Contact information (2-step relationship through accounts)
+        t.contact_id,
+        COALESCE(c.name, c.first_name || ' ' || c.last_name) as contact_name,
+        c.email as contact_email,
+
+        -- Product information
+        p.name as product_name,
+
+        -- Generate Transaction ID: "Account Name - Term"
+        CONCAT(
+          COALESCE(a.account_name, 'Unknown'),
+          ' - ',
+          CASE
+            WHEN LOWER(t.term) = 'monthly' OR t.term = '1' THEN '1 month'
+            WHEN LOWER(t.term) = 'quarterly' OR t.term = '3' THEN '3 months'
+            WHEN LOWER(t.term) = 'semi-annual' OR LOWER(t.term) = 'semi_annual' OR t.term = '6' THEN '6 months'
+            WHEN LOWER(t.term) = 'annual' OR LOWER(t.term) = 'yearly' OR t.term = '12' THEN '1 year'
+            ELSE COALESCE(t.term, 'Unknown')
+          END
+        ) as transaction_id
       FROM transactions t
-      LEFT JOIN contacts c ON t.contact_id = c.id
       LEFT JOIN accounts a ON t.account_id = a.id
+      LEFT JOIN contacts c ON t.contact_id = c.id
       LEFT JOIN products p ON t.product_id = p.id
       WHERE t.organization_id = $1
     `;
@@ -155,6 +191,7 @@ router.post('/', validate(transactionSchemas.create), async (req, res) => {
       contact_id,
       product_id,
       payment_method,
+      source,
       term,
       amount,
       currency,
@@ -176,6 +213,7 @@ router.post('/', validate(transactionSchemas.create), async (req, res) => {
         contact_id,
         product_id,
         payment_method,
+        source,
         term,
         amount,
         currency,
@@ -184,7 +222,7 @@ router.post('/', validate(transactionSchemas.create), async (req, res) => {
         notes,
         transaction_date,
         created_by
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), $12)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), $13)
       RETURNING *
     `, [
       organization_id,
@@ -192,6 +230,7 @@ router.post('/', validate(transactionSchemas.create), async (req, res) => {
       contact_id,
       product_id,
       payment_method,
+      source,
       term,
       amount,
       currency,

@@ -1,192 +1,199 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import {
   DollarSign,
   Search,
   Calendar,
   Download,
-  Filter,
   CreditCard,
   CheckCircle,
   XCircle,
   Clock,
   TrendingUp,
-  FileText
+  Eye,
+  Edit,
+  Trash2
 } from 'lucide-react'
-import ColumnSelector from '../components/ColumnSelector'
-import InlineEditCell from '../components/InlineEditCell'
 import { transactionsAPI } from '../services/api'
 
-// Define available columns with metadata
-const COLUMN_DEFINITIONS = [
-  { key: 'transaction_id', label: 'Transaction ID', description: 'Transaction identifier', required: true },
-  { key: 'contact', label: 'Contact', description: 'Contact name and email', required: false },
-  { key: 'amount', label: 'Amount', description: 'Transaction amount', required: false },
-  { key: 'date', label: 'Date', description: 'Transaction date', required: false },
-  { key: 'method', label: 'Payment Method', description: 'Payment method used', required: false },
-  { key: 'cycle', label: 'Billing Cycle', description: 'Billing cycle', required: false },
-  { key: 'status', label: 'Status', description: 'Transaction status', required: false }
-]
-
-// Default visible columns
-const DEFAULT_VISIBLE_COLUMNS = {
-  transaction_id: true,
-  contact: true,
-  amount: true,
-  date: true,
-  method: true,
-  cycle: false,
-  status: true
+// Helper function to format currency
+const formatCurrency = (amount) => {
+  if (!amount && amount !== 0) return '$0.00'
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(amount)
 }
 
-// Payment method options
-const PAYMENT_METHOD_OPTIONS = [
-  { value: 'Credit Card', label: 'Credit Card' },
-  { value: 'PayPal', label: 'PayPal' },
-  { value: 'Bank Transfer', label: 'Bank Transfer' },
-  { value: 'Cash', label: 'Cash' }
-]
+// Helper function to format source
+const formatSource = (source) => {
+  if (!source) return 'Unknown'
 
-// Billing cycle options
-const BILLING_CYCLE_OPTIONS = [
-  { value: 'monthly', label: 'Monthly' },
-  { value: 'quarterly', label: 'Quarterly' },
-  { value: 'semi-annual', label: 'Semi-Annual' },
-  { value: 'annual', label: 'Annual' }
-]
+  const sourceMap = {
+    'website': 'Website',
+    'phone': 'Phone',
+    'email': 'Email',
+    'referral': 'Referral',
+    'walk_in': 'Walk-in',
+    'walk-in': 'Walk-in',
+    'partner': 'Partner',
+    'social_media': 'Social Media',
+    'social-media': 'Social Media',
+    'other': 'Other'
+  }
 
-// Status options
-const STATUS_OPTIONS = [
-  { value: 'completed', label: 'Completed' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'failed', label: 'Failed' }
-]
+  return sourceMap[source.toLowerCase()] || source
+}
+
+// Helper function to format payment method
+const formatPaymentMethod = (method) => {
+  if (!method) return 'Unknown'
+
+  const methodMap = {
+    'credit_card': 'Credit Card',
+    'credit card': 'Credit Card',
+    'debit_card': 'Debit Card',
+    'debit card': 'Debit Card',
+    'paypal': 'PayPal',
+    'bank_transfer': 'Bank Transfer',
+    'bank transfer': 'Bank Transfer',
+    'cash': 'Cash',
+    'check': 'Check'
+  }
+
+  return methodMap[method.toLowerCase()] || method
+}
 
 const TransactionsPage = () => {
   const [transactions, setTransactions] = useState([])
-  const [localTransactions, setLocalTransactions] = useState([]) // For optimistic updates
+  const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterMethod, setFilterMethod] = useState('all')
-  const [dateRange, setDateRange] = useState('all')
-
-  // Load column visibility from localStorage or use defaults
-  const [visibleColumns, setVisibleColumns] = useState(() => {
-    const saved = localStorage.getItem('transactions_visible_columns')
-    return saved ? JSON.parse(saved) : DEFAULT_VISIBLE_COLUMNS
-  })
-
-  // Column visibility handlers
-  const handleColumnToggle = (columnKey) => {
-    const newVisibleColumns = {
-      ...visibleColumns,
-      [columnKey]: !visibleColumns[columnKey]
-    }
-    setVisibleColumns(newVisibleColumns)
-    localStorage.setItem('transactions_visible_columns', JSON.stringify(newVisibleColumns))
-  }
-
-  const handleResetColumns = () => {
-    setVisibleColumns(DEFAULT_VISIBLE_COLUMNS)
-    localStorage.setItem('transactions_visible_columns', JSON.stringify(DEFAULT_VISIBLE_COLUMNS))
-  }
-
-  // Inline edit handler with optimistic updates
-  const handleFieldUpdate = async (recordId, fieldName, newValue) => {
-    // Optimistic update: immediately update local state
-    setLocalTransactions(prevTransactions =>
-      prevTransactions.map(transaction =>
-        transaction.id === recordId
-          ? { ...transaction, [fieldName]: newValue }
-          : transaction
-      )
-    )
-
-    try {
-      // Make API call to update the transaction
-      await transactionsAPI.updateTransaction(recordId, { [fieldName]: newValue })
-
-      // Also update the main transactions state for consistency
-      setTransactions(prevTransactions =>
-        prevTransactions.map(transaction =>
-          transaction.id === recordId
-            ? { ...transaction, [fieldName]: newValue }
-            : transaction
-        )
-      )
-    } catch (error) {
-      // Error is thrown back to InlineEditCell for rollback
-      console.error('Failed to update transaction:', error)
-      throw error
-    }
-  }
-
-  // Use localTransactions for display (optimistic updates), fallback to transactions
-  const displayTransactions = localTransactions.length > 0 ? localTransactions : transactions
-
-  // Initialize localTransactions when transactions changes
-  React.useEffect(() => {
-    setLocalTransactions(transactions)
-  }, [transactions])
+  const [filterSource, setFilterSource] = useState('all')
 
   // Fetch transactions on component mount
-  React.useEffect(() => {
-    const fetchTransactions = async () => {
-      try {
-        const response = await transactionsAPI.getTransactions()
-        setTransactions(response.transactions || [])
-      } catch (error) {
-        console.error('Error fetching transactions:', error)
-      }
-    }
+  useEffect(() => {
     fetchTransactions()
   }, [])
 
+  const fetchTransactions = async () => {
+    try {
+      setLoading(true)
+      const response = await transactionsAPI.getTransactions()
+      setTransactions(response.transactions || [])
+    } catch (error) {
+      console.error('Error fetching transactions:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   // Calculate statistics
   const stats = {
-    totalRevenue: displayTransactions
+    totalRevenue: transactions
       .filter(t => t.status === 'completed')
       .reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0),
-    completedTransactions: displayTransactions.filter(t => t.status === 'completed').length,
-    pendingTransactions: displayTransactions.filter(t => t.status === 'pending').length,
-    failedTransactions: displayTransactions.filter(t => t.status === 'failed').length,
-    avgTransaction: displayTransactions.filter(t => t.status === 'completed').length > 0
-      ? displayTransactions.filter(t => t.status === 'completed').reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0) /
-        displayTransactions.filter(t => t.status === 'completed').length
-      : 0
+    totalTransactions: transactions.length,
+    completedTransactions: transactions.filter(t => t.status === 'completed').length,
+    pendingTransactions: transactions.filter(t => t.status === 'pending').length,
+    failedTransactions: transactions.filter(t => t.status === 'failed').length,
+    avgTransaction: 0
   }
+
+  // Calculate average transaction
+  if (stats.completedTransactions > 0) {
+    stats.avgTransaction = stats.totalRevenue / stats.completedTransactions
+  }
+
+  // Calculate this month revenue
+  const now = new Date()
+  const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+  const monthlyRevenue = transactions
+    .filter(t => {
+      const transDate = new Date(t.payment_date || t.created_at)
+      return t.status === 'completed' && transDate >= firstDayOfMonth
+    })
+    .reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0)
+
+  // Filter transactions
+  const filteredTransactions = transactions.filter(transaction => {
+    // Search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase()
+      const matchesSearch =
+        (transaction.transaction_id || '').toLowerCase().includes(query) ||
+        (transaction.account_name || '').toLowerCase().includes(query) ||
+        (transaction.contact_name || '').toLowerCase().includes(query)
+      if (!matchesSearch) return false
+    }
+
+    // Status filter
+    if (filterStatus !== 'all' && transaction.status !== filterStatus) {
+      return false
+    }
+
+    // Payment method filter
+    if (filterMethod !== 'all' && transaction.payment_method !== filterMethod) {
+      return false
+    }
+
+    // Source filter
+    if (filterSource !== 'all' && transaction.source !== filterSource) {
+      return false
+    }
+
+    return true
+  })
 
   const getStatusBadge = (status) => {
     const badges = {
       completed: {
-        class: 'badge badge-success',
+        class: 'bg-green-100 text-green-800',
         icon: <CheckCircle size={12} className="mr-1" />,
         text: 'Completed'
       },
       pending: {
-        class: 'badge badge-warning',
+        class: 'bg-yellow-100 text-yellow-800',
         icon: <Clock size={12} className="mr-1" />,
         text: 'Pending'
       },
       failed: {
-        class: 'badge badge-danger',
+        class: 'bg-red-100 text-red-800',
         icon: <XCircle size={12} className="mr-1" />,
         text: 'Failed'
+      },
+      refunded: {
+        class: 'bg-blue-100 text-blue-800',
+        icon: <XCircle size={12} className="mr-1" />,
+        text: 'Refunded'
       }
     }
     return badges[status] || badges.completed
   }
 
-  const getStatusColor = (status) => {
-    const colors = {
-      completed: 'bg-green-100 text-green-800',
-      pending: 'bg-yellow-100 text-yellow-800',
-      failed: 'bg-red-100 text-red-800'
-    }
-    return colors[status] || 'bg-gray-100 text-gray-800'
+  const handleView = (id) => {
+    console.log('View transaction:', id)
+    // TODO: Navigate to transaction details page
   }
 
-  const getPaymentMethodIcon = (method) => {
-    return <CreditCard size={14} className="mr-1" />
+  const handleEdit = (id) => {
+    console.log('Edit transaction:', id)
+    // TODO: Open edit modal
+  }
+
+  const handleDelete = async (id) => {
+    if (window.confirm('Are you sure you want to delete this transaction?')) {
+      try {
+        await transactionsAPI.deleteTransaction(id)
+        fetchTransactions() // Refresh the list
+      } catch (error) {
+        console.error('Error deleting transaction:', error)
+        alert('Failed to delete transaction')
+      }
+    }
   }
 
   return (
@@ -195,7 +202,7 @@ const TransactionsPage = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Transactions</h1>
-          <p className="text-gray-600 mt-1">Track all payment transactions from your customers</p>
+          <p className="text-gray-600 mt-1">Track all payment transactions and revenue</p>
         </div>
         <button className="btn btn-primary btn-md">
           <Download size={16} className="mr-2" />
@@ -203,14 +210,15 @@ const TransactionsPage = () => {
         </button>
       </div>
 
-      {/* Stats Cards */}
+      {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        {/* Total Revenue */}
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600 mb-1">Total Revenue</p>
               <p className="text-2xl font-bold text-green-600">
-                ${stats.totalRevenue.toFixed(2)}
+                {formatCurrency(stats.totalRevenue)}
               </p>
             </div>
             <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
@@ -219,11 +227,12 @@ const TransactionsPage = () => {
           </div>
         </div>
 
+        {/* Total Transactions */}
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 mb-1">Completed</p>
-              <p className="text-2xl font-bold text-blue-600">{stats.completedTransactions}</p>
+              <p className="text-sm text-gray-600 mb-1">Total Transactions</p>
+              <p className="text-2xl font-bold text-blue-600">{stats.totalTransactions}</p>
             </div>
             <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
               <CheckCircle className="text-blue-600" size={24} />
@@ -231,28 +240,32 @@ const TransactionsPage = () => {
           </div>
         </div>
 
+        {/* This Month */}
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 mb-1">Pending</p>
-              <p className="text-2xl font-bold text-yellow-600">{stats.pendingTransactions}</p>
+              <p className="text-sm text-gray-600 mb-1">This Month</p>
+              <p className="text-2xl font-bold text-purple-600">
+                {formatCurrency(monthlyRevenue)}
+              </p>
             </div>
-            <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-              <Clock className="text-yellow-600" size={24} />
+            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+              <Calendar className="text-purple-600" size={24} />
             </div>
           </div>
         </div>
 
+        {/* Average Transaction */}
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 mb-1">Avg Transaction</p>
-              <p className="text-2xl font-bold text-purple-600">
-                ${stats.avgTransaction.toFixed(2)}
+              <p className="text-sm text-gray-600 mb-1">Average Transaction</p>
+              <p className="text-2xl font-bold text-orange-600">
+                {formatCurrency(stats.avgTransaction)}
               </p>
             </div>
-            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-              <TrendingUp className="text-purple-600" size={24} />
+            <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+              <TrendingUp className="text-orange-600" size={24} />
             </div>
           </div>
         </div>
@@ -265,7 +278,7 @@ const TransactionsPage = () => {
             <Search size={16} className="absolute left-3 top-3 text-gray-400" />
             <input
               type="text"
-              placeholder="Search by contact or account..."
+              placeholder="Search transactions..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="input pl-10"
@@ -281,6 +294,7 @@ const TransactionsPage = () => {
             <option value="completed">Completed</option>
             <option value="pending">Pending</option>
             <option value="failed">Failed</option>
+            <option value="refunded">Refunded</option>
           </select>
 
           <select
@@ -293,165 +307,152 @@ const TransactionsPage = () => {
             <option value="PayPal">PayPal</option>
             <option value="Bank Transfer">Bank Transfer</option>
             <option value="Cash">Cash</option>
+            <option value="Check">Check</option>
           </select>
 
           <select
-            value={dateRange}
-            onChange={(e) => setDateRange(e.target.value)}
+            value={filterSource}
+            onChange={(e) => setFilterSource(e.target.value)}
             className="input"
           >
-            <option value="all">All Time</option>
-            <option value="today">Today</option>
-            <option value="week">This Week</option>
-            <option value="month">This Month</option>
-            <option value="quarter">This Quarter</option>
-            <option value="year">This Year</option>
+            <option value="all">All Sources</option>
+            <option value="website">Website</option>
+            <option value="phone">Phone</option>
+            <option value="email">Email</option>
+            <option value="referral">Referral</option>
+            <option value="walk-in">Walk-in</option>
+            <option value="partner">Partner</option>
           </select>
         </div>
       </div>
 
-      {/* Transaction History Table */}
+      {/* Transactions Table */}
       <div className="card">
-        {/* Toolbar */}
-        {displayTransactions.length > 0 && (
-          <div className="border-b border-gray-200 px-4 py-3 flex items-center justify-between bg-gray-50">
-            <div className="flex items-center gap-2">
-              <FileText size={20} className="text-gray-700" />
-              <span className="text-sm font-medium text-gray-700">
-                {displayTransactions.length} {displayTransactions.length === 1 ? 'Transaction' : 'Transactions'}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <ColumnSelector
-                columns={COLUMN_DEFINITIONS}
-                visibleColumns={visibleColumns}
-                onColumnToggle={handleColumnToggle}
-                onReset={handleResetColumns}
-              />
-            </div>
+        {loading ? (
+          <div className="text-center py-12">
+            <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading transactions...</p>
           </div>
-        )}
-
-        {displayTransactions.length === 0 ? (
+        ) : filteredTransactions.length === 0 ? (
           <div className="text-center py-12">
             <DollarSign className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No transactions found</h3>
-            <p className="text-gray-600">Transaction records will appear here once they are recorded</p>
+            <p className="text-gray-600">
+              {searchQuery || filterStatus !== 'all' || filterMethod !== 'all' || filterSource !== 'all'
+                ? 'Try adjusting your filters'
+                : 'Transaction records will appear here once they are created'}
+            </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-gray-200">
-                  {visibleColumns.transaction_id && <th className="text-left py-3 px-4 font-medium text-gray-900">Transaction ID</th>}
-                  {visibleColumns.contact && <th className="text-left py-3 px-4 font-medium text-gray-900">Contact</th>}
-                  {visibleColumns.amount && <th className="text-left py-3 px-4 font-medium text-gray-900">Amount</th>}
-                  {visibleColumns.date && <th className="text-left py-3 px-4 font-medium text-gray-900">Date</th>}
-                  {visibleColumns.method && <th className="text-left py-3 px-4 font-medium text-gray-900">Method</th>}
-                  {visibleColumns.cycle && <th className="text-left py-3 px-4 font-medium text-gray-900">Cycle</th>}
-                  {visibleColumns.status && <th className="text-left py-3 px-4 font-medium text-gray-900">Status</th>}
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">Actions</th>
+                <tr className="border-b border-gray-200 bg-gray-50">
+                  <th className="text-left py-3 px-4 font-semibold text-gray-700 text-sm">Payment Date</th>
+                  <th className="text-left py-3 px-4 font-semibold text-gray-700 text-sm">Transaction ID</th>
+                  <th className="text-left py-3 px-4 font-semibold text-gray-700 text-sm">Account Name</th>
+                  <th className="text-left py-3 px-4 font-semibold text-gray-700 text-sm">Contact Name</th>
+                  <th className="text-left py-3 px-4 font-semibold text-gray-700 text-sm">Amount</th>
+                  <th className="text-left py-3 px-4 font-semibold text-gray-700 text-sm">Source</th>
+                  <th className="text-left py-3 px-4 font-semibold text-gray-700 text-sm">Pay Method</th>
+                  <th className="text-left py-3 px-4 font-semibold text-gray-700 text-sm">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {displayTransactions.map((transaction) => {
+                {filteredTransactions.map((transaction) => {
                   const statusBadge = getStatusBadge(transaction.status)
                   return (
-                    <tr key={transaction.id} className="border-b border-gray-100">
-                      {visibleColumns.transaction_id && (
-                        <td className="py-4 px-4">
-                          <span className="font-mono text-sm font-medium text-gray-900">
-                            {transaction.id}
-                          </span>
-                        </td>
-                      )}
-                      {visibleColumns.contact && (
-                        <td className="py-4 px-4">
-                          <div>
-                            <p className="font-medium text-gray-900">{transaction.contact_name}</p>
-                            <p className="text-sm text-gray-600">{transaction.contact_email}</p>
-                          </div>
-                        </td>
-                      )}
-                      {visibleColumns.amount && (
-                        <td className="py-4 px-4">
-                          <InlineEditCell
-                            value={transaction.amount}
-                            fieldName="amount"
-                            fieldType="number"
-                            recordId={transaction.id}
-                            entityType="transactions"
-                            onSave={handleFieldUpdate}
-                            prefix="$"
-                            placeholder="0"
-                            className="text-lg font-bold text-green-600"
-                          />
-                        </td>
-                      )}
-                      {visibleColumns.date && (
-                        <td className="py-4 px-4">
-                          <div className="flex items-center text-sm text-gray-900">
-                            <Calendar size={12} className="mr-1" />
-                            {transaction.transaction_date}
-                          </div>
-                        </td>
-                      )}
-                      {visibleColumns.method && (
-                        <td className="py-4 px-4">
-                          <div className="flex items-center gap-1">
-                            {getPaymentMethodIcon(transaction.payment_method)}
-                            <InlineEditCell
-                              value={transaction.payment_method}
-                              fieldName="payment_method"
-                              fieldType="select"
-                              recordId={transaction.id}
-                              entityType="transactions"
-                              onSave={handleFieldUpdate}
-                              options={PAYMENT_METHOD_OPTIONS}
-                              className="text-sm"
-                            />
-                          </div>
-                        </td>
-                      )}
-                      {visibleColumns.cycle && (
-                        <td className="py-4 px-4">
-                          <InlineEditCell
-                            value={transaction.billing_cycle}
-                            fieldName="billing_cycle"
-                            fieldType="select"
-                            recordId={transaction.id}
-                            entityType="transactions"
-                            onSave={handleFieldUpdate}
-                            options={BILLING_CYCLE_OPTIONS}
-                            displayValue={
-                              <span className="badge badge-gray">{transaction.billing_cycle}</span>
-                            }
-                          />
-                        </td>
-                      )}
-                      {visibleColumns.status && (
-                        <td className="py-4 px-4">
-                          <InlineEditCell
-                            value={transaction.status}
-                            fieldName="status"
-                            fieldType="select"
-                            recordId={transaction.id}
-                            entityType="transactions"
-                            onSave={handleFieldUpdate}
-                            options={STATUS_OPTIONS}
-                            displayValue={
-                              <span className={`inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(transaction.status)}`}>
-                                {statusBadge.icon}
-                                {statusBadge.text}
-                              </span>
-                            }
-                          />
-                        </td>
-                      )}
-                      <td className="py-4 px-4">
-                        <button className="btn btn-sm btn-outline">
-                          View Details
-                        </button>
+                    <tr key={transaction.id} className="border-b border-gray-100 hover:bg-gray-50">
+                      {/* Column 1: Payment Date */}
+                      <td className="py-3 px-4">
+                        <div className="flex items-center text-sm text-gray-900 font-mono">
+                          <Calendar size={14} className="mr-2 text-gray-400" />
+                          {transaction.payment_date || 'N/A'}
+                        </div>
+                      </td>
+
+                      {/* Column 2: Transaction ID */}
+                      <td className="py-3 px-4">
+                        <span className="text-sm font-medium text-gray-900">
+                          {transaction.transaction_id || 'Unknown'}
+                        </span>
+                      </td>
+
+                      {/* Column 3: Account Name */}
+                      <td className="py-3 px-4">
+                        {transaction.account_id ? (
+                          <Link
+                            to={`/accounts/${transaction.account_id}`}
+                            className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
+                          >
+                            {transaction.account_name || 'Unknown Account'}
+                          </Link>
+                        ) : (
+                          <span className="text-sm text-gray-500">No account</span>
+                        )}
+                      </td>
+
+                      {/* Column 4: Contact Name */}
+                      <td className="py-3 px-4">
+                        {transaction.contact_id ? (
+                          <Link
+                            to={`/contacts/${transaction.contact_id}`}
+                            className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
+                          >
+                            {transaction.contact_name || 'Unknown Contact'}
+                          </Link>
+                        ) : (
+                          <span className="text-sm text-gray-500">No contact</span>
+                        )}
+                      </td>
+
+                      {/* Column 5: Amount */}
+                      <td className="py-3 px-4">
+                        <span className="text-sm font-semibold text-green-600">
+                          {formatCurrency(transaction.amount)}
+                        </span>
+                      </td>
+
+                      {/* Column 6: Source */}
+                      <td className="py-3 px-4">
+                        <span className="text-sm text-gray-700">
+                          {formatSource(transaction.source)}
+                        </span>
+                      </td>
+
+                      {/* Column 7: Pay Method */}
+                      <td className="py-3 px-4">
+                        <div className="flex items-center text-sm text-gray-700">
+                          <CreditCard size={14} className="mr-2 text-gray-400" />
+                          {formatPaymentMethod(transaction.payment_method)}
+                        </div>
+                      </td>
+
+                      {/* Column 8: Actions */}
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleView(transaction.id)}
+                            className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded"
+                            title="View Details"
+                          >
+                            <Eye size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleEdit(transaction.id)}
+                            className="p-1 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded"
+                            title="Edit Transaction"
+                          >
+                            <Edit size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(transaction.id)}
+                            className="p-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded"
+                            title="Delete Transaction"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   )
@@ -461,61 +462,14 @@ const TransactionsPage = () => {
           </div>
         )}
 
-        {/* Pagination placeholder */}
-        {displayTransactions.length > 0 && (
-          <div className="mt-4 flex items-center justify-between border-t border-gray-200 pt-4">
+        {/* Pagination */}
+        {filteredTransactions.length > 0 && (
+          <div className="mt-4 flex items-center justify-between border-t border-gray-200 pt-4 px-4">
             <p className="text-sm text-gray-600">
-              Showing {displayTransactions.length} transaction(s)
+              Showing {filteredTransactions.length} of {transactions.length} transaction(s)
             </p>
-            <div className="flex gap-2">
-              <button className="btn btn-sm btn-outline" disabled>Previous</button>
-              <button className="btn btn-sm btn-outline" disabled>Next</button>
-            </div>
           </div>
         )}
-      </div>
-
-      {/* Transaction Summary */}
-      <div className="card">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Transaction Summary</h2>
-        <div className="space-y-3">
-          <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
-            <div className="flex items-center">
-              <CheckCircle className="text-green-600 mr-3" size={20} />
-              <div>
-                <p className="font-medium text-gray-900">Completed Transactions</p>
-                <p className="text-sm text-gray-600">{stats.completedTransactions} transactions</p>
-              </div>
-            </div>
-            <p className="text-lg font-bold text-green-600">${stats.totalRevenue.toFixed(2)}</p>
-          </div>
-
-          {stats.pendingTransactions > 0 && (
-            <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
-              <div className="flex items-center">
-                <Clock className="text-yellow-600 mr-3" size={20} />
-                <div>
-                  <p className="font-medium text-gray-900">Pending Transactions</p>
-                  <p className="text-sm text-gray-600">Awaiting confirmation</p>
-                </div>
-              </div>
-              <p className="text-lg font-bold text-yellow-600">{stats.pendingTransactions}</p>
-            </div>
-          )}
-
-          {stats.failedTransactions > 0 && (
-            <div className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
-              <div className="flex items-center">
-                <XCircle className="text-red-600 mr-3" size={20} />
-                <div>
-                  <p className="font-medium text-gray-900">Failed Transactions</p>
-                  <p className="text-sm text-gray-600">Requires attention</p>
-                </div>
-              </div>
-              <p className="text-lg font-bold text-red-600">{stats.failedTransactions}</p>
-            </div>
-          )}
-        </div>
       </div>
     </div>
   )
