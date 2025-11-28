@@ -17,26 +17,32 @@ import ColumnSelector from '../components/ColumnSelector'
 import InlineEditCell from '../components/InlineEditCell'
 import { accountsAPI } from '../services/api'
 
-// Define available columns with metadata
+// Define available columns with metadata (10 columns as per spec)
 const COLUMN_DEFINITIONS = [
-  { key: 'account_id', label: 'Account ID', description: 'Account identifier', required: true },
-  { key: 'contact', label: 'Contact', description: 'Contact name and email', required: false },
-  { key: 'software', label: 'Product', description: 'Product type (Gold, Jio, Smart)', required: false },
-  { key: 'device', label: 'Device', description: 'Device name and MAC', required: false },
-  { key: 'status', label: 'Status', description: 'Account status', required: false },
-  { key: 'cost', label: 'Monthly Cost', description: 'Monthly cost and billing cycle', required: false },
-  { key: 'renewal', label: 'Next Renewal', description: 'Next renewal date', required: false }
+  { key: 'account_name', label: 'Account Name', description: 'Custom account name', required: true },
+  { key: 'mac_address', label: 'MAC Address', description: 'Device MAC address', required: false },
+  { key: 'device', label: 'Device', description: 'Device name/type', required: false },
+  { key: 'product', label: 'Product', description: 'Product type (Gold, Jio, Smart)', required: false },
+  { key: 'contact', label: 'Contact', description: 'Customer name', required: false },
+  { key: 'accounts_count', label: 'Accounts', description: 'Total accounts for contact', required: false },
+  { key: 'transactions_count', label: 'Transactions', description: 'Transactions for this account', required: false },
+  { key: 'created_date', label: 'Created Date', description: 'Account creation date', required: false },
+  { key: 'next_renewal', label: 'Next Renewal', description: 'Renewal date', required: false },
+  { key: 'actions', label: 'Actions', description: 'Account actions', required: true }
 ]
 
 // Default visible columns
 const DEFAULT_VISIBLE_COLUMNS = {
-  account_id: true,
-  contact: true,
-  software: true,
+  account_name: true,
+  mac_address: true,
   device: true,
-  status: true,
-  cost: true,
-  renewal: true
+  product: true,
+  contact: true,
+  accounts_count: true,
+  transactions_count: true,
+  created_date: true,
+  next_renewal: true,
+  actions: true
 }
 
 // Product options (internal variable name can stay as SOFTWARE_EDITION_OPTIONS for database compatibility)
@@ -60,6 +66,25 @@ const BILLING_CYCLE_OPTIONS = [
   { value: 'semi-annual', label: 'Semi-Annual' },
   { value: 'annual', label: 'Annual' }
 ]
+
+// Helper function to format dates
+const formatDate = (dateString) => {
+  if (!dateString) return 'N/A';
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  });
+}
+
+// Helper function to get renewal date color based on days until renewal
+const getRenewalColor = (daysUntil) => {
+  if (daysUntil == null) return 'text-gray-400';
+  if (daysUntil <= 7) return 'text-red-600 font-semibold';
+  if (daysUntil <= 30) return 'text-yellow-600 font-medium';
+  return 'text-green-600';
+}
 
 const AccountsPage = () => {
   const [accounts, setAccounts] = useState([])
@@ -307,136 +332,141 @@ const AccountsPage = () => {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-200">
-                  {visibleColumns.account_id && <th className="text-left py-3 px-4 font-medium text-gray-900">Account ID</th>}
-                  {visibleColumns.contact && <th className="text-left py-3 px-4 font-medium text-gray-900">Contact</th>}
-                  {visibleColumns.software && <th className="text-left py-3 px-4 font-medium text-gray-900">Product</th>}
+                  {visibleColumns.account_name && <th className="text-left py-3 px-4 font-medium text-gray-900">Account Name</th>}
+                  {visibleColumns.mac_address && <th className="text-left py-3 px-4 font-medium text-gray-900">MAC Address</th>}
                   {visibleColumns.device && <th className="text-left py-3 px-4 font-medium text-gray-900">Device</th>}
-                  {visibleColumns.status && <th className="text-left py-3 px-4 font-medium text-gray-900">Status</th>}
-                  {visibleColumns.cost && <th className="text-left py-3 px-4 font-medium text-gray-900">Monthly Cost</th>}
-                  {visibleColumns.renewal && <th className="text-left py-3 px-4 font-medium text-gray-900">Next Renewal</th>}
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">Actions</th>
+                  {visibleColumns.product && <th className="text-left py-3 px-4 font-medium text-gray-900">Product</th>}
+                  {visibleColumns.contact && <th className="text-left py-3 px-4 font-medium text-gray-900">Contact</th>}
+                  {visibleColumns.accounts_count && <th className="text-center py-3 px-4 font-medium text-gray-900">Accounts</th>}
+                  {visibleColumns.transactions_count && <th className="text-center py-3 px-4 font-medium text-gray-900">Transactions</th>}
+                  {visibleColumns.created_date && <th className="text-left py-3 px-4 font-medium text-gray-900">Created Date</th>}
+                  {visibleColumns.next_renewal && <th className="text-left py-3 px-4 font-medium text-gray-900">Next Renewal</th>}
+                  {visibleColumns.actions && <th className="text-left py-3 px-4 font-medium text-gray-900">Actions</th>}
                 </tr>
               </thead>
               <tbody>
                 {displayAccounts.map((account) => {
-                  const statusBadge = getStatusBadge(account.status, account.days_until_expiry)
+                  const renewalColor = getRenewalColor(account.days_until_renewal)
                   return (
-                    <tr key={account.id} className="border-b border-gray-100">
-                      {visibleColumns.account_id && (
+                    <tr key={account.id} className="border-b border-gray-100 hover:bg-gray-50">
+                      {/* Column 1: Account Name */}
+                      {visibleColumns.account_name && (
                         <td className="py-4 px-4">
-                          <span className="font-mono text-sm font-medium text-gray-900">
-                            {account.id}
+                          <span className="font-medium text-gray-900">
+                            {account.account_name || 'Unnamed Account'}
                           </span>
                         </td>
                       )}
-                      {visibleColumns.contact && (
+
+                      {/* Column 2: MAC Address */}
+                      {visibleColumns.mac_address && (
                         <td className="py-4 px-4">
-                          <div>
-                            <p className="font-medium text-gray-900">{account.contact_name}</p>
-                            <p className="text-sm text-gray-600">{account.contact_email}</p>
-                          </div>
+                          <span className="font-mono text-sm text-gray-700">
+                            {account.mac_address || 'N/A'}
+                          </span>
                         </td>
                       )}
-                      {visibleColumns.software && (
-                        <td className="py-4 px-4">
-                          <InlineEditCell
-                            value={account.edition_name}
-                            fieldName="software_edition"
-                            fieldType="select"
-                            recordId={account.id}
-                            entityType="accounts"
-                            onSave={handleFieldUpdate}
-                            options={SOFTWARE_EDITION_OPTIONS}
-                            displayValue={
-                              <span className="badge badge-info">{account.edition_name || 'N/A'}</span>
-                            }
-                          />
-                        </td>
-                      )}
+
+                      {/* Column 3: Device */}
                       {visibleColumns.device && (
                         <td className="py-4 px-4">
-                          <div>
-                            <InlineEditCell
-                              value={account.device_name}
-                              fieldName="device_name"
-                              fieldType="text"
-                              recordId={account.id}
-                              entityType="accounts"
-                              onSave={handleFieldUpdate}
-                              placeholder="Add device name..."
-                              className="text-sm"
-                            />
-                            <p className="text-xs text-gray-500 font-mono mt-1">{account.mac_address}</p>
-                          </div>
-                        </td>
-                      )}
-                      {visibleColumns.status && (
-                        <td className="py-4 px-4">
-                          <span className={statusBadge.class}>
-                            {statusBadge.icon}
-                            {statusBadge.text}
+                          <span className="text-gray-900">
+                            {account.device_name || 'Unknown Device'}
                           </span>
                         </td>
                       )}
-                      {visibleColumns.cost && (
+
+                      {/* Column 4: Product */}
+                      {visibleColumns.product && (
                         <td className="py-4 px-4">
-                          <div>
-                            <InlineEditCell
-                              value={account.monthly_cost}
-                              fieldName="monthly_cost"
-                              fieldType="number"
-                              recordId={account.id}
-                              entityType="accounts"
-                              onSave={handleFieldUpdate}
-                              prefix="$"
-                              placeholder="0"
-                              className="text-sm font-semibold"
-                            />
-                            <div className="mt-1">
-                              <InlineEditCell
-                                value={account.billing_cycle}
-                                fieldName="billing_cycle"
-                                fieldType="select"
-                                recordId={account.id}
-                                entityType="accounts"
-                                onSave={handleFieldUpdate}
-                                options={BILLING_CYCLE_OPTIONS}
-                                displayValue={
-                                  <span className="text-xs text-gray-500">{account.billing_cycle}</span>
-                                }
-                              />
-                            </div>
-                          </div>
+                          <span className="font-medium text-blue-600">
+                            {account.edition_name || account.edition || 'N/A'}
+                          </span>
                         </td>
                       )}
-                      {visibleColumns.renewal && (
+
+                      {/* Column 5: Contact (clickable) */}
+                      {visibleColumns.contact && (
                         <td className="py-4 px-4">
-                          <div className="flex items-center text-sm text-gray-900">
-                            <Calendar size={12} className="mr-1" />
-                            {account.next_renewal_date
-                              ? new Date(account.next_renewal_date).toLocaleDateString('en-US', {
-                                  year: 'numeric',
-                                  month: 'short',
-                                  day: 'numeric'
-                                })
-                              : 'N/A'}
-                          </div>
-                        </td>
-                      )}
-                      <td className="py-4 px-4">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => handleRecordPayment(account)}
-                            className="btn btn-sm btn-primary"
+                          <a
+                            href={`/contacts/${account.contact_id}`}
+                            className="text-blue-600 hover:underline font-medium"
                           >
-                            <DollarSign size={14} className="mr-1" />
-                            Payment
-                          </button>
-                          <button className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg">
-                            <Eye size={16} />
-                          </button>
-                        </div>
-                      </td>
+                            {account.contact_name || `${account.first_name || ''} ${account.last_name || ''}`.trim() || 'Unknown Contact'}
+                          </a>
+                        </td>
+                      )}
+
+                      {/* Column 6: Total Accounts for Contact */}
+                      {visibleColumns.accounts_count && (
+                        <td className="py-4 px-4 text-center">
+                          <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-700 font-semibold text-sm">
+                            {account.total_accounts_for_contact || 0}
+                          </span>
+                        </td>
+                      )}
+
+                      {/* Column 7: Transactions for THIS Account */}
+                      {visibleColumns.transactions_count && (
+                        <td className="py-4 px-4 text-center">
+                          <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-green-100 text-green-700 font-semibold text-sm">
+                            {account.transaction_count || 0}
+                          </span>
+                        </td>
+                      )}
+
+                      {/* Column 8: Created Date */}
+                      {visibleColumns.created_date && (
+                        <td className="py-4 px-4">
+                          <span className="text-gray-600 text-sm">
+                            {formatDate(account.created_at)}
+                          </span>
+                        </td>
+                      )}
+
+                      {/* Column 9: Next Renewal with Color Coding */}
+                      {visibleColumns.next_renewal && (
+                        <td className="py-4 px-4">
+                          <div className="flex items-center gap-1">
+                            <Calendar size={14} className={renewalColor} />
+                            <span className={`text-sm ${renewalColor}`}>
+                              {account.next_renewal_date ? formatDate(account.next_renewal_date) : 'N/A'}
+                            </span>
+                            {account.days_until_renewal != null && (
+                              <span className="text-xs text-gray-500 ml-1">
+                                ({Math.round(account.days_until_renewal)}d)
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                      )}
+
+                      {/* Column 10: Actions */}
+                      {visibleColumns.actions && (
+                        <td className="py-4 px-4">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleRecordPayment(account)}
+                              className="p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg"
+                              title="Record Payment"
+                            >
+                              <DollarSign size={16} />
+                            </button>
+                            <button
+                              className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
+                              title="View Details"
+                            >
+                              <Eye size={16} />
+                            </button>
+                            <button
+                              className="p-2 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg"
+                              title="Edit Account"
+                            >
+                              <Edit2 size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   )
                 })}
