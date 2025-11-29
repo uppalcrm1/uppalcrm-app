@@ -53,6 +53,8 @@ const LEAD_SOURCES = [
 const LeadsPage = () => {
   console.log('🔴 LeadsPage RENDER', Date.now())
   console.log('🟢 DEPLOYMENT CHECK - Build timestamp:', new Date().toISOString())
+  console.log('✅ TASK MANAGER INTEGRATION - Version 2.0 - Loaded:', new Date().toISOString())
+  console.log('📦 TaskManager component imported:', typeof TaskManager)
 
   const [searchParams, setSearchParams] = useSearchParams()
   const queryClient = useQueryClient()
@@ -852,7 +854,12 @@ const AssignLeadModal = ({ lead, onClose, onSubmit, users, isLoading }) => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-900">Lead Activities</h2>
+              <div className="flex items-center gap-3">
+                <h2 className="text-xl font-semibold text-gray-900">Lead Activities</h2>
+                <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded">
+                  v2.0 TASKS
+                </span>
+              </div>
               <button
                 onClick={() => setShowInteractions(null)}
                 className="text-gray-400 hover:text-gray-600"
