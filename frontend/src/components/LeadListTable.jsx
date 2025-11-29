@@ -16,12 +16,16 @@ import {
   ChevronRight,
   Check,
   Download,
-  Filter
+  Filter,
+  MessageSquare,
+  X
 } from 'lucide-react'
 import { format } from 'date-fns'
 import LeadConversionButton from './LeadConversionButton'
 import ColumnSelector from './ColumnSelector'
 import InlineEditCell from './InlineEditCell'
+import TaskManager from './TaskManager'
+import InteractionsTimeline from './InteractionsTimeline'
 import api from '../services/api'
 import { leadsAPI } from '../services/api'
 
@@ -71,6 +75,8 @@ const LeadListTable = ({
   const [showBulkActions, setShowBulkActions] = useState(false)
   const [fieldLabels, setFieldLabels] = useState({})
   const [columnDefinitions, setColumnDefinitions] = useState(SYSTEM_COLUMN_DEFINITIONS)
+  const [showInteractions, setShowInteractions] = useState(null) // Lead ID for which to show interactions
+  const [activeActivityTab, setActiveActivityTab] = useState('tasks') // tasks or interactions
 
   // Load column visibility from localStorage or use defaults
   const [visibleColumns, setVisibleColumns] = useState(() => {
@@ -795,6 +801,16 @@ const LeadListTable = ({
                   {/* Actions */}
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          setShowInteractions(lead.id)
+                          setActiveActivityTab('tasks')
+                        }}
+                        className="text-purple-600 hover:text-purple-900"
+                        title="Tasks & Activities"
+                      >
+                        <MessageSquare className="w-4 h-4" />
+                      </button>
                       <LeadConversionButton
                         lead={lead}
                         variant="icon"
@@ -837,6 +853,62 @@ const LeadListTable = ({
 
       {/* Pagination */}
       {pagination.total > 0 && <PaginationControls />}
+
+      {/* Activities Modal (Tasks & Interactions) */}
+      {showInteractions && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <h2 className="text-xl font-semibold text-gray-900">Lead Activities</h2>
+                <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded">
+                  v3.0 TASKS
+                </span>
+              </div>
+              <button
+                onClick={() => setShowInteractions(null)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex border-b border-gray-200 px-6">
+              <button
+                onClick={() => setActiveActivityTab('tasks')}
+                className={`px-4 py-3 font-medium border-b-2 transition-colors ${
+                  activeActivityTab === 'tasks'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Tasks & Follow-ups
+              </button>
+              <button
+                onClick={() => setActiveActivityTab('interactions')}
+                className={`px-4 py-3 font-medium border-b-2 transition-colors ${
+                  activeActivityTab === 'interactions'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                All Interactions
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {activeActivityTab === 'tasks' && (
+                <TaskManager leadId={showInteractions} />
+              )}
+              {activeActivityTab === 'interactions' && (
+                <InteractionsTimeline leadId={showInteractions} />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
