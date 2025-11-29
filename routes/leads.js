@@ -1875,4 +1875,472 @@ router.post('/:id/convert',
   }
 );
 
+/**
+ * ============================================================
+ * TASK MANAGEMENT ENDPOINTS
+ * ============================================================
+ */
+
+/**
+ * GET /leads/:leadId/tasks
+ * Get all tasks for a specific lead with filtering options
+ */
+router.get('/:leadId/tasks',
+  validateUuidParam,
+  async (req, res) => {
+    try {
+      const { leadId } = req.params;
+      const { status, date_range, priority, overdue } = req.query;
+      const organizationId = req.organizationId;
+
+      // Verify lead belongs to organization
+      const leadCheck = await db.query(
+        'SELECT id FROM leads WHERE id = $1 AND organization_id = $2',
+        [leadId, organizationId]
+      );
+
+      if (leadCheck.rows.length === 0) {
+        return res.status(404).json({ error: 'Lead not found' });
+      }
+
+      // Build query with filters
+      let whereConditions = ['lead_id = $1', 'interaction_type = $2'];
+      let queryParams = [leadId, 'task'];
+      let paramIndex = 3;
+
+      // Filter by status
+      if (status) {
+        whereConditions.push(`status = $${paramIndex}`);
+        queryParams.push(status);
+        paramIndex++;
+      }
+
+      // Filter by priority
+      if (priority) {
+        whereConditions.push(`priority = $${paramIndex}`);
+        queryParams.push(priority);
+        paramIndex++;
+      }
+
+      // Filter overdue tasks
+      if (overdue === 'true') {
+        whereConditions.push(`scheduled_at < NOW()`);
+        whereConditions.push(`status = 'scheduled'`);
+      }
+
+      // Filter by date range
+      if (date_range === 'today') {
+        whereConditions.push(`DATE(scheduled_at) = CURRENT_DATE`);
+      } else if (date_range === 'week') {
+        whereConditions.push(`scheduled_at BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days'`);
+      } else if (date_range === 'month') {
+        whereConditions.push(`scheduled_at BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '30 days'`);
+      }
+
+      const whereClause = whereConditions.join(' AND ');
+
+      const query = `
+        SELECT
+          li.*,
+          u.first_name as user_first_name,
+          u.last_name as user_last_name,
+          u.email as user_email
+        FROM lead_interactions li
+        LEFT JOIN users u ON li.user_id = u.id
+        WHERE ${whereClause}
+        ORDER BY
+          CASE WHEN li.status = 'scheduled' THEN 0 ELSE 1 END,
+          li.scheduled_at ASC,
+          li.created_at DESC
+      `;
+
+      const result = await db.query(query, queryParams);
+
+      // Calculate statistics
+      const stats = {
+        total: result.rows.length,
+        pending: result.rows.filter(t => t.status === 'scheduled').length,
+        completed: result.rows.filter(t => t.status === 'completed').length,
+        overdue: result.rows.filter(t =>
+          t.status === 'scheduled' && new Date(t.scheduled_at) < new Date()
+        ).length
+      };
+
+      res.json({
+        tasks: result.rows,
+        stats
+      });
+    } catch (error) {
+      console.error('Error fetching tasks:', error);
+      res.status(500).json({ error: 'Failed to fetch tasks' });
+    }
+  }
+);
+
+/**
+ * POST /leads/:leadId/tasks
+ * Create a new task for a lead
+ */
+router.post('/:leadId/tasks',
+  validateUuidParam,
+  async (req, res) => {
+    try {
+      const { leadId } = req.params;
+      const {
+        subject,
+        description,
+        scheduled_at,
+        priority = 'medium',
+        assigned_to
+      } = req.body;
+      const organizationId = req.organizationId;
+      const userId = req.userId;
+
+      // Verify lead belongs to organization
+      const leadCheck = await db.query(
+        'SELECT assigned_to FROM leads WHERE id = $1 AND organization_id = $2',
+        [leadId, organizationId]
+      );
+
+      if (leadCheck.rows.length === 0) {
+        return res.status(404).json({ error: 'Lead not found' });
+      }
+
+      // Use assigned_to from request, or fallback to lead owner, or current user
+      const taskAssignee = assigned_to || leadCheck.rows[0].assigned_to || userId;
+
+      // Determine status based on scheduled date
+      const status = scheduled_at && new Date(scheduled_at) > new Date()
+        ? 'scheduled'
+        : 'completed';
+
+      const insertQuery = `
+        INSERT INTO lead_interactions (
+          lead_id, user_id, organization_id, interaction_type,
+          subject, description, scheduled_at, status, priority, created_by
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        RETURNING *
+      `;
+
+      const result = await db.query(insertQuery, [
+        leadId,
+        taskAssignee,
+        organizationId,
+        'task',
+        subject,
+        description || '',
+        scheduled_at,
+        status,
+        priority,
+        userId
+      ]);
+
+      res.status(201).json({
+        message: 'Task created successfully',
+        task: result.rows[0]
+      });
+    } catch (error) {
+      console.error('Error creating task:', error);
+      res.status(500).json({ error: 'Failed to create task' });
+    }
+  }
+);
+
+/**
+ * PATCH /leads/:leadId/tasks/:taskId/complete
+ * Mark a task as completed
+ */
+router.patch('/:leadId/tasks/:taskId/complete',
+  validateUuidParam,
+  async (req, res) => {
+    try {
+      const { leadId, taskId } = req.params;
+      const { outcome, notes } = req.body;
+      const organizationId = req.organizationId;
+
+      // Verify lead belongs to organization
+      const leadCheck = await db.query(
+        'SELECT id FROM leads WHERE id = $1 AND organization_id = $2',
+        [leadId, organizationId]
+      );
+
+      if (leadCheck.rows.length === 0) {
+        return res.status(404).json({ error: 'Lead not found' });
+      }
+
+      // Update task to completed
+      const query = `
+        UPDATE lead_interactions
+        SET
+          status = 'completed',
+          completed_at = NOW(),
+          outcome = COALESCE($1, outcome),
+          description = CASE
+            WHEN $2 IS NOT NULL THEN description || E'\n\nCompletion Notes: ' || $2
+            ELSE description
+          END,
+          updated_at = NOW()
+        WHERE id = $3 AND lead_id = $4 AND interaction_type = 'task'
+        RETURNING *
+      `;
+
+      const result = await db.query(query, [outcome, notes, taskId, leadId]);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Task not found' });
+      }
+
+      // Update lead's last_contact_date
+      await db.query(
+        'UPDATE leads SET last_contact_date = NOW(), updated_at = NOW() WHERE id = $1',
+        [leadId]
+      );
+
+      res.json({
+        message: 'Task marked as completed',
+        task: result.rows[0]
+      });
+    } catch (error) {
+      console.error('Error completing task:', error);
+      res.status(500).json({ error: 'Failed to complete task' });
+    }
+  }
+);
+
+/**
+ * PATCH /leads/:leadId/tasks/:taskId
+ * Update task details
+ */
+router.patch('/:leadId/tasks/:taskId',
+  validateUuidParam,
+  async (req, res) => {
+    try {
+      const { leadId, taskId } = req.params;
+      const {
+        subject,
+        description,
+        scheduled_at,
+        priority,
+        status
+      } = req.body;
+      const organizationId = req.organizationId;
+
+      // Verify lead belongs to organization
+      const leadCheck = await db.query(
+        'SELECT id FROM leads WHERE id = $1 AND organization_id = $2',
+        [leadId, organizationId]
+      );
+
+      if (leadCheck.rows.length === 0) {
+        return res.status(404).json({ error: 'Lead not found' });
+      }
+
+      const query = `
+        UPDATE lead_interactions
+        SET
+          subject = COALESCE($1, subject),
+          description = COALESCE($2, description),
+          scheduled_at = COALESCE($3, scheduled_at),
+          priority = COALESCE($4, priority),
+          status = COALESCE($5, status),
+          updated_at = NOW()
+        WHERE id = $6 AND lead_id = $7 AND interaction_type = 'task'
+        RETURNING *
+      `;
+
+      const result = await db.query(query, [
+        subject,
+        description,
+        scheduled_at,
+        priority,
+        status,
+        taskId,
+        leadId
+      ]);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Task not found' });
+      }
+
+      res.json({
+        message: 'Task updated successfully',
+        task: result.rows[0]
+      });
+    } catch (error) {
+      console.error('Error updating task:', error);
+      res.status(500).json({ error: 'Failed to update task' });
+    }
+  }
+);
+
+/**
+ * DELETE /leads/:leadId/tasks/:taskId
+ * Delete a task
+ */
+router.delete('/:leadId/tasks/:taskId',
+  validateUuidParam,
+  async (req, res) => {
+    try {
+      const { leadId, taskId } = req.params;
+      const organizationId = req.organizationId;
+
+      // Verify lead belongs to organization
+      const leadCheck = await db.query(
+        'SELECT id FROM leads WHERE id = $1 AND organization_id = $2',
+        [leadId, organizationId]
+      );
+
+      if (leadCheck.rows.length === 0) {
+        return res.status(404).json({ error: 'Lead not found' });
+      }
+
+      const query = `
+        DELETE FROM lead_interactions
+        WHERE id = $1 AND lead_id = $2 AND interaction_type = 'task'
+        RETURNING id
+      `;
+
+      const result = await db.query(query, [taskId, leadId]);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Task not found' });
+      }
+
+      res.json({ message: 'Task deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting task:', error);
+      res.status(500).json({ error: 'Failed to delete task' });
+    }
+  }
+);
+
+/**
+ * POST /leads/:leadId/tasks/bulk-complete
+ * Mark multiple tasks as completed
+ */
+router.post('/:leadId/tasks/bulk-complete',
+  validateUuidParam,
+  async (req, res) => {
+    try {
+      const { leadId } = req.params;
+      const { taskIds } = req.body;
+      const organizationId = req.organizationId;
+
+      if (!Array.isArray(taskIds) || taskIds.length === 0) {
+        return res.status(400).json({ error: 'taskIds must be a non-empty array' });
+      }
+
+      // Verify lead belongs to organization
+      const leadCheck = await db.query(
+        'SELECT id FROM leads WHERE id = $1 AND organization_id = $2',
+        [leadId, organizationId]
+      );
+
+      if (leadCheck.rows.length === 0) {
+        return res.status(404).json({ error: 'Lead not found' });
+      }
+
+      const query = `
+        UPDATE lead_interactions
+        SET
+          status = 'completed',
+          completed_at = NOW(),
+          updated_at = NOW()
+        WHERE id = ANY($1)
+          AND lead_id = $2
+          AND interaction_type = 'task'
+          AND status != 'completed'
+        RETURNING id
+      `;
+
+      const result = await db.query(query, [taskIds, leadId]);
+
+      res.json({
+        message: `${result.rows.length} tasks marked as completed`,
+        completedCount: result.rows.length
+      });
+    } catch (error) {
+      console.error('Error bulk completing tasks:', error);
+      res.status(500).json({ error: 'Failed to complete tasks' });
+    }
+  }
+);
+
+/**
+ * GET /tasks/overdue
+ * Get all overdue tasks across all leads for the organization
+ */
+router.get('/tasks/overdue', async (req, res) => {
+  try {
+    const organizationId = req.organizationId;
+
+    const query = `
+      SELECT
+        li.*,
+        l.first_name as lead_first_name,
+        l.last_name as lead_last_name,
+        l.company as lead_company,
+        u.first_name as user_first_name,
+        u.last_name as user_last_name
+      FROM lead_interactions li
+      JOIN leads l ON li.lead_id = l.id
+      LEFT JOIN users u ON li.user_id = u.id
+      WHERE li.organization_id = $1
+        AND li.interaction_type = 'task'
+        AND li.status = 'scheduled'
+        AND li.scheduled_at < NOW()
+      ORDER BY li.scheduled_at ASC
+    `;
+
+    const result = await db.query(query, [organizationId]);
+
+    res.json({
+      tasks: result.rows,
+      count: result.rows.length
+    });
+  } catch (error) {
+    console.error('Error fetching overdue tasks:', error);
+    res.status(500).json({ error: 'Failed to fetch overdue tasks' });
+  }
+});
+
+/**
+ * GET /tasks/upcoming
+ * Get upcoming tasks (next 7 days) across all leads for the organization
+ */
+router.get('/tasks/upcoming', async (req, res) => {
+  try {
+    const organizationId = req.organizationId;
+    const { days = 7 } = req.query;
+
+    const query = `
+      SELECT
+        li.*,
+        l.first_name as lead_first_name,
+        l.last_name as lead_last_name,
+        l.company as lead_company,
+        u.first_name as user_first_name,
+        u.last_name as user_last_name
+      FROM lead_interactions li
+      JOIN leads l ON li.lead_id = l.id
+      LEFT JOIN users u ON li.user_id = u.id
+      WHERE li.organization_id = $1
+        AND li.interaction_type = 'task'
+        AND li.status = 'scheduled'
+        AND li.scheduled_at BETWEEN NOW() AND NOW() + INTERVAL '${parseInt(days)} days'
+      ORDER BY li.scheduled_at ASC
+    `;
+
+    const result = await db.query(query, [organizationId]);
+
+    res.json({
+      tasks: result.rows,
+      count: result.rows.length
+    });
+  } catch (error) {
+    console.error('Error fetching upcoming tasks:', error);
+    res.status(500).json({ error: 'Failed to fetch upcoming tasks' });
+  }
+});
+
 module.exports = router;

@@ -850,4 +850,55 @@ export const leadInteractionsAPI = {
   }
 }
 
+// Task Management API
+export const taskAPI = {
+  // Get all tasks for a lead with optional filters
+  getTasks: async (leadId, params = {}) => {
+    const response = await api.get(`/leads/${leadId}/tasks`, { params })
+    return response.data
+  },
+
+  // Create a new task
+  createTask: async (leadId, data) => {
+    const response = await api.post(`/leads/${leadId}/tasks`, data)
+    return response.data
+  },
+
+  // Update task details
+  updateTask: async (leadId, taskId, data) => {
+    const response = await api.patch(`/leads/${leadId}/tasks/${taskId}`, data)
+    return response.data
+  },
+
+  // Mark task as completed
+  completeTask: async (leadId, taskId, data = {}) => {
+    const response = await api.patch(`/leads/${leadId}/tasks/${taskId}/complete`, data)
+    return response.data
+  },
+
+  // Delete a task
+  deleteTask: async (leadId, taskId) => {
+    const response = await api.delete(`/leads/${leadId}/tasks/${taskId}`)
+    return response.data
+  },
+
+  // Bulk complete tasks
+  bulkCompleteTasks: async (leadId, taskIds) => {
+    const response = await api.post(`/leads/${leadId}/tasks/bulk-complete`, { taskIds })
+    return response.data
+  },
+
+  // Get overdue tasks across all leads
+  getOverdueTasks: async () => {
+    const response = await api.get('/leads/tasks/overdue')
+    return response.data
+  },
+
+  // Get upcoming tasks across all leads
+  getUpcomingTasks: async (days = 7) => {
+    const response = await api.get('/leads/tasks/upcoming', { params: { days } })
+    return response.data
+  }
+}
+
 export default api
