@@ -1886,7 +1886,6 @@ router.post('/:id/convert',
  * Get all tasks for a specific lead with filtering options
  */
 router.get('/:leadId/tasks',
-  validateUuidParam,
   async (req, res) => {
     try {
       const { leadId } = req.params;
@@ -1982,7 +1981,6 @@ router.get('/:leadId/tasks',
  * Create a new task for a lead
  */
 router.post('/:leadId/tasks',
-  validateUuidParam,
   async (req, res) => {
     try {
       const { leadId } = req.params;
@@ -2051,7 +2049,6 @@ router.post('/:leadId/tasks',
  * Mark a task as completed
  */
 router.patch('/:leadId/tasks/:taskId/complete',
-  validateUuidParam,
   async (req, res) => {
     try {
       const { leadId, taskId } = req.params;
@@ -2112,7 +2109,6 @@ router.patch('/:leadId/tasks/:taskId/complete',
  * Update task details
  */
 router.patch('/:leadId/tasks/:taskId',
-  validateUuidParam,
   async (req, res) => {
     try {
       const { leadId, taskId } = req.params;
@@ -2178,7 +2174,6 @@ router.patch('/:leadId/tasks/:taskId',
  * Delete a task
  */
 router.delete('/:leadId/tasks/:taskId',
-  validateUuidParam,
   async (req, res) => {
     try {
       const { leadId, taskId } = req.params;
@@ -2219,7 +2214,6 @@ router.delete('/:leadId/tasks/:taskId',
  * Mark multiple tasks as completed
  */
 router.post('/:leadId/tasks/bulk-complete',
-  validateUuidParam,
   async (req, res) => {
     try {
       const { leadId } = req.params;
