@@ -2094,11 +2094,11 @@ router.patch('/:leadId/tasks/:taskId/complete',
             ELSE description
           END,
           updated_at = NOW()
-        WHERE id = $3 AND lead_id = $4 AND interaction_type = 'task'
+        WHERE id = $3 AND lead_id = $4 AND interaction_type = 'task' AND organization_id = $5
         RETURNING *
       `;
 
-      const result = await db.query(query, [outcome, notes, taskId, leadId]);
+      const result = await db.query(query, [outcome, notes, taskId, leadId, organizationId]);
 
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Task not found' });
@@ -2116,7 +2116,17 @@ router.patch('/:leadId/tasks/:taskId/complete',
       });
     } catch (error) {
       console.error('Error completing task:', error);
-      res.status(500).json({ error: 'Failed to complete task' });
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        leadId: req.params.leadId,
+        taskId: req.params.taskId,
+        body: req.body
+      });
+      res.status(500).json({
+        error: 'Failed to complete task',
+        detail: error.message
+      });
     }
   }
 );
@@ -2157,7 +2167,7 @@ router.patch('/:leadId/tasks/:taskId',
           priority = COALESCE($4, priority),
           status = COALESCE($5, status),
           updated_at = NOW()
-        WHERE id = $6 AND lead_id = $7 AND interaction_type = 'task'
+        WHERE id = $6 AND lead_id = $7 AND interaction_type = 'task' AND organization_id = $8
         RETURNING *
       `;
 
@@ -2168,7 +2178,8 @@ router.patch('/:leadId/tasks/:taskId',
         priority,
         status,
         taskId,
-        leadId
+        leadId,
+        organizationId
       ]);
 
       if (result.rows.length === 0) {
@@ -2181,7 +2192,17 @@ router.patch('/:leadId/tasks/:taskId',
       });
     } catch (error) {
       console.error('Error updating task:', error);
-      res.status(500).json({ error: 'Failed to update task' });
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        leadId: req.params.leadId,
+        taskId: req.params.taskId,
+        body: req.body
+      });
+      res.status(500).json({
+        error: 'Failed to update task',
+        detail: error.message
+      });
     }
   }
 );
@@ -2208,11 +2229,11 @@ router.delete('/:leadId/tasks/:taskId',
 
       const query = `
         DELETE FROM lead_interactions
-        WHERE id = $1 AND lead_id = $2 AND interaction_type = 'task'
+        WHERE id = $1 AND lead_id = $2 AND interaction_type = 'task' AND organization_id = $3
         RETURNING id
       `;
 
-      const result = await db.query(query, [taskId, leadId]);
+      const result = await db.query(query, [taskId, leadId, organizationId]);
 
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Task not found' });
@@ -2221,7 +2242,16 @@ router.delete('/:leadId/tasks/:taskId',
       res.json({ message: 'Task deleted successfully' });
     } catch (error) {
       console.error('Error deleting task:', error);
-      res.status(500).json({ error: 'Failed to delete task' });
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        leadId: req.params.leadId,
+        taskId: req.params.taskId
+      });
+      res.status(500).json({
+        error: 'Failed to delete task',
+        detail: error.message
+      });
     }
   }
 );
