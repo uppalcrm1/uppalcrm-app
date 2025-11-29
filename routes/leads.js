@@ -1902,38 +1902,38 @@ router.get('/:leadId/tasks',
         return res.status(404).json({ error: 'Lead not found' });
       }
 
-      // Build query with filters
-      let whereConditions = ['lead_id = $1', 'interaction_type = $2', 'li.organization_id = $3'];
+      // Build query with filters (using li. prefix for all columns)
+      let whereConditions = ['li.lead_id = $1', 'li.interaction_type = $2', 'li.organization_id = $3'];
       let queryParams = [leadId, 'task', organizationId];
       let paramIndex = 4;
 
       // Filter by status
       if (status) {
-        whereConditions.push(`status = $${paramIndex}`);
+        whereConditions.push(`li.status = $${paramIndex}`);
         queryParams.push(status);
         paramIndex++;
       }
 
       // Filter by priority
       if (priority) {
-        whereConditions.push(`priority = $${paramIndex}`);
+        whereConditions.push(`li.priority = $${paramIndex}`);
         queryParams.push(priority);
         paramIndex++;
       }
 
       // Filter overdue tasks
       if (overdue === 'true') {
-        whereConditions.push(`scheduled_at < NOW()`);
-        whereConditions.push(`status = 'scheduled'`);
+        whereConditions.push(`li.scheduled_at < NOW()`);
+        whereConditions.push(`li.status = 'scheduled'`);
       }
 
       // Filter by date range
       if (date_range === 'today') {
-        whereConditions.push(`DATE(scheduled_at) = CURRENT_DATE`);
+        whereConditions.push(`DATE(li.scheduled_at) = CURRENT_DATE`);
       } else if (date_range === 'week') {
-        whereConditions.push(`scheduled_at BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days'`);
+        whereConditions.push(`li.scheduled_at BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days'`);
       } else if (date_range === 'month') {
-        whereConditions.push(`scheduled_at BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '30 days'`);
+        whereConditions.push(`li.scheduled_at BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '30 days'`);
       }
 
       const whereClause = whereConditions.join(' AND ');
