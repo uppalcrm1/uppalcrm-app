@@ -1903,9 +1903,9 @@ router.get('/:leadId/tasks',
       }
 
       // Build query with filters
-      let whereConditions = ['lead_id = $1', 'interaction_type = $2'];
-      let queryParams = [leadId, 'task'];
-      let paramIndex = 3;
+      let whereConditions = ['lead_id = $1', 'interaction_type = $2', 'li.organization_id = $3'];
+      let queryParams = [leadId, 'task', organizationId];
+      let paramIndex = 4;
 
       // Filter by status
       if (status) {
@@ -1955,14 +1955,22 @@ router.get('/:leadId/tasks',
 
       const result = await db.query(query, queryParams);
 
-      // Calculate statistics
+      // Calculate statistics from ALL tasks (not filtered)
+      const statsQuery = `
+        SELECT
+          COUNT(*) as total,
+          COUNT(*) FILTER (WHERE status = 'scheduled') as pending,
+          COUNT(*) FILTER (WHERE status = 'completed') as completed,
+          COUNT(*) FILTER (WHERE status = 'scheduled' AND scheduled_at < NOW()) as overdue
+        FROM lead_interactions
+        WHERE lead_id = $1 AND interaction_type = 'task' AND organization_id = $2
+      `;
+      const statsResult = await db.query(statsQuery, [leadId, organizationId]);
       const stats = {
-        total: result.rows.length,
-        pending: result.rows.filter(t => t.status === 'scheduled').length,
-        completed: result.rows.filter(t => t.status === 'completed').length,
-        overdue: result.rows.filter(t =>
-          t.status === 'scheduled' && new Date(t.scheduled_at) < new Date()
-        ).length
+        total: parseInt(statsResult.rows[0].total),
+        pending: parseInt(statsResult.rows[0].pending),
+        completed: parseInt(statsResult.rows[0].completed),
+        overdue: parseInt(statsResult.rows[0].overdue)
       };
 
       res.json({
@@ -1971,7 +1979,16 @@ router.get('/:leadId/tasks',
       });
     } catch (error) {
       console.error('Error fetching tasks:', error);
-      res.status(500).json({ error: 'Failed to fetch tasks' });
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        leadId: req.params.leadId,
+        filters: req.query
+      });
+      res.status(500).json({
+        error: 'Failed to fetch tasks',
+        detail: error.message
+      });
     }
   }
 );
