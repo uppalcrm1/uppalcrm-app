@@ -887,6 +887,37 @@ router.post('/', validateLeadDynamic(false), async (req, res) => {
 
     const createdLead = result.rows[0];
 
+    // Auto-create follow-up task if next_follow_up is set
+    if (nextFollowUp) {
+      try {
+        console.log('📅 Creating follow-up task for next_follow_up date:', nextFollowUp);
+        const leadName = `${firstName || ''} ${lastName || ''}`.trim() || company || 'this lead';
+        const taskUserId = assignedTo || req.userId; // Assign to lead owner or creator
+
+        await db.query(`
+          INSERT INTO lead_interactions (
+            lead_id, user_id, organization_id, interaction_type, subject, description,
+            scheduled_at, status, priority, created_by
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        `, [
+          createdLead.id,
+          taskUserId,
+          req.organizationId,
+          'task',
+          `Follow up with ${leadName}`,
+          'Follow up with lead',
+          nextFollowUp,
+          'scheduled',
+          'medium',
+          req.userId
+        ]);
+
+        console.log('✅ Follow-up task created successfully');
+      } catch (taskError) {
+        console.error('⚠️ Failed to create follow-up task (non-blocking):', taskError.message);
+      }
+    }
+
     // Send emails (fire-and-forget)
     (async () => {
       try {
@@ -969,6 +1000,13 @@ router.put('/:id',
       console.log('📝 Organization ID:', req.organizationId);
       console.log('📝 Request body:', JSON.stringify(req.body, null, 2));
 
+      // Get the old lead data to check if next_follow_up changed
+      const oldLeadResult = await db.query(
+        'SELECT next_follow_up, first_name, last_name, company, assigned_to FROM leads WHERE id = $1 AND organization_id = $2',
+        [req.params.id, req.organizationId]
+      );
+      const oldLead = oldLeadResult.rows[0];
+
       // Pass user ID for audit trail tracking
       const userId = req.user?.id || null;
       const lead = await Lead.update(req.params.id, req.body, req.organizationId, userId);
@@ -979,6 +1017,46 @@ router.put('/:id',
           error: 'Lead not found',
           message: 'Lead does not exist in this organization'
         });
+      }
+
+      // Auto-create follow-up task if next_follow_up changed
+      if (oldLead && req.body.next_follow_up) {
+        const oldDate = oldLead.next_follow_up ? new Date(oldLead.next_follow_up).getTime() : null;
+        const newDate = new Date(req.body.next_follow_up).getTime();
+
+        // Only create task if the date actually changed
+        if (oldDate !== newDate) {
+          try {
+            console.log('📅 Next follow-up date changed, creating new task...');
+            const leadName = `${req.body.first_name || oldLead.first_name || ''} ${req.body.last_name || oldLead.last_name || ''}`.trim()
+              || req.body.company || oldLead.company || 'this lead';
+            const taskUserId = req.body.assigned_to || oldLead.assigned_to || req.userId;
+
+            await db.query(`
+              INSERT INTO lead_interactions (
+                lead_id, user_id, organization_id, interaction_type, subject, description,
+                scheduled_at, status, priority, created_by
+              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            `, [
+              req.params.id,
+              taskUserId,
+              req.organizationId,
+              'task',
+              `Follow up with ${leadName}`,
+              'Follow up with lead',
+              req.body.next_follow_up,
+              'scheduled',
+              'medium',
+              userId
+            ]);
+
+            console.log('✅ Follow-up task created successfully');
+          } catch (taskError) {
+            console.error('⚠️ Failed to create follow-up task (non-blocking):', taskError.message);
+          }
+        } else {
+          console.log('ℹ️ Next follow-up date unchanged, skipping task creation');
+        }
       }
 
       console.log('✅ Lead updated successfully:', lead.id);
