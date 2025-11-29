@@ -25,6 +25,7 @@ import LoadingSpinner from '../components/LoadingSpinner'
 import ConvertLeadModal from '../components/ConvertLeadModal'
 import DynamicLeadForm from '../components/DynamicLeadForm'
 import InteractionsTimeline from '../components/InteractionsTimeline'
+import TaskManager from '../components/TaskManager'
 import toast from 'react-hot-toast'
 import { useForm } from 'react-hook-form'
 import { format } from 'date-fns'
@@ -64,6 +65,7 @@ const LeadsPage = () => {
   const [showInteractions, setShowInteractions] = useState(null)
   const [selectedLead, setSelectedLead] = useState(null)
   const [showFilters, setShowFilters] = useState(false)
+  const [activeActivityTab, setActiveActivityTab] = useState('tasks') // tasks, interactions, all
 
   // Get current filters from URL - memoized to prevent unnecessary re-renders
   const currentFilters = React.useMemo(() => ({
@@ -845,12 +847,12 @@ const AssignLeadModal = ({ lead, onClose, onSubmit, users, isLoading }) => {
       </div>
     </div>
 
-      {/* Interactions Modal */}
+      {/* Activities Modal (Tasks & Interactions) */}
       {showInteractions && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+          <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-900">Lead Interactions</h2>
+              <h2 className="text-xl font-semibold text-gray-900">Lead Activities</h2>
               <button
                 onClick={() => setShowInteractions(null)}
                 className="text-gray-400 hover:text-gray-600"
@@ -858,8 +860,39 @@ const AssignLeadModal = ({ lead, onClose, onSubmit, users, isLoading }) => {
                 <X className="w-6 h-6" />
               </button>
             </div>
+
+            {/* Tabs */}
+            <div className="flex border-b border-gray-200 px-6">
+              <button
+                onClick={() => setActiveActivityTab('tasks')}
+                className={`px-4 py-3 font-medium border-b-2 transition-colors ${
+                  activeActivityTab === 'tasks'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Tasks & Follow-ups
+              </button>
+              <button
+                onClick={() => setActiveActivityTab('interactions')}
+                className={`px-4 py-3 font-medium border-b-2 transition-colors ${
+                  activeActivityTab === 'interactions'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                All Interactions
+              </button>
+            </div>
+
+            {/* Content */}
             <div className="flex-1 overflow-y-auto p-6">
-              <InteractionsTimeline leadId={showInteractions} />
+              {activeActivityTab === 'tasks' && (
+                <TaskManager leadId={showInteractions} />
+              )}
+              {activeActivityTab === 'interactions' && (
+                <InteractionsTimeline leadId={showInteractions} />
+              )}
             </div>
           </div>
         </div>
