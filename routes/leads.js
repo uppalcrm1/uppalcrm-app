@@ -2069,7 +2069,7 @@ router.patch('/:leadId/tasks/:taskId/complete',
   async (req, res) => {
     try {
       const { leadId, taskId } = req.params;
-      const { outcome, notes } = req.body;
+      const { outcome = null, notes = null } = req.body || {};
       const organizationId = req.organizationId;
 
       // Verify lead belongs to organization
