@@ -2088,9 +2088,9 @@ router.patch('/:leadId/tasks/:taskId/complete',
         SET
           status = 'completed',
           completed_at = NOW(),
-          outcome = COALESCE($1, outcome),
+          outcome = COALESCE($1::text, outcome),
           description = CASE
-            WHEN $2 IS NOT NULL THEN description || E'\n\nCompletion Notes: ' || $2
+            WHEN $2::text IS NOT NULL THEN description || E'\n\nCompletion Notes: ' || $2::text
             ELSE description
           END,
           updated_at = NOW()
