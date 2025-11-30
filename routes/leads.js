@@ -2066,6 +2066,7 @@ router.post('/:leadId/tasks',
  * Mark a task as completed
  */
 router.patch('/:leadId/tasks/:taskId/complete',
+  authenticateToken,
   async (req, res) => {
     try {
       const { leadId, taskId } = req.params;
