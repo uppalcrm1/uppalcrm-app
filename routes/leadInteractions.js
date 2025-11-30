@@ -273,8 +273,8 @@ router.patch('/:leadId/interactions/:interactionId/complete', authenticateToken,
   try {
     const { leadId, interactionId } = req.params;
     const { outcome, duration_minutes } = req.body;
-    const organizationId = req.user.organizationId;
-    const userId = req.user.id;
+    const organizationId = req.organizationId;
+    const userId = req.userId;
 
     // Verify lead belongs to organization
     const leadCheck = await db.query(
