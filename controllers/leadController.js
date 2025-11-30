@@ -201,8 +201,8 @@ class LeadController {
         `;
 
         const [activitiesResult, countResult] = await Promise.all([
-          db.query(activitiesQuery, queryParams),
-          db.query(countQuery, queryParams.slice(0, -2))
+          db.query(activitiesQuery, queryParams, organization_id),
+          db.query(countQuery, queryParams.slice(0, -2), organization_id)
         ]);
 
         const total = parseInt(countResult.rows[0].total);
