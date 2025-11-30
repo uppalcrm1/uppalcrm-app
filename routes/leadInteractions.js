@@ -33,15 +33,19 @@ router.get('/:leadId/interactions', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'Lead not found' });
     }
 
-    // Get all interactions for this lead
+    // Get all interactions for this lead with creator and assignee info
     const query = `
       SELECT
         li.*,
         u.first_name as user_first_name,
         u.last_name as user_last_name,
-        u.email as user_email
+        u.email as user_email,
+        creator.first_name as created_by_first_name,
+        creator.last_name as created_by_last_name,
+        creator.email as created_by_email
       FROM lead_interactions li
       LEFT JOIN users u ON li.user_id = u.id
+      LEFT JOIN users creator ON li.created_by = creator.id
       WHERE li.lead_id = $1
       ORDER BY
         CASE

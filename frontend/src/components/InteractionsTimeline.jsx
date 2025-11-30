@@ -160,39 +160,76 @@ const InteractionsTimeline = ({ leadId }) => {
                       </p>
 
                       {/* Metadata */}
-                      <div className="flex items-center gap-4 text-xs text-gray-500">
-                        <div className="flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          {isScheduled ? (
-                            <span>
-                              Scheduled for {format(new Date(interaction.scheduled_at), 'MMM d, yyyy h:mm a')}
-                            </span>
-                          ) : (
-                            <span>
-                              {formatDistanceToNow(new Date(interaction.created_at), { addSuffix: true })}
-                            </span>
+                      <div className="flex flex-col gap-1 text-xs text-gray-500">
+                        <div className="flex items-center gap-4 flex-wrap">
+                          <div className="flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {isScheduled ? (
+                              <span>
+                                Scheduled for {format(new Date(interaction.scheduled_at), 'MMM d, yyyy h:mm a')}
+                              </span>
+                            ) : (
+                              <span>
+                                {formatDistanceToNow(new Date(interaction.created_at), { addSuffix: true })}
+                              </span>
+                            )}
+                          </div>
+
+                          {interaction.outcome && (
+                            <>
+                              <span>•</span>
+                              <span>Outcome: {interaction.outcome}</span>
+                            </>
+                          )}
+
+                          {interaction.duration_minutes && (
+                            <>
+                              <span>•</span>
+                              <span>{interaction.duration_minutes} minutes</span>
+                            </>
                           )}
                         </div>
 
-                        {interaction.outcome && (
-                          <>
-                            <span>•</span>
-                            <span>Outcome: {interaction.outcome}</span>
-                          </>
+                        {/* Task-specific metadata */}
+                        {interaction.interaction_type === 'task' && (
+                          <div className="flex items-center gap-4 flex-wrap">
+                            {interaction.created_by_first_name && (
+                              <span>
+                                Created by {interaction.created_by_first_name} {interaction.created_by_last_name}
+                              </span>
+                            )}
+                            {interaction.user_first_name && (
+                              <>
+                                <span>•</span>
+                                <span>Assigned to {interaction.user_first_name} {interaction.user_last_name}</span>
+                              </>
+                            )}
+                            {interaction.completed_at && (
+                              <>
+                                <span>•</span>
+                                <span>Completed {formatDistanceToNow(new Date(interaction.completed_at), { addSuffix: true })}</span>
+                              </>
+                            )}
+                            {interaction.priority && (
+                              <>
+                                <span>•</span>
+                                <span className={`capitalize font-medium ${
+                                  interaction.priority === 'high' ? 'text-red-600' :
+                                  interaction.priority === 'medium' ? 'text-orange-600' :
+                                  'text-gray-600'
+                                }`}>
+                                  {interaction.priority} priority
+                                </span>
+                              </>
+                            )}
+                          </div>
                         )}
 
-                        {interaction.duration_minutes && (
-                          <>
-                            <span>•</span>
-                            <span>{interaction.duration_minutes} minutes</span>
-                          </>
-                        )}
-
-                        {interaction.user_first_name && (
-                          <>
-                            <span>•</span>
-                            <span>by {interaction.user_first_name} {interaction.user_last_name}</span>
-                          </>
+                        {/* Non-task metadata (calls, emails, meetings, notes) */}
+                        {interaction.interaction_type !== 'task' && interaction.created_by_first_name && (
+                          <div className="flex items-center gap-4">
+                            <span>by {interaction.created_by_first_name} {interaction.created_by_last_name}</span>
+                          </div>
                         )}
                       </div>
                     </div>
