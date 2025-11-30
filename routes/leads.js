@@ -2071,6 +2071,7 @@ router.patch('/:leadId/tasks/:taskId/complete',
       const { leadId, taskId } = req.params;
       const { outcome = null, notes = null } = req.body || {};
       const organizationId = req.organizationId;
+      const userId = req.userId;
 
       // Verify lead belongs to organization
       const leadCheck = await db.query(
@@ -2081,6 +2082,9 @@ router.patch('/:leadId/tasks/:taskId/complete',
       if (leadCheck.rows.length === 0) {
         return res.status(404).json({ error: 'Lead not found' });
       }
+
+      // Set current user for trigger
+      await db.query(`SELECT set_config('app.current_user_id', $1, true)`, [userId]);
 
       // Update task to completed
       const query = `
@@ -2147,6 +2151,7 @@ router.patch('/:leadId/tasks/:taskId',
         status
       } = req.body;
       const organizationId = req.organizationId;
+      const userId = req.userId;
 
       // Verify lead belongs to organization
       const leadCheck = await db.query(
@@ -2157,6 +2162,9 @@ router.patch('/:leadId/tasks/:taskId',
       if (leadCheck.rows.length === 0) {
         return res.status(404).json({ error: 'Lead not found' });
       }
+
+      // Set current user for trigger
+      await db.query(`SELECT set_config('app.current_user_id', $1, true)`, [userId]);
 
       const query = `
         UPDATE lead_interactions

@@ -274,6 +274,7 @@ router.patch('/:leadId/interactions/:interactionId/complete', authenticateToken,
     const { leadId, interactionId } = req.params;
     const { outcome, duration_minutes } = req.body;
     const organizationId = req.user.organizationId;
+    const userId = req.user.id;
 
     // Verify lead belongs to organization
     const leadCheck = await db.query(
@@ -284,6 +285,9 @@ router.patch('/:leadId/interactions/:interactionId/complete', authenticateToken,
     if (leadCheck.rows.length === 0) {
       return res.status(404).json({ error: 'Lead not found' });
     }
+
+    // Set current user for trigger
+    await db.query(`SELECT set_config('app.current_user_id', $1, true)`, [userId]);
 
     // Mark as completed
     const query = `

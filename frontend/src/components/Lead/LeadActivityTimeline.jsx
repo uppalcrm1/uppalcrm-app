@@ -80,9 +80,29 @@ const LeadActivityTimeline = ({ leadId }) => {
     setExpandedActivities(newExpanded)
   }
 
-  const getActivityIcon = (type) => {
+  const getActivityIcon = (type, eventType) => {
     const iconProps = { size: 16, className: "text-white" }
 
+    // For events, use specific icons based on event type
+    if (eventType) {
+      switch (eventType) {
+        case 'created':
+          return <Info {...iconProps} />
+        case 'completed':
+          return <CheckCircle {...iconProps} />
+        case 'reassigned':
+          return <User {...iconProps} />
+        case 'priority_changed':
+        case 'date_changed':
+          return <AlertCircle {...iconProps} />
+        case 'cancelled':
+          return <AlertCircle {...iconProps} />
+        default:
+          return <Info {...iconProps} />
+      }
+    }
+
+    // Fallback to interaction type
     switch (type) {
       case 'email':
         return <Mail {...iconProps} />
@@ -99,7 +119,28 @@ const LeadActivityTimeline = ({ leadId }) => {
     }
   }
 
-  const getActivityColor = (type) => {
+  const getActivityColor = (type, eventType) => {
+    // For events, use specific colors based on event type
+    if (eventType) {
+      switch (eventType) {
+        case 'created':
+          return 'bg-blue-500'
+        case 'completed':
+          return 'bg-green-500'
+        case 'reassigned':
+          return 'bg-purple-500'
+        case 'priority_changed':
+          return 'bg-yellow-500'
+        case 'date_changed':
+          return 'bg-indigo-500'
+        case 'cancelled':
+          return 'bg-red-500'
+        default:
+          return 'bg-gray-400'
+      }
+    }
+
+    // Fallback to interaction type
     switch (type) {
       case 'email':
         return 'bg-blue-500'
@@ -213,11 +254,17 @@ const LeadActivityTimeline = ({ leadId }) => {
             <div className="flow-root">
               <ul className="-mb-8">
                 {activities.map((activity, index) => {
-                  const isExpanded = expandedActivities.has(activity.id)
+                  // Support both event and legacy interaction structure
+                  const activityId = activity.event_id || activity.id
+                  const isExpanded = expandedActivities.has(activityId)
                   const isLast = index === activities.length - 1
 
+                  // Determine who performed the action
+                  const actorFirstName = activity.event_user_first_name || activity.created_by_first_name || activity.user_first_name
+                  const actorLastName = activity.event_user_last_name || activity.created_by_last_name || activity.user_last_name
+
                   return (
-                    <li key={activity.id}>
+                    <li key={activityId}>
                       <div className="relative pb-8">
                         {!isLast && (
                           <span className="absolute top-5 left-5 -ml-px h-full w-0.5 bg-gray-200" />
@@ -226,8 +273,8 @@ const LeadActivityTimeline = ({ leadId }) => {
                         <div className="relative flex items-start space-x-3">
                           {/* Activity Icon */}
                           <div className={`relative px-1`}>
-                            <div className={`h-10 w-10 rounded-full ${getActivityColor(activity.interaction_type)} flex items-center justify-center ring-8 ring-white`}>
-                              {getActivityIcon(activity.interaction_type)}
+                            <div className={`h-10 w-10 rounded-full ${getActivityColor(activity.interaction_type, activity.event_type)} flex items-center justify-center ring-8 ring-white`}>
+                              {getActivityIcon(activity.interaction_type, activity.event_type)}
                             </div>
                           </div>
 
@@ -235,10 +282,15 @@ const LeadActivityTimeline = ({ leadId }) => {
                           <div className="min-w-0 flex-1">
                             <div className="text-sm text-gray-500 mb-1">
                               <span className="font-medium text-gray-900">
-                                {activity.user_first_name} {activity.user_last_name}
+                                {actorFirstName} {actorLastName}
                               </span>
                               {' '}
-                              <span className="capitalize">{activity.interaction_type}</span>
+                              {/* Show event description if available, otherwise interaction type */}
+                              {activity.event_description ? (
+                                <span>{activity.event_description}</span>
+                              ) : (
+                                <span className="capitalize">{activity.interaction_type}</span>
+                              )}
                               {activity.interaction_type === 'task' && activity.priority && (
                                 <span className="ml-1">
                                   {activity.priority === 'high' ? '🔴' :
@@ -251,8 +303,29 @@ const LeadActivityTimeline = ({ leadId }) => {
                               </time>
                             </div>
 
-                            {/* Task-specific metadata line */}
-                            {activity.interaction_type === 'task' && (
+                            {/* Event-specific details */}
+                            {activity.event_type && (
+                              <div className="text-xs text-gray-500 mb-2 flex flex-wrap items-center gap-2">
+                                <span className="capitalize font-medium text-gray-700">
+                                  {activity.event_type.replace('_', ' ')}
+                                </span>
+                                {activity.field_changed && (
+                                  <>
+                                    <span>•</span>
+                                    <span>
+                                      {activity.old_value && activity.new_value && (
+                                        <>
+                                          Changed from <span className="font-medium">{activity.old_value}</span> to <span className="font-medium">{activity.new_value}</span>
+                                        </>
+                                      )}
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Task-specific metadata line (for legacy non-event data) */}
+                            {activity.interaction_type === 'task' && !activity.event_type && (
                               <div className="text-xs text-gray-500 mb-2 flex flex-wrap items-center gap-2">
                                 {activity.created_by_first_name && (
                                   <span>
@@ -286,8 +359,8 @@ const LeadActivityTimeline = ({ leadId }) => {
                               </div>
                             )}
 
-                            {/* Non-task creator info */}
-                            {activity.interaction_type !== 'task' && activity.created_by_first_name && (
+                            {/* Non-task creator info (for legacy non-event data) */}
+                            {activity.interaction_type !== 'task' && !activity.event_type && activity.created_by_first_name && (
                               <div className="text-xs text-gray-500 mb-2">
                                 by {activity.created_by_first_name} {activity.created_by_last_name}
                               </div>

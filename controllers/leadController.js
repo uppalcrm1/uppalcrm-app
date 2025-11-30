@@ -123,11 +123,11 @@ class LeadController {
       // Try to get activities if table exists, otherwise return empty
       try {
         const offset = (page - 1) * limit;
-        let whereConditions = ['li.lead_id = $1'];
+        let whereConditions = ['ie.lead_id = $1'];
         let queryParams = [id];
         let paramCount = 1;
 
-        // Add type filter
+        // Add type filter (filter by interaction type from the parent interaction)
         if (type) {
           paramCount++;
           whereConditions.push(`li.interaction_type = $${paramCount}`);
@@ -137,33 +137,56 @@ class LeadController {
         // Add date range filter
         if (start_date) {
           paramCount++;
-          whereConditions.push(`li.created_at >= $${paramCount}`);
+          whereConditions.push(`ie.created_at >= $${paramCount}`);
           queryParams.push(start_date);
         }
 
         if (end_date) {
           paramCount++;
-          whereConditions.push(`li.created_at <= $${paramCount}`);
+          whereConditions.push(`ie.created_at <= $${paramCount}`);
           queryParams.push(end_date);
         }
 
         const whereClause = whereConditions.join(' AND ');
 
-        // Get activities with user information
+        // Get interaction events with related interaction and user information
         const activitiesQuery = `
           SELECT
-            li.*,
+            ie.id as event_id,
+            ie.interaction_id,
+            ie.event_type,
+            ie.event_description,
+            ie.field_changed,
+            ie.old_value,
+            ie.new_value,
+            ie.event_metadata,
+            ie.created_at,
+            li.interaction_type,
+            li.subject,
+            li.description,
+            li.priority,
+            li.status,
+            li.scheduled_at,
+            li.completed_at,
+            li.outcome,
+            li.participants,
+            li.activity_metadata,
             creator.first_name as created_by_first_name,
             creator.last_name as created_by_last_name,
             creator.email as created_by_email,
             assignee.first_name as user_first_name,
             assignee.last_name as user_last_name,
-            assignee.email as user_email
-          FROM lead_interactions li
+            assignee.email as user_email,
+            event_user.first_name as event_user_first_name,
+            event_user.last_name as event_user_last_name,
+            event_user.email as event_user_email
+          FROM interaction_events ie
+          LEFT JOIN lead_interactions li ON ie.interaction_id = li.id
           LEFT JOIN users creator ON li.created_by = creator.id
           LEFT JOIN users assignee ON li.user_id = assignee.id
+          LEFT JOIN users event_user ON ie.changed_by = event_user.id
           WHERE ${whereClause}
-          ORDER BY li.created_at DESC
+          ORDER BY ie.created_at DESC
           LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}
         `;
 
@@ -172,7 +195,8 @@ class LeadController {
         // Get total count
         const countQuery = `
           SELECT COUNT(*) as total
-          FROM lead_interactions li
+          FROM interaction_events ie
+          LEFT JOIN lead_interactions li ON ie.interaction_id = li.id
           WHERE ${whereClause}
         `;
 
