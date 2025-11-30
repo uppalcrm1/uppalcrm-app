@@ -2074,6 +2074,27 @@ router.patch('/:leadId/tasks/:taskId/complete',
       const organizationId = req.organizationId;
       const userId = req.userId;
 
+      // Debug logging
+      console.log('Complete task debug:', {
+        leadId,
+        taskId,
+        organizationId,
+        userId,
+        userIdType: typeof userId,
+        orgIdType: typeof organizationId,
+        hasUser: !!req.user,
+        userKeys: req.user ? Object.keys(req.user) : null
+      });
+
+      // Validate required fields
+      if (!userId || !organizationId) {
+        console.error('Missing required fields:', { userId, organizationId });
+        return res.status(400).json({
+          error: 'Authentication data missing',
+          detail: 'User ID or Organization ID not found in request'
+        });
+      }
+
       // Verify lead belongs to organization
       const leadCheck = await db.query(
         'SELECT id FROM leads WHERE id = $1 AND organization_id = $2',
