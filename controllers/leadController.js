@@ -153,11 +153,15 @@ class LeadController {
         const activitiesQuery = `
           SELECT
             li.*,
-            u.first_name as created_by_first_name,
-            u.last_name as created_by_last_name,
-            u.email as created_by_email
+            creator.first_name as created_by_first_name,
+            creator.last_name as created_by_last_name,
+            creator.email as created_by_email,
+            assignee.first_name as user_first_name,
+            assignee.last_name as user_last_name,
+            assignee.email as user_email
           FROM lead_interactions li
-          LEFT JOIN users u ON li.created_by = u.id
+          LEFT JOIN users creator ON li.created_by = creator.id
+          LEFT JOIN users assignee ON li.user_id = assignee.id
           WHERE ${whereClause}
           ORDER BY li.created_at DESC
           LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}
