@@ -136,6 +136,12 @@ const InteractionsTimeline = ({ leadId }) => {
                       <div className="flex items-center gap-2 mb-1">
                         <span className="font-medium text-gray-900 capitalize">
                           {interaction.interaction_type}
+                          {interaction.interaction_type === 'task' && interaction.priority && (
+                            <span className="ml-2">
+                              {interaction.priority === 'high' ? '🔴' :
+                               interaction.priority === 'medium' ? '🟠' : '⚪'}
+                            </span>
+                          )}
                         </span>
                         {interaction.subject && (
                           <>

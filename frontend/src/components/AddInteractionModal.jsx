@@ -29,7 +29,8 @@ const AddInteractionModal = ({ leadId, onClose, onSuccess }) => {
     description: '',
     outcome: '',
     scheduled_at: '',
-    duration_minutes: ''
+    duration_minutes: '',
+    priority: 'medium'
   });
 
   const queryClient = useQueryClient();
@@ -178,6 +179,50 @@ const AddInteractionModal = ({ leadId, onClose, onSuccess }) => {
               <p className="text-xs text-gray-500 mt-1">
                 Leave empty to mark as completed now
               </p>
+            </div>
+          )}
+
+          {/* Priority (for tasks only) */}
+          {formData.interaction_type === 'task' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Priority *
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, priority: 'low' })}
+                  className={`px-4 py-3 rounded-lg border-2 transition-colors text-sm font-medium ${
+                    formData.priority === 'low'
+                      ? 'border-gray-500 bg-gray-50 text-gray-700'
+                      : 'border-gray-200 hover:border-gray-300 text-gray-600'
+                  }`}
+                >
+                  ⚪ Low
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, priority: 'medium' })}
+                  className={`px-4 py-3 rounded-lg border-2 transition-colors text-sm font-medium ${
+                    formData.priority === 'medium'
+                      ? 'border-orange-500 bg-orange-50 text-orange-700'
+                      : 'border-gray-200 hover:border-gray-300 text-gray-600'
+                  }`}
+                >
+                  🟠 Medium
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, priority: 'high' })}
+                  className={`px-4 py-3 rounded-lg border-2 transition-colors text-sm font-medium ${
+                    formData.priority === 'high'
+                      ? 'border-red-500 bg-red-50 text-red-700'
+                      : 'border-gray-200 hover:border-gray-300 text-gray-600'
+                  }`}
+                >
+                  🔴 High
+                </button>
+              </div>
             </div>
           )}
 

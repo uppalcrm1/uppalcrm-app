@@ -235,21 +235,63 @@ const LeadActivityTimeline = ({ leadId }) => {
                           <div className="min-w-0 flex-1">
                             <div className="text-sm text-gray-500 mb-1">
                               <span className="font-medium text-gray-900">
-                                {activity.created_by_first_name} {activity.created_by_last_name}
+                                {activity.user_first_name} {activity.user_last_name}
                               </span>
                               {' '}
                               <span className="capitalize">{activity.interaction_type}</span>
+                              {activity.interaction_type === 'task' && activity.priority && (
+                                <span className="ml-1">
+                                  {activity.priority === 'high' ? '🔴' :
+                                   activity.priority === 'medium' ? '🟠' : '⚪'}
+                                </span>
+                              )}
                               {' • '}
                               <time dateTime={activity.created_at}>
                                 {formatDate(activity.created_at)}
                               </time>
-
-                              {activity.priority && (
-                                <span className="ml-2 inline-flex items-center">
-                                  {getPriorityIcon(activity.priority)}
-                                </span>
-                              )}
                             </div>
+
+                            {/* Task-specific metadata line */}
+                            {activity.interaction_type === 'task' && (
+                              <div className="text-xs text-gray-500 mb-2 flex flex-wrap items-center gap-2">
+                                {activity.created_by_first_name && (
+                                  <span>
+                                    Created by {activity.created_by_first_name} {activity.created_by_last_name}
+                                  </span>
+                                )}
+                                {activity.user_first_name && (
+                                  <>
+                                    <span>•</span>
+                                    <span>Assigned to {activity.user_first_name} {activity.user_last_name}</span>
+                                  </>
+                                )}
+                                {activity.completed_at && (
+                                  <>
+                                    <span>•</span>
+                                    <span>Completed {formatDate(activity.completed_at)}</span>
+                                  </>
+                                )}
+                                {activity.priority && (
+                                  <>
+                                    <span>•</span>
+                                    <span className={`capitalize font-medium ${
+                                      activity.priority === 'high' ? 'text-red-600' :
+                                      activity.priority === 'medium' ? 'text-orange-600' :
+                                      'text-gray-600'
+                                    }`}>
+                                      {activity.priority} priority
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Non-task creator info */}
+                            {activity.interaction_type !== 'task' && activity.created_by_first_name && (
+                              <div className="text-xs text-gray-500 mb-2">
+                                by {activity.created_by_first_name} {activity.created_by_last_name}
+                              </div>
+                            )}
 
                             <div className="bg-gray-50 rounded-lg p-4">
                               {/* Activity Header */}

@@ -11,7 +11,8 @@ const interactionSchema = Joi.object({
   description: Joi.string().required(),
   outcome: Joi.string().max(100).optional().allow(''),
   scheduled_at: Joi.date().iso().optional().allow(null, ''),
-  duration_minutes: Joi.number().integer().min(0).optional().allow(null, '')
+  duration_minutes: Joi.number().integer().min(0).optional().allow(null, ''),
+  priority: Joi.string().valid('low', 'medium', 'high').optional().allow('')
 });
 
 /**
@@ -94,7 +95,8 @@ router.post('/:leadId/interactions', authenticateToken, async (req, res) => {
       description,
       outcome,
       scheduled_at,
-      duration_minutes
+      duration_minutes,
+      priority
     } = req.body;
 
     // Determine status based on whether it's scheduled for future
@@ -107,15 +109,18 @@ router.post('/:leadId/interactions', authenticateToken, async (req, res) => {
     // Insert interaction
     const insertQuery = `
       INSERT INTO lead_interactions (
-        lead_id, user_id, interaction_type, subject, description,
-        outcome, scheduled_at, completed_at, duration_minutes, status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        lead_id, user_id, created_by, organization_id, interaction_type,
+        subject, description, outcome, scheduled_at, completed_at,
+        duration_minutes, priority, status
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
       RETURNING *
     `;
 
     const result = await db.query(insertQuery, [
       leadId,
       userId,
+      userId, // created_by is same as user_id for new interactions
+      organizationId,
       interaction_type,
       subject || null,
       description,
@@ -123,6 +128,7 @@ router.post('/:leadId/interactions', authenticateToken, async (req, res) => {
       scheduled_at || null,
       completed_at,
       duration_minutes || null,
+      priority || 'medium', // default priority
       status
     ]);
 
