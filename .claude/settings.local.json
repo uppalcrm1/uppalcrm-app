@@ -17,7 +17,11 @@
       "Bash(node create-test-task.js:*)",
       "Bash(node backfill-lead-events.js:*)",
       "Bash(node fix-activities-for-lead.js:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(lsof:*)",
+      "Bash(xargs kill -9)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)"
     ],
     "deny": [],
     "ask": []

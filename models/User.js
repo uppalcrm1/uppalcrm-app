@@ -286,7 +286,12 @@ class User {
 
       // Check if session exists and is not expired
       const sessionResult = await query(`
-        SELECT s.*, u.* FROM user_sessions s
+        SELECT
+          u.id, u.organization_id, u.email, u.first_name, u.last_name,
+          u.role, u.status, u.permissions, u.last_login, u.email_verified,
+          u.is_active, u.is_first_login, u.failed_login_attempts,
+          u.created_at, u.updated_at, u.deleted_at, u.created_by
+        FROM user_sessions s
         JOIN users u ON u.id = s.user_id
         WHERE s.token_hash = $1 AND s.expires_at > NOW() AND u.is_active = true
       `, [tokenHash]);
@@ -296,8 +301,24 @@ class User {
       }
 
       const userData = sessionResult.rows[0];
+
+      // Critical validation: Ensure user has valid UUID fields
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!userData.id || !userData.organization_id ||
+          typeof userData.id !== 'string' || typeof userData.organization_id !== 'string' ||
+          userData.id.trim() === '' || userData.organization_id.trim() === '' ||
+          !uuidRegex.test(userData.id) || !uuidRegex.test(userData.organization_id)) {
+        console.error('Invalid user data from database:', {
+          id: userData.id,
+          organization_id: userData.organization_id,
+          email: userData.email
+        });
+        return null;
+      }
+
       return new User(userData);
     } catch (error) {
+      console.error('Token verification error:', error.message);
       return null;
     }
   }

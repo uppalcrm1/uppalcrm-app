@@ -2074,36 +2074,8 @@ router.patch('/:leadId/tasks/:taskId/complete',
       const organizationId = req.organizationId;
       const userId = req.userId;
 
-      // Debug logging
-      console.log('Complete task debug:', {
-        leadId,
-        taskId,
-        organizationId,
-        userId,
-        userIdType: typeof userId,
-        orgIdType: typeof organizationId,
-        hasUser: !!req.user,
-        userKeys: req.user ? Object.keys(req.user) : null
-      });
-
-      // Validate required fields - check for empty strings and null/undefined
-      if (!userId || userId === '' || !organizationId || organizationId === '') {
-        console.error('Missing required fields:', { userId, organizationId });
-        return res.status(400).json({
-          error: 'Authentication data missing',
-          detail: 'User ID or Organization ID not found in request'
-        });
-      }
-
-      // Additional validation: ensure they are valid UUIDs
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      if (!uuidRegex.test(userId) || !uuidRegex.test(organizationId)) {
-        console.error('Invalid UUID format:', { userId, organizationId });
-        return res.status(400).json({
-          error: 'Invalid authentication data',
-          detail: 'User ID or Organization ID is not a valid UUID'
-        });
-      }
+      // Note: userId and organizationId are now guaranteed to be valid UUIDs by authenticateToken middleware
+      console.log('Completing task:', { leadId, taskId, userId: userId.substring(0, 8) + '...', orgId: organizationId.substring(0, 8) + '...' });
 
       // Verify lead belongs to organization
       const leadCheck = await db.query(

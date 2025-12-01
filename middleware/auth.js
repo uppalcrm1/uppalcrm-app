@@ -24,25 +24,40 @@ const authenticateToken = async (req, res, next) => {
     if (!user) {
       return res.status(401).json({
         error: 'Access denied',
-        message: 'Invalid or expired token'
+        message: 'Invalid or expired token. Please log in again.'
       });
     }
 
-    // Validate user has required fields
-    if (!user.id || !user.organization_id) {
-      console.error('User object missing required fields:', {
-        hasId: !!user.id,
-        hasOrgId: !!user.organization_id,
+    // Strict validation: Ensure user has required fields and they are not empty strings
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+    if (!user.id || typeof user.id !== 'string' || user.id.trim() === '' || !uuidRegex.test(user.id)) {
+      console.error('Invalid user ID in token:', {
         userId: user.id,
-        orgId: user.organization_id
+        userIdType: typeof user.id,
+        email: user.email
       });
       return res.status(401).json({
         error: 'Access denied',
-        message: 'Invalid user data in token'
+        message: 'Invalid user ID. Please log in again.'
       });
     }
 
-    // Set user and organization context
+    if (!user.organization_id || typeof user.organization_id !== 'string' ||
+        user.organization_id.trim() === '' || !uuidRegex.test(user.organization_id)) {
+      console.error('Invalid organization ID in token:', {
+        organizationId: user.organization_id,
+        orgIdType: typeof user.organization_id,
+        userId: user.id,
+        email: user.email
+      });
+      return res.status(401).json({
+        error: 'Access denied',
+        message: 'Invalid organization ID. Please log in again.'
+      });
+    }
+
+    // Set user and organization context (now guaranteed to be valid UUIDs)
     req.user = user;
     req.userId = user.id;
     req.organizationId = user.organization_id;
@@ -52,7 +67,7 @@ const authenticateToken = async (req, res, next) => {
     console.error('Authentication error:', error);
     res.status(401).json({
       error: 'Access denied',
-      message: 'Invalid token'
+      message: 'Authentication failed. Please log in again.'
     });
   }
 };
