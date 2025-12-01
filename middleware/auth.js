@@ -28,6 +28,20 @@ const authenticateToken = async (req, res, next) => {
       });
     }
 
+    // Validate user has required fields
+    if (!user.id || !user.organization_id) {
+      console.error('User object missing required fields:', {
+        hasId: !!user.id,
+        hasOrgId: !!user.organization_id,
+        userId: user.id,
+        orgId: user.organization_id
+      });
+      return res.status(401).json({
+        error: 'Access denied',
+        message: 'Invalid user data in token'
+      });
+    }
+
     // Set user and organization context
     req.user = user;
     req.userId = user.id;

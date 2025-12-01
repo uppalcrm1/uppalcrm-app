@@ -40,3 +40,46 @@ build/
 # Backup files
 *.bak
 *.backup
+
+# Diagnostic and test scripts (temporary)
+check-*.js
+test-*.js
+fix-*.js
+diagnose-*.js
+audit-*.js
+run-*.js
+verify-*.js
+apply-*.js
+create-*.js
+add-*.js
+backfill-*.js
+find-*.js
+query-*.js
+setup-*.js
+
+# Session documentation and status files (temporary)
+*_SUMMARY.md
+*_STATUS.md
+*_SUCCESS.md
+*_DIAGNOSTIC.md
+*_RESULTS.md
+*_UPDATE.md
+*_IMPLEMENTATION.md
+*_SUPPORT_UPDATE.md
+ADD_AZURE_TO_RENDER.md
+API_TEST_RESULTS.md
+AZURE_DIAGNOSTIC.md
+BACKEND_PRODUCT_SUPPORT_UPDATE.md
+CONTROLLER_IMPLEMENTATION_SUMMARY.md
+DEPLOYMENT_SUCCESS.md
+FIX_PRODUCTS_STAGING.md
+ORGANIZATION_MODEL_UPDATE_SUCCESS.md
+PRODUCTS_TAB_IMPLEMENTATION.md
+PRODUCT_FIELD_CUSTOMIZATION_IMPLEMENTATION.md
+RENDER_ENV_VARS_FINAL.md
+SESSION_SUMMARY_SUBSCRIPTION_MANAGEMENT.md
+STAGING_DEPLOYMENT_STATUS.md
+SUBSCRIPTION_MIGRATION_SUCCESS.md
+
+# Temporary agent files (keep only if needed)
+agentstwilio-integration.md

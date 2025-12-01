@@ -1,123 +1,116 @@
 /**
- * Run Interaction Events Migration
- * Creates interaction_events table and triggers for tracking task lifecycle
+ * Run migration 017a: Fix interaction events backfill
+ * This fixes the issue where activities don't show up in the timeline
  */
-
 const { Pool } = require('pg');
 const fs = require('fs');
+const path = require('path');
 require('dotenv').config();
 
-const DATABASE_URL = process.env.DATABASE_URL;
+async function runMigration() {
+  const databaseUrl = process.env.DATABASE_URL;
 
-if (!DATABASE_URL) {
-  console.error('❌ DATABASE_URL not found in .env');
-  console.error('Please set DATABASE_URL to your staging database connection string');
-  process.exit(1);
-}
+  if (!databaseUrl) {
+    console.error('❌ DATABASE_URL not set in .env file');
+    process.exit(1);
+  }
 
-console.log('🔧 RUNNING INTERACTION EVENTS MIGRATION');
-console.log('=====================================\n');
-console.log('Database:', DATABASE_URL.split('@')[1]?.split('?')[0] || 'hidden');
-console.log('');
-
-const pool = new Pool({
-  connectionString: DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
-});
-
-(async () => {
-  const client = await pool.connect();
+  const pool = new Pool({
+    connectionString: databaseUrl,
+    ssl: { rejectUnauthorized: false }
+  });
 
   try {
-    console.log('📖 Reading migration file...');
-    const sql = fs.readFileSync('./database/migrations/017_interaction_events.sql', 'utf8');
+    const client = await pool.connect();
 
-    console.log('🚀 Executing migration...\n');
+    console.log('\n🔧 Running Migration 017a: Fix Interaction Events Backfill\n');
+    console.log('This will:');
+    console.log('  1. Set organization_id on all interactions (from their lead)');
+    console.log('  2. Backfill missing "created" events');
+    console.log('  3. Backfill missing "completed" events\n');
 
-    // Execute the entire migration as one transaction
-    await client.query('BEGIN');
+    // Step 1: Check current state
+    console.log('📊 Current state:\n');
 
-    try {
-      await client.query(sql);
-      await client.query('COMMIT');
-      console.log('  ✅ Migration executed successfully');
-    } catch (err) {
-      await client.query('ROLLBACK');
-      throw err;
-    }
+    const interactionsCount = await client.query(
+      'SELECT COUNT(*) FROM lead_interactions'
+    );
+    console.log(`   Total interactions: ${interactionsCount.rows[0].count}`);
 
-    console.log('\n📊 Verifying migration...\n');
+    const interactionsWithoutOrg = await client.query(
+      'SELECT COUNT(*) FROM lead_interactions WHERE organization_id IS NULL'
+    );
+    console.log(`   Interactions without organization_id: ${interactionsWithoutOrg.rows[0].count}`);
 
-    // Verify table exists
-    const tableResult = await client.query(`
-      SELECT table_name FROM information_schema.tables
-      WHERE table_schema = 'public'
-      AND table_name = 'interaction_events'
-    `);
+    const eventsCount = await client.query(
+      'SELECT COUNT(DISTINCT interaction_id) FROM interaction_events'
+    );
+    console.log(`   Interactions with events: ${eventsCount.rows[0].count}`);
 
-    console.log('Table check:');
-    console.log(`  interaction_events: ${tableResult.rows.length > 0 ? '✅ EXISTS' : '❌ MISSING'}`);
+    const interactionsWithoutEvents = await client.query(
+      `SELECT COUNT(*) FROM lead_interactions li
+       WHERE NOT EXISTS (
+         SELECT 1 FROM interaction_events ie WHERE ie.interaction_id = li.id
+       )`
+    );
+    console.log(`   Interactions without events: ${interactionsWithoutEvents.rows[0].count}\n`);
 
-    // Verify triggers exist
-    const triggersResult = await client.query(`
-      SELECT trigger_name FROM information_schema.triggers
-      WHERE event_object_table = 'lead_interactions'
-      AND trigger_name IN ('trigger_create_interaction_event', 'trigger_track_interaction_updates')
-    `);
+    // Step 2: Run the migration
+    console.log('🚀 Running migration...\n');
 
-    console.log('\nTriggers check:');
-    const triggerNames = triggersResult.rows.map(r => r.trigger_name);
-    console.log(`  trigger_create_interaction_event:    ${triggerNames.includes('trigger_create_interaction_event') ? '✅ EXISTS' : '❌ MISSING'}`);
-    console.log(`  trigger_track_interaction_updates:   ${triggerNames.includes('trigger_track_interaction_updates') ? '✅ EXISTS' : '❌ MISSING'}`);
+    const migrationPath = path.join(__dirname, 'database', 'migrations', '017a_fix_interaction_events_backfill.sql');
+    const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
 
-    // Count backfilled events
-    const eventsResult = await client.query(`
-      SELECT COUNT(*) as count FROM interaction_events
-    `);
+    // Execute the migration
+    await client.query(migrationSQL);
 
-    console.log('\nBackfilled events:');
-    console.log(`  Total events created: ${eventsResult.rows[0].count}`);
+    console.log('✅ Migration executed successfully!\n');
 
-    // Show event type breakdown
-    const eventTypesResult = await client.query(`
-      SELECT event_type, COUNT(*) as count
-      FROM interaction_events
-      GROUP BY event_type
-      ORDER BY count DESC
-    `);
+    // Step 3: Verify results
+    console.log('📊 After migration:\n');
 
-    console.log('\nEvent type breakdown:');
-    eventTypesResult.rows.forEach(row => {
-      console.log(`  ${row.event_type.padEnd(20)}: ${row.count}`);
-    });
+    const newInteractionsWithoutOrg = await client.query(
+      'SELECT COUNT(*) FROM lead_interactions WHERE organization_id IS NULL'
+    );
+    console.log(`   Interactions without organization_id: ${newInteractionsWithoutOrg.rows[0].count}`);
 
-    console.log('\n=====================================');
+    const newEventsCount = await client.query(
+      'SELECT COUNT(DISTINCT interaction_id) FROM interaction_events'
+    );
+    console.log(`   Interactions with events: ${newEventsCount.rows[0].count}`);
 
-    if (tableResult.rows.length > 0 && triggerNames.length === 2) {
-      console.log('✅ MIGRATION SUCCESSFUL!');
-      console.log('=====================================\n');
-      console.log('Next steps:');
-      console.log('1. Restart the backend server to pick up changes');
-      console.log('2. Test creating a new task - should create "created" event');
-      console.log('3. Test completing a task - should create "completed" event');
-      console.log('4. Test reassigning a task - should create "reassigned" event');
-      console.log('5. Check the timeline displays separate entries\n');
+    const newInteractionsWithoutEvents = await client.query(
+      `SELECT COUNT(*) FROM lead_interactions li
+       WHERE NOT EXISTS (
+         SELECT 1 FROM interaction_events ie WHERE ie.interaction_id = li.id
+       )`
+    );
+    console.log(`   Interactions without events: ${newInteractionsWithoutEvents.rows[0].count}\n`);
+
+    // Step 4: Summary
+    const fixedOrg = parseInt(interactionsWithoutOrg.rows[0].count) - parseInt(newInteractionsWithoutOrg.rows[0].count);
+    const fixedEvents = parseInt(newEventsCount.rows[0].count) - parseInt(eventsCount.rows[0].count);
+
+    console.log('📈 Summary:\n');
+    console.log(`   ✅ Fixed organization_id for ${fixedOrg} interactions`);
+    console.log(`   ✅ Created events for ${fixedEvents} interactions\n`);
+
+    if (parseInt(newInteractionsWithoutEvents.rows[0].count) === 0) {
+      console.log('🎉 SUCCESS! All interactions now have events!');
+      console.log('   The Activities tab should now work correctly.\n');
     } else {
-      console.log('⚠️  MIGRATION INCOMPLETE');
-      console.log('=====================================\n');
-      console.log('Table or triggers may be missing.');
-      console.log('Check the errors above.\n');
+      console.log(`⚠️  Warning: ${newInteractionsWithoutEvents.rows[0].count} interactions still dont have events.`);
+      console.log('   This might be due to missing organization_id on their leads.\n');
     }
 
+    client.release();
   } catch (error) {
-    console.error('\n❌ MIGRATION FAILED');
-    console.error('=====================================');
-    console.error('Error:', error.message);
-    console.error('\nFull error:');
+    console.error('\n❌ Migration failed:', error.message);
     console.error(error);
     process.exit(1);
   } finally {
-    client.release();
     await pool.end();
   }
-})();
+}
+
+runMigration();

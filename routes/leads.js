@@ -2086,12 +2086,22 @@ router.patch('/:leadId/tasks/:taskId/complete',
         userKeys: req.user ? Object.keys(req.user) : null
       });
 
-      // Validate required fields
-      if (!userId || !organizationId) {
+      // Validate required fields - check for empty strings and null/undefined
+      if (!userId || userId === '' || !organizationId || organizationId === '') {
         console.error('Missing required fields:', { userId, organizationId });
         return res.status(400).json({
           error: 'Authentication data missing',
           detail: 'User ID or Organization ID not found in request'
+        });
+      }
+
+      // Additional validation: ensure they are valid UUIDs
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(userId) || !uuidRegex.test(organizationId)) {
+        console.error('Invalid UUID format:', { userId, organizationId });
+        return res.status(400).json({
+          error: 'Invalid authentication data',
+          detail: 'User ID or Organization ID is not a valid UUID'
         });
       }
 
