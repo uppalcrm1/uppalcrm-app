@@ -23,13 +23,18 @@ export const CallProvider = ({ children }) => {
 
   // Fetch call history
   const fetchCallHistory = useCallback(async () => {
+    // Don't fetch if not authenticated
+    if (!isAuthenticated) {
+      return
+    }
+
     try {
       const data = await twilioAPI.getCallHistory({ limit: 50 })
       setCallHistory(data.calls || [])
     } catch (error) {
       console.error('Error fetching call history:', error)
     }
-  }, [])
+  }, [isAuthenticated])
 
   // Poll for incoming calls (simple polling approach)
   useEffect(() => {
