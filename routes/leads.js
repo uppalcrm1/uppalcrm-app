@@ -505,7 +505,7 @@ router.get('/by-status', async (req, res) => {
   console.log('🔍 DEBUG: by-status endpoint hit');
   console.log('🔍 DEBUG: Query params:', req.query);
   console.log('🔍 DEBUG: Organization ID:', req.organizationId);
-  console.log('🔍 DEBUG: User ID:', req.userId);
+  console.log('🔍 DEBUG: User ID:', req.user.id);
 
   try {
     // Ensure value column is detected
@@ -835,7 +835,7 @@ router.post('/', validateLeadDynamic(false), async (req, res) => {
   try {
     console.log('🔍 Creating lead with data:', req.body);
     console.log('🔍 Organization ID:', req.organizationId);
-    console.log('🔍 User ID:', req.userId);
+    console.log('🔍 User ID:', req.user.id);
     console.log('🔍 Value column name:', valueColumnName);
 
     const {
@@ -847,7 +847,7 @@ router.post('/', validateLeadDynamic(false), async (req, res) => {
     // Note: firstName and lastName are now optional fields (no validation required)
 
     // Validate authentication context
-    if (!req.organizationId || !req.userId) {
+    if (!req.organizationId || !req.user.id) {
       return res.status(401).json({
         error: 'Authentication failed',
         message: 'Missing organization or user context'
@@ -882,7 +882,7 @@ router.post('/', validateLeadDynamic(false), async (req, res) => {
     `, [
       req.organizationId, firstName, lastName, email, phone, company, source,
       status || 'new', priority || 'medium', potentialValue, assignedTo, nextFollowUp, notes,
-      req.userId
+      req.user.id
     ]);
 
     const createdLead = result.rows[0];
@@ -892,7 +892,7 @@ router.post('/', validateLeadDynamic(false), async (req, res) => {
       try {
         console.log('📅 Creating follow-up task for next_follow_up date:', nextFollowUp);
         const leadName = `${firstName || ''} ${lastName || ''}`.trim() || company || 'this lead';
-        const taskUserId = assignedTo || req.userId; // Assign to lead owner or creator
+        const taskUserId = assignedTo || req.user.id; // Assign to lead owner or creator
 
         await db.query(`
           INSERT INTO lead_interactions (
@@ -909,7 +909,7 @@ router.post('/', validateLeadDynamic(false), async (req, res) => {
           nextFollowUp,
           'scheduled',
           'medium',
-          req.userId
+          req.user.id
         ]);
 
         console.log('✅ Follow-up task created successfully');
@@ -1030,7 +1030,7 @@ router.put('/:id',
             console.log('📅 Next follow-up date changed, creating new task...');
             const leadName = `${req.body.first_name || oldLead.first_name || ''} ${req.body.last_name || oldLead.last_name || ''}`.trim()
               || req.body.company || oldLead.company || 'this lead';
-            const taskUserId = req.body.assigned_to || oldLead.assigned_to || req.userId;
+            const taskUserId = req.body.assigned_to || oldLead.assigned_to || req.user.id;
 
             await db.query(`
               INSERT INTO lead_interactions (
@@ -1549,7 +1549,7 @@ router.post('/:id/convert',
     console.log('🔄 Lead conversion started');
     console.log('Lead ID:', req.params.id);
     console.log('Organization ID:', req.organizationId);
-    console.log('User ID:', req.userId);
+    console.log('User ID:', req.user.id);
     console.log('Request body:', req.body);
 
     const client = await db.pool.connect();
@@ -1565,7 +1565,7 @@ router.post('/:id/convert',
 
       await client.query(
         "SELECT set_config('app.current_user_id', $1, true)",
-        [req.userId]
+        [req.user.id]
       );
       console.log('✅ Session variables set');
 
@@ -1625,7 +1625,7 @@ router.post('/:id/convert',
             contact.id,
             req.body.relationshipType || 'existing_customer',
             req.body.interestType,
-            req.userId
+            req.user.id
           ]
         );
 
@@ -1666,7 +1666,7 @@ router.post('/:id/convert',
               lead.id,
               lead.source,      // Maps to contact_source (base column)
               lead.notes,
-              req.userId,
+              req.user.id,
               'customer',       // Maps to type (base column)
               'active'          // Maps to contact_status (base column)
             ]
@@ -1766,7 +1766,7 @@ router.post('/:id/convert',
             details.isTrial || false,
             details.isTrial ? 'trial' : 'active',
             'pending',
-            req.userId,
+            req.user.id,
             productId
           ]
         );
@@ -1806,7 +1806,7 @@ router.post('/:id/convert',
               txnDetails.amount,
               txnDetails.currency || 'USD',
               txnDetails.status || 'completed',
-              req.userId
+              req.user.id
             ]
           );
           console.log('✅ Transaction created successfully');
@@ -2009,7 +2009,7 @@ router.post('/:leadId/tasks',
         assigned_to
       } = req.body;
       const organizationId = req.organizationId;
-      const userId = req.userId;
+      const userId = req.user.id;
 
       // Verify lead belongs to organization
       const leadCheck = await db.query(
@@ -2187,7 +2187,7 @@ router.patch('/:leadId/tasks/:taskId',
         status
       } = req.body;
       const organizationId = req.organizationId;
-      const userId = req.userId;
+      const userId = req.user.id;
 
       // Verify lead belongs to organization
       const leadCheck = await db.query(
