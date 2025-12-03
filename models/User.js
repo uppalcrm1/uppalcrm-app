@@ -285,6 +285,7 @@ class User {
       const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
       // Check if session exists and is not expired
+      // IMPORTANT: Pass organizationId to enable RLS context for user_sessions table
       const sessionResult = await query(`
         SELECT
           u.id, u.organization_id, u.email, u.first_name, u.last_name,
@@ -294,7 +295,7 @@ class User {
         FROM user_sessions s
         JOIN users u ON u.id = s.user_id
         WHERE s.token_hash = $1 AND s.expires_at > NOW() AND u.is_active = true
-      `, [tokenHash]);
+      `, [tokenHash], decoded.organizationId);
 
       if (sessionResult.rows.length === 0) {
         return null;
