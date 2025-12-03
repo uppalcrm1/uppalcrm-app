@@ -101,10 +101,15 @@ api.interceptors.response.use(
         // or if we're already on the login page
         const isAuthCheckRequest = error.config?.url?.includes('/auth/me')
         const isOnLoginPage = window.location.pathname === '/login' || window.location.pathname === '/register'
+        const isTwilioCall = error.config?.url?.includes('/twilio')
 
-        clearAuth()
+        // Don't clear auth or show errors if on login page or for Twilio calls when not authenticated
+        if (!isOnLoginPage) {
+          clearAuth()
+        }
 
-        if (!isAuthCheckRequest && !isOnLoginPage) {
+        // Only show error and redirect if NOT on login page, NOT an auth check, and NOT a Twilio call on login page
+        if (!isAuthCheckRequest && !isOnLoginPage && !isTwilioCall) {
           window.location.href = '/login'
           toast.error('Session expired. Please log in again.')
         }
@@ -872,6 +877,17 @@ export const taskAPI = {
 
   // Mark task as completed
   completeTask: async (leadId, taskId, data = {}) => {
+    // Validate UUIDs before making request
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+    if (!leadId || typeof leadId !== 'string' || !uuidRegex.test(leadId)) {
+      throw new Error(`Invalid lead ID: ${leadId}`);
+    }
+
+    if (!taskId || typeof taskId !== 'string' || !uuidRegex.test(taskId)) {
+      throw new Error(`Invalid task ID: ${taskId}`);
+    }
+
     const response = await api.patch(`/leads/${leadId}/tasks/${taskId}/complete`, data)
     return response.data
   },

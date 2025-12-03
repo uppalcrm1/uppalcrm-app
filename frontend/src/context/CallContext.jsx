@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { twilioAPI } from '../services/api'
 import toast from 'react-hot-toast'
+import { useAuth } from '../contexts/AuthContext'
 
 const CallContext = createContext()
 
@@ -13,6 +14,8 @@ export const useCall = () => {
 }
 
 export const CallProvider = ({ children }) => {
+  const auth = useAuth();
+  const isAuthenticated = auth?.isAuthenticated || false;
   const [incomingCall, setIncomingCall] = useState(null)
   const [activeCall, setActiveCall] = useState(null)
   const [callHistory, setCallHistory] = useState([])
@@ -31,6 +34,7 @@ export const CallProvider = ({ children }) => {
   // Poll for incoming calls (simple polling approach)
   useEffect(() => {
     const checkForIncomingCalls = async () => {
+      if (!isAuthenticated) return
       const token = localStorage.getItem('authToken')
       if (!token) return
 
@@ -63,11 +67,14 @@ export const CallProvider = ({ children }) => {
       }
     }
 
+    // Only start polling if authenticated
+    if (!isAuthenticated) return;
+
     // Poll every 3 seconds
     const interval = setInterval(checkForIncomingCalls, 3000)
 
     return () => clearInterval(interval)
-  }, [incomingCall])
+  }, [incomingCall, isAuthenticated])
 
   // Play notification sound for incoming calls
   const playNotificationSound = () => {
@@ -190,10 +197,12 @@ export const CallProvider = ({ children }) => {
     setMissedCallCount(0)
   }
 
-  // Load call history on mount
+  // Load call history on mount (only if authenticated)
   useEffect(() => {
-    fetchCallHistory()
-  }, [fetchCallHistory])
+    if (isAuthenticated) {
+      fetchCallHistory()
+    }
+  }, [isAuthenticated, fetchCallHistory])
 
   const value = {
     incomingCall,

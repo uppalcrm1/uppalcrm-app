@@ -237,6 +237,11 @@ const TaskManager = ({ leadId }) => {
     onSuccess: () => {
       queryClient.invalidateQueries(['tasks', leadId]);
       queryClient.invalidateQueries(['leads']);
+    },
+    onError: (error) => {
+      console.error('Error completing task:', error);
+      const errorMessage = error.response?.data?.detail || error.message || 'Failed to complete task';
+      alert(`Error: ${errorMessage}\n\nPlease refresh the page and try again.`);
     }
   });
 
@@ -249,6 +254,20 @@ const TaskManager = ({ leadId }) => {
   });
 
   const handleComplete = (task) => {
+    // Validate task ID before attempting to complete
+    if (!task || !task.id) {
+      console.error('Invalid task: missing ID', task);
+      alert('Error: Invalid task ID. Please refresh the page and try again.');
+      return;
+    }
+
+    // Validate leadId prop
+    if (!leadId) {
+      console.error('Invalid leadId prop', leadId);
+      alert('Error: Invalid lead ID. Please refresh the page and try again.');
+      return;
+    }
+
     if (window.confirm(`Mark "${task.subject}" as completed?`)) {
       completeMutation.mutate({ taskId: task.id });
     }

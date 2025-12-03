@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { twilioAPI } from '../services/api';
 import { ToastContainer } from '../components/ToastNotification';
+import { useAuth } from '../contexts/AuthContext';
 
 const NotificationContext = createContext();
 
@@ -10,6 +11,8 @@ export function useNotifications() {
 }
 
 export function NotificationProvider({ children }) {
+  const auth = useAuth();
+  const isAuthenticated = auth?.isAuthenticated || false;
   const [toasts, setToasts] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [browserPermission, setBrowserPermission] = useState('default');
@@ -32,12 +35,13 @@ export function NotificationProvider({ children }) {
     return 'denied';
   }, []);
 
-  // Poll for new messages
+  // Poll for new messages (only if authenticated)
   const { data: conversationsData } = useQuery({
     queryKey: ['notifications-check'],
     queryFn: twilioAPI.getConversations,
     refetchInterval: 15000, // Check every 15 seconds
-    staleTime: 10000
+    staleTime: 10000,
+    enabled: isAuthenticated // Only run when authenticated
   });
 
   // Check for new messages and trigger notifications
