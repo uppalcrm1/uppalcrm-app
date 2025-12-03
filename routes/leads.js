@@ -2072,7 +2072,7 @@ router.patch('/:leadId/tasks/:taskId/complete',
       const { leadId, taskId } = req.params;
       const { outcome = null, notes = null } = req.body || {};
       const organizationId = req.organizationId;
-      const userId = req.userId;
+      const userId = req.user?.id;
 
       // Validate UUID parameters
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -2091,7 +2091,21 @@ router.patch('/:leadId/tasks/:taskId/complete',
         });
       }
 
-      // Note: userId and organizationId are now guaranteed to be valid UUIDs by authenticateToken middleware
+      // Validate organizationId and userId
+      if (!organizationId || typeof organizationId !== 'string' || !uuidRegex.test(organizationId)) {
+        return res.status(400).json({
+          error: 'Invalid organization ID',
+          detail: 'Organization context missing or invalid: ' + organizationId
+        });
+      }
+
+      if (!userId || typeof userId !== 'string' || !uuidRegex.test(userId)) {
+        return res.status(400).json({
+          error: 'Invalid user ID',
+          detail: 'User context missing or invalid: ' + userId
+        });
+      }
+
       console.log('Completing task:', { leadId, taskId, userId: userId.substring(0, 8) + '...', orgId: organizationId.substring(0, 8) + '...' });
 
       // Verify lead belongs to organization
