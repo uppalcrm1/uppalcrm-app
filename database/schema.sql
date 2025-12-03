@@ -86,7 +86,8 @@ CREATE POLICY user_isolation ON users
 CREATE POLICY session_isolation ON user_sessions
     FOR ALL
     TO PUBLIC
-    USING (organization_id = current_setting('app.current_organization_id')::uuid);
+    USING (organization_id = current_setting('app.current_organization_id')::uuid)
+    WITH CHECK (organization_id = current_setting('app.current_organization_id')::uuid);
 
 -- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
