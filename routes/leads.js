@@ -2067,6 +2067,7 @@ router.post('/:leadId/tasks',
  */
 router.patch('/:leadId/tasks/:taskId/complete',
   authenticateToken,
+  validateOrganizationContext,
   async (req, res) => {
     try {
       const { leadId, taskId } = req.params;
