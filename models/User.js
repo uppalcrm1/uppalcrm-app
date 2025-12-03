@@ -250,22 +250,35 @@ class User {
       issuer: 'uppal-crm'
     });
 
+    console.log('[generateToken] Token created for user:', {
+      userId: this.id,
+      email: this.email,
+      organizationId: this.organization_id
+    });
+
     // Store session in database
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + 24);
 
-    await query(`
-      INSERT INTO user_sessions (user_id, organization_id, token_hash, expires_at, ip_address, user_agent)
-      VALUES ($1, $2, $3, $4, $5, $6)
-    `, [
-      this.id,
-      this.organization_id,
-      tokenHash,
-      expiresAt,
-      ipAddress,
-      userAgent
-    ], this.organization_id);
+    try {
+      await query(`
+        INSERT INTO user_sessions (user_id, organization_id, token_hash, expires_at, ip_address, user_agent)
+        VALUES ($1, $2, $3, $4, $5, $6)
+      `, [
+        this.id,
+        this.organization_id,
+        tokenHash,
+        expiresAt,
+        ipAddress,
+        userAgent
+      ], this.organization_id);
+
+      console.log('[generateToken] Session stored successfully');
+    } catch (error) {
+      console.error('[generateToken] Error storing session:', error.message);
+      throw error;
+    }
 
     return {
       token,
@@ -284,6 +297,12 @@ class User {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
+      console.log('[verifyToken] Decoded token:', {
+        userId: decoded.userId,
+        organizationId: decoded.organizationId,
+        email: decoded.email
+      });
+
       // Check if session exists and is not expired
       // IMPORTANT: Pass organizationId to enable RLS context for user_sessions table
       const sessionResult = await query(`
@@ -297,7 +316,10 @@ class User {
         WHERE s.token_hash = $1 AND s.expires_at > NOW() AND u.is_active = true
       `, [tokenHash], decoded.organizationId);
 
+      console.log('[verifyToken] Session query result rows:', sessionResult.rows.length);
+
       if (sessionResult.rows.length === 0) {
+        console.log('[verifyToken] No session found for token hash');
         return null;
       }
 
