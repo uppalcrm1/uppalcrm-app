@@ -23,7 +23,8 @@
       "Bash(netstat:*)",
       "Bash(findstr:*)",
       "Bash(npm run logs:*)",
-      "Bash(npm run logs:staging:*)"
+      "Bash(npm run logs:staging:*)",
+      "Bash(npm start)"
     ],
     "deny": [],
     "ask": []
