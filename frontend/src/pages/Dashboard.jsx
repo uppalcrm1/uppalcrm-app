@@ -1,45 +1,53 @@
 import React from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { 
-  Users, 
-  UserPlus, 
-  TrendingUp, 
-  DollarSign, 
+import {
+  Users,
+  UserPlus,
+  TrendingUp,
+  DollarSign,
   Calendar,
   AlertCircle,
   ArrowRight,
   Activity
 } from 'lucide-react'
 import { leadsAPI, contactsAPI, organizationsAPI } from '../services/api'
+import { useAuth } from '../contexts/AuthContext'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 
 const Dashboard = () => {
-  // Fetch dashboard data
+  const { isAuthenticated } = useAuth()
+
+  // Fetch dashboard data - only when authenticated
   const { data: leadStats, isLoading: leadsLoading } = useQuery({
     queryKey: ['leadStats'],
-    queryFn: leadsAPI.getStats
+    queryFn: leadsAPI.getStats,
+    enabled: isAuthenticated
   })
 
   const { data: contactStats, isLoading: contactsLoading } = useQuery({
     queryKey: ['contactStats'],
-    queryFn: contactsAPI.getStats
+    queryFn: contactsAPI.getStats,
+    enabled: isAuthenticated
   })
 
   const { data: orgStats, isLoading: orgLoading } = useQuery({
     queryKey: ['organizationStats'],
-    queryFn: organizationsAPI.getStats
+    queryFn: organizationsAPI.getStats,
+    enabled: isAuthenticated
   })
 
   const { data: recentLeads, isLoading: recentLeadsLoading } = useQuery({
     queryKey: ['recentLeads'],
-    queryFn: () => leadsAPI.getLeads({ limit: 5, sort: 'created_at', order: 'desc' })
+    queryFn: () => leadsAPI.getLeads({ limit: 5, sort: 'created_at', order: 'desc' }),
+    enabled: isAuthenticated
   })
 
   const { data: recentContacts, isLoading: recentContactsLoading } = useQuery({
     queryKey: ['recentContacts'],
-    queryFn: () => contactsAPI.getContacts({ limit: 5, sort: 'created_at', order: 'desc' })
+    queryFn: () => contactsAPI.getContacts({ limit: 5, sort: 'created_at', order: 'desc' }),
+    enabled: isAuthenticated
   })
 
   const isLoading = leadsLoading || contactsLoading || orgLoading || recentLeadsLoading || recentContactsLoading
