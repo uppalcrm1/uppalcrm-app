@@ -289,6 +289,79 @@ export const leadsAPI = {
   convertLead: async (leadId, conversionData) => {
     const response = await api.post(`/leads/${leadId}/convert`, conversionData)
     return response.data
+  },
+
+  /**
+   * Get all tasks for a specific lead with optional filtering
+   * @param {string} leadId - The lead UUID
+   * @param {Object} filters - Optional query parameters
+   * @param {string} filters.status - Filter by task status (scheduled, completed, cancelled)
+   * @param {string} filters.priority - Filter by priority (low, medium, high)
+   * @param {string} filters.date_range - Filter by date range ('today', 'week', 'month')
+   * @param {string} filters.overdue - Show only overdue tasks ('true')
+   * @returns {Promise<{tasks: Array, stats: Object}>} Tasks array with statistics
+   */
+  getTasks: async (leadId, filters = {}) => {
+    const response = await api.get(`/leads/${leadId}/tasks`, { params: filters })
+    return response.data
+  },
+
+  /**
+   * Create a new task for a lead
+   * @param {string} leadId - The lead UUID
+   * @param {Object} taskData - Task data
+   * @param {string} taskData.subject - Task subject (required)
+   * @param {string} [taskData.description] - Task description (optional)
+   * @param {string} [taskData.scheduled_at] - ISO date when task is scheduled (optional)
+   * @param {string} [taskData.priority='medium'] - Task priority: 'low', 'medium', 'high' (default: 'medium')
+   * @param {string} [taskData.assigned_to] - UUID of user to assign task to (optional)
+   * @returns {Promise<{message: string, task: Object}>} Created task object
+   */
+  createTask: async (leadId, taskData) => {
+    const response = await api.post(`/leads/${leadId}/tasks`, taskData)
+    return response.data
+  },
+
+  /**
+   * Mark a task as completed with optional outcome and notes
+   * @param {string} leadId - The lead UUID
+   * @param {string} taskId - The task UUID
+   * @param {Object} [completionData={}] - Optional completion data
+   * @param {string} [completionData.outcome] - Task outcome (optional)
+   * @param {string} [completionData.notes] - Completion notes (optional)
+   * @returns {Promise<{message: string, task: Object}>} Updated task object with completed status
+   */
+  completeTask: async (leadId, taskId, completionData = {}) => {
+    const response = await api.patch(`/leads/${leadId}/tasks/${taskId}/complete`, completionData)
+    return response.data
+  },
+
+  /**
+   * Update task details
+   * @param {string} leadId - The lead UUID
+   * @param {string} taskId - The task UUID
+   * @param {Object} updateData - Fields to update (all optional)
+   * @param {string} [updateData.subject] - Updated subject
+   * @param {string} [updateData.description] - Updated description
+   * @param {string} [updateData.scheduled_at] - Updated scheduled date (ISO format)
+   * @param {string} [updateData.priority] - Updated priority: 'low', 'medium', 'high'
+   * @param {string} [updateData.status] - Updated status: 'scheduled', 'completed', 'cancelled'
+   * @returns {Promise<{message: string, task: Object}>} Updated task object
+   */
+  updateTask: async (leadId, taskId, updateData) => {
+    const response = await api.patch(`/leads/${leadId}/tasks/${taskId}`, updateData)
+    return response.data
+  },
+
+  /**
+   * Delete a task
+   * @param {string} leadId - The lead UUID
+   * @param {string} taskId - The task UUID
+   * @returns {Promise<{message: string}>} Success message
+   */
+  deleteTask: async (leadId, taskId) => {
+    const response = await api.delete(`/leads/${leadId}/tasks/${taskId}`)
+    return response.data
   }
 }
 

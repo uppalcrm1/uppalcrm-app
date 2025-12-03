@@ -1127,7 +1127,7 @@ router.delete('/:id',
   async (req, res) => {
     try {
       const success = await Lead.delete(req.params.id, req.organizationId);
-      
+
       if (!success) {
         return res.status(404).json({
           error: 'Lead not found',
