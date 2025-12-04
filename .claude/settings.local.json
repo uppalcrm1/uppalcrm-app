@@ -24,7 +24,14 @@
       "Bash(findstr:*)",
       "Bash(npm run logs:*)",
       "Bash(npm run logs:staging:*)",
-      "Bash(npm start)"
+      "Bash(npm start)",
+      "Bash(if [ -f .env.staging ])",
+      "Bash(then cat .env.staging)",
+      "Bash(elif [ -f .env ])",
+      "Bash(then cat .env)",
+      "Bash(else echo \"No .env file found\")",
+      "Bash(fi)",
+      "Bash(psql:*)"
     ],
     "deny": [],
     "ask": []

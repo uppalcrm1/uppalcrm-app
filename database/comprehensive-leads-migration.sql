@@ -101,25 +101,29 @@ CREATE TABLE IF NOT EXISTS lead_interactions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     lead_id UUID NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES users(id),
-    
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+
     -- Interaction Details
     interaction_type VARCHAR(50) NOT NULL, -- call, email, meeting, note, task
     subject VARCHAR(255),
     description TEXT,
     outcome VARCHAR(100), -- successful, no_answer, callback_requested, etc.
-    
+
     -- Scheduling
     scheduled_at TIMESTAMP WITH TIME ZONE,
     completed_at TIMESTAMP WITH TIME ZONE,
     duration_minutes INTEGER,
-    
+
     -- Status
     status VARCHAR(50) DEFAULT 'completed', -- scheduled, completed, cancelled
-    
+
     -- Metadata
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Indexes for lead_interactions
+CREATE INDEX IF NOT EXISTS idx_lead_interactions_organization_id ON lead_interactions(organization_id);
 
 -- Lead Scoring Rules table
 CREATE TABLE IF NOT EXISTS lead_scoring_rules (

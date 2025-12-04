@@ -19,7 +19,8 @@ import {
   MoreVertical,
   Plus,
   User,
-  FileText
+  FileText,
+  CheckSquare
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import api from '../services/api'
@@ -31,6 +32,7 @@ import LeadHistoryPanel from '../components/Lead/LeadHistoryPanel'
 import DuplicateAlert from '../components/Lead/DuplicateAlert'
 import DynamicLeadForm from '../components/DynamicLeadForm'
 import LeadConversionModal from '../components/LeadConversionModal'
+import TaskManager from '../components/TaskManager'
 
 const LeadDetail = () => {
   const { id } = useParams()
@@ -203,6 +205,7 @@ const LeadDetail = () => {
   const tabs = [
     { id: 'details', label: 'Details', icon: Building2 },
     { id: 'activities', label: 'Activities', icon: Clock },
+    { id: 'tasks', label: 'Tasks', icon: CheckSquare },
     { id: 'history', label: 'History', icon: Calendar }
   ]
 
@@ -366,6 +369,16 @@ const LeadDetail = () => {
                   </button>
                 </div>
                 <LeadActivityTimeline leadId={id} refreshKey={refreshKey} />
+              </div>
+            )}
+
+            {activeTab === 'tasks' && (
+              <div>
+                <h2 className="text-lg font-semibold mb-6">Tasks & Follow-ups</h2>
+                <TaskManager
+                  leadId={id}
+                  refreshKey={refreshKey}
+                />
               </div>
             )}
 

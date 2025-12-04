@@ -118,8 +118,9 @@ const LeadsPage = () => {
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => leadsAPI.updateLead(id, data),
-    onSuccess: () => {
+    onSuccess: (response, variables) => {
       queryClient.invalidateQueries(['leads'])
+      queryClient.invalidateQueries(['tasks', variables.id])
       toast.success('Lead updated successfully')
       setShowEditModal(false)
       setSelectedLead(null)
