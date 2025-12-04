@@ -362,6 +362,31 @@ export const leadsAPI = {
   deleteTask: async (leadId, taskId) => {
     const response = await api.delete(`/leads/${leadId}/tasks/${taskId}`)
     return response.data
+  },
+
+  /**
+   * Get all tasks across the organization with optional filtering and sorting
+   * @param {Object} filters - Optional query parameters
+   * @param {string} [filters.status] - Filter by task status (scheduled, completed, cancelled, pending, overdue)
+   * @param {string} [filters.assigned_to] - Filter by assigned user UUID
+   * @param {string} [filters.lead_owner] - Filter by lead owner UUID
+   * @param {string} [filters.priority] - Filter by priority (low, medium, high)
+   * @param {string} [filters.sort_by] - Sort field (scheduled_at, priority, created_at)
+   * @param {string} [filters.sort_order] - Sort order (asc, desc)
+   * @returns {Promise<{tasks: Array, stats: Object}>} All tasks with statistics
+   */
+  getAllTasks: async (filters = {}) => {
+    const response = await api.get('/api/tasks', { params: filters })
+    return response.data
+  },
+
+  /**
+   * Get all users in the organization for assignment dropdowns
+   * @returns {Promise<{users: Array}>} List of users with id, first_name, last_name, email
+   */
+  getOrganizationUsers: async () => {
+    const response = await api.get('/api/users')
+    return response.data
   }
 }
 
@@ -986,6 +1011,12 @@ export const taskAPI = {
   // Get upcoming tasks across all leads
   getUpcomingTasks: async (days = 7) => {
     const response = await api.get('/leads/tasks/upcoming', { params: { days } })
+    return response.data
+  },
+
+  // Get all tasks across organization with filters
+  getAllTasks: async (params = {}) => {
+    const response = await api.get('/tasks/all', { params })
     return response.data
   }
 }

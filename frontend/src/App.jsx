@@ -8,6 +8,7 @@ import RegisterPage from './pages/RegisterPage'
 import DashboardLayout from './components/DashboardLayout'
 import Dashboard from './pages/Dashboard'
 import Leads from './pages/Leads'
+import TasksDashboard from './pages/TasksDashboard'
 import Contacts from './pages/Contacts'
 import SettingsPage from './pages/SettingsPage'
 import ZapierIntegrationPage from './pages/settings/ZapierIntegrationPage'
@@ -107,6 +108,7 @@ function App() {
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="leads" element={<Leads />} />
         <Route path="leads/:id" element={<LeadDetail />} />
+        <Route path="tasks" element={<TasksDashboard />} />
         <Route path="contacts" element={<ContactsPage />} />
         <Route path="settings/*" element={<SettingsPage />} />
         <Route path="integrations/zapier" element={<ZapierIntegrationPage />} />

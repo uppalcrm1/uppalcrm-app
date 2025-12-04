@@ -23,6 +23,7 @@ import {
   Sliders,
   Package,
   MessageSquare,
+  CheckSquare,
 } from 'lucide-react'
 import LoadingSpinner from './LoadingSpinner'
 import IncomingCallNotification from './IncomingCallNotification'
@@ -31,6 +32,7 @@ import IncomingCallNotification from './IncomingCallNotification'
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Leads', href: '/leads', icon: Users },
+  { name: 'Tasks', href: '/tasks', icon: CheckSquare },
   { name: 'Contacts', href: '/contacts', icon: UserCircle2 },
   { name: 'Accounts', href: '/accounts', icon: Building2 },
   { name: 'Transactions', href: '/transactions', icon: DollarSign },

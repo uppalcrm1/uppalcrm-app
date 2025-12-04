@@ -18,6 +18,7 @@ const userRoutes = require('./routes/users');
 const organizationRoutes = require('./routes/organizations');
 const leadRoutes = require('./routes/leads');
 const leadInteractionsRoutes = require('./routes/leadInteractions');
+const tasksRoutes = require('./routes/tasks');
 const contactRoutes = require('./routes/contacts');
 const trialRoutes = require('./routes/trials');
 const superAdminRoutes = require('./routes/super-admin');
@@ -184,6 +185,7 @@ app.use('/api/user-management', rateLimiters.general, require('./routes/user-man
 app.use('/api/organizations', rateLimiters.general, organizationRoutes);
 app.use('/api/leads', rateLimiters.general, leadRoutes);
 app.use('/api/leads', rateLimiters.general, leadInteractionsRoutes);
+app.use('/api/tasks', rateLimiters.general, tasksRoutes);
 app.use('/api/contacts', rateLimiters.general, contactRoutes);
 app.use('/api/trials', rateLimiters.general, trialRoutes);
 app.use('/api/super-admin', rateLimiters.general, superAdminRoutes);
