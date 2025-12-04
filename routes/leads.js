@@ -2107,6 +2107,17 @@ router.patch('/:leadId/tasks/:taskId/complete',
         });
       }
 
+      console.log('=== ABOUT TO EXECUTE QUERIES ===');
+      console.log('Parameters:', {
+        leadId,
+        taskId,
+        organizationId,
+        userId,
+        outcome: req.body?.outcome || null,
+        notes: req.body?.notes || null
+      });
+      console.log('All UUIDs valid? ', leadId && taskId && organizationId && userId);
+
       console.log('Completing task:', { leadId, taskId, userId: userId.substring(0, 8) + '...', orgId: organizationId.substring(0, 8) + '...' });
 
       // Verify lead belongs to organization
@@ -2120,7 +2131,10 @@ router.patch('/:leadId/tasks/:taskId/complete',
       }
 
       // Set current user for trigger
-      await db.query(`SELECT set_config('app.current_user_id', $1, true)`, [userId]);
+      await db.query(
+        "SELECT set_config('app.current_user_id', $1, true)",
+        [userId]
+      );
 
       // Update task to completed
       const query = `
