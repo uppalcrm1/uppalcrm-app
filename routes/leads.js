@@ -2130,18 +2130,13 @@ router.patch('/:leadId/tasks/:taskId/complete',
         return res.status(404).json({ error: 'Lead not found' });
       }
 
-      // Set current user for trigger
-      await db.query(
-        "SELECT set_config('app.current_user_id', $1, true)",
-        [userId]
-      );
-
       // Update task to completed
       const query = `
         UPDATE lead_interactions
         SET
           status = 'completed',
           completed_at = NOW(),
+          last_modified_by = $6,
           outcome = COALESCE($1::text, outcome),
           description = CASE
             WHEN $2::text IS NOT NULL THEN description || E'\n\nCompletion Notes: ' || $2::text
@@ -2152,7 +2147,7 @@ router.patch('/:leadId/tasks/:taskId/complete',
         RETURNING *
       `;
 
-      const result = await db.query(query, [outcome, notes, taskId, leadId, organizationId]);
+      const result = await db.query(query, [outcome, notes, taskId, leadId, organizationId, userId]);
 
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Task not found' });
@@ -2213,9 +2208,7 @@ router.patch('/:leadId/tasks/:taskId',
         return res.status(404).json({ error: 'Lead not found' });
       }
 
-      // Set current user for trigger
-      await db.query(`SELECT set_config('app.current_user_id', $1, true)`, [userId]);
-
+      // Update task with last_modified_by tracking
       const query = `
         UPDATE lead_interactions
         SET
@@ -2224,6 +2217,7 @@ router.patch('/:leadId/tasks/:taskId',
           scheduled_at = COALESCE($3, scheduled_at),
           priority = COALESCE($4, priority),
           status = COALESCE($5, status),
+          last_modified_by = $9,
           updated_at = NOW()
         WHERE id = $6 AND lead_id = $7 AND interaction_type = 'task' AND organization_id = $8
         RETURNING *
@@ -2237,7 +2231,8 @@ router.patch('/:leadId/tasks/:taskId',
         status,
         taskId,
         leadId,
-        organizationId
+        organizationId,
+        userId
       ]);
 
       if (result.rows.length === 0) {
