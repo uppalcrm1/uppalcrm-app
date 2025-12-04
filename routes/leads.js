@@ -2364,6 +2364,137 @@ router.post('/:leadId/tasks/bulk-complete',
 );
 
 /**
+ * GET /tasks
+ * Get all tasks across the organization with filtering and sorting
+ */
+router.get('/tasks',
+  authenticateToken,
+  validateOrganizationContext,
+  async (req, res) => {
+    try {
+      const {
+        assigned_to,
+        lead_owner,
+        status = 'scheduled,pending',
+        sort_by = 'scheduled_at',
+        sort_order = 'ASC',
+        limit = 50,
+        offset = 0
+      } = req.query;
+
+      const organizationId = req.organizationId;
+
+      // Build WHERE clause
+      let whereConditions = [
+        'li.organization_id = $1',
+        "li.interaction_type = 'task'"
+      ];
+      let params = [organizationId];
+      let paramCount = 1;
+
+      // Filter by status
+      if (status) {
+        const statuses = status.split(',').map(s => s.trim());
+        const statusPlaceholders = statuses.map((_, i) => `$${paramCount + i + 1}`).join(',');
+        whereConditions.push(`li.status IN (${statusPlaceholders})`);
+        params.push(...statuses);
+        paramCount += statuses.length;
+      }
+
+      // Filter by assigned user
+      if (assigned_to) {
+        whereConditions.push(`li.user_id = $${++paramCount}`);
+        params.push(assigned_to);
+      }
+
+      // Filter by lead owner
+      if (lead_owner) {
+        whereConditions.push(`l.assigned_to = $${++paramCount}`);
+        params.push(lead_owner);
+      }
+
+      // Build ORDER BY
+      let orderBy = 'li.scheduled_at ASC';
+      if (sort_by === 'priority') {
+        orderBy = `CASE WHEN li.priority = 'high' THEN 1 WHEN li.priority = 'medium' THEN 2 ELSE 3 END ${sort_order}`;
+      } else if (sort_by === 'created_at') {
+        orderBy = `li.created_at ${sort_order}`;
+      } else {
+        orderBy = `li.scheduled_at ${sort_order}`;
+      }
+
+      const whereClause = whereConditions.join(' AND ');
+
+      // Get total count and statistics
+      const countQuery = `
+        SELECT COUNT(*) as total,
+               COUNT(CASE WHEN li.status IN ('scheduled', 'pending') THEN 1 END) as pending,
+               COUNT(CASE WHEN li.status = 'completed' THEN 1 END) as completed,
+               COUNT(CASE WHEN li.scheduled_at < NOW() AND li.status NOT IN ('completed', 'cancelled') THEN 1 END) as overdue
+        FROM lead_interactions li
+        JOIN leads l ON li.lead_id = l.id
+        WHERE ${whereClause}
+      `;
+
+      const countResult = await db.query(countQuery, params);
+      const stats = countResult.rows[0];
+
+      // Get tasks with pagination
+      const tasksQuery = `
+        SELECT
+          li.id,
+          li.lead_id,
+          li.subject,
+          li.description,
+          li.status,
+          li.priority,
+          li.scheduled_at,
+          li.completed_at,
+          li.created_at,
+          l.first_name || ' ' || l.last_name as lead_name,
+          l.id as lead_id,
+          u.first_name || ' ' || u.last_name as assigned_to_name,
+          li.user_id as assigned_to,
+          owner.first_name || ' ' || owner.last_name as lead_owner_name,
+          l.assigned_to as lead_owner_id
+        FROM lead_interactions li
+        JOIN leads l ON li.lead_id = l.id
+        LEFT JOIN users u ON li.user_id = u.id
+        LEFT JOIN users owner ON l.assigned_to = owner.id
+        WHERE ${whereClause}
+        ORDER BY ${orderBy}
+        LIMIT $${++paramCount} OFFSET $${++paramCount}
+      `;
+
+      params.push(parseInt(limit), parseInt(offset));
+
+      const tasksResult = await db.query(tasksQuery, params);
+
+      res.json({
+        tasks: tasksResult.rows,
+        stats: {
+          total: parseInt(stats.total) || 0,
+          pending: parseInt(stats.pending) || 0,
+          completed: parseInt(stats.completed) || 0,
+          overdue: parseInt(stats.overdue) || 0
+        },
+        pagination: {
+          limit: parseInt(limit),
+          offset: parseInt(offset),
+          total: parseInt(stats.total) || 0
+        }
+      });
+    } catch (error) {
+      console.error('Get tasks error:', error);
+      res.status(500).json({
+        error: 'Failed to retrieve tasks',
+        message: error.message
+      });
+    }
+  }
+);
+
+/**
  * GET /tasks/overdue
  * Get all overdue tasks across all leads for the organization
  */

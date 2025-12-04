@@ -376,7 +376,7 @@ export const leadsAPI = {
    * @returns {Promise<{tasks: Array, stats: Object}>} All tasks with statistics
    */
   getAllTasks: async (filters = {}) => {
-    const response = await api.get('/api/tasks', { params: filters })
+    const response = await api.get('/leads/tasks', { params: filters })
     return response.data
   },
 
