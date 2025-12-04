@@ -17,7 +17,7 @@ import {
 import api from '../../services/api'
 import LoadingSpinner from '../LoadingSpinner'
 
-const LeadActivityTimeline = ({ leadId }) => {
+const LeadActivityTimeline = ({ leadId, refreshKey }) => {
   const [activities, setActivities] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -31,7 +31,7 @@ const LeadActivityTimeline = ({ leadId }) => {
 
   useEffect(() => {
     fetchActivities(1, true)
-  }, [leadId, filters])
+  }, [leadId, filters, refreshKey])
 
   const fetchActivities = async (pageNum = 1, reset = false) => {
     try {

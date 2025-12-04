@@ -365,7 +365,7 @@ const LeadDetail = () => {
                     Add Activity
                   </button>
                 </div>
-                <LeadActivityTimeline leadId={id} />
+                <LeadActivityTimeline leadId={id} refreshKey={refreshKey} />
               </div>
             )}
 
