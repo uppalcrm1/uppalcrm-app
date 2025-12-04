@@ -840,9 +840,12 @@ router.post('/', validateLeadDynamic(false), async (req, res) => {
 
     const {
       firstName, lastName, email, phone, company, source,
-      status, priority, potentialValue, assignedTo, nextFollowUp, notes,
+      status, priority, potentialValue, assignedTo, nextFollowUp, next_follow_up, notes,
       customFields = {} // Accept custom fields
     } = req.body;
+
+    // Handle both camelCase and snake_case for follow-up date
+    const followUpDate = nextFollowUp || next_follow_up;
 
     // Note: firstName and lastName are now optional fields (no validation required)
 
@@ -881,16 +884,16 @@ router.post('/', validateLeadDynamic(false), async (req, res) => {
                 priority, ${valueColumnName}, assigned_to, next_follow_up, notes, created_at
     `, [
       req.organizationId, firstName, lastName, email, phone, company, source,
-      status || 'new', priority || 'medium', potentialValue, assignedTo, nextFollowUp, notes,
+      status || 'new', priority || 'medium', potentialValue, assignedTo, followUpDate, notes,
       req.user.id
     ]);
 
     const createdLead = result.rows[0];
 
     // Auto-create follow-up task if next_follow_up is set
-    if (nextFollowUp) {
+    if (followUpDate) {
       try {
-        console.log('📅 Creating follow-up task for next_follow_up date:', nextFollowUp);
+        console.log('📅 Creating follow-up task for next_follow_up date:', followUpDate);
         const leadName = `${firstName || ''} ${lastName || ''}`.trim() || company || 'this lead';
         const taskUserId = assignedTo || req.user.id; // Assign to lead owner or creator
 
@@ -906,7 +909,7 @@ router.post('/', validateLeadDynamic(false), async (req, res) => {
           'task',
           `Follow up with ${leadName}`,
           'Follow up with lead',
-          nextFollowUp,
+          followUpDate,
           'scheduled',
           'medium',
           req.user.id
