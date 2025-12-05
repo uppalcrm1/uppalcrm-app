@@ -385,7 +385,7 @@ export const leadsAPI = {
    * @returns {Promise<{users: Array}>} List of users with id, first_name, last_name, email
    */
   getOrganizationUsers: async () => {
-    const response = await api.get('/api/users')
+    const response = await api.get('/users')
     return response.data
   }
 }
