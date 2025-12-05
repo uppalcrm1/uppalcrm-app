@@ -160,7 +160,7 @@ const schemas = {
       search: Joi.string().min(1).max(100).optional(),
       sort: Joi.string().valid('created_at', 'updated_at', 'email', 'first_name', 'last_name').default('created_at'),
       order: Joi.string().valid('asc', 'desc').default('desc')
-    })
+    }).unknown(true)
   }
 };
 
