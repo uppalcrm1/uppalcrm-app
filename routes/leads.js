@@ -805,6 +805,10 @@ router.get('/stats',
  * Get all tasks across the organization with filtering and sorting
  */
 router.get('/tasks',
+  (req, res, next) => {
+    console.log('✅ /tasks route HIT - query:', req.query);
+    next();
+  },
   authenticateToken,
   validateOrganizationContext,
   validate({
@@ -820,6 +824,7 @@ router.get('/tasks',
     })
   }),
   async (req, res) => {
+    console.log('✅ /tasks HANDLER executing');
     try {
       const {
         assigned_to,
