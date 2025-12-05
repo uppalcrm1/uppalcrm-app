@@ -885,7 +885,7 @@ router.get('/tasks',
         WHERE ${whereClause}
       `;
 
-      const countResult = await db.query(countQuery, params);
+      const countResult = await db.query(countQuery, params, organizationId);
       const stats = countResult.rows[0];
 
       // Get tasks with pagination
@@ -917,7 +917,7 @@ router.get('/tasks',
 
       params.push(parseInt(limit), parseInt(offset));
 
-      const tasksResult = await db.query(tasksQuery, params);
+      const tasksResult = await db.query(tasksQuery, params, organizationId);
 
       res.json({
         tasks: tasksResult.rows,
