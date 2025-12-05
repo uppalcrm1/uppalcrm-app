@@ -1891,6 +1891,18 @@ router.post('/:id/convert',
 router.get('/tasks',
   authenticateToken,
   validateOrganizationContext,
+  validate({
+    query: Joi.object({
+      assigned_to: Joi.string().guid({ version: 'uuidv4' }).optional().allow('', null),
+      lead_owner: Joi.string().guid({ version: 'uuidv4' }).optional().allow('', null),
+      status: Joi.string().optional().allow(''),
+      sort_by: Joi.string().valid('scheduled_at', 'priority', 'created_at').default('scheduled_at'),
+      sort_order: Joi.string().valid('asc', 'desc', 'ASC', 'DESC').default('ASC'),
+      limit: Joi.number().integer().min(1).max(1000).default(50),
+      offset: Joi.number().integer().min(0).default(0),
+      priority: Joi.string().valid('low', 'medium', 'high').optional().allow('')
+    })
+  }),
   async (req, res) => {
     try {
       const {
