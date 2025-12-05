@@ -1508,6 +1508,14 @@ router.get('/tasks/upcoming', async (req, res) => {
  * Get specific lead by ID
  */
 router.get('/:id',
+  // Skip this route if :id is actually a route name like "tasks", "stats", etc.
+  (req, res, next) => {
+    const nonIdPaths = ['tasks', 'stats', 'by-status', 'export', 'lead-statuses', 'form-config'];
+    if (nonIdPaths.includes(req.params.id)) {
+      return next('route'); // Skip to next route
+    }
+    next();
+  },
   validateUuidParam,
   async (req, res) => {
     try {
