@@ -7,6 +7,20 @@ const Joi = require('joi');
 const validate = (schema) => {
   return (req, res, next) => {
     const errors = {};
+    
+    // Debug logging for /tasks route
+    if (req.path === '/tasks' && req.method === 'GET') {
+      console.log(`🔍 Validating /tasks route:`, {
+        path: req.path,
+        method: req.method,
+        url: req.originalUrl,
+        hasBodySchema: !!schema.body,
+        hasParamsSchema: !!schema.params,
+        hasQuerySchema: !!schema.query,
+        reqParams: req.params,
+        reqQuery: req.query
+      });
+    }
 
     // Validate request body
     if (schema.body) {
@@ -23,6 +37,9 @@ const validate = (schema) => {
     if (schema.params) {
       const { error } = schema.params.validate(req.params, { stripUnknown: false });
       if (error) {
+        if (req.path === '/tasks') {
+          console.log(`❌ Params validation error on /tasks:`, error);
+        }
         errors.params = error.details.map(detail => ({
           field: detail.path.join('.'),
           message: detail.message
