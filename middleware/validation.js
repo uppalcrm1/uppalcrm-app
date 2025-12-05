@@ -10,7 +10,7 @@ const validate = (schema) => {
 
     // Validate request body
     if (schema.body) {
-      const { error } = schema.body.validate(req.body);
+      const { error } = schema.body.validate(req.body, { stripUnknown: false });
       if (error) {
         errors.body = error.details.map(detail => ({
           field: detail.path.join('.'),
@@ -21,7 +21,7 @@ const validate = (schema) => {
 
     // Validate request parameters
     if (schema.params) {
-      const { error } = schema.params.validate(req.params);
+      const { error } = schema.params.validate(req.params, { stripUnknown: false });
       if (error) {
         errors.params = error.details.map(detail => ({
           field: detail.path.join('.'),
@@ -30,9 +30,9 @@ const validate = (schema) => {
       }
     }
 
-    // Validate query parameters
+    // Validate query parameters - allow unknown parameters
     if (schema.query) {
-      const { error } = schema.query.validate(req.query);
+      const { error } = schema.query.unknown(true).validate(req.query);
       if (error) {
         errors.query = error.details.map(detail => ({
           field: detail.path.join('.'),
@@ -160,7 +160,7 @@ const schemas = {
       search: Joi.string().min(1).max(100).optional(),
       sort: Joi.string().valid('created_at', 'updated_at', 'email', 'first_name', 'last_name').default('created_at'),
       order: Joi.string().valid('asc', 'desc').default('desc')
-    }).unknown(true)
+    })
   }
 };
 
