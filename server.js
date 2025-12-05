@@ -183,6 +183,16 @@ app.use('/api/auth', rateLimiters.general, authRoutes);
 app.use('/api/users', rateLimiters.general, userRoutes);
 app.use('/api/user-management', rateLimiters.general, require('./routes/user-management'));
 app.use('/api/organizations', rateLimiters.general, organizationRoutes);
+
+// Debug: Log routes registered in leadRoutes
+console.log('🔍 Registering leadRoutes...');
+if (leadRoutes && leadRoutes.stack) {
+  const routes = leadRoutes.stack
+    .filter(layer => layer.route)
+    .map(layer => `${Object.keys(layer.route.methods)[0].toUpperCase()} ${layer.route.path}`);
+  console.log('📋 leadRoutes registered routes:', routes.slice(0, 20));
+}
+
 app.use('/api/leads', rateLimiters.general, leadRoutes);
 app.use('/api/leads', rateLimiters.general, leadInteractionsRoutes);
 app.use('/api/tasks', rateLimiters.general, tasksRoutes);
