@@ -793,6 +793,713 @@ router.get('/stats',
         details: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }
+
+/**
+ * ============================================================
+ * TASK MANAGEMENT ENDPOINTS
+ * ============================================================
+ */
+
+/**
+ * GET /tasks
+ * Get all tasks across the organization with filtering and sorting
+ */
+router.get('/tasks',
+  authenticateToken,
+  validateOrganizationContext,
+  validate({
+    query: Joi.object({
+      assigned_to: Joi.string().guid({ version: 'uuidv4' }).optional().allow('', null),
+      lead_owner: Joi.string().guid({ version: 'uuidv4' }).optional().allow('', null),
+      status: Joi.string().optional().allow(''),
+      sort_by: Joi.string().valid('scheduled_at', 'priority', 'created_at').default('scheduled_at'),
+      sort_order: Joi.string().valid('asc', 'desc', 'ASC', 'DESC').default('ASC'),
+      limit: Joi.number().integer().min(1).max(1000).default(50),
+      offset: Joi.number().integer().min(0).default(0),
+      priority: Joi.string().valid('low', 'medium', 'high').optional().allow('')
+    })
+  }),
+  async (req, res) => {
+    try {
+      const {
+        assigned_to,
+        lead_owner,
+        status = 'scheduled,pending',
+        sort_by = 'scheduled_at',
+        sort_order = 'ASC',
+        limit = 50,
+        offset = 0
+      } = req.query;
+
+      const organizationId = req.organizationId;
+
+      // Build WHERE clause
+      let whereConditions = [
+        'li.organization_id = $1',
+        "li.interaction_type = 'task'"
+      ];
+      let params = [organizationId];
+      let paramCount = 1;
+
+      // Filter by status
+      if (status) {
+        const statuses = status.split(',').map(s => s.trim());
+        const statusPlaceholders = statuses.map((_, i) => `$${paramCount + i + 1}`).join(',');
+        whereConditions.push(`li.status IN (${statusPlaceholders})`);
+        params.push(...statuses);
+        paramCount += statuses.length;
+      }
+
+      // Filter by assigned user
+      if (assigned_to) {
+        whereConditions.push(`li.user_id = $${++paramCount}`);
+        params.push(assigned_to);
+      }
+
+      // Filter by lead owner
+      if (lead_owner) {
+        whereConditions.push(`l.assigned_to = $${++paramCount}`);
+        params.push(lead_owner);
+      }
+
+      // Build ORDER BY
+      let orderBy = 'li.scheduled_at ASC';
+      if (sort_by === 'priority') {
+        orderBy = `CASE WHEN li.priority = 'high' THEN 1 WHEN li.priority = 'medium' THEN 2 ELSE 3 END ${sort_order}`;
+      } else if (sort_by === 'created_at') {
+        orderBy = `li.created_at ${sort_order}`;
+      } else {
+        orderBy = `li.scheduled_at ${sort_order}`;
+      }
+
+      const whereClause = whereConditions.join(' AND ');
+
+      // Get total count and statistics
+      const countQuery = `
+        SELECT COUNT(*) as total,
+               COUNT(CASE WHEN li.status IN ('scheduled', 'pending') THEN 1 END) as pending,
+               COUNT(CASE WHEN li.status = 'completed' THEN 1 END) as completed,
+               COUNT(CASE WHEN li.scheduled_at < NOW() AND li.status NOT IN ('completed', 'cancelled') THEN 1 END) as overdue
+        FROM lead_interactions li
+        JOIN leads l ON li.lead_id = l.id
+        WHERE ${whereClause}
+      `;
+
+      const countResult = await db.query(countQuery, params);
+      const stats = countResult.rows[0];
+
+      // Get tasks with pagination
+      const tasksQuery = `
+        SELECT
+          li.id,
+          li.lead_id,
+          li.subject,
+          li.description,
+          li.status,
+          li.priority,
+          li.scheduled_at,
+          li.completed_at,
+          li.created_at,
+          l.first_name || ' ' || l.last_name as lead_name,
+          l.id as lead_id,
+          u.first_name || ' ' || u.last_name as assigned_to_name,
+          li.user_id as assigned_to,
+          owner.first_name || ' ' || owner.last_name as lead_owner_name,
+          l.assigned_to as lead_owner_id
+        FROM lead_interactions li
+        JOIN leads l ON li.lead_id = l.id
+        LEFT JOIN users u ON li.user_id = u.id
+        LEFT JOIN users owner ON l.assigned_to = owner.id
+        WHERE ${whereClause}
+        ORDER BY ${orderBy}
+        LIMIT $${++paramCount} OFFSET $${++paramCount}
+      `;
+
+      params.push(parseInt(limit), parseInt(offset));
+
+      const tasksResult = await db.query(tasksQuery, params);
+
+      res.json({
+        tasks: tasksResult.rows,
+        stats: {
+          total: parseInt(stats.total) || 0,
+          pending: parseInt(stats.pending) || 0,
+          completed: parseInt(stats.completed) || 0,
+          overdue: parseInt(stats.overdue) || 0
+        },
+        pagination: {
+          limit: parseInt(limit),
+          offset: parseInt(offset),
+          total: parseInt(stats.total) || 0
+        }
+      });
+    } catch (error) {
+      console.error('Get tasks error:', error);
+      res.status(500).json({
+        error: 'Failed to retrieve tasks',
+        message: error.message
+      });
+    }
+  }
+);
+
+/**
+ * GET /leads/:leadId/tasks
+ * Get all tasks for a specific lead with filtering options
+ */
+router.get('/:leadId/tasks',
+  async (req, res) => {
+    try {
+      const { leadId } = req.params;
+      const { status, date_range, priority, overdue } = req.query;
+      const organizationId = req.organizationId;
+
+      // Verify lead belongs to organization
+      const leadCheck = await db.query(
+        'SELECT id FROM leads WHERE id = $1 AND organization_id = $2',
+        [leadId, organizationId]
+      );
+
+      if (leadCheck.rows.length === 0) {
+        return res.status(404).json({ error: 'Lead not found' });
+      }
+
+      // Build query with filters (using li. prefix for all columns)
+      let whereConditions = ['li.lead_id = $1', 'li.interaction_type = $2', 'li.organization_id = $3'];
+      let queryParams = [leadId, 'task', organizationId];
+      let paramIndex = 4;
+
+      // Filter by status
+      if (status) {
+        whereConditions.push(`li.status = $${paramIndex}`);
+        queryParams.push(status);
+        paramIndex++;
+      }
+
+      // Filter by priority
+      if (priority) {
+        whereConditions.push(`li.priority = $${paramIndex}`);
+        queryParams.push(priority);
+        paramIndex++;
+      }
+
+      // Filter overdue tasks
+      if (overdue === 'true') {
+        whereConditions.push(`li.scheduled_at < NOW()`);
+        whereConditions.push(`li.status = 'scheduled'`);
+      }
+
+      // Filter by date range
+      if (date_range === 'today') {
+        whereConditions.push(`DATE(li.scheduled_at) = CURRENT_DATE`);
+      } else if (date_range === 'week') {
+        whereConditions.push(`li.scheduled_at BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days'`);
+      } else if (date_range === 'month') {
+        whereConditions.push(`li.scheduled_at BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '30 days'`);
+      }
+
+      const whereClause = whereConditions.join(' AND ');
+
+      const query = `
+        SELECT
+          li.*,
+          u.first_name as user_first_name,
+          u.last_name as user_last_name,
+          u.email as user_email
+        FROM lead_interactions li
+        LEFT JOIN users u ON li.user_id = u.id
+        WHERE ${whereClause}
+        ORDER BY
+          CASE WHEN li.status = 'scheduled' THEN 0 ELSE 1 END,
+          li.scheduled_at ASC,
+          li.created_at DESC
+      `;
+
+      const result = await db.query(query, queryParams);
+
+      // Calculate statistics from ALL tasks (not filtered)
+      const statsQuery = `
+        SELECT
+          COUNT(*) as total,
+          COUNT(*) FILTER (WHERE status = 'scheduled') as pending,
+          COUNT(*) FILTER (WHERE status = 'completed') as completed,
+          COUNT(*) FILTER (WHERE status = 'scheduled' AND scheduled_at < NOW()) as overdue
+        FROM lead_interactions
+        WHERE lead_id = $1 AND interaction_type = 'task' AND organization_id = $2
+      `;
+      const statsResult = await db.query(statsQuery, [leadId, organizationId]);
+      const stats = {
+        total: parseInt(statsResult.rows[0].total),
+        pending: parseInt(statsResult.rows[0].pending),
+        completed: parseInt(statsResult.rows[0].completed),
+        overdue: parseInt(statsResult.rows[0].overdue)
+      };
+
+      res.json({
+        tasks: result.rows,
+        stats
+      });
+    } catch (error) {
+      console.error('Error fetching tasks:', error);
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        leadId: req.params.leadId,
+        filters: req.query
+      });
+      res.status(500).json({
+        error: 'Failed to fetch tasks',
+        detail: error.message
+      });
+    }
+  }
+);
+
+/**
+ * POST /leads/:leadId/tasks
+ * Create a new task for a lead
+ */
+router.post('/:leadId/tasks',
+  async (req, res) => {
+    try {
+      const { leadId } = req.params;
+      const {
+        subject,
+        description,
+        scheduled_at,
+        priority = 'medium',
+        assigned_to
+      } = req.body;
+      const organizationId = req.organizationId;
+      const userId = req.user.id;
+
+      // Verify lead belongs to organization
+      const leadCheck = await db.query(
+        'SELECT assigned_to FROM leads WHERE id = $1 AND organization_id = $2',
+        [leadId, organizationId]
+      );
+
+      if (leadCheck.rows.length === 0) {
+        return res.status(404).json({ error: 'Lead not found' });
+      }
+
+      // Use assigned_to from request, or fallback to lead owner, or current user
+      const taskAssignee = assigned_to || leadCheck.rows[0].assigned_to || userId;
+
+      // Determine status based on scheduled date
+      const status = scheduled_at && new Date(scheduled_at) > new Date()
+        ? 'scheduled'
+        : 'completed';
+
+      const insertQuery = `
+        INSERT INTO lead_interactions (
+          lead_id, user_id, organization_id, interaction_type,
+          subject, description, scheduled_at, status, priority, created_by
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        RETURNING *
+      `;
+
+      const result = await db.query(insertQuery, [
+        leadId,
+        taskAssignee,
+        organizationId,
+        'task',
+        subject,
+        description || '',
+        scheduled_at,
+        status,
+        priority,
+        userId
+      ]);
+
+      res.status(201).json({
+        message: 'Task created successfully',
+        task: result.rows[0]
+      });
+    } catch (error) {
+      console.error('Error creating task:', error);
+      res.status(500).json({ error: 'Failed to create task' });
+    }
+  }
+);
+
+/**
+ * PATCH /leads/:leadId/tasks/:taskId/complete
+ * Mark a task as completed
+ */
+router.patch('/:leadId/tasks/:taskId/complete',
+  authenticateToken,
+  validateOrganizationContext,
+  async (req, res) => {
+    try {
+      const { leadId, taskId } = req.params;
+      const { outcome = null, notes = null } = req.body || {};
+      const organizationId = req.organizationId;
+      const userId = req.user?.id;
+
+      // Validate UUID parameters
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+      if (!leadId || typeof leadId !== 'string' || !uuidRegex.test(leadId)) {
+        return res.status(400).json({
+          error: 'Invalid lead ID',
+          detail: 'Lead ID must be a valid UUID'
+        });
+      }
+
+      if (!taskId || typeof taskId !== 'string' || !uuidRegex.test(taskId)) {
+        return res.status(400).json({
+          error: 'Invalid task ID',
+          detail: 'Task ID must be a valid UUID'
+        });
+      }
+
+      // Validate organizationId and userId
+      if (!organizationId || typeof organizationId !== 'string' || !uuidRegex.test(organizationId)) {
+        return res.status(400).json({
+          error: 'Invalid organization ID',
+          detail: 'Organization context missing or invalid: ' + organizationId
+        });
+      }
+
+      if (!userId || typeof userId !== 'string' || !uuidRegex.test(userId)) {
+        return res.status(400).json({
+          error: 'Invalid user ID',
+          detail: 'User context missing or invalid: ' + userId
+        });
+      }
+
+      console.log('=== ABOUT TO EXECUTE QUERIES ===');
+      console.log('Parameters:', {
+        leadId,
+        taskId,
+        organizationId,
+        userId,
+        outcome: req.body?.outcome || null,
+        notes: req.body?.notes || null
+      });
+      console.log('All UUIDs valid? ', leadId && taskId && organizationId && userId);
+
+      console.log('Completing task:', { leadId, taskId, userId: userId.substring(0, 8) + '...', orgId: organizationId.substring(0, 8) + '...' });
+
+      // Verify lead belongs to organization
+      const leadCheck = await db.query(
+        'SELECT id FROM leads WHERE id = $1 AND organization_id = $2',
+        [leadId, organizationId]
+      );
+
+      if (leadCheck.rows.length === 0) {
+        return res.status(404).json({ error: 'Lead not found' });
+      }
+
+      // Update task to completed
+      const query = `
+        UPDATE lead_interactions
+        SET
+          status = 'completed',
+          completed_at = NOW(),
+          last_modified_by = $6,
+          outcome = COALESCE($1::text, outcome),
+          description = CASE
+            WHEN $2::text IS NOT NULL THEN description || E'\n\nCompletion Notes: ' || $2::text
+            ELSE description
+          END,
+          updated_at = NOW()
+        WHERE id = $3 AND lead_id = $4 AND interaction_type = 'task' AND organization_id = $5
+        RETURNING *
+      `;
+
+      const result = await db.query(query, [outcome, notes, taskId, leadId, organizationId, userId]);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Task not found' });
+      }
+
+      // Update lead's last_contact_date
+      await db.query(
+        'UPDATE leads SET last_contact_date = NOW(), updated_at = NOW() WHERE id = $1',
+        [leadId]
+      );
+
+      res.json({
+        message: 'Task marked as completed',
+        task: result.rows[0]
+      });
+    } catch (error) {
+      console.error('Error completing task:', error);
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        leadId: req.params.leadId,
+        taskId: req.params.taskId,
+        body: req.body
+      });
+      res.status(500).json({
+        error: 'Failed to complete task',
+        detail: error.message
+      });
+    }
+  }
+);
+
+/**
+ * PATCH /leads/:leadId/tasks/:taskId
+ * Update task details
+ */
+router.patch('/:leadId/tasks/:taskId',
+  async (req, res) => {
+    try {
+      const { leadId, taskId } = req.params;
+      const {
+        subject,
+        description,
+        scheduled_at,
+        priority,
+        status
+      } = req.body;
+      const organizationId = req.organizationId;
+      const userId = req.user.id;
+
+      // Verify lead belongs to organization
+      const leadCheck = await db.query(
+        'SELECT id FROM leads WHERE id = $1 AND organization_id = $2',
+        [leadId, organizationId]
+      );
+
+      if (leadCheck.rows.length === 0) {
+        return res.status(404).json({ error: 'Lead not found' });
+      }
+
+      // Update task with last_modified_by tracking
+      const query = `
+        UPDATE lead_interactions
+        SET
+          subject = COALESCE($1, subject),
+          description = COALESCE($2, description),
+          scheduled_at = COALESCE($3, scheduled_at),
+          priority = COALESCE($4, priority),
+          status = COALESCE($5, status),
+          last_modified_by = $9,
+          updated_at = NOW()
+        WHERE id = $6 AND lead_id = $7 AND interaction_type = 'task' AND organization_id = $8
+        RETURNING *
+      `;
+
+      const result = await db.query(query, [
+        subject,
+        description,
+        scheduled_at,
+        priority,
+        status,
+        taskId,
+        leadId,
+        organizationId,
+        userId
+      ]);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Task not found' });
+      }
+
+      res.json({
+        message: 'Task updated successfully',
+        task: result.rows[0]
+      });
+    } catch (error) {
+      console.error('Error updating task:', error);
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        leadId: req.params.leadId,
+        taskId: req.params.taskId,
+        body: req.body
+      });
+      res.status(500).json({
+        error: 'Failed to update task',
+        detail: error.message
+      });
+    }
+  }
+);
+
+/**
+ * DELETE /leads/:leadId/tasks/:taskId
+ * Delete a task
+ */
+router.delete('/:leadId/tasks/:taskId',
+  async (req, res) => {
+    try {
+      const { leadId, taskId } = req.params;
+      const organizationId = req.organizationId;
+
+      // Verify lead belongs to organization
+      const leadCheck = await db.query(
+        'SELECT id FROM leads WHERE id = $1 AND organization_id = $2',
+        [leadId, organizationId]
+      );
+
+      if (leadCheck.rows.length === 0) {
+        return res.status(404).json({ error: 'Lead not found' });
+      }
+
+      const query = `
+        DELETE FROM lead_interactions
+        WHERE id = $1 AND lead_id = $2 AND interaction_type = 'task' AND organization_id = $3
+        RETURNING id
+      `;
+
+      const result = await db.query(query, [taskId, leadId, organizationId]);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Task not found' });
+      }
+
+      res.json({ message: 'Task deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting task:', error);
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        leadId: req.params.leadId,
+        taskId: req.params.taskId
+      });
+      res.status(500).json({
+        error: 'Failed to delete task',
+        detail: error.message
+      });
+    }
+  }
+);
+
+/**
+ * POST /leads/:leadId/tasks/bulk-complete
+ * Mark multiple tasks as completed
+ */
+router.post('/:leadId/tasks/bulk-complete',
+  async (req, res) => {
+    try {
+      const { leadId } = req.params;
+      const { taskIds } = req.body;
+      const organizationId = req.organizationId;
+
+      if (!Array.isArray(taskIds) || taskIds.length === 0) {
+        return res.status(400).json({ error: 'taskIds must be a non-empty array' });
+      }
+
+      // Verify lead belongs to organization
+      const leadCheck = await db.query(
+        'SELECT id FROM leads WHERE id = $1 AND organization_id = $2',
+        [leadId, organizationId]
+      );
+
+      if (leadCheck.rows.length === 0) {
+        return res.status(404).json({ error: 'Lead not found' });
+      }
+
+      const query = `
+        UPDATE lead_interactions
+        SET
+          status = 'completed',
+          completed_at = NOW(),
+          updated_at = NOW()
+        WHERE id = ANY($1)
+          AND lead_id = $2
+          AND interaction_type = 'task'
+          AND status != 'completed'
+        RETURNING id
+      `;
+
+      const result = await db.query(query, [taskIds, leadId]);
+
+      res.json({
+        message: `${result.rows.length} tasks marked as completed`,
+        completedCount: result.rows.length
+      });
+    } catch (error) {
+      console.error('Error bulk completing tasks:', error);
+      res.status(500).json({ error: 'Failed to complete tasks' });
+    }
+  }
+);
+
+/**
+ * GET /tasks/overdue
+ * Get all overdue tasks across all leads for the organization
+ */
+router.get('/tasks/overdue', async (req, res) => {
+  try {
+    const organizationId = req.organizationId;
+
+    const query = `
+      SELECT
+        li.*,
+        l.first_name as lead_first_name,
+        l.last_name as lead_last_name,
+        l.company as lead_company,
+        u.first_name as user_first_name,
+        u.last_name as user_last_name
+      FROM lead_interactions li
+      JOIN leads l ON li.lead_id = l.id
+      LEFT JOIN users u ON li.user_id = u.id
+      WHERE li.organization_id = $1
+        AND li.interaction_type = 'task'
+        AND li.status = 'scheduled'
+        AND li.scheduled_at < NOW()
+      ORDER BY li.scheduled_at ASC
+    `;
+
+    const result = await db.query(query, [organizationId]);
+
+    res.json({
+      tasks: result.rows,
+      count: result.rows.length
+    });
+  } catch (error) {
+    console.error('Error fetching overdue tasks:', error);
+    res.status(500).json({ error: 'Failed to fetch overdue tasks' });
+  }
+});
+
+/**
+ * GET /tasks/upcoming
+ * Get upcoming tasks (next 7 days) across all leads for the organization
+ */
+router.get('/tasks/upcoming', async (req, res) => {
+  try {
+    const organizationId = req.organizationId;
+    const { days = 7 } = req.query;
+
+    const query = `
+      SELECT
+        li.*,
+        l.first_name as lead_first_name,
+        l.last_name as lead_last_name,
+        l.company as lead_company,
+        u.first_name as user_first_name,
+        u.last_name as user_last_name
+      FROM lead_interactions li
+      JOIN leads l ON li.lead_id = l.id
+      LEFT JOIN users u ON li.user_id = u.id
+      WHERE li.organization_id = $1
+        AND li.interaction_type = 'task'
+        AND li.status = 'scheduled'
+        AND li.scheduled_at BETWEEN NOW() AND NOW() + INTERVAL '${parseInt(days)} days'
+      ORDER BY li.scheduled_at ASC
+    `;
+
+    const result = await db.query(query, [organizationId]);
+
+    res.json({
+      tasks: result.rows,
+      count: result.rows.length
+    });
+  } catch (error) {
+    console.error('Error fetching upcoming tasks:', error);
+    res.status(500).json({ error: 'Failed to fetch upcoming tasks' });
+  }
+});
+
+
   }
 );
 
@@ -1877,710 +2584,5 @@ router.post('/:id/convert',
     }
   }
 );
-
-/**
- * ============================================================
- * TASK MANAGEMENT ENDPOINTS
- * ============================================================
- */
-
-/**
- * GET /tasks
- * Get all tasks across the organization with filtering and sorting
- */
-router.get('/tasks',
-  authenticateToken,
-  validateOrganizationContext,
-  validate({
-    query: Joi.object({
-      assigned_to: Joi.string().guid({ version: 'uuidv4' }).optional().allow('', null),
-      lead_owner: Joi.string().guid({ version: 'uuidv4' }).optional().allow('', null),
-      status: Joi.string().optional().allow(''),
-      sort_by: Joi.string().valid('scheduled_at', 'priority', 'created_at').default('scheduled_at'),
-      sort_order: Joi.string().valid('asc', 'desc', 'ASC', 'DESC').default('ASC'),
-      limit: Joi.number().integer().min(1).max(1000).default(50),
-      offset: Joi.number().integer().min(0).default(0),
-      priority: Joi.string().valid('low', 'medium', 'high').optional().allow('')
-    })
-  }),
-  async (req, res) => {
-    try {
-      const {
-        assigned_to,
-        lead_owner,
-        status = 'scheduled,pending',
-        sort_by = 'scheduled_at',
-        sort_order = 'ASC',
-        limit = 50,
-        offset = 0
-      } = req.query;
-
-      const organizationId = req.organizationId;
-
-      // Build WHERE clause
-      let whereConditions = [
-        'li.organization_id = $1',
-        "li.interaction_type = 'task'"
-      ];
-      let params = [organizationId];
-      let paramCount = 1;
-
-      // Filter by status
-      if (status) {
-        const statuses = status.split(',').map(s => s.trim());
-        const statusPlaceholders = statuses.map((_, i) => `$${paramCount + i + 1}`).join(',');
-        whereConditions.push(`li.status IN (${statusPlaceholders})`);
-        params.push(...statuses);
-        paramCount += statuses.length;
-      }
-
-      // Filter by assigned user
-      if (assigned_to) {
-        whereConditions.push(`li.user_id = $${++paramCount}`);
-        params.push(assigned_to);
-      }
-
-      // Filter by lead owner
-      if (lead_owner) {
-        whereConditions.push(`l.assigned_to = $${++paramCount}`);
-        params.push(lead_owner);
-      }
-
-      // Build ORDER BY
-      let orderBy = 'li.scheduled_at ASC';
-      if (sort_by === 'priority') {
-        orderBy = `CASE WHEN li.priority = 'high' THEN 1 WHEN li.priority = 'medium' THEN 2 ELSE 3 END ${sort_order}`;
-      } else if (sort_by === 'created_at') {
-        orderBy = `li.created_at ${sort_order}`;
-      } else {
-        orderBy = `li.scheduled_at ${sort_order}`;
-      }
-
-      const whereClause = whereConditions.join(' AND ');
-
-      // Get total count and statistics
-      const countQuery = `
-        SELECT COUNT(*) as total,
-               COUNT(CASE WHEN li.status IN ('scheduled', 'pending') THEN 1 END) as pending,
-               COUNT(CASE WHEN li.status = 'completed' THEN 1 END) as completed,
-               COUNT(CASE WHEN li.scheduled_at < NOW() AND li.status NOT IN ('completed', 'cancelled') THEN 1 END) as overdue
-        FROM lead_interactions li
-        JOIN leads l ON li.lead_id = l.id
-        WHERE ${whereClause}
-      `;
-
-      const countResult = await db.query(countQuery, params);
-      const stats = countResult.rows[0];
-
-      // Get tasks with pagination
-      const tasksQuery = `
-        SELECT
-          li.id,
-          li.lead_id,
-          li.subject,
-          li.description,
-          li.status,
-          li.priority,
-          li.scheduled_at,
-          li.completed_at,
-          li.created_at,
-          l.first_name || ' ' || l.last_name as lead_name,
-          l.id as lead_id,
-          u.first_name || ' ' || u.last_name as assigned_to_name,
-          li.user_id as assigned_to,
-          owner.first_name || ' ' || owner.last_name as lead_owner_name,
-          l.assigned_to as lead_owner_id
-        FROM lead_interactions li
-        JOIN leads l ON li.lead_id = l.id
-        LEFT JOIN users u ON li.user_id = u.id
-        LEFT JOIN users owner ON l.assigned_to = owner.id
-        WHERE ${whereClause}
-        ORDER BY ${orderBy}
-        LIMIT $${++paramCount} OFFSET $${++paramCount}
-      `;
-
-      params.push(parseInt(limit), parseInt(offset));
-
-      const tasksResult = await db.query(tasksQuery, params);
-
-      res.json({
-        tasks: tasksResult.rows,
-        stats: {
-          total: parseInt(stats.total) || 0,
-          pending: parseInt(stats.pending) || 0,
-          completed: parseInt(stats.completed) || 0,
-          overdue: parseInt(stats.overdue) || 0
-        },
-        pagination: {
-          limit: parseInt(limit),
-          offset: parseInt(offset),
-          total: parseInt(stats.total) || 0
-        }
-      });
-    } catch (error) {
-      console.error('Get tasks error:', error);
-      res.status(500).json({
-        error: 'Failed to retrieve tasks',
-        message: error.message
-      });
-    }
-  }
-);
-
-/**
- * GET /leads/:leadId/tasks
- * Get all tasks for a specific lead with filtering options
- */
-router.get('/:leadId/tasks',
-  async (req, res) => {
-    try {
-      const { leadId } = req.params;
-      const { status, date_range, priority, overdue } = req.query;
-      const organizationId = req.organizationId;
-
-      // Verify lead belongs to organization
-      const leadCheck = await db.query(
-        'SELECT id FROM leads WHERE id = $1 AND organization_id = $2',
-        [leadId, organizationId]
-      );
-
-      if (leadCheck.rows.length === 0) {
-        return res.status(404).json({ error: 'Lead not found' });
-      }
-
-      // Build query with filters (using li. prefix for all columns)
-      let whereConditions = ['li.lead_id = $1', 'li.interaction_type = $2', 'li.organization_id = $3'];
-      let queryParams = [leadId, 'task', organizationId];
-      let paramIndex = 4;
-
-      // Filter by status
-      if (status) {
-        whereConditions.push(`li.status = $${paramIndex}`);
-        queryParams.push(status);
-        paramIndex++;
-      }
-
-      // Filter by priority
-      if (priority) {
-        whereConditions.push(`li.priority = $${paramIndex}`);
-        queryParams.push(priority);
-        paramIndex++;
-      }
-
-      // Filter overdue tasks
-      if (overdue === 'true') {
-        whereConditions.push(`li.scheduled_at < NOW()`);
-        whereConditions.push(`li.status = 'scheduled'`);
-      }
-
-      // Filter by date range
-      if (date_range === 'today') {
-        whereConditions.push(`DATE(li.scheduled_at) = CURRENT_DATE`);
-      } else if (date_range === 'week') {
-        whereConditions.push(`li.scheduled_at BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days'`);
-      } else if (date_range === 'month') {
-        whereConditions.push(`li.scheduled_at BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '30 days'`);
-      }
-
-      const whereClause = whereConditions.join(' AND ');
-
-      const query = `
-        SELECT
-          li.*,
-          u.first_name as user_first_name,
-          u.last_name as user_last_name,
-          u.email as user_email
-        FROM lead_interactions li
-        LEFT JOIN users u ON li.user_id = u.id
-        WHERE ${whereClause}
-        ORDER BY
-          CASE WHEN li.status = 'scheduled' THEN 0 ELSE 1 END,
-          li.scheduled_at ASC,
-          li.created_at DESC
-      `;
-
-      const result = await db.query(query, queryParams);
-
-      // Calculate statistics from ALL tasks (not filtered)
-      const statsQuery = `
-        SELECT
-          COUNT(*) as total,
-          COUNT(*) FILTER (WHERE status = 'scheduled') as pending,
-          COUNT(*) FILTER (WHERE status = 'completed') as completed,
-          COUNT(*) FILTER (WHERE status = 'scheduled' AND scheduled_at < NOW()) as overdue
-        FROM lead_interactions
-        WHERE lead_id = $1 AND interaction_type = 'task' AND organization_id = $2
-      `;
-      const statsResult = await db.query(statsQuery, [leadId, organizationId]);
-      const stats = {
-        total: parseInt(statsResult.rows[0].total),
-        pending: parseInt(statsResult.rows[0].pending),
-        completed: parseInt(statsResult.rows[0].completed),
-        overdue: parseInt(statsResult.rows[0].overdue)
-      };
-
-      res.json({
-        tasks: result.rows,
-        stats
-      });
-    } catch (error) {
-      console.error('Error fetching tasks:', error);
-      console.error('Error details:', {
-        message: error.message,
-        stack: error.stack,
-        leadId: req.params.leadId,
-        filters: req.query
-      });
-      res.status(500).json({
-        error: 'Failed to fetch tasks',
-        detail: error.message
-      });
-    }
-  }
-);
-
-/**
- * POST /leads/:leadId/tasks
- * Create a new task for a lead
- */
-router.post('/:leadId/tasks',
-  async (req, res) => {
-    try {
-      const { leadId } = req.params;
-      const {
-        subject,
-        description,
-        scheduled_at,
-        priority = 'medium',
-        assigned_to
-      } = req.body;
-      const organizationId = req.organizationId;
-      const userId = req.user.id;
-
-      // Verify lead belongs to organization
-      const leadCheck = await db.query(
-        'SELECT assigned_to FROM leads WHERE id = $1 AND organization_id = $2',
-        [leadId, organizationId]
-      );
-
-      if (leadCheck.rows.length === 0) {
-        return res.status(404).json({ error: 'Lead not found' });
-      }
-
-      // Use assigned_to from request, or fallback to lead owner, or current user
-      const taskAssignee = assigned_to || leadCheck.rows[0].assigned_to || userId;
-
-      // Determine status based on scheduled date
-      const status = scheduled_at && new Date(scheduled_at) > new Date()
-        ? 'scheduled'
-        : 'completed';
-
-      const insertQuery = `
-        INSERT INTO lead_interactions (
-          lead_id, user_id, organization_id, interaction_type,
-          subject, description, scheduled_at, status, priority, created_by
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-        RETURNING *
-      `;
-
-      const result = await db.query(insertQuery, [
-        leadId,
-        taskAssignee,
-        organizationId,
-        'task',
-        subject,
-        description || '',
-        scheduled_at,
-        status,
-        priority,
-        userId
-      ]);
-
-      res.status(201).json({
-        message: 'Task created successfully',
-        task: result.rows[0]
-      });
-    } catch (error) {
-      console.error('Error creating task:', error);
-      res.status(500).json({ error: 'Failed to create task' });
-    }
-  }
-);
-
-/**
- * PATCH /leads/:leadId/tasks/:taskId/complete
- * Mark a task as completed
- */
-router.patch('/:leadId/tasks/:taskId/complete',
-  authenticateToken,
-  validateOrganizationContext,
-  async (req, res) => {
-    try {
-      const { leadId, taskId } = req.params;
-      const { outcome = null, notes = null } = req.body || {};
-      const organizationId = req.organizationId;
-      const userId = req.user?.id;
-
-      // Validate UUID parameters
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-      if (!leadId || typeof leadId !== 'string' || !uuidRegex.test(leadId)) {
-        return res.status(400).json({
-          error: 'Invalid lead ID',
-          detail: 'Lead ID must be a valid UUID'
-        });
-      }
-
-      if (!taskId || typeof taskId !== 'string' || !uuidRegex.test(taskId)) {
-        return res.status(400).json({
-          error: 'Invalid task ID',
-          detail: 'Task ID must be a valid UUID'
-        });
-      }
-
-      // Validate organizationId and userId
-      if (!organizationId || typeof organizationId !== 'string' || !uuidRegex.test(organizationId)) {
-        return res.status(400).json({
-          error: 'Invalid organization ID',
-          detail: 'Organization context missing or invalid: ' + organizationId
-        });
-      }
-
-      if (!userId || typeof userId !== 'string' || !uuidRegex.test(userId)) {
-        return res.status(400).json({
-          error: 'Invalid user ID',
-          detail: 'User context missing or invalid: ' + userId
-        });
-      }
-
-      console.log('=== ABOUT TO EXECUTE QUERIES ===');
-      console.log('Parameters:', {
-        leadId,
-        taskId,
-        organizationId,
-        userId,
-        outcome: req.body?.outcome || null,
-        notes: req.body?.notes || null
-      });
-      console.log('All UUIDs valid? ', leadId && taskId && organizationId && userId);
-
-      console.log('Completing task:', { leadId, taskId, userId: userId.substring(0, 8) + '...', orgId: organizationId.substring(0, 8) + '...' });
-
-      // Verify lead belongs to organization
-      const leadCheck = await db.query(
-        'SELECT id FROM leads WHERE id = $1 AND organization_id = $2',
-        [leadId, organizationId]
-      );
-
-      if (leadCheck.rows.length === 0) {
-        return res.status(404).json({ error: 'Lead not found' });
-      }
-
-      // Update task to completed
-      const query = `
-        UPDATE lead_interactions
-        SET
-          status = 'completed',
-          completed_at = NOW(),
-          last_modified_by = $6,
-          outcome = COALESCE($1::text, outcome),
-          description = CASE
-            WHEN $2::text IS NOT NULL THEN description || E'\n\nCompletion Notes: ' || $2::text
-            ELSE description
-          END,
-          updated_at = NOW()
-        WHERE id = $3 AND lead_id = $4 AND interaction_type = 'task' AND organization_id = $5
-        RETURNING *
-      `;
-
-      const result = await db.query(query, [outcome, notes, taskId, leadId, organizationId, userId]);
-
-      if (result.rows.length === 0) {
-        return res.status(404).json({ error: 'Task not found' });
-      }
-
-      // Update lead's last_contact_date
-      await db.query(
-        'UPDATE leads SET last_contact_date = NOW(), updated_at = NOW() WHERE id = $1',
-        [leadId]
-      );
-
-      res.json({
-        message: 'Task marked as completed',
-        task: result.rows[0]
-      });
-    } catch (error) {
-      console.error('Error completing task:', error);
-      console.error('Error details:', {
-        message: error.message,
-        stack: error.stack,
-        leadId: req.params.leadId,
-        taskId: req.params.taskId,
-        body: req.body
-      });
-      res.status(500).json({
-        error: 'Failed to complete task',
-        detail: error.message
-      });
-    }
-  }
-);
-
-/**
- * PATCH /leads/:leadId/tasks/:taskId
- * Update task details
- */
-router.patch('/:leadId/tasks/:taskId',
-  async (req, res) => {
-    try {
-      const { leadId, taskId } = req.params;
-      const {
-        subject,
-        description,
-        scheduled_at,
-        priority,
-        status
-      } = req.body;
-      const organizationId = req.organizationId;
-      const userId = req.user.id;
-
-      // Verify lead belongs to organization
-      const leadCheck = await db.query(
-        'SELECT id FROM leads WHERE id = $1 AND organization_id = $2',
-        [leadId, organizationId]
-      );
-
-      if (leadCheck.rows.length === 0) {
-        return res.status(404).json({ error: 'Lead not found' });
-      }
-
-      // Update task with last_modified_by tracking
-      const query = `
-        UPDATE lead_interactions
-        SET
-          subject = COALESCE($1, subject),
-          description = COALESCE($2, description),
-          scheduled_at = COALESCE($3, scheduled_at),
-          priority = COALESCE($4, priority),
-          status = COALESCE($5, status),
-          last_modified_by = $9,
-          updated_at = NOW()
-        WHERE id = $6 AND lead_id = $7 AND interaction_type = 'task' AND organization_id = $8
-        RETURNING *
-      `;
-
-      const result = await db.query(query, [
-        subject,
-        description,
-        scheduled_at,
-        priority,
-        status,
-        taskId,
-        leadId,
-        organizationId,
-        userId
-      ]);
-
-      if (result.rows.length === 0) {
-        return res.status(404).json({ error: 'Task not found' });
-      }
-
-      res.json({
-        message: 'Task updated successfully',
-        task: result.rows[0]
-      });
-    } catch (error) {
-      console.error('Error updating task:', error);
-      console.error('Error details:', {
-        message: error.message,
-        stack: error.stack,
-        leadId: req.params.leadId,
-        taskId: req.params.taskId,
-        body: req.body
-      });
-      res.status(500).json({
-        error: 'Failed to update task',
-        detail: error.message
-      });
-    }
-  }
-);
-
-/**
- * DELETE /leads/:leadId/tasks/:taskId
- * Delete a task
- */
-router.delete('/:leadId/tasks/:taskId',
-  async (req, res) => {
-    try {
-      const { leadId, taskId } = req.params;
-      const organizationId = req.organizationId;
-
-      // Verify lead belongs to organization
-      const leadCheck = await db.query(
-        'SELECT id FROM leads WHERE id = $1 AND organization_id = $2',
-        [leadId, organizationId]
-      );
-
-      if (leadCheck.rows.length === 0) {
-        return res.status(404).json({ error: 'Lead not found' });
-      }
-
-      const query = `
-        DELETE FROM lead_interactions
-        WHERE id = $1 AND lead_id = $2 AND interaction_type = 'task' AND organization_id = $3
-        RETURNING id
-      `;
-
-      const result = await db.query(query, [taskId, leadId, organizationId]);
-
-      if (result.rows.length === 0) {
-        return res.status(404).json({ error: 'Task not found' });
-      }
-
-      res.json({ message: 'Task deleted successfully' });
-    } catch (error) {
-      console.error('Error deleting task:', error);
-      console.error('Error details:', {
-        message: error.message,
-        stack: error.stack,
-        leadId: req.params.leadId,
-        taskId: req.params.taskId
-      });
-      res.status(500).json({
-        error: 'Failed to delete task',
-        detail: error.message
-      });
-    }
-  }
-);
-
-/**
- * POST /leads/:leadId/tasks/bulk-complete
- * Mark multiple tasks as completed
- */
-router.post('/:leadId/tasks/bulk-complete',
-  async (req, res) => {
-    try {
-      const { leadId } = req.params;
-      const { taskIds } = req.body;
-      const organizationId = req.organizationId;
-
-      if (!Array.isArray(taskIds) || taskIds.length === 0) {
-        return res.status(400).json({ error: 'taskIds must be a non-empty array' });
-      }
-
-      // Verify lead belongs to organization
-      const leadCheck = await db.query(
-        'SELECT id FROM leads WHERE id = $1 AND organization_id = $2',
-        [leadId, organizationId]
-      );
-
-      if (leadCheck.rows.length === 0) {
-        return res.status(404).json({ error: 'Lead not found' });
-      }
-
-      const query = `
-        UPDATE lead_interactions
-        SET
-          status = 'completed',
-          completed_at = NOW(),
-          updated_at = NOW()
-        WHERE id = ANY($1)
-          AND lead_id = $2
-          AND interaction_type = 'task'
-          AND status != 'completed'
-        RETURNING id
-      `;
-
-      const result = await db.query(query, [taskIds, leadId]);
-
-      res.json({
-        message: `${result.rows.length} tasks marked as completed`,
-        completedCount: result.rows.length
-      });
-    } catch (error) {
-      console.error('Error bulk completing tasks:', error);
-      res.status(500).json({ error: 'Failed to complete tasks' });
-    }
-  }
-);
-
-/**
- * GET /tasks/overdue
- * Get all overdue tasks across all leads for the organization
- */
-router.get('/tasks/overdue', async (req, res) => {
-  try {
-    const organizationId = req.organizationId;
-
-    const query = `
-      SELECT
-        li.*,
-        l.first_name as lead_first_name,
-        l.last_name as lead_last_name,
-        l.company as lead_company,
-        u.first_name as user_first_name,
-        u.last_name as user_last_name
-      FROM lead_interactions li
-      JOIN leads l ON li.lead_id = l.id
-      LEFT JOIN users u ON li.user_id = u.id
-      WHERE li.organization_id = $1
-        AND li.interaction_type = 'task'
-        AND li.status = 'scheduled'
-        AND li.scheduled_at < NOW()
-      ORDER BY li.scheduled_at ASC
-    `;
-
-    const result = await db.query(query, [organizationId]);
-
-    res.json({
-      tasks: result.rows,
-      count: result.rows.length
-    });
-  } catch (error) {
-    console.error('Error fetching overdue tasks:', error);
-    res.status(500).json({ error: 'Failed to fetch overdue tasks' });
-  }
-});
-
-/**
- * GET /tasks/upcoming
- * Get upcoming tasks (next 7 days) across all leads for the organization
- */
-router.get('/tasks/upcoming', async (req, res) => {
-  try {
-    const organizationId = req.organizationId;
-    const { days = 7 } = req.query;
-
-    const query = `
-      SELECT
-        li.*,
-        l.first_name as lead_first_name,
-        l.last_name as lead_last_name,
-        l.company as lead_company,
-        u.first_name as user_first_name,
-        u.last_name as user_last_name
-      FROM lead_interactions li
-      JOIN leads l ON li.lead_id = l.id
-      LEFT JOIN users u ON li.user_id = u.id
-      WHERE li.organization_id = $1
-        AND li.interaction_type = 'task'
-        AND li.status = 'scheduled'
-        AND li.scheduled_at BETWEEN NOW() AND NOW() + INTERVAL '${parseInt(days)} days'
-      ORDER BY li.scheduled_at ASC
-    `;
-
-    const result = await db.query(query, [organizationId]);
-
-    res.json({
-      tasks: result.rows,
-      count: result.rows.length
-    });
-  } catch (error) {
-    console.error('Error fetching upcoming tasks:', error);
-    res.status(500).json({ error: 'Failed to fetch upcoming tasks' });
-  }
-});
 
 module.exports = router;
