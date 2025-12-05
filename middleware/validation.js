@@ -24,7 +24,7 @@ const validate = (schema) => {
 
     // Validate request body
     if (schema.body) {
-      const { error } = schema.body.validate(req.body, { stripUnknown: false });
+      const { error } = schema.body.unknown(true).validate(req.body);
       if (error) {
         errors.body = error.details.map(detail => ({
           field: detail.path.join('.'),
@@ -33,9 +33,9 @@ const validate = (schema) => {
       }
     }
 
-    // Validate request parameters
+    // Validate request parameters - allow unknown parameters
     if (schema.params) {
-      const { error } = schema.params.validate(req.params, { stripUnknown: false });
+      const { error } = schema.params.unknown(true).validate(req.params);
       if (error) {
         if (req.path === '/tasks') {
           console.log(`❌ Params validation error on /tasks:`, error);
