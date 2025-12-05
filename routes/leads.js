@@ -817,7 +817,7 @@ router.get('/tasks',
       limit: Joi.number().integer().min(1).max(1000).default(50),
       offset: Joi.number().integer().min(0).default(0),
       priority: Joi.string().valid('low', 'medium', 'high').optional().allow('')
-    })
+    }).unknown(true)
   }),
   async (req, res) => {
     try {
