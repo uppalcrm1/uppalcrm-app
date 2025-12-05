@@ -374,10 +374,22 @@ app.get('/', (req, res) => {
 
 // Handle 404 for API routes
 app.use('/api/*', (req, res) => {
+  console.error('❌ 404 Handler Hit:', {
+    method: req.method,
+    originalUrl: req.originalUrl,
+    url: req.url,
+    path: req.path,
+    baseUrl: req.baseUrl
+  });
   res.status(404).json({
     error: 'Endpoint not found',
-    message: `API endpoint ${req.method} ${req.path} does not exist`,
-    available_endpoints: '/api'
+    message: `API endpoint ${req.method} ${req.originalUrl} does not exist`,
+    available_endpoints: '/api',
+    debug: {
+      url: req.url,
+      path: req.path,
+      originalUrl: req.originalUrl
+    }
   });
 });
 
