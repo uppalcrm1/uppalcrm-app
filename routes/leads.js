@@ -1505,10 +1505,6 @@ router.get('/tasks/upcoming', async (req, res) => {
   }
 });
 
-
-  }
-);
-
 /**
  * GET /leads/:id
  * Get specific lead by ID
