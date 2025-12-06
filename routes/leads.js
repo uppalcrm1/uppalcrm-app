@@ -1095,7 +1095,7 @@ router.post('/:leadId/tasks',
       // Determine status based on scheduled date
       const status = scheduled_at && new Date(scheduled_at) > new Date()
         ? 'scheduled'
-        : 'completed';
+        : 'pending';
 
       const insertQuery = `
         INSERT INTO lead_interactions (
