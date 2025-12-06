@@ -793,6 +793,8 @@ router.get('/stats',
         details: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }
+  }
+);
 
 /**
  * ============================================================
