@@ -31,7 +31,9 @@
       "Bash(then cat .env)",
       "Bash(else echo \"No .env file found\")",
       "Bash(fi)",
-      "Bash(psql:*)"
+      "Bash(psql:*)",
+      "WebFetch(domain:uppalcrm-frontend-staging.onrender.com)",
+      "Bash(dir:*)"
     ],
     "deny": [],
     "ask": []

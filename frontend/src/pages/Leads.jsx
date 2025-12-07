@@ -4,7 +4,7 @@ import DynamicLeadForm from '../components/DynamicLeadForm'
 import ConvertLeadModal from '../components/ConvertLeadModal'
 import DeleteConfirmModal from '../components/DeleteConfirmModal'
 import LeadViews from './LeadViews'
-import { leadsAPI } from '../services/api'
+import { leadsAPI, contactsAPI } from '../services/api'
 import toast from 'react-hot-toast'
 
 const Leads = () => {
@@ -132,9 +132,18 @@ const Leads = () => {
       {showConvertModal && selectedLead && (
         <ConvertLeadModal
           lead={selectedLead}
-          isOpen={showConvertModal}
           onClose={handleCloseModals}
-          onSuccess={handleFormSuccess}
+          onSubmit={async (conversionData) => {
+            try {
+              await contactsAPI.convertFromLead(conversionData)
+              toast.success('Lead converted to contact successfully')
+              handleFormSuccess()
+            } catch (error) {
+              console.error('Error converting lead:', error)
+              toast.error(error.response?.data?.message || 'Failed to convert lead')
+            }
+          }}
+          isLoading={false}
         />
       )}
     </div>
