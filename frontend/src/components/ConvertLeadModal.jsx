@@ -5,6 +5,8 @@ import { contactsAPI } from '../services/api';
 import LoadingSpinner from './LoadingSpinner';
 
 const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
+  console.log('🎯 ConvertLeadModal Version: 2.0 - Tab-Based Workflow - Build:', new Date().toISOString());
+
   const [createAccount, setCreateAccount] = useState(true);
   const [createTransaction, setCreateTransaction] = useState(true);
   const [activeTab, setActiveTab] = useState('contact');
