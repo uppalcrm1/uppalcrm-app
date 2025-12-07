@@ -442,45 +442,206 @@ router.post('/software-editions',
 
 /**
  * POST /contacts/convert-from-lead/:leadId
- * Convert lead to contact
+ * Convert lead to contact with optional account and transaction creation
  */
 router.post('/convert-from-lead/:leadId',
-  validate(contactSchemas.convertFromLead),
+  validateUuidParam,
   async (req, res) => {
+    const { query } = require('../database/connection');
+
     try {
       const { leadId } = req.params;
-      const additionalData = {
-        type: req.body.type,
-        status: req.body.status,
-        notes: req.body.additional_notes ? 
-          `${req.body.additional_notes}\n\nConverted from lead on ${new Date().toISOString()}` :
-          `Converted from lead on ${new Date().toISOString()}`
-      };
+      const {
+        contactMode,
+        existingContactId,
+        contact: contactData,
+        createAccount,
+        account: accountData,
+        createTransaction,
+        transaction: transactionData
+      } = req.body;
 
-      const contact = await Contact.convertFromLead(
-        leadId, 
-        req.organizationId, 
-        req.user.id, 
-        additionalData
+      console.log('🔄 Converting lead:', { leadId, contactMode, createAccount, createTransaction });
+
+      // Start transaction
+      await query('BEGIN');
+
+      // Step 1: Get the lead
+      const leadResult = await query(
+        `SELECT * FROM leads WHERE id = $1 AND organization_id = $2`,
+        [leadId, req.organizationId]
       );
 
-      res.status(201).json({
-        message: 'Lead converted to contact successfully',
-        contact: contact.toJSON()
-      });
-    } catch (error) {
-      console.error('Convert lead to contact error:', error);
-      
-      if (error.message.includes('not found')) {
+      if (leadResult.rows.length === 0) {
+        await query('ROLLBACK');
         return res.status(404).json({
           error: 'Lead not found',
           message: 'Lead does not exist in this organization'
         });
       }
 
+      const lead = leadResult.rows[0];
+      let contact;
+      let contactId;
+
+      // Step 2: Handle contact creation or linking
+      if (contactMode === 'new') {
+        // Create new contact from lead data
+        const contactInsertResult = await query(
+          `INSERT INTO contacts (
+            organization_id, first_name, last_name, email, phone,
+            status, type, company, title, converted_from_lead_id, created_by
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+          RETURNING *`,
+          [
+            req.organizationId,
+            contactData?.firstName || lead.first_name,
+            contactData?.lastName || lead.last_name,
+            contactData?.email || lead.email,
+            contactData?.phone || lead.phone,
+            'active',
+            'customer',
+            lead.company,
+            lead.title,
+            leadId,
+            req.user.id
+          ]
+        );
+        contact = contactInsertResult.rows[0];
+        contactId = contact.id;
+        console.log('✅ Created new contact:', contactId);
+      } else if (contactMode === 'existing' && existingContactId) {
+        // Link to existing contact
+        contactId = existingContactId;
+        const existingContactResult = await query(
+          `SELECT * FROM contacts WHERE id = $1 AND organization_id = $2`,
+          [contactId, req.organizationId]
+        );
+
+        if (existingContactResult.rows.length === 0) {
+          await query('ROLLBACK');
+          return res.status(404).json({
+            error: 'Contact not found',
+            message: 'Selected contact does not exist'
+          });
+        }
+        contact = existingContactResult.rows[0];
+        console.log('✅ Linked to existing contact:', contactId);
+      } else {
+        await query('ROLLBACK');
+        return res.status(400).json({
+          error: 'Invalid contact mode',
+          message: 'Must provide contact data for new contact or contact ID for existing'
+        });
+      }
+
+      // Step 3: Update lead status and link to contact
+      await query(
+        `UPDATE leads
+         SET status = 'converted',
+             linked_contact_id = $1,
+             converted_date = NOW(),
+             updated_at = NOW()
+         WHERE id = $2`,
+        [contactId, leadId]
+      );
+      console.log('✅ Updated lead status to converted');
+
+      // Step 4: Create lead-contact relationship
+      await query(
+        `INSERT INTO lead_contact_relationships (
+          lead_id, contact_id, relationship_type, created_by
+        ) VALUES ($1, $2, $3, $4)
+        ON CONFLICT (lead_id, contact_id) DO NOTHING`,
+        [leadId, contactId, 'conversion', req.user.id]
+      );
+
+      let account = null;
+      let accountId = null;
+
+      // Step 5: Create account if requested
+      if (createAccount && accountData) {
+        const accountInsertResult = await query(
+          `INSERT INTO accounts (
+            organization_id, contact_id, account_name, edition,
+            device_name, mac_address, billing_cycle, account_type,
+            license_status, created_by
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          RETURNING *`,
+          [
+            req.organizationId,
+            contactId,
+            accountData.accountName || `${contact.first_name} ${contact.last_name}'s Account`,
+            accountData.product || 'Standard',
+            accountData.deviceName,
+            accountData.macAddress,
+            accountData.term || 'Monthly',
+            'active',
+            'active',
+            req.user.id
+          ]
+        );
+        account = accountInsertResult.rows[0];
+        accountId = account.id;
+        console.log('✅ Created account:', accountId);
+      }
+
+      let transaction = null;
+
+      // Step 6: Create transaction if requested
+      if (createTransaction && transactionData && accountId) {
+        const transactionInsertResult = await query(
+          `INSERT INTO transactions (
+            organization_id, account_id, contact_id, payment_method,
+            term, amount, status, transaction_date, notes, created_by
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          RETURNING *`,
+          [
+            req.organizationId,
+            accountId,
+            contactId,
+            transactionData.paymentMethod || 'Credit Card',
+            transactionData.term || 'Monthly',
+            transactionData.amount || 0,
+            'pending',
+            transactionData.paymentDate || new Date(),
+            `Converted from lead ${lead.full_name}`,
+            req.user.id
+          ]
+        );
+        transaction = transactionInsertResult.rows[0];
+        console.log('✅ Created transaction:', transaction.id);
+
+        // Update account with next renewal date if provided
+        if (transactionData.nextRenewalDate && accountId) {
+          await query(
+            `UPDATE accounts SET next_renewal_date = $1 WHERE id = $2`,
+            [transactionData.nextRenewalDate, accountId]
+          );
+        }
+      }
+
+      // Commit transaction
+      await query('COMMIT');
+
+      res.status(201).json({
+        message: 'Lead converted successfully',
+        contact,
+        account,
+        transaction,
+        summary: {
+          contactCreated: contactMode === 'new',
+          accountCreated: createAccount && account !== null,
+          transactionCreated: createTransaction && transaction !== null
+        }
+      });
+    } catch (error) {
+      await query('ROLLBACK');
+      console.error('Convert lead error:', error);
+
       res.status(500).json({
         error: 'Lead conversion failed',
-        message: 'Unable to convert lead to contact'
+        message: error.message || 'Unable to convert lead'
       });
     }
   }

@@ -437,8 +437,9 @@ export const contactsAPI = {
     return response.data
   },
   
-  convertFromLead: async (leadId, additionalData = {}) => {
-    const response = await api.post(`/contacts/convert-from-lead/${leadId}`, additionalData)
+  convertFromLead: async (conversionData) => {
+    const { leadId, ...data } = conversionData;
+    const response = await api.post(`/contacts/convert-from-lead/${leadId}`, data)
     return response.data
   },
   

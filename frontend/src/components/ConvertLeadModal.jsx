@@ -1,252 +1,713 @@
-import React, { useState } from 'react'
-import { useQuery, useMutation } from '@tanstack/react-query'
-import { useForm } from 'react-hook-form'
-import { X, Search, ArrowRightLeft, CheckCircle } from 'lucide-react'
-import { leadsAPI, contactsAPI } from '../services/api'
-import LoadingSpinner from './LoadingSpinner'
-import toast from 'react-hot-toast'
+import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { X, CheckCircle2, User, Building2, CreditCard, Info, Search } from 'lucide-react';
+import { contactsAPI } from '../services/api';
+import LoadingSpinner from './LoadingSpinner';
 
-const ConvertLeadModal = ({ onClose, onSuccess }) => {
-  const [selectedLead, setSelectedLead] = useState(null)
-  const [searchTerm, setSearchTerm] = useState('')
+const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
+  const [createAccount, setCreateAccount] = useState(true);
+  const [createTransaction, setCreateTransaction] = useState(true);
+  const [activeTab, setActiveTab] = useState('contact');
+  const [contactMode, setContactMode] = useState('new');
+  const [selectedContact, setSelectedContact] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
 
-  const { register, handleSubmit, formState: { errors } } = useForm({
-    defaultValues: {
-      type: 'customer',
-      status: 'active'
-    }
-  })
+  // Form state
+  const [contactForm, setContactForm] = useState({
+    firstName: lead?.first_name || '',
+    lastName: lead?.last_name || '',
+    email: lead?.email || '',
+    phone: lead?.phone || ''
+  });
 
-  // Fetch leads
-  const { data: leadsData, isLoading: leadsLoading } = useQuery({
-    queryKey: ['leads', { search: searchTerm, status: 'qualified,new,contacted' }],
-    queryFn: () => leadsAPI.getLeads({ 
-      search: searchTerm, 
-      limit: 50,
-      status: searchTerm ? '' : 'qualified' // Show qualified leads by default, all if searching
-    }),
-  })
+  const [accountForm, setAccountForm] = useState({
+    product: 'Standard (Default)',
+    accountName: `${lead?.first_name || ''} ${lead?.last_name || ''}'s Account`.trim(),
+    deviceName: '',
+    macAddress: '',
+    term: 'Monthly'
+  });
 
-  // Convert lead mutation
-  const convertMutation = useMutation({
-    mutationFn: ({ leadId, additionalData }) => contactsAPI.convertFromLead(leadId, additionalData),
-    onSuccess: (data) => {
-      toast.success('Lead converted to contact successfully')
-      onSuccess(data)
-    },
-    onError: (error) => {
-      toast.error(error.response?.data?.message || 'Failed to convert lead')
-    }
-  })
+  const [transactionForm, setTransactionForm] = useState({
+    paymentMethod: 'Credit Card',
+    amount: '',
+    owner: 'Admin User',
+    paymentDate: new Date().toISOString().split('T')[0],
+    source: 'website',
+    term: 'Monthly',
+    nextRenewalDate: ''
+  });
 
-  const handleConvert = (data) => {
-    if (!selectedLead) {
-      toast.error('Please select a lead to convert')
-      return
-    }
+  // Fetch existing contacts
+  const { data: contactsData } = useQuery({
+    queryKey: ['contacts', { search: searchTerm }],
+    queryFn: () => contactsAPI.getContacts({ search: searchTerm, limit: 50 }),
+    enabled: contactMode === 'existing'
+  });
 
-    convertMutation.mutate({
-      leadId: selectedLead.id,
-      additionalData: {
-        type: data.type,
-        status: data.status,
-        additional_notes: data.additional_notes
+  const existingContacts = contactsData?.contacts || [];
+  const filteredContacts = existingContacts.filter(contact =>
+    contact.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    contact.email?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Auto-calculate renewal date based on term and payment date
+  useEffect(() => {
+    if (transactionForm.paymentDate && transactionForm.term) {
+      const paymentDate = new Date(transactionForm.paymentDate);
+      let renewalDate = new Date(paymentDate);
+
+      switch (transactionForm.term) {
+        case 'Monthly':
+          renewalDate.setMonth(renewalDate.getMonth() + 1);
+          break;
+        case 'Quarterly':
+          renewalDate.setMonth(renewalDate.getMonth() + 3);
+          break;
+        case 'Annually':
+          renewalDate.setFullYear(renewalDate.getFullYear() + 1);
+          break;
       }
-    })
-  }
 
-  const filteredLeads = leadsData?.leads || []
+      setTransactionForm(prev => ({
+        ...prev,
+        nextRenewalDate: renewalDate.toISOString().split('T')[0]
+      }));
+    }
+  }, [transactionForm.paymentDate, transactionForm.term]);
+
+  // Sync term between account and transaction
+  useEffect(() => {
+    setTransactionForm(prev => ({
+      ...prev,
+      term: accountForm.term
+    }));
+  }, [accountForm.term]);
+
+  // Auto-fill transaction amount based on product (mock pricing)
+  useEffect(() => {
+    const pricing = {
+      'Standard (Default)': { Monthly: '49.99', Quarterly: '139.99', Annually: '499.99' },
+      'Premium': { Monthly: '99.99', Quarterly: '279.99', Annually: '999.99' },
+      'Enterprise': { Monthly: '199.99', Quarterly: '549.99', Annually: '1999.99' }
+    };
+
+    const price = pricing[accountForm.product]?.[accountForm.term];
+    if (price) {
+      setTransactionForm(prev => ({
+        ...prev,
+        amount: price
+      }));
+    }
+  }, [accountForm.product, accountForm.term]);
+
+  // Validation functions
+  const isContactValid = () => {
+    if (contactMode === 'existing') {
+      return selectedContact !== '';
+    }
+    return contactForm.firstName.trim() !== '' &&
+           contactForm.lastName.trim() !== '' &&
+           (contactForm.email.trim() !== '' || contactForm.phone.trim() !== '');
+  };
+
+  const isAccountValid = () => {
+    if (!createAccount) return true;
+    return accountForm.accountName.trim() !== '' &&
+           accountForm.deviceName.trim() !== '' &&
+           accountForm.macAddress.trim() !== '';
+  };
+
+  const isTransactionValid = () => {
+    if (!createTransaction) return true;
+    return transactionForm.amount.trim() !== '' &&
+           transactionForm.nextRenewalDate.trim() !== '';
+  };
+
+  const handleContactNext = () => {
+    if (isContactValid()) {
+      if (createAccount) {
+        setActiveTab('account');
+      } else if (createTransaction) {
+        setActiveTab('transaction');
+      }
+    }
+  };
+
+  const handleAccountNext = () => {
+    if (isAccountValid()) {
+      if (createTransaction) {
+        setActiveTab('transaction');
+      }
+    }
+  };
+
+  const handleConvert = () => {
+    if (isContactValid() && isAccountValid() && isTransactionValid()) {
+      const conversionData = {
+        leadId: lead.id,
+        contactMode,
+        existingContactId: contactMode === 'existing' ? selectedContact : null,
+        contact: contactMode === 'new' ? contactForm : null,
+        createAccount,
+        account: createAccount ? accountForm : null,
+        createTransaction,
+        transaction: createTransaction ? transactionForm : null
+      };
+
+      onSubmit(conversionData);
+    }
+  };
+
+  if (!lead) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-        <div className="fixed inset-0 transition-opacity" onClick={onClose}>
-          <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[95vh] overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <div>
+            <h2 className="text-xl font-semibold">Convert Lead</h2>
+            <p className="text-sm text-gray-600 mt-0.5">{lead.full_name}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 p-1"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
-        <div className="inline-block w-full max-w-4xl px-6 py-6 my-8 text-left align-middle transition-all transform bg-white shadow-xl rounded-lg">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-gray-900">Convert Lead to Contact</h3>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-              <X size={24} />
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Lead Selection */}
-            <div>
-              <h4 className="text-md font-medium text-gray-900 mb-4">Select Lead</h4>
-              
-              {/* Search */}
-              <div className="mb-4">
-                <div className="relative">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Search leads..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="input pl-10"
-                  />
-                </div>
-              </div>
-
-              {/* Lead List */}
-              <div className="border rounded-lg max-h-96 overflow-y-auto">
-                {leadsLoading ? (
-                  <div className="p-4 text-center">
-                    <LoadingSpinner size="sm" />
-                  </div>
-                ) : filteredLeads.length === 0 ? (
-                  <div className="p-4 text-center text-gray-500">
-                    {searchTerm ? 'No leads found matching your search' : 'No qualified leads available'}
+        {/* What will be created section */}
+        <div className="px-6 py-3 bg-blue-50 border-b border-blue-100">
+          <div className="flex items-start gap-2">
+            <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <div className="text-sm text-blue-900 mb-2">This conversion will create:</div>
+              <div className="flex gap-6">
+                {contactMode === 'new' ? (
+                  <div className="flex items-center gap-2 text-sm">
+                    <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" />
+                    <User className="w-4 h-4 text-gray-600 flex-shrink-0" />
+                    <span><strong>New Contact</strong></span>
                   </div>
                 ) : (
-                  <div className="divide-y divide-gray-200">
-                    {filteredLeads.map((lead) => (
-                      <div
-                        key={lead.id}
-                        onClick={() => setSelectedLead(lead)}
-                        className={`p-4 cursor-pointer hover:bg-gray-50 ${
-                          selectedLead?.id === lead.id ? 'bg-primary-50 border-l-4 border-l-primary-500' : ''
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h5 className="font-medium text-gray-900">{lead.full_name}</h5>
-                            <p className="text-sm text-gray-600">{lead.company}</p>
-                            <div className="flex items-center space-x-2 mt-1">
-                              <span className={`badge badge-sm badge-${
-                                lead.status === 'qualified' ? 'green' : 
-                                lead.status === 'new' ? 'blue' : 'yellow'
-                              }`}>
-                                {lead.status}
-                              </span>
-                              {lead.value > 0 && (
-                                <span className="text-xs text-gray-500">${lead.value.toLocaleString()}</span>
-                              )}
-                            </div>
-                          </div>
-                          {selectedLead?.id === lead.id && (
-                            <CheckCircle className="text-primary-600" size={20} />
-                          )}
-                        </div>
-                      </div>
-                    ))}
+                  <div className="flex items-center gap-2 text-sm">
+                    <CheckCircle2 className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                    <User className="w-4 h-4 text-gray-600 flex-shrink-0" />
+                    <span><strong>Link to Existing Contact</strong></span>
+                  </div>
+                )}
+                {createAccount && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" />
+                    <Building2 className="w-4 h-4 text-gray-600 flex-shrink-0" />
+                    <span><strong>Account</strong></span>
+                  </div>
+                )}
+                {createTransaction && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" />
+                    <CreditCard className="w-4 h-4 text-gray-600 flex-shrink-0" />
+                    <span><strong>Transaction</strong></span>
                   </div>
                 )}
               </div>
             </div>
+          </div>
+        </div>
 
-            {/* Conversion Options */}
-            <div>
-              <h4 className="text-md font-medium text-gray-900 mb-4">Contact Details</h4>
-              
-              {selectedLead ? (
-                <form onSubmit={handleSubmit(handleConvert)} className="space-y-4">
-                  {/* Selected Lead Preview */}
-                  <div className="p-4 bg-gray-50 rounded-lg">
-                    <h5 className="font-medium text-gray-900 mb-2">Converting:</h5>
-                    <div className="space-y-1 text-sm">
-                      <p><span className="font-medium">Name:</span> {selectedLead.full_name}</p>
-                      {selectedLead.company && (
-                        <p><span className="font-medium">Company:</span> {selectedLead.company}</p>
-                      )}
-                      {selectedLead.email && (
-                        <p><span className="font-medium">Email:</span> {selectedLead.email}</p>
-                      )}
-                      {selectedLead.phone && (
-                        <p><span className="font-medium">Phone:</span> {selectedLead.phone}</p>
+        {/* Main Content with Tabs */}
+        <div className="flex-1 px-6 py-4 overflow-y-auto">
+          {/* Tab Navigation */}
+          <div className="flex gap-2 mb-4 border-b border-gray-200">
+            <button
+              onClick={() => setActiveTab('contact')}
+              className={`px-4 py-3 font-medium border-b-2 transition-colors ${
+                activeTab === 'contact'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <User className="w-4 h-4" />
+                Contact
+              </div>
+            </button>
+            <button
+              onClick={() => createAccount && setActiveTab('account')}
+              disabled={!createAccount}
+              className={`px-4 py-3 font-medium border-b-2 transition-colors ${
+                activeTab === 'account'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-600 hover:text-gray-900'
+              } ${!createAccount ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              <div className="flex items-center gap-2">
+                <Building2 className="w-4 h-4" />
+                Account
+                {!createAccount && <span className="text-xs">(disabled)</span>}
+              </div>
+            </button>
+            <button
+              onClick={() => createTransaction && setActiveTab('transaction')}
+              disabled={!createTransaction}
+              className={`px-4 py-3 font-medium border-b-2 transition-colors ${
+                activeTab === 'transaction'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-600 hover:text-gray-900'
+              } ${!createTransaction ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              <div className="flex items-center gap-2">
+                <CreditCard className="w-4 h-4" />
+                Transaction
+                {!createTransaction && <span className="text-xs">(disabled)</span>}
+              </div>
+            </button>
+          </div>
+
+          {/* Contact Tab */}
+          {activeTab === 'contact' && (
+            <div className="space-y-4">
+              {/* Contact Mode Selection */}
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => setContactMode('new')}
+                  className={`p-3 border-2 rounded-lg text-left transition-all ${
+                    contactMode === 'new'
+                      ? 'border-blue-600 bg-blue-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                      contactMode === 'new' ? 'border-blue-600' : 'border-gray-300'
+                    }`}>
+                      {contactMode === 'new' && (
+                        <div className="w-2 h-2 rounded-full bg-blue-600" />
                       )}
                     </div>
+                    <span className="text-sm font-medium">Create New Contact</span>
                   </div>
+                  <p className="text-xs text-gray-600 ml-6">
+                    Create a brand new contact from this lead
+                  </p>
+                </button>
 
-                  {/* Contact Type */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Contact Type</label>
-                    <select {...register('type')} className="select">
-                      <option value="customer">Customer</option>
-                      <option value="prospect">Prospect</option>
-                      <option value="partner">Partner</option>
-                      <option value="vendor">Vendor</option>
-                    </select>
+                <button
+                  onClick={() => setContactMode('existing')}
+                  className={`p-3 border-2 rounded-lg text-left transition-all ${
+                    contactMode === 'existing'
+                      ? 'border-blue-600 bg-blue-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                      contactMode === 'existing' ? 'border-blue-600' : 'border-gray-300'
+                    }`}>
+                      {contactMode === 'existing' && (
+                        <div className="w-2 h-2 rounded-full bg-blue-600" />
+                      )}
+                    </div>
+                    <span className="text-sm font-medium">Use Existing Contact</span>
                   </div>
+                  <p className="text-xs text-gray-600 ml-6">
+                    Add another account to an existing contact
+                  </p>
+                </button>
+              </div>
 
-                  {/* Contact Status */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Contact Status</label>
-                    <select {...register('status')} className="select">
-                      <option value="active">Active</option>
-                      <option value="prospect">Prospect</option>
-                      <option value="customer">Customer</option>
-                      <option value="inactive">Inactive</option>
-                    </select>
-                  </div>
-
-                  {/* Additional Notes */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Additional Notes</label>
-                    <textarea
-                      {...register('additional_notes')}
-                      rows={3}
-                      className="input resize-none"
-                      placeholder="Any additional notes about this conversion..."
-                    />
-                  </div>
-
-                  {/* Conversion Notice */}
-                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                    <div className="flex items-start">
-                      <ArrowRightLeft className="text-blue-600 mt-0.5 mr-2" size={16} />
-                      <div className="text-sm text-blue-800">
-                        <p className="font-medium mb-1">Conversion Process:</p>
-                        <ul className="space-y-1 text-xs">
-                          <li>• Lead will be marked as "converted"</li>
-                          <li>• New contact will be created with lead data</li>
-                          <li>• Lead notes and history will be preserved</li>
-                          <li>• Assignment will be maintained</li>
-                        </ul>
-                      </div>
+              {/* New Contact Form */}
+              {contactMode === 'new' && (
+                <div className="border border-gray-200 rounded-lg p-4">
+                  <h3 className="text-sm font-medium mb-3">Contact Information</h3>
+                  <div className="grid grid-cols-4 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">First Name *</label>
+                      <input
+                        type="text"
+                        value={contactForm.firstName}
+                        onChange={(e) => setContactForm({ ...contactForm, firstName: e.target.value })}
+                        className="input h-9"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Last Name *</label>
+                      <input
+                        type="text"
+                        value={contactForm.lastName}
+                        onChange={(e) => setContactForm({ ...contactForm, lastName: e.target.value })}
+                        className="input h-9"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
+                      <input
+                        type="email"
+                        value={contactForm.email}
+                        onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
+                        className="input h-9"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Phone</label>
+                      <input
+                        type="tel"
+                        value={contactForm.phone}
+                        onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })}
+                        placeholder="Not provided"
+                        className="input h-9"
+                      />
                     </div>
                   </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center justify-end space-x-3 pt-4">
-                    <button
-                      type="button"
-                      onClick={onClose}
-                      className="btn btn-secondary btn-md"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={convertMutation.isPending}
-                      className="btn btn-primary btn-md"
-                    >
-                      {convertMutation.isPending ? (
-                        <LoadingSpinner size="sm" />
-                      ) : (
-                        <>
-                          <ArrowRightLeft size={16} className="mr-2" />
-                          Convert to Contact
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </form>
-              ) : (
-                <div className="text-center py-8 text-gray-500">
-                  <ArrowRightLeft className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                  <p>Select a lead from the list to configure conversion options</p>
+                  <p className="text-xs text-gray-500 mt-2">At least one contact method (email or phone) is required</p>
                 </div>
+              )}
+
+              {/* Existing Contact Selection */}
+              {contactMode === 'existing' && (
+                <div className="border border-gray-200 rounded-lg p-4">
+                  <h3 className="text-sm font-medium mb-3">Select Existing Contact</h3>
+                  <div className="space-y-3">
+                    <div className="relative">
+                      <Search className="w-4 h-4 absolute left-3 top-2.5 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Search contacts by name or email..."
+                        className="input pl-10 h-9"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                      />
+                    </div>
+                    <div className="border border-gray-200 rounded-lg max-h-48 overflow-y-auto">
+                      {filteredContacts.length > 0 ? (
+                        filteredContacts.map((contact) => (
+                          <button
+                            key={contact.id}
+                            onClick={() => setSelectedContact(contact.id)}
+                            className={`w-full p-3 border-b border-gray-100 last:border-b-0 text-left hover:bg-gray-50 transition-colors ${
+                              selectedContact === contact.id ? 'bg-blue-50' : ''
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                                selectedContact === contact.id ? 'border-blue-600' : 'border-gray-300'
+                              }`}>
+                                {selectedContact === contact.id && (
+                                  <div className="w-2 h-2 rounded-full bg-blue-600" />
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm font-medium truncate">{contact.full_name}</div>
+                                <div className="text-xs text-gray-600 truncate">{contact.email}</div>
+                              </div>
+                            </div>
+                          </button>
+                        ))
+                      ) : (
+                        <div className="p-6 text-center text-gray-500">
+                          <p className="text-sm">No contacts found</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Account Tab */}
+          {activeTab === 'account' && (
+            <div className="space-y-4">
+              <div className="flex items-start gap-3 pb-3 border-b border-gray-200">
+                <input
+                  type="checkbox"
+                  id="createAccount"
+                  checked={createAccount}
+                  onChange={(e) => {
+                    setCreateAccount(e.target.checked);
+                    if (!e.target.checked && activeTab === 'account') {
+                      setActiveTab('contact');
+                    }
+                  }}
+                  className="mt-0.5"
+                />
+                <div>
+                  <label htmlFor="createAccount" className="cursor-pointer text-sm font-medium">
+                    Create Account
+                  </label>
+                  <p className="text-xs text-gray-600">
+                    Create a subscription account for this contact
+                  </p>
+                </div>
+              </div>
+
+              {createAccount && (
+                <div className="border border-gray-200 rounded-lg p-4">
+                  <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
+                    <Building2 className="w-4 h-4 text-blue-600" />
+                    Account Details
+                  </h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Product *</label>
+                      <select
+                        value={accountForm.product}
+                        onChange={(e) => setAccountForm({ ...accountForm, product: e.target.value })}
+                        className="select h-9"
+                      >
+                        <option>Standard (Default)</option>
+                        <option>Premium</option>
+                        <option>Enterprise</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Term *</label>
+                      <select
+                        value={accountForm.term}
+                        onChange={(e) => setAccountForm({ ...accountForm, term: e.target.value })}
+                        className="select h-9"
+                      >
+                        <option>Monthly</option>
+                        <option>Quarterly</option>
+                        <option>Annually</option>
+                      </select>
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Account Name *</label>
+                      <input
+                        type="text"
+                        value={accountForm.accountName}
+                        onChange={(e) => setAccountForm({ ...accountForm, accountName: e.target.value })}
+                        className="input h-9"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Device Name *</label>
+                      <input
+                        type="text"
+                        value={accountForm.deviceName}
+                        onChange={(e) => setAccountForm({ ...accountForm, deviceName: e.target.value })}
+                        placeholder="e.g., Device 001"
+                        className="input h-9"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">MAC Address *</label>
+                      <input
+                        type="text"
+                        value={accountForm.macAddress}
+                        onChange={(e) => setAccountForm({ ...accountForm, macAddress: e.target.value })}
+                        placeholder="00:00:00:00:00:00"
+                        className="input h-9"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Transaction Tab */}
+          {activeTab === 'transaction' && (
+            <div className="space-y-4">
+              <div className="flex items-start gap-3 pb-3 border-b border-gray-200">
+                <input
+                  type="checkbox"
+                  id="createTransaction"
+                  checked={createTransaction}
+                  onChange={(e) => {
+                    setCreateTransaction(e.target.checked);
+                    if (!e.target.checked && activeTab === 'transaction') {
+                      setActiveTab('contact');
+                    }
+                  }}
+                  className="mt-0.5"
+                />
+                <div>
+                  <label htmlFor="createTransaction" className="cursor-pointer text-sm font-medium">
+                    Create Initial Transaction
+                  </label>
+                  <p className="text-xs text-gray-600">
+                    Record the first payment transaction for this account
+                  </p>
+                </div>
+              </div>
+
+              {createTransaction && (
+                <div className="border border-gray-200 rounded-lg p-4">
+                  <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
+                    <CreditCard className="w-4 h-4 text-blue-600" />
+                    Payment Details
+                  </h3>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Payment Method *</label>
+                      <select
+                        value={transactionForm.paymentMethod}
+                        onChange={(e) => setTransactionForm({ ...transactionForm, paymentMethod: e.target.value })}
+                        className="select h-9"
+                      >
+                        <option>Credit Card</option>
+                        <option>Debit Card</option>
+                        <option>Bank Transfer</option>
+                        <option>PayPal</option>
+                        <option>Cash</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Amount *</label>
+                      <input
+                        type="number"
+                        value={transactionForm.amount}
+                        onChange={(e) => setTransactionForm({ ...transactionForm, amount: e.target.value })}
+                        placeholder="0.00"
+                        step="0.01"
+                        className="input h-9"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Owner *</label>
+                      <select
+                        value={transactionForm.owner}
+                        onChange={(e) => setTransactionForm({ ...transactionForm, owner: e.target.value })}
+                        className="select h-9"
+                      >
+                        <option>Admin User</option>
+                        <option>Sales User 1</option>
+                        <option>Sales User 2</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Payment Date *</label>
+                      <input
+                        type="date"
+                        value={transactionForm.paymentDate}
+                        onChange={(e) => setTransactionForm({ ...transactionForm, paymentDate: e.target.value })}
+                        className="input h-9"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Source *</label>
+                      <input
+                        type="text"
+                        value={transactionForm.source}
+                        onChange={(e) => setTransactionForm({ ...transactionForm, source: e.target.value })}
+                        className="input h-9 bg-gray-50"
+                        readOnly
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Term *</label>
+                      <select
+                        value={transactionForm.term}
+                        onChange={(e) => setTransactionForm({ ...transactionForm, term: e.target.value })}
+                        className="select h-9"
+                      >
+                        <option>Monthly</option>
+                        <option>Quarterly</option>
+                        <option>Annually</option>
+                      </select>
+                    </div>
+                    <div className="col-span-3">
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Next Renewal Date *</label>
+                      <input
+                        type="date"
+                        value={transactionForm.nextRenewalDate}
+                        onChange={(e) => setTransactionForm({ ...transactionForm, nextRenewalDate: e.target.value })}
+                        className="input h-9"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Transaction will be created with status "Pending" and linked to both contact and account
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Footer with Summary */}
+        <div className="border-t border-gray-200 bg-gray-50 px-6 py-3">
+          <div className="flex items-start justify-between gap-6">
+            <div className="flex-1">
+              <h4 className="text-sm font-medium mb-1.5">What happens next:</h4>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-0.5 text-xs text-gray-700">
+                <div className="flex items-start gap-1.5">
+                  <span className="text-blue-600 mt-0.5">•</span>
+                  <span>Lead status will be set to "Converted"</span>
+                </div>
+                {contactMode === 'new' ? (
+                  <div className="flex items-start gap-1.5">
+                    <span className="text-blue-600 mt-0.5">•</span>
+                    <span>A new contact will be created with lead information</span>
+                  </div>
+                ) : (
+                  <div className="flex items-start gap-1.5">
+                    <span className="text-blue-600 mt-0.5">•</span>
+                    <span>Lead will be linked to the selected existing contact</span>
+                  </div>
+                )}
+                {createAccount && (
+                  <div className="flex items-start gap-1.5">
+                    <span className="text-blue-600 mt-0.5">•</span>
+                    <span>A subscription account will be created and linked</span>
+                  </div>
+                )}
+                {createTransaction && (
+                  <div className="flex items-start gap-1.5">
+                    <span className="text-blue-600 mt-0.5">•</span>
+                    <span>Initial transaction record will be created</span>
+                  </div>
+                )}
+                <div className="flex items-start gap-1.5">
+                  <span className="text-blue-600 mt-0.5">•</span>
+                  <span>Lead history and notes will be preserved</span>
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={onClose}
+                className="btn btn-secondary btn-md"
+              >
+                Cancel
+              </button>
+              {activeTab === 'contact' && (
+                <button
+                  className="btn btn-primary btn-md"
+                  onClick={handleContactNext}
+                  disabled={!isContactValid()}
+                >
+                  Continue to {createAccount ? 'Account' : createTransaction ? 'Transaction' : 'Review'}
+                </button>
+              )}
+              {activeTab === 'account' && (
+                <button
+                  className="btn btn-primary btn-md"
+                  onClick={handleAccountNext}
+                  disabled={!isAccountValid()}
+                >
+                  Continue to {createTransaction ? 'Transaction' : 'Review'}
+                </button>
+              )}
+              {activeTab === 'transaction' && (
+                <button
+                  className="btn btn-primary btn-md"
+                  onClick={handleConvert}
+                  disabled={isLoading || !isContactValid() || !isAccountValid() || !isTransactionValid()}
+                >
+                  {isLoading ? <LoadingSpinner size="sm" /> : 'Convert Lead'}
+                </button>
               )}
             </div>
           </div>
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default ConvertLeadModal
+export default ConvertLeadModal;
