@@ -84,37 +84,18 @@ const contactSchemas = {
     body: Joi.object({
       // Contact mode: 'new' or 'existing'
       contactMode: Joi.string().valid('new', 'existing').required(),
-      existingContactId: Joi.string().guid({ version: 'uuidv4' }).optional().allow(null),
+      existingContactId: Joi.string().guid({ version: 'uuidv4' }).optional().allow(null, ''),
       
       // Contact data (for new contacts)
-      contact: Joi.object({
-        firstName: Joi.string().optional(),
-        lastName: Joi.string().optional(),
-        email: Joi.string().email().optional(),
-        phone: Joi.string().optional()
-      }).optional().allow(null),
+      contact: Joi.any().optional().allow(null),
       
       // Account creation
-      createAccount: Joi.boolean().default(false),
-      account: Joi.object({
-        product: Joi.string().optional(),
-        accountName: Joi.string().optional(),
-        deviceName: Joi.string().optional(),
-        macAddress: Joi.string().optional(),
-        term: Joi.string().optional()
-      }).optional().allow(null),
+      createAccount: Joi.boolean().optional(),
+      account: Joi.any().optional().allow(null),
       
       // Transaction creation
-      createTransaction: Joi.boolean().default(false),
-      transaction: Joi.object({
-        paymentMethod: Joi.string().optional(),
-        amount: Joi.number().optional(),
-        owner: Joi.string().optional(),
-        paymentDate: Joi.date().iso().optional(),
-        source: Joi.string().optional(),
-        term: Joi.string().optional(),
-        nextRenewalDate: Joi.date().iso().optional()
-      }).optional().allow(null)
+      createTransaction: Joi.boolean().optional(),
+      transaction: Joi.any().optional().allow(null)
     }).unknown(true)
   },
 
