@@ -475,7 +475,7 @@ router.post('/software-editions',
  * Convert lead to contact with optional account and transaction creation
  */
 router.post('/convert-from-lead/:leadId',
-  validateUuidParam,
+  validate(contactSchemas.convertFromLead),
   async (req, res) => {
     const { query } = require('../database/connection');
 
