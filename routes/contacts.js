@@ -456,12 +456,20 @@ router.post('/software-editions',
  * Convert lead to contact with optional account and transaction creation
  */
 router.post('/convert-from-lead/:leadId',
-  validate(contactSchemas.convertFromLead),
   async (req, res) => {
     const { query } = require('../database/connection');
 
     try {
       const { leadId } = req.params;
+      
+      // Validate leadId is a UUID
+      if (!leadId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(leadId)) {
+        return res.status(400).json({
+          error: 'Invalid lead ID',
+          message: 'Lead ID must be a valid UUID'
+        });
+      }
+      
       const {
         contactMode,
         existingContactId,
