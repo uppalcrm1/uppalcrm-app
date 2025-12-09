@@ -24,6 +24,7 @@ import AccountManagement from './pages/AccountManagement'
 import SubscriptionManagement from './pages/SubscriptionManagement'
 import ImportLeads from './pages/ImportLeads'
 import ImportContacts from './pages/ImportContacts'
+import ContactImport from './pages/ContactImport'
 import LeadDetail from './pages/LeadDetail'
 import ContactsPage from './pages/ContactsPage'
 import AccountsPage from './pages/AccountsPage'
@@ -115,6 +116,7 @@ function App() {
         <Route path="leads/new" element={<DynamicLeadForm />} />
         <Route path="leads/import" element={<ImportLeads />} />
         <Route path="contacts/import" element={<ImportContacts />} />
+        <Route path="import/contacts" element={<ContactImport />} />
         <Route path="accounts" element={<AccountsPage />} />
         <Route path="transactions" element={<TransactionsPage />} />
         <Route path="subscription" element={<SubscriptionPage />} />

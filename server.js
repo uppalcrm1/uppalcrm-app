@@ -49,6 +49,7 @@ const downloadRoutes = require('./routes/downloads');
 
 // Import Routes
 const importRoutes = require('./routes/import');
+const contactImportRoutes = require('./routes/contactImportRoutes');
 // Public leads routes (simplified for production deployment)
 let publicLeadRoutes;
 try {
@@ -215,6 +216,7 @@ app.use('/api/downloads', rateLimiters.general, downloadRoutes);
 
 // Import API routes
 app.use('/api/import', rateLimiters.general, importRoutes);
+app.use('/api/imports/contacts', rateLimiters.general, contactImportRoutes);
 
 // Webhook routes (external integrations - use webhook-specific rate limiting)
 app.use('/api/webhooks', rateLimiters.webhook, webhooksRoutes);
