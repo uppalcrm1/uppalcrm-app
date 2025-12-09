@@ -1,7 +1,7 @@
 const express = require('express');
 const multer = require('multer');
 const router = express.Router();
-const authenticate = require('../middleware/authenticate');
+const { authenticateToken } = require('../middleware/auth');
 const ContactImportService = require('../services/ContactImportService');
 const ContactImport = require('../models/ContactImport');
 
@@ -28,7 +28,7 @@ const upload = multer({
  * POST /api/imports/contacts/upload
  * Upload and preview CSV file
  */
-router.post('/upload', authenticate, upload.single('file'), async (req, res) => {
+router.post('/upload', authenticateToken, upload.single('file'), async (req, res) => {
   try {
     const { organizationId } = req.user;
     const { file } = req;
@@ -81,7 +81,7 @@ router.post('/upload', authenticate, upload.single('file'), async (req, res) => 
  * POST /api/imports/contacts/:importId/process
  * Start the actual import processing
  */
-router.post('/:importId/process', authenticate, async (req, res) => {
+router.post('/:importId/process', authenticateToken, async (req, res) => {
   try {
     const { organizationId } = req.user;
     const { importId } = req.params;
@@ -135,7 +135,7 @@ router.post('/:importId/process', authenticate, async (req, res) => {
  * GET /api/imports/contacts/:importId
  * Get import status and results
  */
-router.get('/:importId', authenticate, async (req, res) => {
+router.get('/:importId', authenticateToken, async (req, res) => {
   try {
     const { organizationId } = req.user;
     const { importId } = req.params;
@@ -156,7 +156,7 @@ router.get('/:importId', authenticate, async (req, res) => {
  * GET /api/imports/contacts
  * Get all imports for organization
  */
-router.get('/', authenticate, async (req, res) => {
+router.get('/', authenticateToken, async (req, res) => {
   try {
     const { organizationId } = req.user;
     const { limit = 20, offset = 0 } = req.query;
@@ -181,7 +181,7 @@ router.get('/', authenticate, async (req, res) => {
  * POST /api/imports/contacts/mappings/save
  * Save a field mapping for future use
  */
-router.post('/mappings/save', authenticate, async (req, res) => {
+router.post('/mappings/save', authenticateToken, async (req, res) => {
   try {
     const { organizationId } = req.user;
     const { mappingName, fieldMapping, duplicateHandling, matchField } = req.body;
@@ -213,7 +213,7 @@ router.post('/mappings/save', authenticate, async (req, res) => {
  * GET /api/imports/contacts/mappings/list
  * Get all saved mappings for organization
  */
-router.get('/mappings/list', authenticate, async (req, res) => {
+router.get('/mappings/list', authenticateToken, async (req, res) => {
   try {
     const { organizationId } = req.user;
 
