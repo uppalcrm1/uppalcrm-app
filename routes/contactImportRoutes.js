@@ -30,7 +30,7 @@ const upload = multer({
  */
 router.post('/upload', authenticateToken, upload.single('file'), async (req, res) => {
   try {
-    const { organizationId } = req.user;
+    const organizationId = req.organizationId;
     const { file } = req;
 
     if (!file) {
@@ -83,7 +83,7 @@ router.post('/upload', authenticateToken, upload.single('file'), async (req, res
  */
 router.post('/:importId/process', authenticateToken, async (req, res) => {
   try {
-    const { organizationId } = req.user;
+    const organizationId = req.organizationId;
     const { importId } = req.params;
     const { fieldMapping, duplicateHandling = 'create_or_update', matchField = 'email', fileBuffer } = req.body;
 
@@ -137,7 +137,7 @@ router.post('/:importId/process', authenticateToken, async (req, res) => {
  */
 router.get('/:importId', authenticateToken, async (req, res) => {
   try {
-    const { organizationId } = req.user;
+    const organizationId = req.organizationId;
     const { importId } = req.params;
 
     const importRecord = await ContactImport.getImportById(importId, organizationId);
@@ -158,7 +158,7 @@ router.get('/:importId', authenticateToken, async (req, res) => {
  */
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    const { organizationId } = req.user;
+    const organizationId = req.organizationId;
     const { limit = 20, offset = 0 } = req.query;
 
     const imports = await ContactImport.getImportsByOrganization(
@@ -183,7 +183,7 @@ router.get('/', authenticateToken, async (req, res) => {
  */
 router.post('/mappings/save', authenticateToken, async (req, res) => {
   try {
-    const { organizationId } = req.user;
+    const organizationId = req.organizationId;
     const { mappingName, fieldMapping, duplicateHandling, matchField } = req.body;
 
     if (!mappingName || !fieldMapping) {
@@ -215,7 +215,7 @@ router.post('/mappings/save', authenticateToken, async (req, res) => {
  */
 router.get('/mappings/list', authenticateToken, async (req, res) => {
   try {
-    const { organizationId } = req.user;
+    const organizationId = req.organizationId;
 
     const mappings = await ContactImport.getMappingsByOrganization(organizationId);
 
