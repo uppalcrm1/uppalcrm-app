@@ -24,6 +24,7 @@ import { useAuth } from '../contexts/AuthContext'
 import AdminFields from './admin/AdminFields'
 import AdminUsers from './admin/AdminUsers'
 import AdminProducts from './admin/AdminProducts'
+import ContactImport from './ContactImport'
 
 const SettingsPage = () => {
   const { user } = useAuth()
@@ -395,28 +396,7 @@ const IntegrationsSettings = () => {
 
 // Import Settings Component
 const ImportSettings = () => {
-  return (
-    <div>
-      <h3 className="text-lg font-semibold text-gray-900 mb-6">Import Data</h3>
-
-      <div className="space-y-6">
-        <p className="text-gray-600">Import your data from CSV, Excel, or other CRMs</p>
-
-        <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-          <Upload size={48} className="mx-auto text-gray-400 mb-4" />
-          <h4 className="text-sm font-medium text-gray-900 mb-2">Upload File</h4>
-          <p className="text-sm text-gray-600 mb-4">CSV, Excel, or other supported formats</p>
-          <button className="btn btn-primary btn-sm">Choose File</button>
-        </div>
-
-        <div className="border border-gray-200 rounded-lg p-4">
-          <h4 className="text-sm font-medium text-gray-900 mb-2">Import from other CRM</h4>
-          <p className="text-sm text-gray-600 mb-4">Migrate data from Salesforce, HubSpot, or other CRMs</p>
-          <button className="btn btn-secondary btn-sm">Start Migration</button>
-        </div>
-      </div>
-    </div>
-  )
+  return <ContactImport />
 }
 
 // Field Configuration Settings Component
