@@ -89,7 +89,7 @@ const ContactImport = () => {
       const formData = new FormData();
       formData.append('file', file);
 
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('authToken');
       const response = await axios.post(`${API_URL}/imports/contacts/upload`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -170,7 +170,7 @@ const ContactImport = () => {
     setError(null);
 
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('authToken');
       const response = await axios.post(
         `${API_URL}/imports/contacts/${importId}/process`,
         {
@@ -198,7 +198,7 @@ const ContactImport = () => {
 
   // Poll import status
   const pollImportStatus = async () => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('authToken');
     const maxAttempts = 60; // 60 attempts = 30 seconds max
     let attempts = 0;
 
