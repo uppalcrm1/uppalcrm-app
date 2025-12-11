@@ -64,7 +64,7 @@ class Contact {
           next_follow_up
         )
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-        RETURNING id, name, tenant_id, status, source, email, first_name, last_name, company, phone, notes, created_at, updated_at
+        RETURNING id, organization_id, contact_status, contact_source, email, first_name, last_name, company, phone, notes, created_at, updated_at
       `, [
         organizationId,
         title,
