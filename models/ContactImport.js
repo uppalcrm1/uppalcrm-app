@@ -11,7 +11,8 @@ class ContactImport {
         (organization_id, filename, file_size_bytes, status, created_by)
         VALUES ($1, $2, $3, $4, $5)
         RETURNING *`,
-        [organizationId, filename, fileSize, 'pending', userId]
+        [organizationId, filename, fileSize, 'pending', userId],
+        organizationId
       );
       return result.rows[0];
     } catch (error) {
@@ -30,7 +31,8 @@ class ContactImport {
         SET status = $3, updated_at = NOW()
         WHERE id = $1 AND organization_id = $2
         RETURNING *`,
-        [importId, organizationId, status]
+        [importId, organizationId, status],
+        organizationId
       );
 
       return result.rows[0];
@@ -48,7 +50,8 @@ class ContactImport {
       const result = await query(
         `SELECT * FROM contact_imports
         WHERE id = $1 AND organization_id = $2`,
-        [importId, organizationId]
+        [importId, organizationId],
+        organizationId
       );
       return result.rows[0] || null;
     } catch (error) {
@@ -67,7 +70,8 @@ class ContactImport {
         WHERE organization_id = $1
         ORDER BY created_at DESC
         LIMIT $2 OFFSET $3`,
-        [organizationId, limit, offset]
+        [organizationId, limit, offset],
+        organizationId
       );
       return result.rows;
     } catch (error) {
@@ -86,7 +90,8 @@ class ContactImport {
         (organization_id, mapping_name, field_mapping, duplicate_handling, match_field, created_by)
         VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING *`,
-        [organizationId, mappingName, JSON.stringify(fieldMapping), duplicateHandling, matchField, userId]
+        [organizationId, mappingName, JSON.stringify(fieldMapping), duplicateHandling, matchField, userId],
+        organizationId
       );
       return result.rows[0];
     } catch (error) {
@@ -105,7 +110,8 @@ class ContactImport {
         FROM contact_import_mappings
         WHERE organization_id = $1 AND is_active = true
         ORDER BY is_default DESC, created_at DESC`,
-        [organizationId]
+        [organizationId],
+        organizationId
       );
       return result.rows;
     } catch (error) {
@@ -124,7 +130,8 @@ class ContactImport {
         (import_id, organization_id, contact_id, row_number, action, imported_data, error_message)
         VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING *`,
-        [importId, organizationId, contactId, rowNumber, action, JSON.stringify(importedData), errorMessage]
+        [importId, organizationId, contactId, rowNumber, action, JSON.stringify(importedData), errorMessage],
+        organizationId
       );
       return result.rows[0];
     } catch (error) {
@@ -144,7 +151,8 @@ class ContactImport {
             error_details = $7, completed_at = NOW(), updated_at = NOW()
         WHERE id = $1 AND organization_id = $2
         RETURNING *`,
-        [importId, organizationId, 'completed', totalRows, successfulRows, failedRows, JSON.stringify(errorDetails)]
+        [importId, organizationId, 'completed', totalRows, successfulRows, failedRows, JSON.stringify(errorDetails)],
+        organizationId
       );
       return result.rows[0];
     } catch (error) {

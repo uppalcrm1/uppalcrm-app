@@ -33,6 +33,23 @@ router.post('/upload', authenticateToken, upload.single('file'), async (req, res
     const organizationId = req.organizationId;
     const { file } = req;
 
+    console.log('[ContactImport Upload] Request context:', {
+      hasUser: !!req.user,
+      userId: req.user?.id,
+      organizationId: organizationId,
+      userOrgId: req.user?.organization_id
+    });
+
+    if (!organizationId) {
+      console.error('[ContactImport Upload] Missing organizationId:', {
+        user: req.user,
+        headers: req.headers.authorization?.substring(0, 20) + '...'
+      });
+      return res.status(400).json({
+        message: 'Organization context is missing. Please log in again.'
+      });
+    }
+
     if (!file) {
       return res.status(400).json({ message: 'No file uploaded' });
     }
