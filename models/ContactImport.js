@@ -2,10 +2,38 @@ const { query } = require('../database/connection');
 
 class ContactImport {
   /**
+   * Delete old import records with the same filename that are in pending or failed state
+   */
+  static async cleanupOldImports(organizationId, filename) {
+    try {
+      const result = await query(
+        `DELETE FROM contact_imports
+        WHERE organization_id = $1
+        AND filename = $2
+        AND status IN ('pending', 'failed')
+        RETURNING id`,
+        [organizationId, filename],
+        organizationId
+      );
+      if (result.rows.length > 0) {
+        console.log(`Cleaned up ${result.rows.length} old import(s) for file: ${filename}`);
+      }
+      return result.rows.length;
+    } catch (error) {
+      console.error('Error cleaning up old imports:', error);
+      // Don't throw - this is a cleanup operation
+      return 0;
+    }
+  }
+
+  /**
    * Create a new import record
    */
   static async createImport(organizationId, userId, filename, fileSize) {
     try {
+      // Clean up any old pending/failed imports with the same filename
+      await this.cleanupOldImports(organizationId, filename);
+
       const result = await query(
         `INSERT INTO contact_imports
         (organization_id, filename, file_size_bytes, status, created_by)
