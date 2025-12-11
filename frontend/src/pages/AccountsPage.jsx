@@ -15,7 +15,9 @@ import {
 } from 'lucide-react'
 import ColumnSelector from '../components/ColumnSelector'
 import InlineEditCell from '../components/InlineEditCell'
+import CreateTransactionModal from '../components/CreateTransactionModal'
 import { accountsAPI } from '../services/api'
+import toast from 'react-hot-toast'
 
 // Define available columns with metadata (10 columns as per spec)
 const COLUMN_DEFINITIONS = [
@@ -91,6 +93,8 @@ const AccountsPage = () => {
   const [localAccounts, setLocalAccounts] = useState([]) // For optimistic updates
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [selectedAccount, setSelectedAccount] = useState(null)
+  const [showCreateTransactionModal, setShowCreateTransactionModal] = useState(false)
+  const [selectedAccountForTransaction, setSelectedAccountForTransaction] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
 
@@ -208,6 +212,22 @@ const AccountsPage = () => {
   const handleRecordPayment = (account) => {
     setSelectedAccount(account)
     setShowPaymentModal(true)
+  }
+
+  const handleCreateTransaction = (account) => {
+    // Validate account has contact
+    if (!account.contact_id) {
+      toast.error('Cannot create transaction: Account has no associated contact')
+      return
+    }
+    setSelectedAccountForTransaction(account)
+    setShowCreateTransactionModal(true)
+  }
+
+  const handleTransactionCreated = () => {
+    setShowCreateTransactionModal(false)
+    setSelectedAccountForTransaction(null)
+    toast.success('Transaction created successfully')
   }
 
   return (
@@ -446,6 +466,13 @@ const AccountsPage = () => {
                         <td className="py-4 px-4">
                           <div className="flex items-center gap-2">
                             <button
+                              onClick={() => handleCreateTransaction(account)}
+                              className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
+                              title="Create Transaction"
+                            >
+                              <Plus size={16} />
+                            </button>
+                            <button
                               onClick={() => handleRecordPayment(account)}
                               className="p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg"
                               title="Record Payment"
@@ -574,6 +601,19 @@ const AccountsPage = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Create Transaction Modal */}
+      {showCreateTransactionModal && selectedAccountForTransaction && (
+        <CreateTransactionModal
+          account={selectedAccountForTransaction}
+          onClose={() => {
+            setShowCreateTransactionModal(false)
+            setSelectedAccountForTransaction(null)
+          }}
+          onSuccess={handleTransactionCreated}
+          isOpen={showCreateTransactionModal}
+        />
       )}
     </div>
   )
