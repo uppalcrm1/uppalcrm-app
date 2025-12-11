@@ -34,15 +34,40 @@ class ContactImport {
       // Clean up any old pending/failed imports with the same filename
       await this.cleanupOldImports(organizationId, filename);
 
-      const result = await query(
-        `INSERT INTO contact_imports
-        (organization_id, filename, file_size_bytes, status, created_by)
-        VALUES ($1, $2, $3, $4, $5)
-        RETURNING *`,
-        [organizationId, filename, fileSize, 'pending', userId],
-        organizationId
-      );
-      return result.rows[0];
+      let importFilename = filename;
+      let attempts = 0;
+      const maxAttempts = 3;
+
+      while (attempts < maxAttempts) {
+        try {
+          const result = await query(
+            `INSERT INTO contact_imports
+            (organization_id, filename, file_size_bytes, status, created_by)
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING *`,
+            [organizationId, importFilename, fileSize, 'pending', userId],
+            organizationId
+          );
+          return result.rows[0];
+        } catch (insertError) {
+          // If duplicate key error, append timestamp and retry
+          if (insertError.code === '23505' && insertError.constraint === 'contact_imports_organization_id_filename_key') {
+            attempts++;
+            const timestamp = Date.now();
+            const filenameParts = filename.split('.');
+            const extension = filenameParts.length > 1 ? `.${filenameParts.pop()}` : '';
+            const basename = filenameParts.join('.');
+            importFilename = `${basename}_${timestamp}${extension}`;
+            console.log(`Duplicate filename detected, retrying with: ${importFilename}`);
+
+            if (attempts >= maxAttempts) {
+              throw new Error('Unable to create import record after multiple attempts');
+            }
+          } else {
+            throw insertError;
+          }
+        }
+      }
     } catch (error) {
       console.error('Error creating import:', error);
       throw error;
