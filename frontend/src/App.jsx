@@ -27,6 +27,7 @@ import ImportContacts from './pages/ImportContacts'
 import ContactImport from './pages/ContactImport'
 import LeadDetail from './pages/LeadDetail'
 import ContactsPage from './pages/ContactsPage'
+import ContactDetailPage from './pages/ContactDetailPage'
 import AccountsPage from './pages/AccountsPage'
 import AccountDetail from './pages/AccountDetail'
 import TransactionsPage from './pages/TransactionsPage'
@@ -111,7 +112,8 @@ function App() {
         <Route path="leads" element={<Leads />} />
         <Route path="leads/:id" element={<LeadDetail />} />
         <Route path="tasks" element={<TasksDashboard />} />
-        <Route path="contacts" element={<ContactsPage />} />
+        <Route path="contacts" element={<Contacts />} />
+        <Route path="contacts/:id" element={<ContactDetailPage />} />
         <Route path="settings/*" element={<SettingsPage />} />
         <Route path="integrations/zapier" element={<ZapierIntegrationPage />} />
         <Route path="leads/new" element={<DynamicLeadForm />} />

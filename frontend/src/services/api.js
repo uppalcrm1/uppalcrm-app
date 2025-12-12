@@ -401,7 +401,12 @@ export const contactsAPI = {
     const response = await api.get(`/contacts/${id}`)
     return response.data
   },
-  
+
+  getContactDetail: async (id) => {
+    const response = await api.get(`/contacts/${id}/detail`)
+    return response.data
+  },
+
   createContact: async (contactData) => {
     const response = await api.post('/contacts', contactData)
     return response.data

@@ -183,10 +183,14 @@ const Contacts = () => {
   // Mutations
   const createMutation = useMutation({
     mutationFn: contactsAPI.createContact,
-    onSuccess: () => {
+    onSuccess: (response) => {
       queryClient.invalidateQueries(['contacts'])
       toast.success('Contact created successfully')
       setShowCreateModal(false)
+      // Optionally navigate to the new contact's detail page
+      if (response?.contact?.id) {
+        navigate(`/contacts/${response.contact.id}`)
+      }
     },
     onError: (error) => {
       toast.error(error.response?.data?.message || 'Failed to create contact')
@@ -233,8 +237,8 @@ const Contacts = () => {
   }
 
   const handleViewContact = (contact) => {
-    setSelectedContact(contact)
-    setViewMode('detail')
+    // Navigate to contact detail page
+    navigate(`/contacts/${contact.id}`)
   }
 
   const handleBackToList = () => {

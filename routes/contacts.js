@@ -667,6 +667,46 @@ router.post('/convert-from-lead/:leadId',
 );
 
 /**
+ * GET /contacts/:id/detail
+ * Get contact with related data (accounts, stats)
+ */
+router.get('/:id/detail',
+  validateUuidParam,
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const organizationId = req.organizationId;
+
+      // Fetch contact
+      const contact = await Contact.findById(id, organizationId);
+      if (!contact) {
+        return res.status(404).json({
+          error: 'Contact not found',
+          message: 'Contact does not exist in this organization'
+        });
+      }
+
+      // Fetch related accounts
+      const accounts = await Contact.getAccounts(organizationId, {
+        contact_id: id
+      });
+
+      // Return aggregated data
+      res.json({
+        contact: contact.toJSON(),
+        accounts: accounts || []
+      });
+    } catch (error) {
+      console.error('Error fetching contact detail:', error);
+      res.status(500).json({
+        error: 'Failed to fetch contact detail',
+        message: error.message || 'Unable to get contact details'
+      });
+    }
+  }
+);
+
+/**
  * GET /contacts/:id
  * Get specific contact by ID
  */
@@ -675,7 +715,7 @@ router.get('/:id',
   async (req, res) => {
     try {
       const contact = await Contact.findById(req.params.id, req.organizationId);
-      
+
       if (!contact) {
         return res.status(404).json({
           error: 'Contact not found',
