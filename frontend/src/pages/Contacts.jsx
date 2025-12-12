@@ -478,14 +478,21 @@ const Contacts = () => {
                   {contacts.map((contact) => (
                     <tr
                       key={contact.id}
-                      onClick={() => handleViewContact(contact)}
-                      className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
+                      className="border-b border-gray-100 hover:bg-gray-50"
                     >
                       {visibleColumns.contact && (
                         <td className="py-4 px-4">
                           <div>
-                            <p className="font-medium text-gray-900">{contact.full_name}</p>
-                            <div className="flex items-center space-x-2 text-sm text-gray-600">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleViewContact(contact);
+                              }}
+                              className="font-semibold text-blue-600 hover:text-blue-800 hover:underline text-left"
+                            >
+                              {contact.full_name || `${contact.first_name || ''} ${contact.last_name || ''}`.trim() || 'Unnamed Contact'}
+                            </button>
+                            <div className="flex items-center space-x-2 text-sm text-gray-600 mt-1">
                               {contact.email && (
                                 <div className="flex items-center">
                                   <Mail size={12} className="mr-1" />
