@@ -124,6 +124,113 @@ router.get('/stats', async (req, res) => {
 });
 
 /**
+ * GET /api/accounts/:id/detail
+ * Get detailed account information for the detail page
+ */
+router.get('/:id/detail', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { organization_id } = req.user;
+
+    // Query account with joined contact and product info
+    const accountQuery = `
+      SELECT
+        a.*,
+        c.id as contact_id,
+        c.first_name,
+        c.last_name,
+        CONCAT(c.first_name, ' ', c.last_name) as contact_name,
+        c.email as contact_email,
+        c.phone as contact_phone,
+        c.company as contact_company,
+        p.name as product_name,
+        p.price as product_price,
+        p.description as product_description,
+        a.edition as edition_name,
+        -- Calculate next renewal date
+        CASE
+          WHEN a.is_trial = true THEN a.trial_end_date
+          WHEN a.next_renewal_date IS NOT NULL THEN a.next_renewal_date
+          WHEN a.billing_cycle = 'monthly' THEN a.created_at + INTERVAL '1 month'
+          WHEN a.billing_cycle = 'quarterly' THEN a.created_at + INTERVAL '3 months'
+          WHEN a.billing_cycle = 'semi-annual' OR a.billing_cycle = 'semi_annual' THEN a.created_at + INTERVAL '6 months'
+          WHEN a.billing_cycle = 'annual' THEN a.created_at + INTERVAL '12 months'
+        END as next_renewal_date,
+        -- Calculate days until renewal
+        CASE
+          WHEN a.is_trial = true THEN EXTRACT(DAY FROM (a.trial_end_date - NOW()))
+          WHEN a.next_renewal_date IS NOT NULL THEN EXTRACT(DAY FROM (a.next_renewal_date - NOW()))
+          WHEN a.billing_cycle = 'monthly' THEN EXTRACT(DAY FROM ((a.created_at + INTERVAL '1 month') - NOW()))
+          WHEN a.billing_cycle = 'quarterly' THEN EXTRACT(DAY FROM ((a.created_at + INTERVAL '3 months') - NOW()))
+          WHEN a.billing_cycle = 'semi-annual' OR a.billing_cycle = 'semi_annual' THEN EXTRACT(DAY FROM ((a.created_at + INTERVAL '6 months') - NOW()))
+          WHEN a.billing_cycle = 'annual' THEN EXTRACT(DAY FROM ((a.created_at + INTERVAL '12 months') - NOW()))
+        END as days_until_renewal,
+        (SELECT COUNT(*) FROM accounts WHERE contact_id = a.contact_id AND organization_id = $2) as total_accounts_for_contact
+      FROM accounts a
+      LEFT JOIN contacts c ON a.contact_id = c.id
+      LEFT JOIN products p ON a.product_id = p.id
+      WHERE a.id = $1 AND a.organization_id = $2
+    `;
+
+    const accountResult = await db.query(accountQuery, [id, organization_id], organization_id);
+
+    if (accountResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Account not found' });
+    }
+
+    const account = accountResult.rows[0];
+
+    // Get transactions for this account
+    const transactionsQuery = `
+      SELECT * FROM transactions
+      WHERE account_id = $1 AND organization_id = $2
+      ORDER BY created_at DESC
+    `;
+    const transactionsResult = await db.query(transactionsQuery, [id, organization_id], organization_id);
+
+    // Get other accounts for the same contact
+    const relatedAccountsQuery = `
+      SELECT
+        a.id,
+        a.account_name,
+        a.edition,
+        a.license_status,
+        a.next_renewal_date,
+        CASE
+          WHEN a.next_renewal_date IS NOT NULL THEN a.next_renewal_date
+          WHEN a.billing_cycle = 'monthly' THEN a.created_at + INTERVAL '1 month'
+          WHEN a.billing_cycle = 'quarterly' THEN a.created_at + INTERVAL '3 months'
+          WHEN a.billing_cycle = 'semi-annual' OR a.billing_cycle = 'semi_annual' THEN a.created_at + INTERVAL '6 months'
+          WHEN a.billing_cycle = 'annual' THEN a.created_at + INTERVAL '12 months'
+        END as calculated_next_renewal
+      FROM accounts a
+      WHERE a.contact_id = $1 AND a.id != $2 AND a.organization_id = $3
+      ORDER BY a.created_at DESC
+      LIMIT 5
+    `;
+    const relatedAccountsResult = await db.query(relatedAccountsQuery, [
+      account.contact_id,
+      id,
+      organization_id
+    ], organization_id);
+
+    res.json({
+      success: true,
+      account,
+      transactions: transactionsResult.rows,
+      relatedAccounts: relatedAccountsResult.rows
+    });
+
+  } catch (error) {
+    console.error('Error fetching account detail:', error);
+    res.status(500).json({
+      error: 'Failed to fetch account details',
+      message: error.message
+    });
+  }
+});
+
+/**
  * GET /api/accounts/:id
  * Get a single account
  */
