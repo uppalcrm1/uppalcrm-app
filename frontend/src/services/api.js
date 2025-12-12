@@ -561,6 +561,11 @@ export const accountsAPI = {
     return response.data
   },
 
+  getAccountDetail: async (id) => {
+    const response = await api.get(`/accounts/${id}/detail`)
+    return response.data
+  },
+
   createAccount: async (accountData) => {
     const response = await api.post('/accounts', accountData)
     return response.data

@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   CreditCard,
   Plus,
@@ -89,6 +90,7 @@ const getRenewalColor = (daysUntil) => {
 }
 
 const AccountsPage = () => {
+  const navigate = useNavigate()
   const [accounts, setAccounts] = useState([])
   const [localAccounts, setLocalAccounts] = useState([]) // For optimistic updates
   const [showPaymentModal, setShowPaymentModal] = useState(false)
@@ -372,9 +374,12 @@ const AccountsPage = () => {
                       {/* Column 1: Account Name */}
                       {visibleColumns.account_name && (
                         <td className="py-4 px-4">
-                          <span className="font-medium text-gray-900">
+                          <button
+                            onClick={() => navigate(`/accounts/${account.id}`)}
+                            className="font-medium text-blue-600 hover:text-blue-800 hover:underline text-left"
+                          >
                             {account.account_name || 'Unnamed Account'}
-                          </span>
+                          </button>
                         </td>
                       )}
 

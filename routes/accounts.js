@@ -11,6 +11,9 @@ router.use(authenticateToken);
 // GET /api/accounts - Get all account subscriptions with filtering and pagination
 router.get('/', accountController.getAccountSubscriptions);
 
+// GET /api/accounts/:id/detail - Get account detail for detail page
+router.get('/:id/detail', accountController.getAccountDetail);
+
 // GET /api/accounts/:id - Get single account subscription details
 router.get('/:id', accountController.getAccountSubscription);
 

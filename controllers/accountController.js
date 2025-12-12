@@ -268,6 +268,104 @@ class AccountController {
     }
   }
 
+  // Get account detail for detail page
+  async getAccountDetail(req, res) {
+    const client = await db.pool.connect();
+
+    try {
+      const { id } = req.params;
+
+      // Set RLS context for organization isolation
+      await client.query('SELECT set_config($1, $2, true)', [
+        'app.current_organization_id',
+        req.user.organization_id
+      ]);
+
+      // Query account with joined contact and product info
+      const accountQuery = `
+        SELECT
+          a.*,
+          c.id as contact_id,
+          c.first_name,
+          c.last_name,
+          CONCAT(c.first_name, ' ', c.last_name) as contact_name,
+          c.email as contact_email,
+          c.phone as contact_phone,
+          c.company as contact_company,
+          a.edition as product_name,
+          a.edition as edition_name,
+          -- Calculate next renewal date
+          CASE
+            WHEN a.is_trial = true THEN a.trial_end_date
+            WHEN a.billing_cycle = 'monthly' THEN a.created_at + INTERVAL '1 month'
+            WHEN a.billing_cycle = 'quarterly' THEN a.created_at + INTERVAL '3 months'
+            WHEN a.billing_cycle = 'semi-annual' THEN a.created_at + INTERVAL '6 months'
+            WHEN a.billing_cycle = 'annual' THEN a.created_at + INTERVAL '12 months'
+          END as next_renewal_date,
+          -- Calculate days until renewal
+          CASE
+            WHEN a.is_trial = true THEN EXTRACT(DAY FROM (a.trial_end_date - NOW()))
+            WHEN a.billing_cycle = 'monthly' THEN EXTRACT(DAY FROM ((a.created_at + INTERVAL '1 month') - NOW()))
+            WHEN a.billing_cycle = 'quarterly' THEN EXTRACT(DAY FROM ((a.created_at + INTERVAL '3 months') - NOW()))
+            WHEN a.billing_cycle = 'semi-annual' THEN EXTRACT(DAY FROM ((a.created_at + INTERVAL '6 months') - NOW()))
+            WHEN a.billing_cycle = 'annual' THEN EXTRACT(DAY FROM ((a.created_at + INTERVAL '12 months') - NOW()))
+          END as days_until_renewal,
+          (SELECT COUNT(*) FROM accounts WHERE contact_id = a.contact_id AND organization_id = $2) as total_accounts_for_contact
+        FROM accounts a
+        LEFT JOIN contacts c ON a.contact_id = c.id
+        WHERE a.id = $1 AND a.organization_id = $2
+      `;
+
+      const accountResult = await client.query(accountQuery, [id, req.user.organization_id]);
+
+      if (accountResult.rows.length === 0) {
+        return res.status(404).json({ error: 'Account not found' });
+      }
+
+      const account = accountResult.rows[0];
+
+      // Get transactions for this account
+      const transactionsQuery = `
+        SELECT * FROM transactions
+        WHERE account_id = $1 AND organization_id = $2
+        ORDER BY created_at DESC
+      `;
+      const transactionsResult = await client.query(transactionsQuery, [id, req.user.organization_id]);
+
+      // Get other accounts for the same contact
+      const relatedAccountsQuery = `
+        SELECT id, account_name, edition, license_status,
+          CASE
+            WHEN billing_cycle = 'monthly' THEN created_at + INTERVAL '1 month'
+            WHEN billing_cycle = 'quarterly' THEN created_at + INTERVAL '3 months'
+            WHEN billing_cycle = 'semi-annual' THEN created_at + INTERVAL '6 months'
+            WHEN billing_cycle = 'annual' THEN created_at + INTERVAL '12 months'
+          END as next_renewal_date
+        FROM accounts
+        WHERE contact_id = $1 AND id != $2 AND organization_id = $3
+        ORDER BY created_at DESC
+        LIMIT 5
+      `;
+      const relatedAccountsResult = await client.query(relatedAccountsQuery, [
+        account.contact_id,
+        id,
+        req.user.organization_id
+      ]);
+
+      res.json({
+        account,
+        transactions: transactionsResult.rows,
+        relatedAccounts: relatedAccountsResult.rows
+      });
+
+    } catch (error) {
+      console.error('Error fetching account detail:', error);
+      res.status(500).json({ error: 'Failed to fetch account details' });
+    } finally {
+      client.release();
+    }
+  }
+
   // Create new account subscription
   async createAccountSubscription(req, res) {
     const client = await pool.connect();

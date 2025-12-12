@@ -28,6 +28,7 @@ import ContactImport from './pages/ContactImport'
 import LeadDetail from './pages/LeadDetail'
 import ContactsPage from './pages/ContactsPage'
 import AccountsPage from './pages/AccountsPage'
+import AccountDetail from './pages/AccountDetail'
 import TransactionsPage from './pages/TransactionsPage'
 import SubscriptionPage from './pages/SubscriptionPage'
 import IntegrationsPage from './pages/IntegrationsPage'
@@ -117,6 +118,7 @@ function App() {
         <Route path="leads/import" element={<ImportLeads />} />
         <Route path="contacts/import" element={<ImportContacts />} />
         <Route path="import/contacts" element={<ContactImport />} />
+        <Route path="accounts/:id" element={<AccountDetail />} />
         <Route path="accounts" element={<AccountsPage />} />
         <Route path="transactions" element={<TransactionsPage />} />
         <Route path="subscription" element={<SubscriptionPage />} />
