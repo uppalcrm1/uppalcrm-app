@@ -308,8 +308,8 @@ const ContactsPage = () => {
                   {visibleColumns.name && <th className="text-left py-3 px-4 font-medium text-gray-900">Name</th>}
                   {visibleColumns.email && <th className="text-left py-3 px-4 font-medium text-gray-900">Email</th>}
                   {visibleColumns.phone && <th className="text-left py-3 px-4 font-medium text-gray-900">Phone</th>}
-                  {visibleColumns.accounts && <th className="text-left py-3 px-4 font-medium text-gray-900">Accounts</th>}
-                  {visibleColumns.transactions && <th className="text-left py-3 px-4 font-medium text-gray-900">Transactions</th>}
+                  {visibleColumns.accounts && <th className="text-center py-3 px-4 font-medium text-gray-900">Accounts</th>}
+                  {visibleColumns.transactions && <th className="text-center py-3 px-4 font-medium text-gray-900">Transactions</th>}
                   {visibleColumns.total_revenue && <th className="text-left py-3 px-4 font-medium text-gray-900">Total Revenue</th>}
                   {visibleColumns.customer_since && <th className="text-left py-3 px-4 font-medium text-gray-900">Customer Since</th>}
                   {visibleColumns.last_contact && <th className="text-left py-3 px-4 font-medium text-gray-900">Last Contact</th>}
@@ -403,16 +403,16 @@ const ContactsPage = () => {
                       )}
 
                       {visibleColumns.accounts && (
-                        <td className="py-4 px-4">
-                          <span className="text-gray-900 font-medium">
+                        <td className="py-4 px-4 text-center">
+                          <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-700 font-semibold text-sm">
                             {contact.accounts_count || 0}
                           </span>
                         </td>
                       )}
 
                       {visibleColumns.transactions && (
-                        <td className="py-4 px-4">
-                          <span className="text-gray-900 font-medium">
+                        <td className="py-4 px-4 text-center">
+                          <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-green-100 text-green-700 font-semibold text-sm">
                             {contact.transactions_count || 0}
                           </span>
                         </td>
