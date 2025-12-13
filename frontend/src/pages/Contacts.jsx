@@ -38,7 +38,9 @@ import api from '../services/api'
 
 // Define available columns with metadata
 const COLUMN_DEFINITIONS = [
-  { key: 'contact', label: 'Contact', description: 'Contact name and contact info', required: true },
+  { key: 'name', label: 'Name', description: 'Contact name', required: true },
+  { key: 'email', label: 'Email', description: 'Email address', required: false },
+  { key: 'phone', label: 'Phone', description: 'Phone number', required: false },
   { key: 'company', label: 'Company', description: 'Company name', required: false },
   { key: 'status', label: 'Status', description: 'Contact status', required: false },
   { key: 'type', label: 'Type', description: 'Contact type', required: false },
@@ -49,7 +51,9 @@ const COLUMN_DEFINITIONS = [
 
 // Default visible columns
 const DEFAULT_VISIBLE_COLUMNS = {
-  contact: true,
+  name: true,
+  email: true,
+  phone: true,
   company: true,
   status: true,
   type: true,
@@ -464,7 +468,9 @@ const Contacts = () => {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-200">
-                    {visibleColumns.contact && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('contact', 'Contact')}</th>}
+                    {visibleColumns.name && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('name', 'Name')}</th>}
+                    {visibleColumns.email && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('email', 'Email')}</th>}
+                    {visibleColumns.phone && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('phone', 'Phone')}</th>}
                     {visibleColumns.company && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('company', 'Company')}</th>}
                     {visibleColumns.status && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('status', 'Status')}</th>}
                     {visibleColumns.type && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('type', 'Type')}</th>}
@@ -480,33 +486,41 @@ const Contacts = () => {
                       key={contact.id}
                       className="border-b border-gray-100 hover:bg-gray-50"
                     >
-                      {visibleColumns.contact && (
+                      {visibleColumns.name && (
                         <td className="py-4 px-4">
-                          <div>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleViewContact(contact);
-                              }}
-                              className="font-semibold text-blue-600 hover:text-blue-800 hover:underline text-left"
-                            >
-                              {contact.full_name || `${contact.first_name || ''} ${contact.last_name || ''}`.trim() || 'Unnamed Contact'}
-                            </button>
-                            <div className="flex items-center space-x-2 text-sm text-gray-600 mt-1">
-                              {contact.email && (
-                                <div className="flex items-center">
-                                  <Mail size={12} className="mr-1" />
-                                  {contact.email}
-                                </div>
-                              )}
-                              {contact.phone && (
-                                <div className="flex items-center">
-                                  <Phone size={12} className="mr-1" />
-                                  {contact.phone}
-                                </div>
-                              )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleViewContact(contact);
+                            }}
+                            className="font-semibold text-blue-600 hover:text-blue-800 hover:underline text-left"
+                          >
+                            {contact.full_name || `${contact.first_name || ''} ${contact.last_name || ''}`.trim() || 'Unnamed Contact'}
+                          </button>
+                        </td>
+                      )}
+                      {visibleColumns.email && (
+                        <td className="py-4 px-4">
+                          {contact.email ? (
+                            <div className="flex items-center text-gray-900">
+                              <Mail size={14} className="mr-2 text-gray-400" />
+                              {contact.email}
                             </div>
-                          </div>
+                          ) : (
+                            <span className="text-gray-500">—</span>
+                          )}
+                        </td>
+                      )}
+                      {visibleColumns.phone && (
+                        <td className="py-4 px-4">
+                          {contact.phone ? (
+                            <div className="flex items-center text-gray-900">
+                              <Phone size={14} className="mr-2 text-gray-400" />
+                              {contact.phone}
+                            </div>
+                          ) : (
+                            <span className="text-gray-500">—</span>
+                          )}
                         </td>
                       )}
                       {visibleColumns.company && (
