@@ -44,6 +44,8 @@ const COLUMN_DEFINITIONS = [
   { key: 'company', label: 'Company', description: 'Company name', required: false },
   { key: 'status', label: 'Status', description: 'Contact status', required: false },
   { key: 'type', label: 'Type', description: 'Contact type', required: false },
+  { key: 'accounts', label: 'Accounts', description: 'Number of accounts', required: false },
+  { key: 'transactions', label: 'Transactions', description: 'Number of transactions', required: false },
   { key: 'value', label: 'Value', description: 'Contact value', required: false },
   { key: 'assigned', label: 'Assigned', description: 'Assigned team member', required: false },
   { key: 'created', label: 'Created', description: 'Creation date', required: false }
@@ -57,6 +59,8 @@ const DEFAULT_VISIBLE_COLUMNS = {
   company: true,
   status: true,
   type: true,
+  accounts: true,
+  transactions: true,
   value: true,
   assigned: true,
   created: true
@@ -474,6 +478,8 @@ const Contacts = () => {
                     {visibleColumns.company && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('company', 'Company')}</th>}
                     {visibleColumns.status && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('status', 'Status')}</th>}
                     {visibleColumns.type && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('type', 'Type')}</th>}
+                    {visibleColumns.accounts && <th className="text-center py-3 px-4 font-medium text-gray-900">Accounts</th>}
+                    {visibleColumns.transactions && <th className="text-center py-3 px-4 font-medium text-gray-900">Transactions</th>}
                     {visibleColumns.value && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('value', 'Value')}</th>}
                     {visibleColumns.assigned && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('assigned_to', 'Assigned')}</th>}
                     {visibleColumns.created && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('created_at', 'Created')}</th>}
@@ -547,6 +553,20 @@ const Contacts = () => {
                         <td className="py-4 px-4">
                           <span className={`badge badge-${getTypeBadgeColor(contact.type)}`}>
                             {CONTACT_TYPES.find(t => t.value === contact.type)?.label || contact.type}
+                          </span>
+                        </td>
+                      )}
+                      {visibleColumns.accounts && (
+                        <td className="py-4 px-4 text-center">
+                          <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-700 font-semibold text-sm">
+                            {contact.accounts_count || 0}
+                          </span>
+                        </td>
+                      )}
+                      {visibleColumns.transactions && (
+                        <td className="py-4 px-4 text-center">
+                          <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-green-100 text-green-700 font-semibold text-sm">
+                            {contact.transactions_count || 0}
                           </span>
                         </td>
                       )}
