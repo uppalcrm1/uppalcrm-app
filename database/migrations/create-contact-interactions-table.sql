@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS contact_interactions (
   organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
   contact_id UUID NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
   user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_by UUID REFERENCES users(id) ON DELETE SET NULL,
 
   -- Interaction details
   interaction_type VARCHAR(50) NOT NULL CHECK (interaction_type IN ('email', 'call', 'meeting', 'note', 'support_ticket')),
