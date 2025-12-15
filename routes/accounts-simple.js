@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../database/connection');
 const { authenticateToken, validateOrganizationContext } = require('../middleware/auth');
+const accountController = require('../backend/controllers/accountController');
 
 // Apply authentication middleware to all routes
 router.use(authenticateToken);
@@ -274,5 +275,35 @@ router.get('/:id', async (req, res) => {
     });
   }
 });
+
+// =====================================================
+// SOFT DELETE ENDPOINTS
+// =====================================================
+
+/**
+ * POST /api/accounts/:id/delete
+ * Soft delete an account
+ * Marks account as deleted without permanently removing it
+ */
+router.post('/:id/delete', accountController.softDeleteAccount);
+
+/**
+ * POST /api/accounts/:id/restore
+ * Restore a soft-deleted account
+ */
+router.post('/:id/restore', accountController.restoreAccount);
+
+/**
+ * GET /api/accounts/deleted/list
+ * Get all deleted accounts (admin only)
+ */
+router.get('/deleted/list', accountController.getDeletedAccounts);
+
+/**
+ * DELETE /api/accounts/:id/permanent
+ * Permanently delete an account (admin only - use with extreme caution)
+ * Requires confirmation in request body: { "confirmation": "PERMANENTLY DELETE" }
+ */
+router.delete('/:id/permanent', accountController.permanentDeleteAccount);
 
 module.exports = router;

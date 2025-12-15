@@ -3,6 +3,7 @@ const router = express.Router();
 const Joi = require('joi');
 const db = require('../database/connection');
 const { authenticateToken, validateOrganizationContext } = require('../middleware/auth');
+const transactionController = require('../backend/controllers/transactionController');
 
 // Apply authentication middleware to all routes
 router.use(authenticateToken);
@@ -413,5 +414,35 @@ router.delete('/:id', async (req, res) => {
     client.release();
   }
 });
+
+// =====================================================
+// SOFT DELETE (VOID) ENDPOINTS
+// =====================================================
+
+/**
+ * POST /api/transactions/:id/void
+ * Void a transaction (soft delete)
+ * Marks transaction as void without permanently deleting it
+ */
+router.post('/:id/void', transactionController.voidTransaction);
+
+/**
+ * POST /api/transactions/:id/restore
+ * Restore a voided transaction
+ * WARNING: Use with caution - affects financial reports
+ */
+router.post('/:id/restore', transactionController.restoreTransaction);
+
+/**
+ * GET /api/transactions/voided/list
+ * Get all voided transactions (admin only)
+ */
+router.get('/voided/list', transactionController.getVoidedTransactions);
+
+/**
+ * GET /api/transactions/stats
+ * Get transaction statistics (includes void stats)
+ */
+router.get('/stats', transactionController.getTransactionStats);
 
 module.exports = router;

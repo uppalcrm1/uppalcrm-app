@@ -586,6 +586,29 @@ export const accountsAPI = {
     return response.data
   },
 
+  // Soft delete methods
+  softDeleteAccount: async (id, reason) => {
+    const response = await api.post(`/accounts/${id}/delete`, { reason })
+    return response.data
+  },
+
+  restoreAccount: async (id) => {
+    const response = await api.post(`/accounts/${id}/restore`)
+    return response.data
+  },
+
+  getDeletedAccounts: async (params = {}) => {
+    const response = await api.get('/accounts/deleted/list', { params })
+    return response.data
+  },
+
+  permanentDeleteAccount: async (id, confirmation) => {
+    const response = await api.delete(`/accounts/${id}/permanent`, {
+      data: { confirmation }
+    })
+    return response.data
+  },
+
   getStats: async () => {
     const response = await api.get('/accounts/stats')
     return response.data
@@ -621,6 +644,22 @@ export const transactionsAPI = {
 
   deleteTransaction: async (id) => {
     const response = await api.delete(`/transactions/${id}`)
+    return response.data
+  },
+
+  // Soft delete (void) methods
+  voidTransaction: async (id, reason) => {
+    const response = await api.post(`/transactions/${id}/void`, { reason })
+    return response.data
+  },
+
+  restoreTransaction: async (id, justification) => {
+    const response = await api.post(`/transactions/${id}/restore`, { justification })
+    return response.data
+  },
+
+  getVoidedTransactions: async (params = {}) => {
+    const response = await api.get('/transactions/voided/list', { params })
     return response.data
   },
 
