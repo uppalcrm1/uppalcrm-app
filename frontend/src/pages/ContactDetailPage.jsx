@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { contactsAPI, transactionsAPI } from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
+import ContactForm from '../components/ContactForm';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 
@@ -21,6 +22,7 @@ const ContactDetailPage = () => {
   const [interactions, setInteractions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showEditModal, setShowEditModal] = useState(false);
 
   // Collapsible sections state
   const [sectionsOpen, setSectionsOpen] = useState({
@@ -67,6 +69,20 @@ const ContactDetailPage = () => {
       setTransactions(response.transactions || []);
     } catch (err) {
       console.error('Failed to load transactions:', err);
+    }
+  };
+
+  // Update contact
+  const handleUpdateContact = async (contactData) => {
+    try {
+      await contactsAPI.updateContact(id, contactData);
+      toast.success('Contact updated successfully');
+      setShowEditModal(false);
+      // Refresh contact data
+      fetchContactDetail();
+    } catch (err) {
+      console.error('Failed to update contact:', err);
+      toast.error('Failed to update contact');
     }
   };
 
@@ -178,7 +194,7 @@ const ContactDetailPage = () => {
                 Message
               </button>
               <button
-                onClick={() => navigate(`/contacts/${id}/edit`)}
+                onClick={() => setShowEditModal(true)}
                 className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2 text-sm font-medium"
               >
                 <Edit size={16} />
@@ -572,6 +588,15 @@ const ContactDetailPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Edit Contact Modal */}
+      {showEditModal && contact && (
+        <ContactForm
+          contact={contact}
+          onClose={() => setShowEditModal(false)}
+          onSubmit={handleUpdateContact}
+        />
+      )}
     </div>
   );
 };
