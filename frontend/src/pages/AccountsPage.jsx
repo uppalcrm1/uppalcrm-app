@@ -17,6 +17,7 @@ import {
 import ColumnSelector from '../components/ColumnSelector'
 import InlineEditCell from '../components/InlineEditCell'
 import CreateTransactionModal from '../components/CreateTransactionModal'
+import { AccountActions } from '../components/accounts/AccountActions'
 import { accountsAPI } from '../services/api'
 import toast from 'react-hot-toast'
 
@@ -99,6 +100,7 @@ const AccountsPage = () => {
   const [selectedAccountForTransaction, setSelectedAccountForTransaction] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
+  const [showDeleted, setShowDeleted] = useState(false)
 
   // Load column visibility from localStorage or use defaults
   const [visibleColumns, setVisibleColumns] = useState(() => {
@@ -151,6 +153,28 @@ const AccountsPage = () => {
     }
   }
 
+  // Soft delete handler
+  const handleDeleteAccount = async (accountId, reason) => {
+    try {
+      await accountsAPI.softDeleteAccount(accountId, reason)
+      // Refresh accounts list
+      await fetchAccounts()
+    } catch (error) {
+      throw error // Let component handle error
+    }
+  }
+
+  // Restore account handler
+  const handleRestoreAccount = async (accountId) => {
+    try {
+      await accountsAPI.restoreAccount(accountId)
+      // Refresh accounts list
+      await fetchAccounts()
+    } catch (error) {
+      throw error // Let component handle error
+    }
+  }
+
   // Use localAccounts for display (optimistic updates), fallback to accounts
   const displayAccounts = localAccounts.length > 0 ? localAccounts : accounts
 
@@ -159,23 +183,25 @@ const AccountsPage = () => {
     setLocalAccounts(accounts)
   }, [accounts])
 
-  // Fetch accounts on component mount
-  React.useEffect(() => {
-    const fetchAccounts = async () => {
-      try {
-        const response = await accountsAPI.getAccounts()
-        console.log('API Response:', response)
-        // Backend can return either 'accounts' or 'subscriptions' depending on endpoint
-        const accountsData = response.accounts || response.subscriptions || []
-        console.log('Accounts data:', accountsData)
-        console.log('Accounts length:', accountsData.length)
-        setAccounts(accountsData)
-      } catch (error) {
-        console.error('Error fetching accounts:', error)
-      }
+  // Fetch accounts function (moved outside useEffect to be callable)
+  const fetchAccounts = React.useCallback(async () => {
+    try {
+      const response = await accountsAPI.getAccounts(showDeleted)
+      console.log('API Response:', response)
+      // Backend can return either 'accounts' or 'subscriptions' depending on endpoint
+      const accountsData = response.accounts || response.subscriptions || []
+      console.log('Accounts data:', accountsData)
+      console.log('Accounts length:', accountsData.length)
+      setAccounts(accountsData)
+    } catch (error) {
+      console.error('Error fetching accounts:', error)
     }
+  }, [showDeleted])
+
+  // Fetch accounts on component mount and when showDeleted changes
+  React.useEffect(() => {
     fetchAccounts()
-  }, [])
+  }, [fetchAccounts])
 
   // Calculate statistics
   const stats = {
@@ -311,6 +337,15 @@ const AccountsPage = () => {
             <option value="expiring_soon">Expiring Soon</option>
             <option value="expired">Expired</option>
           </select>
+          <label className="flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors">
+            <input
+              type="checkbox"
+              checked={showDeleted}
+              onChange={(e) => setShowDeleted(e.target.checked)}
+              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+            />
+            <span className="text-sm font-medium text-gray-700">Show deleted</span>
+          </label>
         </div>
       </div>
 
@@ -485,17 +520,18 @@ const AccountsPage = () => {
                               <DollarSign size={16} />
                             </button>
                             <button
+                              onClick={() => navigate(`/accounts/${account.id}`)}
                               className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
                               title="View Details"
                             >
                               <Eye size={16} />
                             </button>
-                            <button
-                              className="p-2 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg"
-                              title="Edit Account"
-                            >
-                              <Edit2 size={16} />
-                            </button>
+                            <AccountActions
+                              account={account}
+                              onDelete={handleDeleteAccount}
+                              onRestore={handleRestoreAccount}
+                              onRefresh={fetchAccounts}
+                            />
                           </div>
                         </td>
                       )}
