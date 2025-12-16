@@ -66,6 +66,20 @@ const formatPaymentMethod = (method) => {
   return methodMap[method.toLowerCase()] || method
 }
 
+// Helper function to format date to yyyy-mm-dd
+const formatDate = (dateString) => {
+  if (!dateString) return 'N/A'
+
+  const date = new Date(dateString)
+  if (isNaN(date.getTime())) return 'N/A'
+
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+
+  return `${year}-${month}-${day}`
+}
+
 const TransactionsPage = () => {
   const [transactions, setTransactions] = useState([])
   const [loading, setLoading] = useState(true)
@@ -367,7 +381,7 @@ const TransactionsPage = () => {
                       <td className="py-3 px-4">
                         <div className="flex items-center text-sm text-gray-900 font-mono">
                           <Calendar size={14} className="mr-2 text-gray-400" />
-                          {transaction.payment_date || 'N/A'}
+                          {formatDate(transaction.payment_date)}
                         </div>
                       </td>
 
