@@ -31,6 +31,7 @@ import ContactDetailPage from './pages/ContactDetailPage'
 import AccountsPage from './pages/AccountsPage'
 import AccountDetail from './pages/AccountDetail'
 import TransactionsPage from './pages/TransactionsPage'
+import TransactionDetail from './pages/TransactionDetail'
 import SubscriptionPage from './pages/SubscriptionPage'
 import IntegrationsPage from './pages/IntegrationsPage'
 import ImportPage from './pages/ImportPage'
@@ -122,6 +123,7 @@ function App() {
         <Route path="import/contacts" element={<ContactImport />} />
         <Route path="accounts/:id" element={<AccountDetail />} />
         <Route path="accounts" element={<AccountsPage />} />
+        <Route path="transactions/:id" element={<TransactionDetail />} />
         <Route path="transactions" element={<TransactionsPage />} />
         <Route path="subscription" element={<SubscriptionPage />} />
         <Route path="integrations" element={<IntegrationsPage />} />

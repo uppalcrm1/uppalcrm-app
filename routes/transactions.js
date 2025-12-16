@@ -59,7 +59,7 @@ const validate = (schema) => {
 router.get('/', async (req, res) => {
   try {
     const { organization_id } = req.user;
-    const { status, limit = 100, offset = 0 } = req.query;
+    const { status, contact_id, limit = 100, offset = 0 } = req.query;
 
     let query = `
       SELECT
@@ -113,6 +113,11 @@ router.get('/', async (req, res) => {
     if (status) {
       query += ` AND t.status = $${params.length + 1}`;
       params.push(status);
+    }
+
+    if (contact_id) {
+      query += ` AND t.contact_id = $${params.length + 1}`;
+      params.push(contact_id);
     }
 
     query += ` ORDER BY t.transaction_date DESC, t.created_at DESC`;

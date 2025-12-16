@@ -3,9 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Mail, Phone, Copy, ChevronDown, ChevronUp,
   MessageSquare, Edit, MoreVertical, Calendar, CheckCircle2,
-  CalendarClock, Plus, ClipboardList, Laptop
+  CalendarClock, Plus, ClipboardList, Laptop, DollarSign
 } from 'lucide-react';
-import { contactsAPI } from '../services/api';
+import { contactsAPI, transactionsAPI } from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -17,6 +17,7 @@ const ContactDetailPage = () => {
   // State
   const [contact, setContact] = useState(null);
   const [accounts, setAccounts] = useState([]);
+  const [transactions, setTransactions] = useState([]);
   const [interactions, setInteractions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -25,6 +26,7 @@ const ContactDetailPage = () => {
   const [sectionsOpen, setSectionsOpen] = useState({
     contactDetails: true,
     accounts: true,
+    transactions: true,
     recentActivity: true
   });
 
@@ -32,6 +34,7 @@ const ContactDetailPage = () => {
   useEffect(() => {
     fetchContactDetail();
     fetchInteractions();
+    fetchTransactions();
   }, [id]);
 
   const fetchContactDetail = async () => {
@@ -55,6 +58,15 @@ const ContactDetailPage = () => {
       setInteractions(response.interactions || []);
     } catch (err) {
       console.error('Failed to load interactions:', err);
+    }
+  };
+
+  const fetchTransactions = async () => {
+    try {
+      const response = await transactionsAPI.getContactTransactions(id, { limit: 10 });
+      setTransactions(response.transactions || []);
+    } catch (err) {
+      console.error('Failed to load transactions:', err);
     }
   };
 
@@ -332,17 +344,84 @@ const ContactDetailPage = () => {
                               <Laptop size={20} className="text-purple-600" />
                             </div>
                             <div>
-                              <p className="text-sm font-medium text-gray-900">
+                              <button
+                                onClick={() => account.id && navigate(`/accounts/${account.id}`)}
+                                className="text-sm font-medium text-blue-600 hover:underline text-left"
+                              >
                                 {account.account_name || `Account ${idx + 1}`}
-                              </p>
+                              </button>
                               <p className="text-xs text-gray-600">
                                 MAC: {account.mac_address || `XX:XX:XX:XX:XX:XX`} • Added {account.created_at ? format(new Date(account.created_at), 'MMM yyyy') : 'Recently'}
                               </p>
                             </div>
                           </div>
                           <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
-                            Active
+                            {account.status || 'Active'}
                           </span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Transactions Section */}
+            <div className="bg-white rounded-lg border border-gray-200">
+              <button
+                onClick={() => toggleSection('transactions')}
+                className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50"
+              >
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg font-semibold text-gray-900">Transactions</h2>
+                  <span className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded-full text-xs font-medium">
+                    {transactions.length}
+                  </span>
+                </div>
+                {sectionsOpen.transactions ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+              </button>
+
+              {sectionsOpen.transactions && (
+                <div className="px-6 pb-6 border-t border-gray-100">
+                  <div className="space-y-3 mt-4">
+                    {transactions.length === 0 ? (
+                      <p className="text-sm text-gray-500 text-center py-4">No transactions found</p>
+                    ) : (
+                      transactions.slice(0, 5).map((transaction, idx) => (
+                        <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                          <div className="flex items-center gap-3 flex-1">
+                            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                              <DollarSign size={20} className="text-green-600" />
+                            </div>
+                            <div className="flex-1">
+                              <button
+                                onClick={() => transaction.id && navigate(`/transactions/${transaction.id}`)}
+                                className="text-sm font-medium text-blue-600 hover:underline text-left block"
+                              >
+                                {transaction.transaction_id || `Transaction ${idx + 1}`}
+                              </button>
+                              <p className="text-xs text-gray-600">
+                                {transaction.payment_date ? format(new Date(transaction.payment_date), 'MMM d, yyyy') : 'No date'} • {transaction.payment_method || 'Unknown method'}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="text-right">
+                              <p className="text-sm font-semibold text-gray-900">
+                                {new Intl.NumberFormat('en-US', {
+                                  style: 'currency',
+                                  currency: transaction.currency || 'USD'
+                                }).format(transaction.amount || 0)}
+                              </p>
+                              <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                transaction.status === 'completed' ? 'bg-green-100 text-green-700' :
+                                transaction.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                                'bg-gray-100 text-gray-700'
+                              }`}>
+                                {transaction.status || 'Unknown'}
+                              </span>
+                            </div>
+                          </div>
                         </div>
                       ))
                     )}

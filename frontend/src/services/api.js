@@ -637,6 +637,13 @@ export const transactionsAPI = {
     return response.data
   },
 
+  getContactTransactions: async (contactId, params = {}) => {
+    const response = await api.get('/transactions', {
+      params: { ...params, contact_id: contactId }
+    })
+    return response.data
+  },
+
   updateTransaction: async (id, transactionData) => {
     const response = await api.put(`/transactions/${id}`, transactionData)
     return response.data
