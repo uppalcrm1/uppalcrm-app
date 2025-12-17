@@ -1236,6 +1236,37 @@ router.post('/create-lead', async (req, res) => {
 
     // Note: History logging is handled automatically by the track_lead_creation_trigger database trigger
 
+    // Auto-create follow-up task if next_follow_up is set
+    if (finalNextFollowUp) {
+      try {
+        console.log('📅 Creating follow-up task for next_follow_up date:', finalNextFollowUp);
+        const leadName = `${finalFirstName || ''} ${finalLastName || ''}`.trim() || company || 'this lead';
+        const taskUserId = finalAssignedTo || req.user.id; // Assign to lead owner or creator
+
+        await db.query(`
+          INSERT INTO lead_interactions (
+            lead_id, user_id, organization_id, interaction_type, subject, description,
+            scheduled_at, status, priority, created_by
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        `, [
+          createdLead.id,
+          taskUserId,
+          req.organizationId,
+          'task',
+          `Follow up with ${leadName}`,
+          'Follow up with lead',
+          finalNextFollowUp,
+          'scheduled',
+          'medium',
+          req.user.id
+        ], req.organizationId);
+
+        console.log('✅ Follow-up task created successfully');
+      } catch (taskError) {
+        console.error('⚠️ Failed to create follow-up task (non-blocking):', taskError.message);
+      }
+    }
+
     // Send emails (fire-and-forget)
     (async () => {
       try {
