@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { Check, X, Loader2 } from 'lucide-react'
+import { format } from 'date-fns'
 
 /**
  * InlineEditCell - Reusable component for inline editing in tables
@@ -212,6 +213,29 @@ const InlineEditCell = React.memo(({
           </div>
         )
 
+      case 'date':
+        // Convert ISO string to datetime-local format for the input
+        const dateInputValue = currentValue
+          ? new Date(currentValue).toISOString().slice(0, 16)
+          : ''
+
+        return (
+          <input
+            ref={inputRef}
+            type="datetime-local"
+            value={dateInputValue}
+            onChange={(e) => {
+              // Convert back to ISO string for storage
+              const newValue = e.target.value ? new Date(e.target.value).toISOString() : ''
+              setCurrentValue(newValue)
+            }}
+            onKeyDown={handleKeyDown}
+            onBlur={handleBlur}
+            className={baseInputClass}
+            disabled={isSaving}
+          />
+        )
+
       case 'select':
         return (
           <select
@@ -308,6 +332,18 @@ const InlineEditCell = React.memo(({
     // For numbers with prefix
     if (fieldType === 'number' && prefix && currentValue) {
       return `${prefix}${parseFloat(currentValue).toLocaleString()}`
+    }
+
+    // For date fields, format to human-readable format
+    if (fieldType === 'date' && currentValue) {
+      try {
+        const date = new Date(currentValue)
+        // Format as "Dec 18, 2025, 07:00 PM" to match Tasks Dashboard
+        return format(date, 'MMM d, yyyy, hh:mm a')
+      } catch (error) {
+        console.error('Error formatting date:', error)
+        return currentValue
+      }
     }
 
     return currentValue || <span className="text-gray-400 text-xs italic">{placeholder || 'Click to add...'}</span>
