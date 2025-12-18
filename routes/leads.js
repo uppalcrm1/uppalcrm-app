@@ -1614,6 +1614,13 @@ router.post('/', validateLeadDynamic(false), async (req, res) => {
         const leadName = `${firstName || ''} ${lastName || ''}`.trim() || company || 'this lead';
         const taskUserId = assignedTo || req.user.id; // Assign to lead owner or creator
 
+        // Adjust date if it's at midnight UTC (convert to noon UTC for better timezone display)
+        const taskDate = new Date(followUpDate);
+        if (taskDate.getUTCHours() === 0 && taskDate.getUTCMinutes() === 0 && taskDate.getUTCSeconds() === 0) {
+          taskDate.setUTCHours(12, 0, 0, 0); // Set to noon UTC
+          console.log('📅 Adjusted task date from midnight UTC to noon UTC:', taskDate.toISOString());
+        }
+
         await db.query(`
           INSERT INTO lead_interactions (
             lead_id, user_id, organization_id, interaction_type, subject, description,
@@ -1626,7 +1633,7 @@ router.post('/', validateLeadDynamic(false), async (req, res) => {
           'task',
           `Follow up with ${leadName}`,
           'Follow up with lead',
-          followUpDate,
+          taskDate.toISOString(),
           'scheduled',
           'medium',
           req.user.id
@@ -1752,6 +1759,13 @@ router.put('/:id',
               || req.body.company || oldLead.company || 'this lead';
             const taskUserId = req.body.assigned_to || oldLead.assigned_to || req.user.id;
 
+            // Adjust date if it's at midnight UTC (convert to noon UTC for better timezone display)
+            const taskDate = new Date(req.body.next_follow_up);
+            if (taskDate.getUTCHours() === 0 && taskDate.getUTCMinutes() === 0 && taskDate.getUTCSeconds() === 0) {
+              taskDate.setUTCHours(12, 0, 0, 0); // Set to noon UTC
+              console.log('📅 Adjusted task date from midnight UTC to noon UTC:', taskDate.toISOString());
+            }
+
             await db.query(`
               INSERT INTO lead_interactions (
                 lead_id, user_id, organization_id, interaction_type, subject, description,
@@ -1764,7 +1778,7 @@ router.put('/:id',
               'task',
               `Follow up with ${leadName}`,
               'Follow up with lead',
-              req.body.next_follow_up,
+              taskDate.toISOString(),
               'scheduled',
               'medium',
               userId
