@@ -509,8 +509,8 @@ router.post('/convert-from-lead/:leadId',
         const contactInsertResult = await query(
           `INSERT INTO contacts (
             organization_id, first_name, last_name, email, phone,
-            status, type, company, title, converted_from_lead_id, created_by
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            contact_status, company, title, converted_from_lead_id, created_by
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
           RETURNING *`,
           [
             req.organizationId,
@@ -518,7 +518,6 @@ router.post('/convert-from-lead/:leadId',
             contactData?.lastName || lead.last_name,
             contactData?.email || lead.email,
             contactData?.phone || lead.phone,
-            'active',
             'customer',
             lead.company,
             lead.title,
