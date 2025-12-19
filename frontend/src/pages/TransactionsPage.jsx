@@ -12,9 +12,11 @@ import {
   TrendingUp,
   Eye,
   Edit,
-  Trash2
+  Trash2,
+  FileText
 } from 'lucide-react'
 import { transactionsAPI } from '../services/api'
+import EditTransactionModal from '../components/EditTransactionModal'
 
 // Helper function to format currency
 const formatCurrency = (amount) => {
@@ -87,6 +89,8 @@ const TransactionsPage = () => {
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterMethod, setFilterMethod] = useState('all')
   const [filterSource, setFilterSource] = useState('all')
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [selectedTransaction, setSelectedTransaction] = useState(null)
 
   // Fetch transactions on component mount
   useEffect(() => {
@@ -193,9 +197,15 @@ const TransactionsPage = () => {
     // TODO: Navigate to transaction details page
   }
 
-  const handleEdit = (id) => {
-    console.log('Edit transaction:', id)
-    // TODO: Open edit modal
+  const handleEdit = (transaction) => {
+    setSelectedTransaction(transaction)
+    setShowEditModal(true)
+  }
+
+  const handleEditSuccess = () => {
+    setShowEditModal(false)
+    setSelectedTransaction(null)
+    fetchTransactions() // Refresh the list
   }
 
   const handleDelete = async (id) => {
@@ -342,6 +352,18 @@ const TransactionsPage = () => {
 
       {/* Transactions Table */}
       <div className="card">
+        {/* Toolbar */}
+        {!loading && filteredTransactions.length > 0 && (
+          <div className="border-b border-gray-200 px-4 py-3 flex items-center justify-between bg-gray-50">
+            <div className="flex items-center gap-2">
+              <FileText size={20} className="text-gray-700" />
+              <span className="text-sm font-medium text-gray-700">
+                {filteredTransactions.length} {filteredTransactions.length === 1 ? 'Transaction' : 'Transactions'}
+              </span>
+            </div>
+          </div>
+        )}
+
         {loading ? (
           <div className="text-center py-12">
             <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
@@ -361,15 +383,15 @@ const TransactionsPage = () => {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-gray-200 bg-gray-50">
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700 text-sm">Payment Date</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700 text-sm">Transaction ID</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700 text-sm">Account Name</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700 text-sm">Contact Name</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700 text-sm">Amount</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700 text-sm">Source</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700 text-sm">Pay Method</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700 text-sm">Actions</th>
+                <tr className="border-b border-gray-200">
+                  <th className="text-left py-3 px-4 font-medium text-gray-900">Payment Date</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-900">Transaction ID</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-900">Account Name</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-900">Contact Name</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-900">Amount</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-900">Source</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-900">Pay Method</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-900">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -378,7 +400,7 @@ const TransactionsPage = () => {
                   return (
                     <tr key={transaction.id} className="border-b border-gray-100 hover:bg-gray-50">
                       {/* Column 1: Payment Date */}
-                      <td className="py-3 px-4">
+                      <td className="py-4 px-4">
                         <div className="flex items-center text-sm text-gray-900 font-mono">
                           <Calendar size={14} className="mr-2 text-gray-400" />
                           {formatDate(transaction.payment_date)}
@@ -386,14 +408,14 @@ const TransactionsPage = () => {
                       </td>
 
                       {/* Column 2: Transaction ID */}
-                      <td className="py-3 px-4">
+                      <td className="py-4 px-4">
                         <span className="text-sm font-medium text-gray-900">
                           {transaction.transaction_id || 'Unknown'}
                         </span>
                       </td>
 
                       {/* Column 3: Account Name */}
-                      <td className="py-3 px-4">
+                      <td className="py-4 px-4">
                         {transaction.account_id ? (
                           <Link
                             to={`/accounts/${transaction.account_id}`}
@@ -407,7 +429,7 @@ const TransactionsPage = () => {
                       </td>
 
                       {/* Column 4: Contact Name */}
-                      <td className="py-3 px-4">
+                      <td className="py-4 px-4">
                         {transaction.contact_id ? (
                           <Link
                             to={`/contacts/${transaction.contact_id}`}
@@ -421,21 +443,21 @@ const TransactionsPage = () => {
                       </td>
 
                       {/* Column 5: Amount */}
-                      <td className="py-3 px-4">
+                      <td className="py-4 px-4">
                         <span className="text-sm font-semibold text-green-600">
                           {formatCurrency(transaction.amount)}
                         </span>
                       </td>
 
                       {/* Column 6: Source */}
-                      <td className="py-3 px-4">
+                      <td className="py-4 px-4">
                         <span className="text-sm text-gray-700">
                           {formatSource(transaction.source)}
                         </span>
                       </td>
 
                       {/* Column 7: Pay Method */}
-                      <td className="py-3 px-4">
+                      <td className="py-4 px-4">
                         <div className="flex items-center text-sm text-gray-700">
                           <CreditCard size={14} className="mr-2 text-gray-400" />
                           {formatPaymentMethod(transaction.payment_method)}
@@ -443,7 +465,7 @@ const TransactionsPage = () => {
                       </td>
 
                       {/* Column 8: Actions */}
-                      <td className="py-3 px-4">
+                      <td className="py-4 px-4">
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => handleView(transaction.id)}
@@ -453,7 +475,7 @@ const TransactionsPage = () => {
                             <Eye size={16} />
                           </button>
                           <button
-                            onClick={() => handleEdit(transaction.id)}
+                            onClick={() => handleEdit(transaction)}
                             className="p-1 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded"
                             title="Edit Transaction"
                           >
@@ -475,16 +497,20 @@ const TransactionsPage = () => {
             </table>
           </div>
         )}
-
-        {/* Pagination */}
-        {filteredTransactions.length > 0 && (
-          <div className="mt-4 flex items-center justify-between border-t border-gray-200 pt-4 px-4">
-            <p className="text-sm text-gray-600">
-              Showing {filteredTransactions.length} of {transactions.length} transaction(s)
-            </p>
-          </div>
-        )}
       </div>
+
+      {/* Edit Transaction Modal */}
+      {showEditModal && selectedTransaction && (
+        <EditTransactionModal
+          transaction={selectedTransaction}
+          onClose={() => {
+            setShowEditModal(false)
+            setSelectedTransaction(null)
+          }}
+          onSuccess={handleEditSuccess}
+          isOpen={showEditModal}
+        />
+      )}
     </div>
   )
 }
