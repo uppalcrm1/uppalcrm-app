@@ -9,6 +9,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import AccountDetailsPanel from '../components/Account/AccountDetailsPanel';
 import AccountTransactionsList from '../components/Account/AccountTransactionsList';
 import AccountHistoryPanel from '../components/Account/AccountHistoryPanel';
+import CreateTransactionModal from '../components/CreateTransactionModal';
 
 const AccountDetail = () => {
   const { id } = useParams();
@@ -232,6 +233,14 @@ const AccountDetail = () => {
           </div>
         </div>
       </div>
+
+      {/* Create Transaction Modal */}
+      <CreateTransactionModal
+        isOpen={showCreateTransactionModal}
+        account={account}
+        onClose={() => setShowCreateTransactionModal(false)}
+        onSuccess={() => setRefreshKey(prev => prev + 1)}
+      />
     </div>
   );
 };
