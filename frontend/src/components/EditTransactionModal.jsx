@@ -15,11 +15,17 @@ import {
 } from 'lucide-react'
 import { transactionsAPI } from '../services/api'
 import toast from 'react-hot-toast'
+import {
+  PAYMENT_METHODS,
+  TRANSACTION_SOURCES,
+  BILLING_TERMS
+} from '../constants/transactions'
 
 const EditTransactionModal = ({ transaction, onClose, onSuccess, isOpen }) => {
   // State for form data - pre-populate with existing transaction data
   const [formData, setFormData] = useState({
     amount: transaction?.amount?.toString() || '',
+    payment_date: transaction?.payment_date || new Date().toISOString().split('T')[0],
     status: transaction?.status || 'completed',
     payment_method: transaction?.payment_method || 'Credit Card',
     source: transaction?.source || 'manual',
@@ -37,6 +43,7 @@ const EditTransactionModal = ({ transaction, onClose, onSuccess, isOpen }) => {
     if (transaction) {
       setFormData({
         amount: transaction.amount?.toString() || '',
+        payment_date: transaction.payment_date || new Date().toISOString().split('T')[0],
         status: transaction.status || 'completed',
         payment_method: transaction.payment_method || 'Credit Card',
         source: transaction.source || 'manual',
@@ -117,6 +124,7 @@ const EditTransactionModal = ({ transaction, onClose, onSuccess, isOpen }) => {
       currency: formData.currency,
       status: formData.status,
       payment_method: formData.payment_method,
+      payment_date: formData.payment_date,
       source: formData.source,
       term: formData.term,
       transaction_reference: formData.transaction_reference || null,
@@ -242,6 +250,24 @@ const EditTransactionModal = ({ transaction, onClose, onSuccess, isOpen }) => {
                   )}
                 </div>
 
+                {/* Payment Date Field */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Payment Date <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    name="payment_date"
+                    value={formData.payment_date}
+                    onChange={handleChange}
+                    required
+                    className={`input ${errors.payment_date ? 'border-red-500' : ''}`}
+                  />
+                  {errors.payment_date && (
+                    <p className="text-red-600 text-sm mt-1">{errors.payment_date}</p>
+                  )}
+                </div>
+
                 {/* Status Field */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -277,10 +303,11 @@ const EditTransactionModal = ({ transaction, onClose, onSuccess, isOpen }) => {
                     className={`select ${errors.term ? 'border-red-500' : ''}`}
                   >
                     <option value="">Select term</option>
-                    <option value="1">Monthly (1 month)</option>
-                    <option value="3">Quarterly (3 months)</option>
-                    <option value="6">Semi-Annual (6 months)</option>
-                    <option value="12">Annual (12 months)</option>
+                    {BILLING_TERMS.map(term => (
+                      <option key={term.value} value={term.value}>
+                        {term.label}
+                      </option>
+                    ))}
                   </select>
                   {errors.term && (
                     <p className="text-red-600 text-sm mt-1">{errors.term}</p>
@@ -302,12 +329,9 @@ const EditTransactionModal = ({ transaction, onClose, onSuccess, isOpen }) => {
                     required
                     className={`select ${errors.payment_method ? 'border-red-500' : ''}`}
                   >
-                    <option value="Credit Card">Credit Card</option>
-                    <option value="Debit Card">Debit Card</option>
-                    <option value="PayPal">PayPal</option>
-                    <option value="Bank Transfer">Bank Transfer</option>
-                    <option value="Cash">Cash</option>
-                    <option value="Check">Check</option>
+                    {PAYMENT_METHODS.map(method => (
+                      <option key={method} value={method}>{method}</option>
+                    ))}
                   </select>
                   {errors.payment_method && (
                     <p className="text-red-600 text-sm mt-1">{errors.payment_method}</p>
@@ -325,13 +349,11 @@ const EditTransactionModal = ({ transaction, onClose, onSuccess, isOpen }) => {
                     onChange={handleChange}
                     className="select"
                   >
-                    <option value="manual">Manual Entry</option>
-                    <option value="website">Website</option>
-                    <option value="phone">Phone</option>
-                    <option value="email">Email</option>
-                    <option value="referral">Referral</option>
-                    <option value="walk-in">Walk-in</option>
-                    <option value="partner">Partner</option>
+                    {TRANSACTION_SOURCES.map(source => (
+                      <option key={source.value} value={source.value}>
+                        {source.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
 

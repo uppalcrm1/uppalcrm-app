@@ -17,11 +17,17 @@ import {
 } from 'lucide-react'
 import { transactionsAPI } from '../services/api'
 import toast from 'react-hot-toast'
+import {
+  PAYMENT_METHODS,
+  TRANSACTION_SOURCES,
+  BILLING_TERMS
+} from '../constants/transactions'
 
 const CreateTransactionModal = ({ account, onClose, onSuccess, isOpen }) => {
   // State for form data
   const [formData, setFormData] = useState({
     amount: '',
+    payment_date: new Date().toISOString().split('T')[0], // Default to today
     status: 'completed',
     payment_method: 'Credit Card',
     source: 'manual',
@@ -141,7 +147,8 @@ const CreateTransactionModal = ({ account, onClose, onSuccess, isOpen }) => {
       currency: formData.currency,
       status: formData.status,
       payment_method: formData.payment_method,
-      source: 'manual',
+      payment_date: formData.payment_date,
+      source: formData.source,
       term: formData.term,
       transaction_reference: formData.transaction_reference || null,
       notes: formData.notes || null
@@ -208,6 +215,27 @@ const CreateTransactionModal = ({ account, onClose, onSuccess, isOpen }) => {
   }, [isOpen, onClose])
 
   if (!isOpen) return null
+
+  // ✅ CRITICAL: Prevent creating transactions without an account (business rule enforcement)
+  if (!account || !account.id) {
+    console.error('CreateTransactionModal: Cannot create transaction without an account')
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg p-6 max-w-md w-full">
+          <div className="flex items-center mb-4">
+            <AlertCircle className="text-red-600 mr-2" size={24} />
+            <h3 className="text-lg font-semibold text-red-600">Error</h3>
+          </div>
+          <p className="text-gray-700 mb-4">
+            Cannot create transaction without selecting an account. Please select an account first.
+          </p>
+          <button onClick={onClose} className="btn btn-primary w-full">
+            Close
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   const isSubmitting = createTransactionMutation.isPending
 
@@ -335,6 +363,24 @@ const CreateTransactionModal = ({ account, onClose, onSuccess, isOpen }) => {
                   )}
                 </div>
 
+                {/* Payment Date Field */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Payment Date <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    name="payment_date"
+                    value={formData.payment_date}
+                    onChange={handleChange}
+                    required
+                    className={`input ${errors.payment_date ? 'border-red-500' : ''}`}
+                  />
+                  {errors.payment_date && (
+                    <p className="text-red-600 text-sm mt-1">{errors.payment_date}</p>
+                  )}
+                </div>
+
                 {/* Status Field */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -369,10 +415,11 @@ const CreateTransactionModal = ({ account, onClose, onSuccess, isOpen }) => {
                     className={`select ${errors.term ? 'border-red-500' : ''}`}
                   >
                     <option value="">Select term</option>
-                    <option value="1">Monthly (1 month)</option>
-                    <option value="3">Quarterly (3 months)</option>
-                    <option value="6">Semi-Annual (6 months)</option>
-                    <option value="12">Annual (12 months)</option>
+                    {BILLING_TERMS.map(term => (
+                      <option key={term.value} value={term.value}>
+                        {term.label}
+                      </option>
+                    ))}
                   </select>
                   {account?.billing_cycle && (
                     <span className="text-xs text-gray-500 mt-1 flex items-center">
@@ -400,16 +447,33 @@ const CreateTransactionModal = ({ account, onClose, onSuccess, isOpen }) => {
                     required
                     className={`select ${errors.payment_method ? 'border-red-500' : ''}`}
                   >
-                    <option value="Credit Card">Credit Card</option>
-                    <option value="Debit Card">Debit Card</option>
-                    <option value="PayPal">PayPal</option>
-                    <option value="Bank Transfer">Bank Transfer</option>
-                    <option value="Cash">Cash</option>
-                    <option value="Check">Check</option>
+                    {PAYMENT_METHODS.map(method => (
+                      <option key={method} value={method}>{method}</option>
+                    ))}
                   </select>
                   {errors.payment_method && (
                     <p className="text-red-600 text-sm mt-1">{errors.payment_method}</p>
                   )}
+                </div>
+
+                {/* Source Field */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Source
+                  </label>
+                  <select
+                    name="source"
+                    value={formData.source}
+                    onChange={handleChange}
+                    className="select"
+                  >
+                    {TRANSACTION_SOURCES.map(source => (
+                      <option key={source.value} value={source.value}>
+                        {source.label}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="text-xs text-gray-500 mt-1">Where this payment came from</span>
                 </div>
 
                 {/* Transaction Reference Field */}

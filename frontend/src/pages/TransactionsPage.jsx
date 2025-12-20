@@ -13,11 +13,13 @@ import {
   Eye,
   Edit,
   Trash2,
-  FileText
+  FileText,
+  RotateCcw
 } from 'lucide-react'
 import { transactionsAPI } from '../services/api'
 import EditTransactionModal from '../components/EditTransactionModal'
 import ColumnSelector from '../components/ColumnSelector'
+import { formatSource, formatPaymentMethod } from '../constants/transactions'
 
 // Define available columns with metadata
 const COLUMN_DEFINITIONS = [
@@ -26,8 +28,9 @@ const COLUMN_DEFINITIONS = [
   { key: 'account_name', label: 'Account Name', description: 'Associated account', required: false },
   { key: 'contact_name', label: 'Contact Name', description: 'Associated contact', required: false },
   { key: 'amount', label: 'Amount', description: 'Transaction amount', required: true },
+  { key: 'status', label: 'Status', description: 'Transaction status', required: false },
   { key: 'source', label: 'Source', description: 'Payment source', required: false },
-  { key: 'payment_method', label: 'Pay Method', description: 'Payment method used', required: false },
+  { key: 'payment_method', label: 'Payment Method', description: 'Payment method used', required: false },
   { key: 'actions', label: 'Actions', description: 'Transaction actions', required: true }
 ]
 
@@ -38,6 +41,7 @@ const DEFAULT_VISIBLE_COLUMNS = {
   account_name: true,
   contact_name: true,
   amount: true,
+  status: true,
   source: true,
   payment_method: true,
   actions: true
@@ -54,44 +58,7 @@ const formatCurrency = (amount) => {
   }).format(amount)
 }
 
-// Helper function to format source
-const formatSource = (source) => {
-  if (!source) return 'Unknown'
-
-  const sourceMap = {
-    'website': 'Website',
-    'phone': 'Phone',
-    'email': 'Email',
-    'referral': 'Referral',
-    'walk_in': 'Walk-in',
-    'walk-in': 'Walk-in',
-    'partner': 'Partner',
-    'social_media': 'Social Media',
-    'social-media': 'Social Media',
-    'other': 'Other'
-  }
-
-  return sourceMap[source.toLowerCase()] || source
-}
-
-// Helper function to format payment method
-const formatPaymentMethod = (method) => {
-  if (!method) return 'Unknown'
-
-  const methodMap = {
-    'credit_card': 'Credit Card',
-    'credit card': 'Credit Card',
-    'debit_card': 'Debit Card',
-    'debit card': 'Debit Card',
-    'paypal': 'PayPal',
-    'bank_transfer': 'Bank Transfer',
-    'bank transfer': 'Bank Transfer',
-    'cash': 'Cash',
-    'check': 'Check'
-  }
-
-  return methodMap[method.toLowerCase()] || method
-}
+// formatSource and formatPaymentMethod are now imported from constants/transactions.js
 
 // Helper function to format date to yyyy-mm-dd
 const formatDate = (dateString) => {
@@ -443,8 +410,9 @@ const TransactionsPage = () => {
                   {visibleColumns.account_name && <th className="text-left py-3 px-4 font-medium text-gray-900">Account Name</th>}
                   {visibleColumns.contact_name && <th className="text-left py-3 px-4 font-medium text-gray-900">Contact Name</th>}
                   {visibleColumns.amount && <th className="text-left py-3 px-4 font-medium text-gray-900">Amount</th>}
+                  {visibleColumns.status && <th className="text-left py-3 px-4 font-medium text-gray-900">Status</th>}
                   {visibleColumns.source && <th className="text-left py-3 px-4 font-medium text-gray-900">Source</th>}
-                  {visibleColumns.payment_method && <th className="text-left py-3 px-4 font-medium text-gray-900">Pay Method</th>}
+                  {visibleColumns.payment_method && <th className="text-left py-3 px-4 font-medium text-gray-900">Payment Method</th>}
                   {visibleColumns.actions && <th className="text-left py-3 px-4 font-medium text-gray-900">Actions</th>}
                 </tr>
               </thead>
@@ -513,7 +481,17 @@ const TransactionsPage = () => {
                         </td>
                       )}
 
-                      {/* Column 6: Source */}
+                      {/* Column 6: Status */}
+                      {visibleColumns.status && (
+                        <td className="py-4 px-4">
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${statusBadge.class}`}>
+                            {statusBadge.icon}
+                            {statusBadge.text}
+                          </span>
+                        </td>
+                      )}
+
+                      {/* Column 7: Source */}
                       {visibleColumns.source && (
                         <td className="py-4 px-4">
                           <span className="text-sm text-gray-700">
@@ -522,7 +500,7 @@ const TransactionsPage = () => {
                         </td>
                       )}
 
-                      {/* Column 7: Pay Method */}
+                      {/* Column 8: Payment Method */}
                       {visibleColumns.payment_method && (
                         <td className="py-4 px-4">
                           <div className="flex items-center text-sm text-gray-700">
@@ -532,7 +510,7 @@ const TransactionsPage = () => {
                         </td>
                       )}
 
-                      {/* Column 8: Actions */}
+                      {/* Column 9: Actions */}
                       {visibleColumns.actions && (
                         <td className="py-4 px-4">
                           <div className="flex items-center gap-2">

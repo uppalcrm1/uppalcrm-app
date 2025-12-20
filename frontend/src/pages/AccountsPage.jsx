@@ -17,6 +17,7 @@ import {
 import ColumnSelector from '../components/ColumnSelector'
 import InlineEditCell from '../components/InlineEditCell'
 import CreateTransactionModal from '../components/CreateTransactionModal'
+import AccountSelectorModal from '../components/AccountSelectorModal'
 import { AccountActions } from '../components/accounts/AccountActions'
 import { accountsAPI } from '../services/api'
 import toast from 'react-hot-toast'
@@ -94,7 +95,7 @@ const AccountsPage = () => {
   const navigate = useNavigate()
   const [accounts, setAccounts] = useState([])
   const [localAccounts, setLocalAccounts] = useState([]) // For optimistic updates
-  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [showAccountSelector, setShowAccountSelector] = useState(false)
   const [selectedAccount, setSelectedAccount] = useState(null)
   const [showCreateTransactionModal, setShowCreateTransactionModal] = useState(false)
   const [selectedAccountForTransaction, setSelectedAccountForTransaction] = useState(null)
@@ -267,7 +268,13 @@ const AccountsPage = () => {
           <p className="text-gray-600 mt-1">Track software licenses, device registrations, and billing for customer accounts</p>
         </div>
         <button
-          onClick={() => setShowPaymentModal(true)}
+          onClick={() => {
+            if (!accounts || accounts.length === 0) {
+              toast.error('No accounts available. Please create an account first.')
+              return
+            }
+            setShowAccountSelector(true)
+          }}
           className="btn btn-primary btn-md"
         >
           <DollarSign size={16} className="mr-2" />
@@ -377,7 +384,13 @@ const AccountsPage = () => {
             <h3 className="text-lg font-medium text-gray-900 mb-2">No accounts found</h3>
             <p className="text-gray-600 mb-6">Start by recording your first account payment</p>
             <button
-              onClick={() => setShowPaymentModal(true)}
+              onClick={() => {
+                if (!accounts || accounts.length === 0) {
+                  toast.error('No accounts available. Please create an account first.')
+                  return
+                }
+                setShowAccountSelector(true)
+              }}
               className="btn btn-primary btn-md"
             >
               <DollarSign size={16} className="mr-2" />
@@ -544,105 +557,17 @@ const AccountsPage = () => {
         )}
       </div>
 
-      {/* Payment Modal */}
-      {showPaymentModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full">
-            <h2 className="text-xl font-bold mb-4 flex items-center">
-              <DollarSign size={20} className="mr-2" />
-              Record Payment
-            </h2>
-
-            {selectedAccount && (
-              <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-                <p className="text-sm text-gray-600">Account</p>
-                <p className="font-medium">{selectedAccount.id} - {selectedAccount.contact_name}</p>
-              </div>
-            )}
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Payment Amount
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-3 text-gray-500">$</span>
-                  <input
-                    type="number"
-                    placeholder="99.00"
-                    className="input pl-8"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Payment Date
-                </label>
-                <input
-                  type="date"
-                  className="input"
-                  defaultValue={new Date().toISOString().split('T')[0]}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Payment Method
-                </label>
-                <select className="input">
-                  <option>Credit Card</option>
-                  <option>PayPal</option>
-                  <option>Bank Transfer</option>
-                  <option>Cash</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Billing Cycle
-                </label>
-                <select className="input">
-                  <option>Monthly</option>
-                  <option>Quarterly</option>
-                  <option>Semi-Annual</option>
-                  <option>Annual</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Notes (Optional)
-                </label>
-                <textarea
-                  className="input"
-                  rows="3"
-                  placeholder="Add any notes about this payment..."
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={() => setShowPaymentModal(false)}
-                className="btn btn-secondary btn-md flex-1"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  alert('Payment recorded successfully!')
-                  setShowPaymentModal(false)
-                }}
-                className="btn btn-primary btn-md flex-1"
-              >
-                <CheckCircle size={16} className="mr-2" />
-                Save Payment
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Account Selector Modal - Select account before creating transaction */}
+      <AccountSelectorModal
+        accounts={accounts}
+        isOpen={showAccountSelector}
+        onSelect={(account) => {
+          setSelectedAccountForTransaction(account)
+          setShowAccountSelector(false)
+          setShowCreateTransactionModal(true)
+        }}
+        onClose={() => setShowAccountSelector(false)}
+      />
 
       {/* Create Transaction Modal */}
       {showCreateTransactionModal && selectedAccountForTransaction && (

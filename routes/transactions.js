@@ -12,15 +12,16 @@ router.use(validateOrganizationContext);
 // Validation schemas
 const transactionSchemas = {
   create: Joi.object({
-    account_id: Joi.string().uuid().allow(null),
-    contact_id: Joi.string().uuid().allow(null),
+    account_id: Joi.string().uuid().required(), // REQUIRED: Every transaction must have an account
+    contact_id: Joi.string().uuid().required(), // REQUIRED: Every transaction must have a contact
     product_id: Joi.string().uuid().allow(null),
     payment_method: Joi.string().max(50).default('Credit Card'),
-    source: Joi.string().max(50).allow('', null), // Payment source (website, phone, referral, etc.)
-    term: Joi.string().max(50).allow('', null),
+    source: Joi.string().max(50).default('manual'), // Default to 'manual' for manually created transactions
+    term: Joi.string().max(50).required(), // REQUIRED: Billing term
     amount: Joi.number().min(0).required(),
     currency: Joi.string().max(10).default('USD'),
     status: Joi.string().valid('completed', 'pending', 'failed', 'refunded').default('completed'),
+    payment_date: Joi.date().iso().required(), // REQUIRED: Date when payment was made
     transaction_reference: Joi.string().max(255).allow('', null),
     notes: Joi.string().allow('', null)
   }),
@@ -28,10 +29,11 @@ const transactionSchemas = {
   update: Joi.object({
     payment_method: Joi.string().max(50),
     source: Joi.string().max(50).allow('', null),
-    term: Joi.string().max(50).allow('', null),
+    term: Joi.string().max(50),
     amount: Joi.number().min(0),
     currency: Joi.string().max(10),
     status: Joi.string().valid('completed', 'pending', 'failed', 'refunded'),
+    payment_date: Joi.date().iso(), // Allow updating payment date
     transaction_reference: Joi.string().max(255).allow('', null),
     notes: Joi.string().allow('', null)
   })
@@ -202,6 +204,7 @@ router.post('/', validate(transactionSchemas.create), async (req, res) => {
       amount,
       currency,
       status,
+      payment_date,
       transaction_reference,
       notes
     } = req.body;
@@ -224,11 +227,11 @@ router.post('/', validate(transactionSchemas.create), async (req, res) => {
         amount,
         currency,
         status,
+        transaction_date,
         transaction_reference,
         notes,
-        transaction_date,
         created_by
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), $13)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
       RETURNING *
     `, [
       organization_id,
@@ -241,6 +244,7 @@ router.post('/', validate(transactionSchemas.create), async (req, res) => {
       amount,
       currency,
       status,
+      payment_date,
       transaction_reference,
       notes,
       user_id
@@ -322,9 +326,15 @@ router.put('/:id', validate(transactionSchemas.update), async (req, res) => {
     const values = [];
     let paramCounter = 1;
 
+    // Map API field names to database column names
+    const fieldMapping = {
+      'payment_date': 'transaction_date' // Map payment_date from API to transaction_date in DB
+    };
+
     Object.keys(updates).forEach(key => {
       if (updates[key] !== undefined) {
-        updateFields.push(`${key} = $${paramCounter}`);
+        const dbColumnName = fieldMapping[key] || key; // Use mapped name or original
+        updateFields.push(`${dbColumnName} = $${paramCounter}`);
         values.push(updates[key]);
         paramCounter++;
       }
