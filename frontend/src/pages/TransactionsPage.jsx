@@ -17,6 +17,31 @@ import {
 } from 'lucide-react'
 import { transactionsAPI } from '../services/api'
 import EditTransactionModal from '../components/EditTransactionModal'
+import ColumnSelector from '../components/ColumnSelector'
+
+// Define available columns with metadata
+const COLUMN_DEFINITIONS = [
+  { key: 'payment_date', label: 'Payment Date', description: 'Transaction payment date', required: true },
+  { key: 'transaction_id', label: 'Transaction ID', description: 'Unique transaction identifier', required: true },
+  { key: 'account_name', label: 'Account Name', description: 'Associated account', required: false },
+  { key: 'contact_name', label: 'Contact Name', description: 'Associated contact', required: false },
+  { key: 'amount', label: 'Amount', description: 'Transaction amount', required: true },
+  { key: 'source', label: 'Source', description: 'Payment source', required: false },
+  { key: 'payment_method', label: 'Pay Method', description: 'Payment method used', required: false },
+  { key: 'actions', label: 'Actions', description: 'Transaction actions', required: true }
+]
+
+// Default visible columns
+const DEFAULT_VISIBLE_COLUMNS = {
+  payment_date: true,
+  transaction_id: true,
+  account_name: true,
+  contact_name: true,
+  amount: true,
+  source: true,
+  payment_method: true,
+  actions: true
+}
 
 // Helper function to format currency
 const formatCurrency = (amount) => {
@@ -91,6 +116,27 @@ const TransactionsPage = () => {
   const [filterSource, setFilterSource] = useState('all')
   const [showEditModal, setShowEditModal] = useState(false)
   const [selectedTransaction, setSelectedTransaction] = useState(null)
+
+  // Load column visibility from localStorage or use defaults
+  const [visibleColumns, setVisibleColumns] = useState(() => {
+    const saved = localStorage.getItem('transactions_visible_columns')
+    return saved ? JSON.parse(saved) : DEFAULT_VISIBLE_COLUMNS
+  })
+
+  // Column visibility handlers
+  const handleColumnToggle = (columnKey) => {
+    const newVisibleColumns = {
+      ...visibleColumns,
+      [columnKey]: !visibleColumns[columnKey]
+    }
+    setVisibleColumns(newVisibleColumns)
+    localStorage.setItem('transactions_visible_columns', JSON.stringify(newVisibleColumns))
+  }
+
+  const handleResetColumns = () => {
+    setVisibleColumns(DEFAULT_VISIBLE_COLUMNS)
+    localStorage.setItem('transactions_visible_columns', JSON.stringify(DEFAULT_VISIBLE_COLUMNS))
+  }
 
   // Fetch transactions on component mount
   useEffect(() => {
@@ -361,6 +407,14 @@ const TransactionsPage = () => {
                 {filteredTransactions.length} {filteredTransactions.length === 1 ? 'Transaction' : 'Transactions'}
               </span>
             </div>
+            <div className="flex items-center gap-2">
+              <ColumnSelector
+                columns={COLUMN_DEFINITIONS}
+                visibleColumns={visibleColumns}
+                onColumnToggle={handleColumnToggle}
+                onReset={handleResetColumns}
+              />
+            </div>
           </div>
         )}
 
@@ -384,14 +438,14 @@ const TransactionsPage = () => {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">Payment Date</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">Transaction ID</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">Account Name</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">Contact Name</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">Amount</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">Source</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">Pay Method</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">Actions</th>
+                  {visibleColumns.payment_date && <th className="text-left py-3 px-4 font-medium text-gray-900">Payment Date</th>}
+                  {visibleColumns.transaction_id && <th className="text-left py-3 px-4 font-medium text-gray-900">Transaction ID</th>}
+                  {visibleColumns.account_name && <th className="text-left py-3 px-4 font-medium text-gray-900">Account Name</th>}
+                  {visibleColumns.contact_name && <th className="text-left py-3 px-4 font-medium text-gray-900">Contact Name</th>}
+                  {visibleColumns.amount && <th className="text-left py-3 px-4 font-medium text-gray-900">Amount</th>}
+                  {visibleColumns.source && <th className="text-left py-3 px-4 font-medium text-gray-900">Source</th>}
+                  {visibleColumns.payment_method && <th className="text-left py-3 px-4 font-medium text-gray-900">Pay Method</th>}
+                  {visibleColumns.actions && <th className="text-left py-3 px-4 font-medium text-gray-900">Actions</th>}
                 </tr>
               </thead>
               <tbody>
@@ -400,96 +454,112 @@ const TransactionsPage = () => {
                   return (
                     <tr key={transaction.id} className="border-b border-gray-100 hover:bg-gray-50">
                       {/* Column 1: Payment Date */}
-                      <td className="py-4 px-4">
-                        <div className="flex items-center text-sm text-gray-900 font-mono">
-                          <Calendar size={14} className="mr-2 text-gray-400" />
-                          {formatDate(transaction.payment_date)}
-                        </div>
-                      </td>
+                      {visibleColumns.payment_date && (
+                        <td className="py-4 px-4">
+                          <div className="flex items-center text-sm text-gray-900 font-mono">
+                            <Calendar size={14} className="mr-2 text-gray-400" />
+                            {formatDate(transaction.payment_date)}
+                          </div>
+                        </td>
+                      )}
 
                       {/* Column 2: Transaction ID */}
-                      <td className="py-4 px-4">
-                        <span className="text-sm font-medium text-gray-900">
-                          {transaction.transaction_id || 'Unknown'}
-                        </span>
-                      </td>
+                      {visibleColumns.transaction_id && (
+                        <td className="py-4 px-4">
+                          <span className="text-sm font-medium text-gray-900">
+                            {transaction.transaction_id || 'Unknown'}
+                          </span>
+                        </td>
+                      )}
 
                       {/* Column 3: Account Name */}
-                      <td className="py-4 px-4">
-                        {transaction.account_id ? (
-                          <Link
-                            to={`/accounts/${transaction.account_id}`}
-                            className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
-                          >
-                            {transaction.account_name || 'Unknown Account'}
-                          </Link>
-                        ) : (
-                          <span className="text-sm text-gray-500">No account</span>
-                        )}
-                      </td>
+                      {visibleColumns.account_name && (
+                        <td className="py-4 px-4">
+                          {transaction.account_id ? (
+                            <Link
+                              to={`/accounts/${transaction.account_id}`}
+                              className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
+                            >
+                              {transaction.account_name || 'Unknown Account'}
+                            </Link>
+                          ) : (
+                            <span className="text-sm text-gray-500">No account</span>
+                          )}
+                        </td>
+                      )}
 
                       {/* Column 4: Contact Name */}
-                      <td className="py-4 px-4">
-                        {transaction.contact_id ? (
-                          <Link
-                            to={`/contacts/${transaction.contact_id}`}
-                            className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
-                          >
-                            {transaction.contact_name || 'Unknown Contact'}
-                          </Link>
-                        ) : (
-                          <span className="text-sm text-gray-500">No contact</span>
-                        )}
-                      </td>
+                      {visibleColumns.contact_name && (
+                        <td className="py-4 px-4">
+                          {transaction.contact_id ? (
+                            <Link
+                              to={`/contacts/${transaction.contact_id}`}
+                              className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
+                            >
+                              {transaction.contact_name || 'Unknown Contact'}
+                            </Link>
+                          ) : (
+                            <span className="text-sm text-gray-500">No contact</span>
+                          )}
+                        </td>
+                      )}
 
                       {/* Column 5: Amount */}
-                      <td className="py-4 px-4">
-                        <span className="text-sm font-semibold text-green-600">
-                          {formatCurrency(transaction.amount)}
-                        </span>
-                      </td>
+                      {visibleColumns.amount && (
+                        <td className="py-4 px-4">
+                          <span className="text-sm font-semibold text-green-600">
+                            {formatCurrency(transaction.amount)}
+                          </span>
+                        </td>
+                      )}
 
                       {/* Column 6: Source */}
-                      <td className="py-4 px-4">
-                        <span className="text-sm text-gray-700">
-                          {formatSource(transaction.source)}
-                        </span>
-                      </td>
+                      {visibleColumns.source && (
+                        <td className="py-4 px-4">
+                          <span className="text-sm text-gray-700">
+                            {formatSource(transaction.source)}
+                          </span>
+                        </td>
+                      )}
 
                       {/* Column 7: Pay Method */}
-                      <td className="py-4 px-4">
-                        <div className="flex items-center text-sm text-gray-700">
-                          <CreditCard size={14} className="mr-2 text-gray-400" />
-                          {formatPaymentMethod(transaction.payment_method)}
-                        </div>
-                      </td>
+                      {visibleColumns.payment_method && (
+                        <td className="py-4 px-4">
+                          <div className="flex items-center text-sm text-gray-700">
+                            <CreditCard size={14} className="mr-2 text-gray-400" />
+                            {formatPaymentMethod(transaction.payment_method)}
+                          </div>
+                        </td>
+                      )}
 
                       {/* Column 8: Actions */}
-                      <td className="py-4 px-4">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => handleView(transaction.id)}
-                            className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded"
-                            title="View Details"
-                          >
-                            <Eye size={16} />
-                          </button>
-                          <button
-                            onClick={() => handleEdit(transaction)}
-                            className="p-1 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded"
-                            title="Edit Transaction"
-                          >
-                            <Edit size={16} />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(transaction.id)}
-                            className="p-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded"
-                            title="Delete Transaction"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      </td>
+                      {visibleColumns.actions && (
+                        <td className="py-4 px-4">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleView(transaction.id)}
+                              className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded"
+                              title="View Details"
+                            >
+                              <Eye size={16} />
+                            </button>
+                            <button
+                              onClick={() => handleEdit(transaction)}
+                              className="p-1 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded"
+                              title="Edit Transaction"
+                            >
+                              <Edit size={16} />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(transaction.id)}
+                              className="p-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded"
+                              title="Delete Transaction"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   )
                 })}
