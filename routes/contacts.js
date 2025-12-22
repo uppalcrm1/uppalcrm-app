@@ -612,7 +612,7 @@ router.post('/convert-from-lead/:leadId',
           `INSERT INTO transactions (
             organization_id, account_id, contact_id, payment_method,
             term, amount, status, transaction_date, notes, created_by
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::date, $9, $10)
           RETURNING *`,
           [
             req.organizationId,
@@ -633,7 +633,7 @@ router.post('/convert-from-lead/:leadId',
         // Update account with next renewal date if provided
         if (transactionData.nextRenewalDate && accountId) {
           await query(
-            `UPDATE accounts SET next_renewal_date = $1 WHERE id = $2`,
+            `UPDATE accounts SET next_renewal_date = $1::date WHERE id = $2`,
             [transactionData.nextRenewalDate, accountId]
           );
         }
