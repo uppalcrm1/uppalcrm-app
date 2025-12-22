@@ -608,6 +608,10 @@ router.post('/convert-from-lead/:leadId',
 
       // Step 6: Create transaction if requested
       if (createTransaction && transactionData && accountId) {
+        console.log('🔍 DEBUG - Payment Date Received:', transactionData.paymentDate);
+        console.log('🔍 DEBUG - Payment Date Type:', typeof transactionData.paymentDate);
+        console.log('🔍 DEBUG - Next Renewal Date:', transactionData.nextRenewalDate);
+
         const transactionInsertResult = await query(
           `INSERT INTO transactions (
             organization_id, account_id, contact_id, payment_method,
@@ -629,13 +633,16 @@ router.post('/convert-from-lead/:leadId',
         );
         transaction = transactionInsertResult.rows[0];
         console.log('✅ Created transaction:', transaction.id);
+        console.log('🔍 DEBUG - Stored transaction_date:', transaction.transaction_date);
 
         // Update account with next renewal date if provided
         if (transactionData.nextRenewalDate && accountId) {
-          await query(
-            `UPDATE accounts SET next_renewal_date = TO_DATE($1, 'YYYY-MM-DD') WHERE id = $2`,
+          console.log('🔍 DEBUG - Updating next_renewal_date to:', transactionData.nextRenewalDate);
+          const updateResult = await query(
+            `UPDATE accounts SET next_renewal_date = TO_DATE($1, 'YYYY-MM-DD') WHERE id = $2 RETURNING next_renewal_date`,
             [transactionData.nextRenewalDate, accountId]
           );
+          console.log('🔍 DEBUG - Stored next_renewal_date:', updateResult.rows[0]?.next_renewal_date);
         }
       }
 
