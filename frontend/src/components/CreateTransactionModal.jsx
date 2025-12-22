@@ -40,6 +40,13 @@ const CreateTransactionModal = ({ account, onClose, onSuccess, isOpen }) => {
   const [isAmountOverridden, setIsAmountOverridden] = useState(false)
   const [errors, setErrors] = useState({})
 
+  // State for expiry update (Option 4 - Manual Control)
+  const [expiryUpdate, setExpiryUpdate] = useState({
+    shouldUpdate: true, // Default to yes (can be changed by user)
+    newExpiryDate: '',
+    calculationMethod: 'extend_from_current' // 'extend_from_current', 'start_from_today', 'custom'
+  })
+
   const queryClient = useQueryClient()
 
   // Helper function to map billing cycle to term
@@ -74,6 +81,43 @@ const CreateTransactionModal = ({ account, onClose, onSuccess, isOpen }) => {
       }))
     }
   }, [account?.billing_cycle])
+
+  // Calculate suggested expiry dates based on term and method
+  useEffect(() => {
+    if (!expiryUpdate.shouldUpdate || !formData.term) return
+
+    const termMonths = parseInt(formData.term) || 1
+    const paymentDate = new Date(formData.payment_date)
+    const currentExpiry = account?.next_renewal_date
+      ? new Date(account.next_renewal_date)
+      : new Date()
+
+    let suggestedDate
+
+    if (expiryUpdate.calculationMethod === 'extend_from_current') {
+      // Add term to current expiry date
+      suggestedDate = new Date(currentExpiry)
+      suggestedDate.setMonth(suggestedDate.getMonth() + termMonths)
+    } else if (expiryUpdate.calculationMethod === 'start_from_today') {
+      // Add term to payment date
+      suggestedDate = new Date(paymentDate)
+      suggestedDate.setMonth(suggestedDate.getMonth() + termMonths)
+    } else {
+      // Custom - don't auto-calculate
+      return
+    }
+
+    setExpiryUpdate(prev => ({
+      ...prev,
+      newExpiryDate: suggestedDate.toISOString().split('T')[0]
+    }))
+  }, [
+    formData.term,
+    formData.payment_date,
+    expiryUpdate.calculationMethod,
+    expiryUpdate.shouldUpdate,
+    account?.next_renewal_date
+  ])
 
   // Mutation for creating transaction
   const createTransactionMutation = useMutation({
@@ -151,7 +195,10 @@ const CreateTransactionModal = ({ account, onClose, onSuccess, isOpen }) => {
       source: formData.source,
       term: formData.term,
       transaction_reference: formData.transaction_reference || null,
-      notes: formData.notes || null
+      notes: formData.notes || null,
+      // Include expiry update fields (Option 4)
+      update_account_expiry: expiryUpdate.shouldUpdate,
+      new_expiry_date: expiryUpdate.shouldUpdate ? expiryUpdate.newExpiryDate : null
     }
 
     createTransactionMutation.mutate(transactionData)
@@ -510,6 +557,189 @@ const CreateTransactionModal = ({ account, onClose, onSuccess, isOpen }) => {
               />
               <span className="text-xs text-gray-500 mt-1">Optional</span>
             </div>
+
+            {/* Expiry Update Section (Option 4 - Manual Control) */}
+            <div className="border-t border-gray-200 pt-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                  <Calendar size={20} className="mr-2 text-blue-600" />
+                  Update Account Expiry
+                </h3>
+              </div>
+
+              {/* Enable/Disable Checkbox */}
+              <label className="flex items-start mb-4 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={expiryUpdate.shouldUpdate}
+                  onChange={(e) =>
+                    setExpiryUpdate({ ...expiryUpdate, shouldUpdate: e.target.checked })
+                  }
+                  className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <span className="ml-2 text-sm text-gray-700">
+                  Update account expiry date based on this transaction
+                </span>
+              </label>
+
+              {expiryUpdate.shouldUpdate && (
+                <div className="space-y-4 pl-6 border-l-2 border-blue-200">
+                  {/* Calculation Method Radio Buttons */}
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-gray-700 mb-2">
+                      How should the expiry date be calculated?
+                    </p>
+
+                    <label className="flex items-start cursor-pointer">
+                      <input
+                        type="radio"
+                        value="extend_from_current"
+                        checked={expiryUpdate.calculationMethod === 'extend_from_current'}
+                        onChange={(e) =>
+                          setExpiryUpdate({
+                            ...expiryUpdate,
+                            calculationMethod: e.target.value
+                          })
+                        }
+                        className="mt-0.5 h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                      />
+                      <span className="ml-2 text-sm">
+                        <span className="text-gray-900 font-medium">
+                          Extend from current expiry
+                        </span>
+                        {account?.next_renewal_date && (
+                          <span className="text-gray-500 block text-xs mt-0.5">
+                            Add {formData.term || '?'} month(s) to{' '}
+                            {new Date(account.next_renewal_date).toLocaleDateString('en-US', {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric'
+                            })}
+                          </span>
+                        )}
+                      </span>
+                    </label>
+
+                    <label className="flex items-start cursor-pointer">
+                      <input
+                        type="radio"
+                        value="start_from_today"
+                        checked={expiryUpdate.calculationMethod === 'start_from_today'}
+                        onChange={(e) =>
+                          setExpiryUpdate({
+                            ...expiryUpdate,
+                            calculationMethod: e.target.value
+                          })
+                        }
+                        className="mt-0.5 h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                      />
+                      <span className="ml-2 text-sm">
+                        <span className="text-gray-900 font-medium">
+                          Start from payment date
+                        </span>
+                        <span className="text-gray-500 block text-xs mt-0.5">
+                          Add {formData.term || '?'} month(s) to{' '}
+                          {new Date(formData.payment_date).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric'
+                          })}
+                        </span>
+                      </span>
+                    </label>
+
+                    <label className="flex items-start cursor-pointer">
+                      <input
+                        type="radio"
+                        value="custom"
+                        checked={expiryUpdate.calculationMethod === 'custom'}
+                        onChange={(e) =>
+                          setExpiryUpdate({
+                            ...expiryUpdate,
+                            calculationMethod: e.target.value
+                          })
+                        }
+                        className="mt-0.5 h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                      />
+                      <span className="ml-2 text-sm">
+                        <span className="text-gray-900 font-medium">Custom date</span>
+                        <span className="text-gray-500 block text-xs mt-0.5">
+                          Pick a specific expiry date manually
+                        </span>
+                      </span>
+                    </label>
+                  </div>
+
+                  {/* New Expiry Date Picker */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      New Expiry Date <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={expiryUpdate.newExpiryDate}
+                      onChange={(e) =>
+                        setExpiryUpdate({
+                          ...expiryUpdate,
+                          newExpiryDate: e.target.value,
+                          calculationMethod: 'custom'
+                        })
+                      }
+                      required={expiryUpdate.shouldUpdate}
+                      className="input"
+                    />
+                  </div>
+
+                  {/* Preview Box */}
+                  {expiryUpdate.newExpiryDate && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <h4 className="text-sm font-semibold text-blue-900 mb-2 flex items-center">
+                        <Info size={14} className="mr-1" />
+                        Preview Changes
+                      </h4>
+                      <div className="space-y-1 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Current Expiry:</span>
+                          <span className="font-medium text-gray-900">
+                            {account?.next_renewal_date
+                              ? new Date(account.next_renewal_date).toLocaleDateString('en-US', {
+                                  year: 'numeric',
+                                  month: 'short',
+                                  day: 'numeric'
+                                })
+                              : 'Not set'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">New Expiry:</span>
+                          <span className="font-medium text-blue-900">
+                            {new Date(expiryUpdate.newExpiryDate).toLocaleDateString('en-US', {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric'
+                            })}
+                          </span>
+                        </div>
+                        {account?.next_renewal_date && (
+                          <div className="flex justify-between pt-2 border-t border-blue-200">
+                            <span className="text-gray-600">Extension:</span>
+                            <span className="font-medium text-green-700">
+                              +
+                              {Math.round(
+                                (new Date(expiryUpdate.newExpiryDate) -
+                                  new Date(account.next_renewal_date)) /
+                                  (1000 * 60 * 60 * 24)
+                              )}{' '}
+                              days
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Footer */}
@@ -535,7 +765,9 @@ const CreateTransactionModal = ({ account, onClose, onSuccess, isOpen }) => {
               ) : (
                 <>
                   <CheckCircle size={16} className="mr-2" />
-                  Create Transaction
+                  {expiryUpdate.shouldUpdate
+                    ? 'Create Transaction & Update Expiry'
+                    : 'Create Transaction'}
                 </>
               )}
             </button>
