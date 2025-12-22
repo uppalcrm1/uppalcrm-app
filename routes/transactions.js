@@ -23,7 +23,10 @@ const transactionSchemas = {
     status: Joi.string().valid('completed', 'pending', 'failed', 'refunded').default('completed'),
     payment_date: Joi.date().iso().required(), // REQUIRED: Date when payment was made
     transaction_reference: Joi.string().max(255).allow('', null),
-    notes: Joi.string().allow('', null)
+    notes: Joi.string().allow('', null),
+    // Manual expiry update fields (Option 4)
+    update_account_expiry: Joi.boolean().default(false), // Whether to update account expiry
+    new_expiry_date: Joi.date().iso().allow(null) // New expiry date if updating
   }),
 
   update: Joi.object({
@@ -187,7 +190,7 @@ router.get('/:id', async (req, res) => {
 
 /**
  * POST /api/transactions
- * Create a new transaction
+ * Create a new transaction with optional account expiry update (Option 4)
  */
 router.post('/', validate(transactionSchemas.create), async (req, res) => {
   const client = await db.pool.connect();
@@ -206,7 +209,10 @@ router.post('/', validate(transactionSchemas.create), async (req, res) => {
       status,
       payment_date,
       transaction_reference,
-      notes
+      notes,
+      // Manual expiry update fields
+      update_account_expiry,
+      new_expiry_date
     } = req.body;
 
     await client.query('BEGIN');
@@ -215,6 +221,7 @@ router.post('/', validate(transactionSchemas.create), async (req, res) => {
     await client.query('SELECT set_config($1, $2, true)', ['app.current_user_id', user_id]);
     await client.query('SELECT set_config($1, $2, true)', ['app.current_organization_id', organization_id]);
 
+    // 1. Create the transaction
     const result = await client.query(`
       INSERT INTO transactions (
         organization_id,
@@ -250,12 +257,48 @@ router.post('/', validate(transactionSchemas.create), async (req, res) => {
       user_id
     ]);
 
+    const transaction = result.rows[0];
+
+    // 2. Update account expiry ONLY if user requested it (Option 4 - Manual Control)
+    let accountUpdateResult = null;
+    if (update_account_expiry && new_expiry_date) {
+      console.log(`📅 Updating account ${account_id} expiry to ${new_expiry_date}`);
+
+      accountUpdateResult = await client.query(`
+        UPDATE accounts
+        SET
+          next_renewal_date = $1,
+          subscription_end_date = $1,
+          price = $2,
+          billing_cycle = $3,
+          updated_at = NOW(),
+          updated_by = $4
+        WHERE id = $5 AND organization_id = $6
+        RETURNING id, account_name, next_renewal_date, subscription_end_date
+      `, [
+        new_expiry_date,
+        amount,
+        term,
+        user_id,
+        account_id,
+        organization_id
+      ]);
+
+      if (accountUpdateResult.rows.length > 0) {
+        console.log(`✅ Account expiry updated successfully for ${accountUpdateResult.rows[0].account_name}`);
+      }
+    }
+
     await client.query('COMMIT');
 
     res.status(201).json({
       success: true,
-      message: 'Transaction created successfully',
-      transaction: result.rows[0]
+      message: update_account_expiry
+        ? 'Transaction created and account expiry updated successfully'
+        : 'Transaction created successfully (account expiry not changed)',
+      transaction: transaction,
+      account_updated: update_account_expiry && accountUpdateResult?.rows.length > 0,
+      updated_account: accountUpdateResult?.rows[0] || null
     });
   } catch (error) {
     await client.query('ROLLBACK');
