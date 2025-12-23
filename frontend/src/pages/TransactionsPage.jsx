@@ -20,6 +20,7 @@ import { transactionsAPI } from '../services/api'
 import EditTransactionModal from '../components/EditTransactionModal'
 import ColumnSelector from '../components/ColumnSelector'
 import { formatSource, formatPaymentMethod } from '../constants/transactions'
+import { formatDateOnly } from '../utils/dateUtils'
 
 // Define available columns with metadata
 const COLUMN_DEFINITIONS = [
@@ -60,18 +61,13 @@ const formatCurrency = (amount) => {
 
 // formatSource and formatPaymentMethod are now imported from constants/transactions.js
 
-// Helper function to format date to yyyy-mm-dd
+// Helper function to format date to yyyy-mm-dd (timezone-safe)
 const formatDate = (dateString) => {
   if (!dateString) return 'N/A'
 
-  const date = new Date(dateString)
-  if (isNaN(date.getTime())) return 'N/A'
-
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-
-  return `${year}-${month}-${day}`
+  // Extract just the date part (YYYY-MM-DD) from ISO string
+  const datePart = dateString.split('T')[0]
+  return datePart
 }
 
 const TransactionsPage = () => {
