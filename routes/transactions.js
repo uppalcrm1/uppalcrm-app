@@ -238,7 +238,7 @@ router.post('/', validate(transactionSchemas.create), async (req, res) => {
         transaction_reference,
         notes,
         created_by
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::date, $12, $13, $14)
       RETURNING *
     `, [
       organization_id,
@@ -267,8 +267,8 @@ router.post('/', validate(transactionSchemas.create), async (req, res) => {
       accountUpdateResult = await client.query(`
         UPDATE accounts
         SET
-          next_renewal_date = $1,
-          subscription_end_date = $1,
+          next_renewal_date = $1::date,
+          subscription_end_date = $1::date,
           price = $2,
           billing_cycle = $3,
           updated_at = NOW(),

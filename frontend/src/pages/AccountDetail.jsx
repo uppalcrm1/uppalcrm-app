@@ -10,6 +10,7 @@ import AccountDetailsPanel from '../components/Account/AccountDetailsPanel';
 import AccountTransactionsList from '../components/Account/AccountTransactionsList';
 import AccountHistoryPanel from '../components/Account/AccountHistoryPanel';
 import CreateTransactionModal from '../components/CreateTransactionModal';
+import { formatDateOnly } from '../utils/dateUtils';
 
 const AccountDetail = () => {
   const { id } = useParams();
@@ -190,10 +191,7 @@ const AccountDetail = () => {
                 <div>
                   <p className="text-sm text-gray-500">Next Renewal</p>
                   <p className="text-sm font-medium text-gray-900">
-                    {account.next_renewal_date
-                      ? new Date(account.next_renewal_date).toLocaleDateString()
-                      : 'N/A'
-                    }
+                    {formatDateOnly(account.next_renewal_date)}
                   </p>
                 </div>
                 <div>

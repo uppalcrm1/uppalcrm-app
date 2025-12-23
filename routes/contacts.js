@@ -608,11 +608,15 @@ router.post('/convert-from-lead/:leadId',
 
       // Step 6: Create transaction if requested
       if (createTransaction && transactionData && accountId) {
+        console.log('🔍 DEBUG - Payment Date Received:', transactionData.paymentDate);
+        console.log('🔍 DEBUG - Payment Date Type:', typeof transactionData.paymentDate);
+        console.log('🔍 DEBUG - Next Renewal Date:', transactionData.nextRenewalDate);
+
         const transactionInsertResult = await query(
           `INSERT INTO transactions (
             organization_id, account_id, contact_id, payment_method,
             term, amount, status, transaction_date, notes, created_by
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, TO_DATE($8, 'YYYY-MM-DD'), $9, $10)
           RETURNING *`,
           [
             req.organizationId,
@@ -622,20 +626,23 @@ router.post('/convert-from-lead/:leadId',
             transactionData.term || 'Monthly',
             transactionData.amount || 0,
             'pending',
-            transactionData.paymentDate || new Date(),
+            transactionData.paymentDate || new Date().toISOString().split('T')[0],
             `Converted from lead ${lead.full_name}`,
             req.user.id
           ]
         );
         transaction = transactionInsertResult.rows[0];
         console.log('✅ Created transaction:', transaction.id);
+        console.log('🔍 DEBUG - Stored transaction_date:', transaction.transaction_date);
 
         // Update account with next renewal date if provided
         if (transactionData.nextRenewalDate && accountId) {
-          await query(
-            `UPDATE accounts SET next_renewal_date = $1 WHERE id = $2`,
+          console.log('🔍 DEBUG - Updating next_renewal_date to:', transactionData.nextRenewalDate);
+          const updateResult = await query(
+            `UPDATE accounts SET next_renewal_date = TO_DATE($1, 'YYYY-MM-DD') WHERE id = $2 RETURNING next_renewal_date`,
             [transactionData.nextRenewalDate, accountId]
           );
+          console.log('🔍 DEBUG - Stored next_renewal_date:', updateResult.rows[0]?.next_renewal_date);
         }
       }
 

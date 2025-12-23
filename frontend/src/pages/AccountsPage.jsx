@@ -21,6 +21,7 @@ import AccountSelectorModal from '../components/AccountSelectorModal'
 import { AccountActions } from '../components/accounts/AccountActions'
 import { accountsAPI } from '../services/api'
 import toast from 'react-hot-toast'
+import { formatDateOnly } from '../utils/dateUtils'
 
 // Define available columns with metadata (10 columns as per spec)
 const COLUMN_DEFINITIONS = [
@@ -72,11 +73,9 @@ const BILLING_CYCLE_OPTIONS = [
   { value: 'annual', label: 'Annual' }
 ]
 
-// Helper function to format dates
+// Helper function to format dates (using timezone-safe utility)
 const formatDate = (dateString) => {
-  if (!dateString) return 'N/A';
-  const date = new Date(dateString);
-  return date.toLocaleDateString('en-US', {
+  return formatDateOnly(dateString, {
     month: 'short',
     day: 'numeric',
     year: 'numeric'

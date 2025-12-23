@@ -8,6 +8,8 @@ const dbConfig = process.env.DATABASE_URL ? {
   idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
   connectionTimeoutMillis: 15000, // Increase timeout for cloud connections
   ssl: { rejectUnauthorized: false }, // Always use SSL for Render database
+  // Set timezone to UTC to prevent date shifting issues
+  options: '-c timezone=UTC',
   // Remove transaction isolation setting for better Render compatibility
   // Render PostgreSQL manages this automatically
 } : {
@@ -19,7 +21,9 @@ const dbConfig = process.env.DATABASE_URL ? {
   max: 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 15000,
-  ssl: false
+  ssl: false,
+  // Set timezone to UTC to prevent date shifting issues
+  options: '-c timezone=UTC'
 };
 
 // Create connection pool

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Building2, CreditCard, Monitor } from 'lucide-react';
+import { formatDateOnly } from '../../utils/dateUtils';
 
 const AccountDetailsPanel = ({ account }) => {
   return (
@@ -28,7 +29,7 @@ const AccountDetailsPanel = ({ account }) => {
           <div>
             <p className="text-sm text-gray-500">Created Date</p>
             <p className="text-sm font-medium text-gray-900">
-              {new Date(account.created_at).toLocaleDateString()}
+              {formatDateOnly(account.created_at)}
             </p>
           </div>
           {account.account_type && (
@@ -82,10 +83,7 @@ const AccountDetailsPanel = ({ account }) => {
           <div>
             <p className="text-sm text-gray-500">Next Renewal</p>
             <p className="text-sm font-medium text-gray-900">
-              {account.next_renewal_date
-                ? new Date(account.next_renewal_date).toLocaleDateString()
-                : 'N/A'
-              }
+              {formatDateOnly(account.next_renewal_date)}
             </p>
           </div>
           {account.days_until_renewal != null && (

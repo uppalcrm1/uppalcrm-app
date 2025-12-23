@@ -22,6 +22,7 @@ import {
   TRANSACTION_SOURCES,
   BILLING_TERMS
 } from '../constants/transactions'
+import { formatDateOnly } from '../utils/dateUtils'
 
 const CreateTransactionModal = ({ account, onClose, onSuccess, isOpen }) => {
   // State for form data
@@ -610,11 +611,7 @@ const CreateTransactionModal = ({ account, onClose, onSuccess, isOpen }) => {
                         {account?.next_renewal_date && (
                           <span className="text-gray-500 block text-xs mt-0.5">
                             Add {formData.term || '?'} month(s) to{' '}
-                            {new Date(account.next_renewal_date).toLocaleDateString('en-US', {
-                              year: 'numeric',
-                              month: 'short',
-                              day: 'numeric'
-                            })}
+                            {formatDateOnly(account.next_renewal_date, { year: 'numeric', month: 'short', day: 'numeric' })}
                           </span>
                         )}
                       </span>
@@ -639,11 +636,7 @@ const CreateTransactionModal = ({ account, onClose, onSuccess, isOpen }) => {
                         </span>
                         <span className="text-gray-500 block text-xs mt-0.5">
                           Add {formData.term || '?'} month(s) to{' '}
-                          {new Date(formData.payment_date).toLocaleDateString('en-US', {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric'
-                          })}
+                          {formatDateOnly(formData.payment_date, { year: 'numeric', month: 'short', day: 'numeric' })}
                         </span>
                       </span>
                     </label>
@@ -702,22 +695,14 @@ const CreateTransactionModal = ({ account, onClose, onSuccess, isOpen }) => {
                           <span className="text-gray-600">Current Expiry:</span>
                           <span className="font-medium text-gray-900">
                             {account?.next_renewal_date
-                              ? new Date(account.next_renewal_date).toLocaleDateString('en-US', {
-                                  year: 'numeric',
-                                  month: 'short',
-                                  day: 'numeric'
-                                })
+                              ? formatDateOnly(account.next_renewal_date, { year: 'numeric', month: 'short', day: 'numeric' })
                               : 'Not set'}
                           </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-gray-600">New Expiry:</span>
                           <span className="font-medium text-blue-900">
-                            {new Date(expiryUpdate.newExpiryDate).toLocaleDateString('en-US', {
-                              year: 'numeric',
-                              month: 'short',
-                              day: 'numeric'
-                            })}
+                            {formatDateOnly(expiryUpdate.newExpiryDate, { year: 'numeric', month: 'short', day: 'numeric' })}
                           </span>
                         </div>
                         {account?.next_renewal_date && (
