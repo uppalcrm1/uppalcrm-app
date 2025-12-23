@@ -15,7 +15,7 @@ router.use(validateOrganizationContext);
 router.get('/', async (req, res) => {
   try {
     const { organization_id } = req.user;
-    const { status, limit = 100, offset = 0 } = req.query;
+    const { status, limit = 100, offset = 0, includeDeleted = 'false' } = req.query;
 
     let query = `
       SELECT
@@ -46,11 +46,12 @@ router.get('/', async (req, res) => {
           ELSE NULL
         END as days_until_renewal,
 
-        -- Count total accounts for this contact
+        -- Count total accounts for this contact (excluding deleted)
         (SELECT COUNT(*)
          FROM accounts a2
          WHERE a2.contact_id = a.contact_id
          AND a2.organization_id = a.organization_id
+         AND a2.deleted_at IS NULL
         ) as total_accounts_for_contact,
 
         -- Count transactions for this specific account
@@ -66,6 +67,11 @@ router.get('/', async (req, res) => {
     `;
 
     const params = [organization_id];
+
+    // Filter deleted accounts unless explicitly requested
+    if (includeDeleted === 'false' || includeDeleted === false) {
+      query += ` AND a.deleted_at IS NULL`;
+    }
 
     if (status) {
       query += ` AND a.status = $${params.length + 1}`;
@@ -108,7 +114,7 @@ router.get('/stats', async (req, res) => {
         COUNT(CASE WHEN is_trial = true THEN 1 END) as trial_count,
         SUM(CASE WHEN status = 'active' THEN price ELSE 0 END) as total_revenue
       FROM accounts
-      WHERE organization_id = $1
+      WHERE organization_id = $1 AND deleted_at IS NULL
     `, [organization_id], organization_id);
 
     res.json({
@@ -166,7 +172,7 @@ router.get('/:id/detail', async (req, res) => {
           WHEN a.billing_cycle = 'semi-annual' OR a.billing_cycle = 'semi_annual' THEN EXTRACT(DAY FROM ((a.created_at + INTERVAL '6 months') - NOW()))
           WHEN a.billing_cycle = 'annual' THEN EXTRACT(DAY FROM ((a.created_at + INTERVAL '12 months') - NOW()))
         END as days_until_renewal,
-        (SELECT COUNT(*) FROM accounts WHERE contact_id = a.contact_id AND organization_id = $2) as total_accounts_for_contact
+        (SELECT COUNT(*) FROM accounts WHERE contact_id = a.contact_id AND organization_id = $2 AND deleted_at IS NULL) as total_accounts_for_contact
       FROM accounts a
       LEFT JOIN contacts c ON a.contact_id = c.id
       LEFT JOIN products p ON a.product_id = p.id
