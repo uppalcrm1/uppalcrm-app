@@ -21,15 +21,71 @@ import {
   BILLING_TERMS
 } from '../constants/transactions'
 
+// Helper function to format date for input field (YYYY-MM-DD)
+const formatDateForInput = (dateValue) => {
+  if (!dateValue) return new Date().toISOString().split('T')[0]
+
+  // If it's already a string in YYYY-MM-DD format, return it
+  if (typeof dateValue === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+    return dateValue
+  }
+
+  // If it's an ISO string or timestamp, extract the date part
+  if (typeof dateValue === 'string') {
+    return dateValue.split('T')[0]
+  }
+
+  // If it's a Date object, format it
+  if (dateValue instanceof Date) {
+    return dateValue.toISOString().split('T')[0]
+  }
+
+  // Fallback to today
+  return new Date().toISOString().split('T')[0]
+}
+
+// Helper function to normalize term value to match BILLING_TERMS options
+const normalizeTermValue = (termValue) => {
+  if (!termValue) return ''
+
+  const term = termValue.toString().toLowerCase().trim()
+
+  // Map various term formats to standard values (1, 3, 6, 12)
+  const termMap = {
+    '1': '1',
+    '1 month': '1',
+    'monthly': '1',
+    'month': '1',
+    '3': '3',
+    '3 months': '3',
+    'quarterly': '3',
+    'quarter': '3',
+    '6': '6',
+    '6 months': '6',
+    'semi-annual': '6',
+    'semi_annual': '6',
+    'semiannual': '6',
+    '12': '12',
+    '12 months': '12',
+    '1 year': '12',
+    'annual': '12',
+    'yearly': '12',
+    'year': '12'
+  }
+
+  return termMap[term] || termValue.toString()
+}
+
 const EditTransactionModal = ({ transaction, onClose, onSuccess, isOpen }) => {
+
   // State for form data - pre-populate with existing transaction data
   const [formData, setFormData] = useState({
     amount: transaction?.amount?.toString() || '',
-    payment_date: transaction?.payment_date || new Date().toISOString().split('T')[0],
+    payment_date: formatDateForInput(transaction?.payment_date),
     status: transaction?.status || 'completed',
     payment_method: transaction?.payment_method || 'Credit Card',
     source: transaction?.source || 'manual',
-    term: transaction?.term?.toString() || '',
+    term: normalizeTermValue(transaction?.term),
     transaction_reference: transaction?.transaction_reference || '',
     notes: transaction?.notes || '',
     currency: transaction?.currency || 'USD'
@@ -41,16 +97,29 @@ const EditTransactionModal = ({ transaction, onClose, onSuccess, isOpen }) => {
   // Update form data when transaction changes
   useEffect(() => {
     if (transaction) {
+      console.log('📝 EditTransactionModal - Received transaction:', transaction)
+      console.log('📅 Payment date value:', transaction.payment_date)
+      console.log('📋 Term value:', transaction.term)
+
+      const formattedDate = formatDateForInput(transaction.payment_date)
+      const normalizedTerm = normalizeTermValue(transaction.term)
+
       setFormData({
         amount: transaction.amount?.toString() || '',
-        payment_date: transaction.payment_date || new Date().toISOString().split('T')[0],
+        payment_date: formattedDate,
         status: transaction.status || 'completed',
         payment_method: transaction.payment_method || 'Credit Card',
         source: transaction.source || 'manual',
-        term: transaction.term?.toString() || '',
+        term: normalizedTerm,
         transaction_reference: transaction.transaction_reference || '',
         notes: transaction.notes || '',
         currency: transaction.currency || 'USD'
+      })
+
+      console.log('✅ Form data initialized:', {
+        payment_date: formattedDate,
+        term: normalizedTerm,
+        raw_term: transaction.term
       })
     }
   }, [transaction])
