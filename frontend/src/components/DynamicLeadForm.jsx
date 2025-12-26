@@ -11,6 +11,10 @@ const DynamicLeadForm = ({
   onSubmit,
   initialData = {}
 }) => {
+  console.log('🚀 DynamicLeadForm RENDER - Mode:', mode);
+  console.log('🚀 DynamicLeadForm RENDER - leadData:', leadData);
+  console.log('🚀 DynamicLeadForm RENDER - leadData.custom_fields:', leadData?.custom_fields);
+
   // Use leadData if provided, otherwise fallback to initialData
   const actualInitialData = leadData && Object.keys(leadData).length > 0 ? leadData : initialData;
   const [formConfig, setFormConfig] = useState({ customFields: [], defaultFields: [] });
@@ -276,6 +280,17 @@ const DynamicLeadForm = ({
       : formData[fieldName] || '';
     const isRequired = field.is_required;
     const errorKey = isCustom ? `custom_${fieldName}` : fieldName;
+
+    // Debug logging for custom fields
+    if (isCustom) {
+      console.log(`🔍 Rendering custom field "${fieldName}":`, {
+        fieldName,
+        fieldLabel,
+        fieldValue,
+        formDataCustomFields: formData.customFields,
+        fullFormData: formData
+      });
+    }
 
 
     const getFieldIcon = (type) => {
