@@ -27,6 +27,8 @@ const DynamicLeadForm = ({
   useEffect(() => {
     if (actualInitialData && Object.keys(actualInitialData).length > 0 && !loading) {
       // Only set the data if form config is loaded (loading is false)
+      console.log('📝 DynamicLeadForm - Received leadData:', actualInitialData);
+      console.log('📋 Custom fields from leadData:', actualInitialData.custom_fields);
 
       // Map API field names to form field names
       const mappedData = {
@@ -39,10 +41,15 @@ const DynamicLeadForm = ({
         nextFollowUp: actualInitialData.next_follow_up || actualInitialData.nextFollowUp || '',
       };
 
+      // Extract and properly map custom fields
+      const customFieldsData = actualInitialData.custom_fields || actualInitialData.customFields || {};
+
+      console.log('✅ Mapped custom fields:', customFieldsData);
+
       setFormData(prev => ({
         ...prev,
         ...mappedData,
-        customFields: { ...prev.customFields, ...(actualInitialData.custom_fields || {}) }
+        customFields: { ...customFieldsData }
       }));
     }
   }, [actualInitialData, loading]);
@@ -90,11 +97,19 @@ const DynamicLeadForm = ({
 
         setFormData(initialFormData);
       } else {
-        // We have existing data, just ensure customFields exists
-        setFormData(prev => ({
-          ...prev,
-          customFields: prev.customFields || {}
-        }));
+        // We have existing data, ensure customFields structure exists
+        // Don't initialize with empty values - the useEffect will populate with actual data
+        setFormData(prev => {
+          // If prev is empty, initialize with custom fields structure
+          if (!prev || Object.keys(prev).length === 0) {
+            return { customFields: {} };
+          }
+          // Otherwise, ensure customFields property exists
+          return {
+            ...prev,
+            customFields: prev.customFields || {}
+          };
+        });
       }
 
     } catch (error) {
