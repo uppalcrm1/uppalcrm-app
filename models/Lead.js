@@ -21,6 +21,7 @@ class Lead {
     this.updated_at = data.updated_at;
     this.last_contact_date = data.last_contact_date;
     this.next_follow_up = data.next_follow_up;
+    this.custom_fields = data.custom_fields || {};
   }
 
   /**
@@ -675,7 +676,8 @@ class Lead {
       created_at: this.created_at,
       updated_at: this.updated_at,
       last_contact_date: this.last_contact_date,
-      next_follow_up: this.next_follow_up
+      next_follow_up: this.next_follow_up,
+      custom_fields: this.custom_fields || {}
     };
   }
 }
