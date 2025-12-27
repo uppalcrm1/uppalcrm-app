@@ -632,75 +632,6 @@ const LeadsPage = () => {
           isLoading={convertMutation.isPending}
         />
       )}
-    </div>
-  )
-}
-
-// Assign Lead Modal Component
-const AssignLeadModal = ({ lead, onClose, onSubmit, users, isLoading }) => {
-  const [selectedUserId, setSelectedUserId] = useState('')
-
-  const handleSubmit = (e) => {
-    e.preventDefault()
-    onSubmit(selectedUserId || null)
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-        <div className="fixed inset-0 transition-opacity" onClick={onClose}>
-          <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
-        </div>
-
-        <div className="inline-block w-full max-w-md px-6 py-6 my-8 text-left align-middle transition-all transform bg-white shadow-xl rounded-lg">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-gray-900">Assign Lead</h3>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-              <X size={24} />
-            </button>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <p className="text-sm text-gray-600 mb-4">
-                Assign <strong>{lead.full_name}</strong> to a team member:
-              </p>
-              
-              <select
-                value={selectedUserId}
-                onChange={(e) => setSelectedUserId(e.target.value)}
-                className="select"
-                required
-              >
-                <option value="">Select team member</option>
-                {users.map(user => (
-                  <option key={user.id} value={user.id}>
-                    {user.full_name} ({user.email})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex items-center justify-end space-x-3 pt-6 border-t">
-              <button
-                type="button"
-                onClick={onClose}
-                className="btn btn-secondary btn-md"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={isLoading || !selectedUserId}
-                className="btn btn-primary btn-md"
-              >
-                {isLoading ? <LoadingSpinner size="sm" /> : 'Assign Lead'}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
 
       {/* Activities Modal (Tasks & Interactions) */}
       {showInteractions && (
@@ -757,6 +688,74 @@ const AssignLeadModal = ({ lead, onClose, onSubmit, users, isLoading }) => {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// Assign Lead Modal Component
+const AssignLeadModal = ({ lead, onClose, onSubmit, users, isLoading }) => {
+  const [selectedUserId, setSelectedUserId] = useState('')
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    onSubmit(selectedUserId || null)
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto">
+      <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+        <div className="fixed inset-0 transition-opacity" onClick={onClose}>
+          <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+        </div>
+
+        <div className="inline-block w-full max-w-md px-6 py-6 my-8 text-left align-middle transition-all transform bg-white shadow-xl rounded-lg">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-semibold text-gray-900">Assign Lead</h3>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+              <X size={24} />
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <p className="text-sm text-gray-600 mb-4">
+                Assign <strong>{lead.full_name}</strong> to a team member:
+              </p>
+
+              <select
+                value={selectedUserId}
+                onChange={(e) => setSelectedUserId(e.target.value)}
+                className="select"
+                required
+              >
+                <option value="">Select team member</option>
+                {users.map(user => (
+                  <option key={user.id} value={user.id}>
+                    {user.full_name} ({user.email})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex items-center justify-end space-x-3 pt-6 border-t">
+              <button
+                type="button"
+                onClick={onClose}
+                className="btn btn-secondary btn-md"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isLoading || !selectedUserId}
+                className="btn btn-primary btn-md"
+              >
+                {isLoading ? <LoadingSpinner size="sm" /> : 'Assign Lead'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
   )
 }
