@@ -510,29 +510,23 @@ const DynamicLeadForm = ({
 
   const formContent = (
     <div className={isModalMode ? "" : "max-w-4xl mx-auto p-6 bg-gray-50 min-h-screen"}>
-      <div className={`bg-white rounded-lg shadow-sm border border-gray-200 ${isModalMode ? "" : ""}`}>
-        <div className="border-b border-gray-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-semibold text-gray-900">
-                {mode === 'edit' ? 'Edit Lead' : 'Add New Lead'}
-              </h1>
-              <p className="mt-1 text-gray-600">
-                {mode === 'edit' ? 'Update lead information' : 'Create a new lead in your CRM system'}
-              </p>
+      <div className={isModalMode ? "" : "bg-white rounded-lg shadow-sm border border-gray-200"}>
+        {!isModalMode && (
+          <div className="border-b border-gray-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-semibold text-gray-900">
+                  {mode === 'edit' ? 'Edit Lead' : 'Add New Lead'}
+                </h1>
+                <p className="mt-1 text-gray-600">
+                  {mode === 'edit' ? 'Update lead information' : 'Create a new lead in your CRM system'}
+                </p>
+              </div>
             </div>
-            {isModalMode && onClose && (
-              <button
-                onClick={onClose}
-                className="text-gray-400 hover:text-gray-600 p-1"
-              >
-                <X size={20} />
-              </button>
-            )}
           </div>
-        </div>
+        )}
 
-        <div className="p-6">
+        <div className={isModalMode ? "" : "p-6"}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* System Fields (excluding full-width fields like notes, description, textarea) */}
             {enabledSystemFields
@@ -584,8 +578,8 @@ const DynamicLeadForm = ({
         </div>
       </div>
 
-      {/* Configuration Preview */}
-      {(enabledSystemFields.length > 0 || enabledCustomFields.length > 0) && (
+      {/* Configuration Preview - Only show in non-modal mode */}
+      {!isModalMode && (enabledSystemFields.length > 0 || enabledCustomFields.length > 0) && (
         <div className="mt-6 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <h2 className="text-lg font-medium text-gray-900 mb-4">Active Form Fields</h2>
           <div className="text-sm text-gray-600">

@@ -563,22 +563,39 @@ const LeadsPage = () => {
             }}>
               <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
             </div>
-            <div className="inline-block w-full max-w-4xl px-6 py-6 my-8 text-left align-middle transition-all transform bg-white shadow-xl rounded-lg">
-              <DynamicLeadForm
-                mode="edit"
-                leadData={selectedLead}
-                onSuccess={() => {
-                  queryClient.invalidateQueries(['leads'])
-                  setShowEditModal(false)
-                  setSelectedLead(null)
-                  toast.success('Lead updated successfully')
-                }}
-                onClose={() => {
-                  setShowEditModal(false)
-                  setSelectedLead(null)
-                }}
-                isOpen={true}
-              />
+            <div className="inline-block w-full max-w-4xl my-8 text-left align-middle transition-all transform bg-white shadow-xl rounded-lg overflow-hidden">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+                <div>
+                  <h3 className="text-xl font-semibold text-gray-900">Edit Lead</h3>
+                  <p className="mt-1 text-sm text-gray-600">Update lead information</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowEditModal(false)
+                    setSelectedLead(null)
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+              <div className="px-6 py-6 max-h-[calc(100vh-200px)] overflow-y-auto">
+                <DynamicLeadForm
+                  mode="edit"
+                  leadData={selectedLead}
+                  onSuccess={() => {
+                    queryClient.invalidateQueries(['leads'])
+                    setShowEditModal(false)
+                    setSelectedLead(null)
+                    toast.success('Lead updated successfully')
+                  }}
+                  onClose={() => {
+                    setShowEditModal(false)
+                    setSelectedLead(null)
+                  }}
+                  isOpen={true}
+                />
+              </div>
             </div>
           </div>
         </div>
