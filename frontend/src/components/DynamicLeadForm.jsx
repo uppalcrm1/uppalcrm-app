@@ -619,18 +619,7 @@ const DynamicLeadForm = ({
 
   // Return with modal wrapper if in modal mode
   if (isModalMode && isOpen) {
-    return (
-      <div className="fixed inset-0 z-50 overflow-y-auto">
-        <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-          <div className="fixed inset-0 transition-opacity" onClick={onClose}>
-            <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
-          </div>
-          <div className="inline-block w-full max-w-4xl px-6 py-6 my-8 text-left align-middle transition-all transform bg-white shadow-xl rounded-lg">
-            {formContent}
-          </div>
-        </div>
-      </div>
-    );
+    return formContent;
   }
 
   // Return regular form if not in modal mode or modal is closed

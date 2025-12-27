@@ -566,7 +566,7 @@ router.get('/',
       console.log('Getting leads for organization:', req.organizationId);
       console.log('Query params:', req.query);
       console.log('Value column being used:', valueColumnName);
-      console.log('🔄 Updated leads endpoint - no custom_fields column');
+      console.log('✅ Updated leads endpoint - includes custom_fields column');
 
       // Check if organization ID exists
       if (!req.organizationId) {
@@ -652,11 +652,11 @@ router.get('/',
       // Add pagination parameters
       queryParams.push(limit, offset);
 
-      // Query leads WITHOUT custom_fields column (for database compatibility)
+      // Query leads WITH custom_fields column
       const leads = await db.query(`
         SELECT id, first_name, last_name, email, phone, company, source, status,
                priority, ${valueColumnName}, assigned_to, next_follow_up, notes,
-               created_at, updated_at
+               created_at, updated_at, custom_fields
         FROM leads
         WHERE ${whereClause}
         ORDER BY ${sortColumn} ${orderDirection}
@@ -696,7 +696,7 @@ router.get('/',
         valueColumnName: valueColumnName,
         query: `SELECT id, first_name, last_name, email, phone, company, source, status,
                priority, ${valueColumnName}, assigned_to, next_follow_up, notes,
-               created_at, updated_at`,
+               created_at, updated_at, custom_fields`,
         params: [req.organizationId, 20, 0]
       });
       res.status(500).json({
