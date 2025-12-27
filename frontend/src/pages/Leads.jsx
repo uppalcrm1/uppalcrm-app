@@ -96,23 +96,67 @@ const Leads = () => {
 
       {/* Create Lead Modal */}
       {showCreateModal && (
-        <DynamicLeadForm
-          isOpen={showCreateModal}
-          onClose={handleCloseModals}
-          onSuccess={handleFormSuccess}
-          mode="create"
-        />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
+            onClick={handleCloseModals}
+          ></div>
+          <div className="relative w-full max-w-4xl bg-white shadow-xl rounded-lg overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-white">
+              <div>
+                <h3 className="text-xl font-semibold text-gray-900">Add New Lead</h3>
+                <p className="mt-1 text-sm text-gray-600">Create a new lead in your CRM</p>
+              </div>
+              <button
+                onClick={handleCloseModals}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <span className="text-2xl">&times;</span>
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 py-6">
+              <DynamicLeadForm
+                isOpen={showCreateModal}
+                onClose={handleCloseModals}
+                onSuccess={handleFormSuccess}
+                mode="create"
+              />
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Edit Lead Modal */}
       {showEditModal && selectedLead && (
-        <DynamicLeadForm
-          isOpen={showEditModal}
-          onClose={handleCloseModals}
-          onSuccess={handleFormSuccess}
-          mode="edit"
-          leadData={selectedLead}
-        />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
+            onClick={handleCloseModals}
+          ></div>
+          <div className="relative w-full max-w-4xl bg-white shadow-xl rounded-lg overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-white">
+              <div>
+                <h3 className="text-xl font-semibold text-gray-900">Edit Lead</h3>
+                <p className="mt-1 text-sm text-gray-600">Update lead information</p>
+              </div>
+              <button
+                onClick={handleCloseModals}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <span className="text-2xl">&times;</span>
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 py-6">
+              <DynamicLeadForm
+                isOpen={showEditModal}
+                onClose={handleCloseModals}
+                onSuccess={handleFormSuccess}
+                mode="edit"
+                leadData={selectedLead}
+              />
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Delete Confirmation Modal */}
