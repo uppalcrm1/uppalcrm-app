@@ -1,10 +1,14 @@
 const express = require('express');
 const router = express.Router();
 const reportingController = require('../controllers/reportingController');
+const { authenticateToken } = require('../middleware/auth');
+
+// Apply authentication middleware to all routes
+router.use(authenticateToken);
 
 /**
  * Reporting Routes
- * All routes require authentication (handled by middleware in server.js)
+ * All routes require authentication
  */
 
 /**
