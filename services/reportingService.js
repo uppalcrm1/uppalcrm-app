@@ -193,7 +193,7 @@ const getActiveAccountsCount = async (organizationId) => {
      FROM accounts
      WHERE organization_id = $1
        AND deleted_at IS NULL
-       AND status = 'active'`,
+       AND license_status = 'active'`,
     [organizationId],
     organizationId
   );
@@ -213,7 +213,7 @@ const getUpcomingRenewals = async (organizationId, days = 30) => {
      FROM accounts
      WHERE organization_id = $1
        AND deleted_at IS NULL
-       AND status = 'active'
+       AND license_status = 'active'
        AND next_renewal_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '${days} days'`,
     [organizationId],
     organizationId
@@ -343,7 +343,7 @@ const getAccountsByProduct = async (organizationId) => {
      LEFT JOIN software_editions se ON a.product_id = se.id
      WHERE a.organization_id = $1
        AND a.deleted_at IS NULL
-       AND a.status = 'active'
+       AND a.license_status = 'active'
      GROUP BY COALESCE(p.name, se.name, 'Unknown')
      ORDER BY account_count DESC`,
     [organizationId],
