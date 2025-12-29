@@ -83,13 +83,12 @@ const getRevenueLastMonth = async (organizationId) => {
 const getRevenueByProduct = async (organizationId, startDate = null, endDate = null) => {
   let query = `
     SELECT
-      COALESCE(p.name, se.name, 'Unknown') as product_name,
+      COALESCE(p.name, a.edition, 'Unknown') as product_name,
       COUNT(t.id) as transaction_count,
       COALESCE(SUM(t.amount), 0) as total_revenue
     FROM transactions t
     LEFT JOIN accounts a ON t.account_id = a.id
     LEFT JOIN products p ON a.product_id = p.id
-    LEFT JOIN software_editions se ON a.product_id = se.id
     WHERE t.organization_id = $1
       AND t.deleted_at IS NULL
       AND t.is_void = FALSE
@@ -109,7 +108,7 @@ const getRevenueByProduct = async (organizationId, startDate = null, endDate = n
   }
 
   query += `
-    GROUP BY COALESCE(p.name, se.name, 'Unknown')
+    GROUP BY COALESCE(p.name, a.edition, 'Unknown')
     ORDER BY total_revenue DESC
   `;
 
@@ -336,15 +335,14 @@ const getDashboardKPIs = async (organizationId) => {
 const getAccountsByProduct = async (organizationId) => {
   const result = await db.query(
     `SELECT
-      COALESCE(p.name, se.name, 'Unknown') as product_name,
+      COALESCE(p.name, a.edition, 'Unknown') as product_name,
       COUNT(a.id) as account_count
      FROM accounts a
      LEFT JOIN products p ON a.product_id = p.id
-     LEFT JOIN software_editions se ON a.product_id = se.id
      WHERE a.organization_id = $1
        AND a.deleted_at IS NULL
        AND a.license_status = 'active'
-     GROUP BY COALESCE(p.name, se.name, 'Unknown')
+     GROUP BY COALESCE(p.name, a.edition, 'Unknown')
      ORDER BY account_count DESC`,
     [organizationId],
     organizationId
