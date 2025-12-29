@@ -70,13 +70,13 @@ const Dashboard = () => {
 
   const { data: revenueByProduct, isLoading: productRevenueLoading } = useQuery({
     queryKey: ['revenueByProduct'],
-    queryFn: reportingAPI.getRevenueByProduct,
+    queryFn: () => reportingAPI.getRevenueByProduct(),
     enabled: isAuthenticated
   })
 
   const { data: paymentMethods, isLoading: paymentMethodsLoading } = useQuery({
     queryKey: ['paymentMethods'],
-    queryFn: reportingAPI.getPaymentMethods,
+    queryFn: () => reportingAPI.getPaymentMethods(),
     enabled: isAuthenticated
   })
 
