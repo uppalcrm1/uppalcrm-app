@@ -1078,4 +1078,51 @@ export const taskAPI = {
   }
 }
 
+// Reporting & Analytics API
+export const reportingAPI = {
+  // Get all dashboard KPIs in a single request
+  getDashboardKPIs: async () => {
+    const response = await api.get('/reporting/dashboard/kpis')
+    return response.data
+  },
+
+  // Get monthly revenue trend
+  getRevenueTrend: async (months = 12) => {
+    const response = await api.get('/reporting/dashboard/revenue-trend', {
+      params: { months }
+    })
+    return response.data
+  },
+
+  // Get revenue breakdown by product
+  getRevenueByProduct: async (startDate = null, endDate = null) => {
+    const params = {}
+    if (startDate) params.startDate = startDate
+    if (endDate) params.endDate = endDate
+
+    const response = await api.get('/reporting/dashboard/revenue-by-product', { params })
+    return response.data
+  },
+
+  // Get payment methods breakdown
+  getPaymentMethods: async () => {
+    const response = await api.get('/reporting/dashboard/payment-methods')
+    return response.data
+  },
+
+  // Get new customers trend
+  getNewCustomersTrend: async (months = 6) => {
+    const response = await api.get('/reporting/dashboard/new-customers', {
+      params: { months }
+    })
+    return response.data
+  },
+
+  // Get accounts breakdown by product
+  getAccountsByProduct: async () => {
+    const response = await api.get('/reporting/dashboard/accounts-by-product')
+    return response.data
+  }
+}
+
 export default api

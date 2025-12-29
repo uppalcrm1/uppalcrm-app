@@ -9,12 +9,17 @@ import {
   Calendar,
   AlertCircle,
   ArrowRight,
-  Activity
+  Activity,
+  CreditCard,
+  Package
 } from 'lucide-react'
-import { leadsAPI, contactsAPI, organizationsAPI } from '../services/api'
+import { leadsAPI, contactsAPI, organizationsAPI, reportingAPI } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
+import RevenueLineChart from '../components/charts/RevenueLineChart'
+import ProductPieChart from '../components/charts/ProductPieChart'
+import PaymentMethodsChart from '../components/charts/PaymentMethodsChart'
 
 const Dashboard = () => {
   const { isAuthenticated } = useAuth()
@@ -50,7 +55,33 @@ const Dashboard = () => {
     enabled: isAuthenticated
   })
 
-  const isLoading = leadsLoading || contactsLoading || orgLoading || recentLeadsLoading || recentContactsLoading
+  // Fetch revenue analytics data
+  const { data: revenueKPIs, isLoading: kpisLoading } = useQuery({
+    queryKey: ['dashboardKPIs'],
+    queryFn: reportingAPI.getDashboardKPIs,
+    enabled: isAuthenticated
+  })
+
+  const { data: revenueTrend, isLoading: trendLoading } = useQuery({
+    queryKey: ['revenueTrend'],
+    queryFn: () => reportingAPI.getRevenueTrend(12),
+    enabled: isAuthenticated
+  })
+
+  const { data: revenueByProduct, isLoading: productRevenueLoading } = useQuery({
+    queryKey: ['revenueByProduct'],
+    queryFn: reportingAPI.getRevenueByProduct,
+    enabled: isAuthenticated
+  })
+
+  const { data: paymentMethods, isLoading: paymentMethodsLoading } = useQuery({
+    queryKey: ['paymentMethods'],
+    queryFn: reportingAPI.getPaymentMethods,
+    enabled: isAuthenticated
+  })
+
+  const isLoading = leadsLoading || contactsLoading || orgLoading || recentLeadsLoading || recentContactsLoading ||
+                     kpisLoading || trendLoading || productRevenueLoading || paymentMethodsLoading
 
   if (isLoading) {
     return <LoadingSpinner className="mt-8" />
@@ -84,30 +115,17 @@ const Dashboard = () => {
       </div>
 
       {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-6">
-        <div className="card">
-          <div className="flex items-center">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Users className="h-6 w-6 text-blue-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Total Leads</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {leadStats?.stats.total_leads || 0}
-              </p>
-            </div>
-          </div>
-        </div>
-
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        {/* Revenue KPIs */}
         <div className="card">
           <div className="flex items-center">
             <div className="p-2 bg-green-100 rounded-lg">
-              <TrendingUp className="h-6 w-6 text-green-600" />
+              <DollarSign className="h-6 w-6 text-green-600" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Conversion Rate</p>
+              <p className="text-sm font-medium text-gray-600">Total Revenue</p>
               <p className="text-2xl font-bold text-gray-900">
-                {leadStats?.stats.conversion_rate || 0}%
+                ${revenueKPIs?.data?.totalRevenue?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}
               </p>
             </div>
           </div>
@@ -115,13 +133,32 @@ const Dashboard = () => {
 
         <div className="card">
           <div className="flex items-center">
-            <div className="p-2 bg-yellow-100 rounded-lg">
-              <DollarSign className="h-6 w-6 text-yellow-600" />
+            <div className="p-2 bg-emerald-100 rounded-lg">
+              <Calendar className="h-6 w-6 text-emerald-600" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Total Value</p>
+              <p className="text-sm font-medium text-gray-600">Revenue This Month</p>
               <p className="text-2xl font-bold text-gray-900">
-                ${leadStats?.stats.total_value?.toLocaleString() || 0}
+                ${revenueKPIs?.data?.revenueThisMonth?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}
+              </p>
+              {revenueKPIs?.data?.revenueGrowth !== undefined && (
+                <p className={`text-xs font-medium ${revenueKPIs.data.revenueGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {revenueKPIs.data.revenueGrowth >= 0 ? '+' : ''}{revenueKPIs.data.revenueGrowth}% from last month
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="flex items-center">
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <TrendingUp className="h-6 w-6 text-blue-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Avg Transaction</p>
+              <p className="text-2xl font-bold text-gray-900">
+                ${revenueKPIs?.data?.avgTransactionValue?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}
               </p>
             </div>
           </div>
@@ -130,24 +167,25 @@ const Dashboard = () => {
         <div className="card">
           <div className="flex items-center">
             <div className="p-2 bg-purple-100 rounded-lg">
-              <UserPlus className="h-6 w-6 text-purple-600" />
+              <Package className="h-6 w-6 text-purple-600" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">New This Week</p>
+              <p className="text-sm font-medium text-gray-600">Active Accounts</p>
               <p className="text-2xl font-bold text-gray-900">
-                {leadStats?.stats.new_this_week || 0}
+                {revenueKPIs?.data?.activeAccounts || 0}
               </p>
             </div>
           </div>
         </div>
 
+        {/* Lead & Contact KPIs */}
         <div className="card">
           <div className="flex items-center">
             <div className="p-2 bg-indigo-100 rounded-lg">
               <Users className="h-6 w-6 text-indigo-600" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Total Contacts</p>
+              <p className="text-sm font-medium text-gray-600">Total Customers</p>
               <p className="text-2xl font-bold text-gray-900">
                 {contactStats?.stats.total_contacts || 0}
               </p>
@@ -157,20 +195,72 @@ const Dashboard = () => {
 
         <div className="card">
           <div className="flex items-center">
-            <div className="p-2 bg-emerald-100 rounded-lg">
-              <Activity className="h-6 w-6 text-emerald-600" />
+            <div className="p-2 bg-teal-100 rounded-lg">
+              <UserPlus className="h-6 w-6 text-teal-600" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Active Licenses</p>
+              <p className="text-sm font-medium text-gray-600">New Customers</p>
               <p className="text-2xl font-bold text-gray-900">
-                {contactStats?.stats.active_licenses || 0}
+                {revenueKPIs?.data?.newCustomersThisMonth || 0}
               </p>
+              <p className="text-xs text-gray-500">This month</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="flex items-center">
+            <div className="p-2 bg-orange-100 rounded-lg">
+              <Calendar className="h-6 w-6 text-orange-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Renewals Due</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {revenueKPIs?.data?.upcomingRenewals || 0}
+              </p>
+              <p className="text-xs text-gray-500">Next 30 days</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="flex items-center">
+            <div className="p-2 bg-cyan-100 rounded-lg">
+              <Activity className="h-6 w-6 text-cyan-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Total Leads</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {leadStats?.stats.total_leads || 0}
+              </p>
+              <p className="text-xs text-gray-500">{leadStats?.stats.conversion_rate || 0}% conversion</p>
             </div>
           </div>
         </div>
       </div>
 
+      {/* Revenue Charts Section */}
+      <div className="card">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Revenue Trend (Last 12 Months)</h3>
+        <RevenueLineChart data={revenueTrend?.data || []} height={350} />
+      </div>
+
       {/* Charts Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Revenue by Product */}
+        <div className="card">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Revenue by Product</h3>
+          <ProductPieChart data={revenueByProduct?.data || []} dataKey="revenue" height={300} />
+        </div>
+
+        {/* Payment Methods Breakdown */}
+        <div className="card">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Payment Methods</h3>
+          <PaymentMethodsChart data={paymentMethods?.data || []} height={300} />
+        </div>
+      </div>
+
+      {/* Additional Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Lead Status Distribution */}
         <div className="card">
@@ -198,8 +288,8 @@ const Dashboard = () => {
           <div className="flex flex-wrap gap-4 mt-4">
             {statusData.map((entry) => (
               <div key={entry.name} className="flex items-center">
-                <div 
-                  className="w-3 h-3 rounded-full mr-2" 
+                <div
+                  className="w-3 h-3 rounded-full mr-2"
                   style={{ backgroundColor: entry.color }}
                 />
                 <span className="text-sm text-gray-600">{entry.name}: {entry.value}</span>
