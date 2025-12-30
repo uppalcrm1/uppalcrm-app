@@ -45,6 +45,10 @@ import AdminSettings from './pages/admin/AdminSettings'
 import AdminAISettings from './pages/admin/AdminAISettings'
 import AdminProducts from './pages/admin/AdminProducts'
 import CommunicationsPage from './pages/CommunicationsPage'
+import ReportsPage from './pages/ReportsPage'
+import ReportBuilderPage from './pages/ReportBuilderPage'
+import CustomDashboardsPage from './pages/CustomDashboardsPage'
+import DashboardBuilderPage from './pages/DashboardBuilderPage'
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuth()
@@ -130,6 +134,14 @@ function App() {
         <Route path="import" element={<ImportPage />} />
         <Route path="field-configuration" element={<FieldConfigurationPage />} />
         <Route path="communications" element={<CommunicationsPage />} />
+
+        {/* Reports & Dashboards Routes */}
+        <Route path="reports" element={<ReportsPage />} />
+        <Route path="reports/builder" element={<ReportBuilderPage />} />
+        <Route path="reports/builder/:id" element={<ReportBuilderPage />} />
+        <Route path="custom-dashboards" element={<CustomDashboardsPage />} />
+        <Route path="custom-dashboards/builder" element={<DashboardBuilderPage />} />
+        <Route path="custom-dashboards/builder/:id" element={<DashboardBuilderPage />} />
 
         {/* Admin Routes */}
         <Route path="admin/users" element={<AdminUsers />} />

@@ -36,6 +36,8 @@ const adminFixTrialsRoutes = require('./routes/admin-fix-trials');
 const transactionsRoutes = require('./routes/transactions');
 const twilioRoutes = require('./routes/twilio');
 const reportingRoutes = require('./routes/reporting');
+const reportsRoutes = require('./routes/reports');
+const dashboardsRoutes = require('./routes/dashboards');
 
 // Import scheduled jobs
 const scheduledJobs = require('./services/scheduledJobs');
@@ -212,6 +214,8 @@ app.use('/api/transactions', rateLimiters.general, transactionsRoutes);
 
 // Reporting & Analytics API routes
 app.use('/api/reporting', rateLimiters.general, reportingRoutes);
+app.use('/api/reports', rateLimiters.general, reportsRoutes);
+app.use('/api/dashboards', rateLimiters.general, dashboardsRoutes);
 // Legacy License Management API routes (for backward compatibility)
 app.use('/api/licenses', rateLimiters.general, licenseRoutes);
 app.use('/api/devices', rateLimiters.general, deviceRoutes);

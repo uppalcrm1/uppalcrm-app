@@ -1125,4 +1125,120 @@ export const reportingAPI = {
   }
 }
 
+// Reports API (Custom Reports)
+export const reportsAPI = {
+  // Execute a dynamic report
+  executeReport: async (config) => {
+    const response = await api.post('/reports/execute', config)
+    return response.data
+  },
+
+  // Get all saved reports for current user
+  getSavedReports: async (filters = {}) => {
+    const response = await api.get('/reports/saved', { params: filters })
+    return response.data
+  },
+
+  // Get a single saved report
+  getSavedReport: async (id) => {
+    const response = await api.get(`/reports/saved/${id}`)
+    return response.data
+  },
+
+  // Create a new saved report
+  createSavedReport: async (reportData) => {
+    const response = await api.post('/reports/saved', reportData)
+    return response.data
+  },
+
+  // Update a saved report
+  updateSavedReport: async (id, reportData) => {
+    const response = await api.put(`/reports/saved/${id}`, reportData)
+    return response.data
+  },
+
+  // Delete a saved report
+  deleteSavedReport: async (id) => {
+    const response = await api.delete(`/reports/saved/${id}`)
+    return response.data
+  },
+
+  // Toggle favorite status
+  toggleFavorite: async (id) => {
+    const response = await api.post(`/reports/saved/${id}/favorite`)
+    return response.data
+  },
+
+  // Export report to CSV
+  exportCSV: async (config) => {
+    const response = await api.post('/reports/export/csv', config, {
+      responseType: 'blob'
+    })
+    return response.data
+  },
+
+  // Get available data sources
+  getDataSources: async () => {
+    const response = await api.get('/reports/metadata/sources')
+    return response.data
+  },
+
+  // Get fields for a data source
+  getFields: async (dataSource) => {
+    const response = await api.get(`/reports/metadata/fields/${dataSource}`)
+    return response.data
+  },
+
+  // Get operators for a field type
+  getOperators: async (fieldType) => {
+    const response = await api.get(`/reports/metadata/operators/${fieldType}`)
+    return response.data
+  }
+}
+
+// Dashboards API (Custom Dashboards)
+export const dashboardsAPI = {
+  // Get all saved dashboards for current user
+  getSavedDashboards: async () => {
+    const response = await api.get('/dashboards/saved')
+    return response.data
+  },
+
+  // Get a single saved dashboard
+  getSavedDashboard: async (id) => {
+    const response = await api.get(`/dashboards/saved/${id}`)
+    return response.data
+  },
+
+  // Create a new saved dashboard
+  createSavedDashboard: async (dashboardData) => {
+    const response = await api.post('/dashboards/saved', dashboardData)
+    return response.data
+  },
+
+  // Update a saved dashboard
+  updateSavedDashboard: async (id, dashboardData) => {
+    const response = await api.put(`/dashboards/saved/${id}`, dashboardData)
+    return response.data
+  },
+
+  // Delete a saved dashboard
+  deleteSavedDashboard: async (id) => {
+    const response = await api.delete(`/dashboards/saved/${id}`)
+    return response.data
+  },
+
+  // Set a dashboard as default
+  setDefaultDashboard: async (id) => {
+    const response = await api.post(`/dashboards/saved/${id}/set-default`)
+    return response.data
+  },
+
+  // Execute a widget
+  executeWidget: async (widgetConfig) => {
+    const response = await api.post('/dashboards/widgets/execute', widgetConfig)
+    return response.data
+  }
+}
+
 export default api

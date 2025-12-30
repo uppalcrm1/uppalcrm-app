@@ -24,6 +24,8 @@ import {
   Package,
   MessageSquare,
   CheckSquare,
+  FileBarChart,
+  LayoutGrid,
 } from 'lucide-react'
 import LoadingSpinner from './LoadingSpinner'
 import IncomingCallNotification from './IncomingCallNotification'
@@ -37,6 +39,8 @@ const navigation = [
   { name: 'Accounts', href: '/accounts', icon: Building2 },
   { name: 'Transactions', href: '/transactions', icon: DollarSign },
   { name: 'Communications', href: '/communications', icon: MessageSquare },
+  { name: 'Reports', href: '/reports', icon: FileBarChart },
+  { name: 'My Dashboards', href: '/custom-dashboards', icon: LayoutGrid },
   { name: 'Billing', href: '/billing', icon: CreditCard },
   { name: 'Team', href: '/team', icon: UserCheck },
   { name: 'Settings', href: '/settings', icon: Settings },
