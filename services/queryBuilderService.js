@@ -17,7 +17,16 @@ const DATA_SOURCES = {
     description: 'Prospects and potential customers',
     fields: {
       id: { type: 'uuid', label: 'Lead ID', filterable: false, groupable: false, sortable: true },
-      full_name: { type: 'text', label: 'Full Name', filterable: true, groupable: true, sortable: true },
+      full_name: {
+        type: 'text',
+        label: 'Full Name',
+        filterable: false,
+        groupable: false,
+        sortable: true,
+        sqlExpression: "CONCAT(first_name, ' ', last_name)"
+      },
+      first_name: { type: 'text', label: 'First Name', filterable: true, groupable: true, sortable: true },
+      last_name: { type: 'text', label: 'Last Name', filterable: true, groupable: true, sortable: true },
       email: { type: 'text', label: 'Email', filterable: true, groupable: true, sortable: true },
       phone: { type: 'text', label: 'Phone', filterable: true, groupable: false, sortable: true },
       company: { type: 'text', label: 'Company', filterable: true, groupable: true, sortable: true },
@@ -61,7 +70,16 @@ const DATA_SOURCES = {
     description: 'Customers who have made purchases',
     fields: {
       id: { type: 'uuid', label: 'Contact ID', filterable: false, groupable: false, sortable: true },
-      full_name: { type: 'text', label: 'Full Name', filterable: true, groupable: true, sortable: true },
+      full_name: {
+        type: 'text',
+        label: 'Full Name',
+        filterable: false,
+        groupable: false,
+        sortable: true,
+        sqlExpression: "CONCAT(first_name, ' ', last_name)"
+      },
+      first_name: { type: 'text', label: 'First Name', filterable: true, groupable: true, sortable: true },
+      last_name: { type: 'text', label: 'Last Name', filterable: true, groupable: true, sortable: true },
       email: { type: 'text', label: 'Email', filterable: true, groupable: true, sortable: true },
       phone: { type: 'text', label: 'Phone', filterable: true, groupable: false, sortable: true },
       status: {
@@ -283,14 +301,21 @@ const buildSelectClause = (fields, dataSource, groupBy = []) => {
   if (groupBy && groupBy.length > 0) {
     const selectParts = sanitizedFields.map(field => {
       if (groupBy.includes(field)) {
+        const fieldMeta = DATA_SOURCES[dataSource].fields[field];
+        // Use SQL expression if available
+        if (fieldMeta.sqlExpression) {
+          return `${fieldMeta.sqlExpression} as ${field}`;
+        }
         return field;
       }
 
       const fieldMeta = DATA_SOURCES[dataSource].fields[field];
       if (fieldMeta.aggregatable) {
-        return `SUM(${field}) as ${field}`;
+        const expr = fieldMeta.sqlExpression || field;
+        return `SUM(${expr}) as ${field}`;
       } else if (fieldMeta.type === 'number') {
-        return `COUNT(${field}) as ${field}_count`;
+        const expr = fieldMeta.sqlExpression || field;
+        return `COUNT(${expr}) as ${field}_count`;
       } else {
         return null; // Skip non-aggregatable fields not in groupBy
       }
@@ -299,7 +324,17 @@ const buildSelectClause = (fields, dataSource, groupBy = []) => {
     return selectParts.join(', ');
   }
 
-  return sanitizedFields.join(', ');
+  // Build select list with SQL expressions
+  const selectParts = sanitizedFields.map(field => {
+    const fieldMeta = DATA_SOURCES[dataSource].fields[field];
+    // Use SQL expression if available, otherwise use field name
+    if (fieldMeta.sqlExpression) {
+      return `${fieldMeta.sqlExpression} as ${field}`;
+    }
+    return field;
+  });
+
+  return selectParts.join(', ');
 };
 
 /**
@@ -387,7 +422,13 @@ const buildOrderByClause = (orderBy, dataSource) => {
 
   const orderParts = orderBy.map(order => {
     const field = sanitizeField(order.field, dataSource);
+    const fieldMeta = DATA_SOURCES[dataSource].fields[field];
     const direction = order.direction?.toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
+
+    // Use SQL expression if available
+    if (fieldMeta.sqlExpression) {
+      return `${fieldMeta.sqlExpression} ${direction}`;
+    }
     return `${field} ${direction}`;
   });
 
