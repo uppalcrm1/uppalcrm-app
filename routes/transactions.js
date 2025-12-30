@@ -271,15 +271,13 @@ router.post('/', validate(transactionSchemas.create), async (req, res) => {
           subscription_end_date = $1::date,
           price = $2,
           billing_cycle = $3,
-          updated_at = NOW(),
-          updated_by = $4
-        WHERE id = $5 AND organization_id = $6
+          updated_at = NOW()
+        WHERE id = $4 AND organization_id = $5
         RETURNING id, account_name, next_renewal_date, subscription_end_date
       `, [
         new_expiry_date,
         amount,
         term,
-        user_id,
         account_id,
         organization_id
       ]);
