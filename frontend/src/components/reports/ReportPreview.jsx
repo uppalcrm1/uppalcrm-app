@@ -24,7 +24,7 @@ const ReportPreview = ({ data = [], isLoading = false, error = null, fields = []
 
   // Sort data
   const sortedData = React.useMemo(() => {
-    if (!sortBy || !data) return data;
+    if (!sortBy || !data) return data || [];
 
     return [...data].sort((a, b) => {
       const aVal = a[sortBy];
@@ -46,6 +46,7 @@ const ReportPreview = ({ data = [], isLoading = false, error = null, fields = []
 
   // Paginate data
   const paginatedData = React.useMemo(() => {
+    if (!sortedData) return [];
     const start = (currentPage - 1) * itemsPerPage;
     const end = start + itemsPerPage;
     return sortedData.slice(start, end);
