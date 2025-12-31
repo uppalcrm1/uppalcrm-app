@@ -116,8 +116,9 @@ const LeadProgressBar = ({ currentStatus, onStatusChange, timeInCurrentStage }) 
   const handleStageClick = (stage, stageIndex) => {
     const currentIndex = getCurrentStageIndex()
 
-    // Allow clicking on current stage or next stage only
-    if (stageIndex === currentIndex + 1 || stageIndex === currentIndex || currentStatus === 'new') {
+    // Allow clicking on any stage (forward or backward movement)
+    // Skip if trying to click on 'lost' or 'converted' as they have dedicated buttons
+    if (stage.key !== 'lost' && stage.key !== 'converted') {
       setSelectedStatus(stage.key)
       setShowConfirmModal(true)
     }
@@ -177,7 +178,7 @@ const LeadProgressBar = ({ currentStatus, onStatusChange, timeInCurrentStage }) 
         <div className="flex items-center -space-x-2">
           {stages.map((stage, index) => {
             const status = getStageStatus(index)
-            const isClickable = index === getCurrentStageIndex() + 1 || index === getCurrentStageIndex() || currentStatus === 'new'
+            const isClickable = stage.key !== 'lost' && stage.key !== 'converted'
 
             // Determine background color
             let bgColor = 'bg-gray-300 text-gray-700'
