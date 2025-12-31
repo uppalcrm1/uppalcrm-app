@@ -613,7 +613,34 @@ const DynamicLeadForm = ({
 
   // Return with modal wrapper if in modal mode
   if (isModalMode && isOpen) {
-    return formContent;
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+          {/* Modal Header */}
+          <div className="flex items-center justify-between p-6 border-b border-gray-200">
+            <div>
+              <h2 className="text-2xl font-semibold text-gray-900">
+                {mode === 'edit' ? 'Edit Lead' : 'Add New Lead'}
+              </h2>
+              <p className="mt-1 text-sm text-gray-600">
+                {mode === 'edit' ? 'Update lead information' : 'Create a new lead in your CRM system'}
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+
+          {/* Modal Body */}
+          <div className="flex-1 overflow-y-auto p-6">
+            {formContent}
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // Return regular form if not in modal mode or modal is closed
