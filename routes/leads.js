@@ -830,7 +830,7 @@ router.get('/tasks',
       const {
         assigned_to,
         lead_owner,
-        status = 'scheduled,pending',
+        status,
         sort_by = 'scheduled_at',
         sort_order = 'ASC',
         limit = 50,
