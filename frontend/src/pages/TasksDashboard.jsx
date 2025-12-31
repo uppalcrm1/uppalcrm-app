@@ -90,6 +90,10 @@ const TasksDashboard = () => {
     onSettled: () => {
       // Refetch after mutation
       queryClient.invalidateQueries({ queryKey: ['allTasks'] })
+      // Also invalidate tasks queries used by TaskManager component on lead pages
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      // Invalidate leads list to update task counts
+      queryClient.invalidateQueries({ queryKey: ['leads'] })
     }
   })
 

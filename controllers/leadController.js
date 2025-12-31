@@ -413,7 +413,15 @@ class LeadController {
       if (reason) {
         try {
           await db.query(
-            'UPDATE lead_change_history SET change_reason = $1 WHERE lead_id = $2 AND field_name = $3 ORDER BY created_at DESC LIMIT 1',
+            `UPDATE lead_change_history
+             SET change_reason = $1
+             WHERE id = (
+               SELECT id
+               FROM lead_change_history
+               WHERE lead_id = $2 AND field_name = $3
+               ORDER BY created_at DESC
+               LIMIT 1
+             )`,
             [reason, id, 'status']
           );
         } catch (reasonError) {

@@ -237,6 +237,8 @@ const TaskManager = ({ leadId }) => {
     onSuccess: () => {
       queryClient.invalidateQueries(['tasks', leadId]);
       queryClient.invalidateQueries(['leads']);
+      // Also invalidate allTasks query used by TasksDashboard
+      queryClient.invalidateQueries(['allTasks']);
     },
     onError: (error) => {
       console.error('Error completing task:', error);
@@ -250,6 +252,9 @@ const TaskManager = ({ leadId }) => {
     mutationFn: (taskId) => taskAPI.deleteTask(leadId, taskId),
     onSuccess: () => {
       queryClient.invalidateQueries(['tasks', leadId]);
+      queryClient.invalidateQueries(['leads']);
+      // Also invalidate allTasks query used by TasksDashboard
+      queryClient.invalidateQueries(['allTasks']);
     }
   });
 
