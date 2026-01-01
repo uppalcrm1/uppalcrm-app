@@ -35,7 +35,7 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
     amount: '',
     owner: (lead?.assigned_first_name && lead?.assigned_last_name)
       ? `${lead.assigned_first_name} ${lead.assigned_last_name}`
-      : '',
+      : null,
     paymentDate: new Date().toISOString().split('T')[0],
     source: lead?.source_name || lead?.source || 'website',
     term: 'Monthly',
