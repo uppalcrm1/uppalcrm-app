@@ -6,11 +6,12 @@ const {
   validate,
   schemas
 } = require('../middleware/validation');
-const { 
-  authenticateToken, 
-  validateOrganizationContext 
+const {
+  authenticateToken,
+  validateOrganizationContext
 } = require('../middleware/auth');
 const Joi = require('joi');
+const { sanitizeUUID, sanitizeUUIDs } = require('../utils/sanitizeUUID');
 
 const router = express.Router();
 
@@ -651,7 +652,7 @@ router.post('/convert-from-lead/:leadId',
             [
               req.organizationId,
               contactId,
-              task.user_id || null, // Handle NULL/empty user_id
+              sanitizeUUID(task.user_id), // Sanitize UUID - converts empty strings to NULL
               'note', // Convert task to note type
               direction,
               taskSubject,
@@ -685,7 +686,7 @@ router.post('/convert-from-lead/:leadId',
             [
               req.organizationId,
               contactId,
-              activity.user_id || null, // Handle NULL/empty user_id
+              sanitizeUUID(activity.user_id), // Sanitize UUID - converts empty strings to NULL
               interactionType,
               direction,
               activity.subject || null, // Handle NULL subject
