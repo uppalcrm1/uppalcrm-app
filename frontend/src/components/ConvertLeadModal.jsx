@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { X, CheckCircle2, User, Building2, CreditCard, Info, Search } from 'lucide-react';
-import { contactsAPI, usersAPI } from '../services/api';
+import { contactsAPI, usersAPI, productsAPI } from '../services/api';
 import LoadingSpinner from './LoadingSpinner';
 
 const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
@@ -23,7 +23,8 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
   });
 
   const [accountForm, setAccountForm] = useState({
-    product: 'Standard (Default)',
+    productId: '',
+    product: '',
     accountName: `${lead?.first_name || ''} ${lead?.last_name || ''}'s Account`.trim(),
     deviceName: '',
     macAddress: '',
@@ -55,8 +56,18 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
     queryFn: () => usersAPI.getUsers()
   });
 
+  // Fetch active products for Product dropdown
+  const { data: productsData, isLoading: productsLoading } = useQuery({
+    queryKey: ['products', { active: true }],
+    queryFn: () => productsAPI.getProducts(false), // false = only active products
+    staleTime: 0, // Always fetch fresh data
+    refetchOnMount: 'always' // Refetch when modal opens
+  });
+
   const existingContacts = contactsData?.contacts || [];
   const users = usersData?.users || [];
+  const products = productsData?.products || [];
+  const defaultProduct = products.find(p => p.is_default);
   const filteredContacts = existingContacts.filter(contact =>
     contact.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     contact.email?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -109,22 +120,18 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
     }
   }, [users, lead?.assigned_to]);
 
-  // Auto-fill transaction amount based on product (mock pricing)
+  // Auto-fill transaction amount based on selected product
   useEffect(() => {
-    const pricing = {
-      'Standard (Default)': { Monthly: '49.99', Quarterly: '139.99', Annually: '499.99' },
-      'Premium': { Monthly: '99.99', Quarterly: '279.99', Annually: '999.99' },
-      'Enterprise': { Monthly: '199.99', Quarterly: '549.99', Annually: '1999.99' }
-    };
-
-    const price = pricing[accountForm.product]?.[accountForm.term];
-    if (price) {
-      setTransactionForm(prev => ({
-        ...prev,
-        amount: price
-      }));
+    if (accountForm.productId && products.length > 0) {
+      const selectedProduct = products.find(p => p.id === accountForm.productId);
+      if (selectedProduct?.price) {
+        setTransactionForm(prev => ({
+          ...prev,
+          amount: selectedProduct.price
+        }));
+      }
     }
-  }, [accountForm.product, accountForm.term]);
+  }, [accountForm.productId, products]);
 
   // Validation functions
   const isContactValid = () => {
@@ -477,15 +484,41 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">Product *</label>
-                      <select
-                        value={accountForm.product}
-                        onChange={(e) => setAccountForm({ ...accountForm, product: e.target.value })}
-                        className="select h-9"
-                      >
-                        <option>Standard (Default)</option>
-                        <option>Premium</option>
-                        <option>Enterprise</option>
-                      </select>
+                      {productsLoading ? (
+                        <div className="flex items-center justify-center h-9 border border-gray-300 rounded-lg bg-gray-50">
+                          <LoadingSpinner size="sm" />
+                        </div>
+                      ) : products.length === 0 ? (
+                        <div className="h-9 px-3 py-2 border border-yellow-300 rounded-lg bg-yellow-50 text-xs text-yellow-800 flex items-center">
+                          No products available
+                        </div>
+                      ) : (
+                        <select
+                          value={accountForm.productId}
+                          onChange={(e) => {
+                            const productId = e.target.value;
+                            const selectedProduct = products.find(p => p.id === productId);
+                            setAccountForm({
+                              ...accountForm,
+                              productId,
+                              product: selectedProduct?.name || ''
+                            });
+                          }}
+                          className="select h-9"
+                          required
+                        >
+                          <option value="">
+                            {defaultProduct ? `${defaultProduct.name} (Default)` : 'Select a product...'}
+                          </option>
+                          {products.map((product) => (
+                            <option key={product.id} value={product.id}>
+                              {product.name}
+                              {product.price ? ` - $${product.price}` : ''}
+                              {product.is_default ? ' (Default)' : ''}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">Term *</label>
