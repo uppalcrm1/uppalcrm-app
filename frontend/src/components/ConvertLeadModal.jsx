@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { X, CheckCircle2, User, Building2, CreditCard, Info, Search } from 'lucide-react';
-import { contactsAPI } from '../services/api';
+import { contactsAPI, usersAPI } from '../services/api';
 import LoadingSpinner from './LoadingSpinner';
 
 const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
@@ -33,9 +33,9 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
   const [transactionForm, setTransactionForm] = useState({
     paymentMethod: 'Credit Card',
     amount: '',
-    owner: 'Admin User',
+    owner: lead?.assigned_user?.full_name || 'Admin User',
     paymentDate: new Date().toISOString().split('T')[0],
-    source: 'website',
+    source: lead?.source_name || lead?.source || 'website',
     term: 'Monthly',
     nextRenewalDate: ''
   });
@@ -47,7 +47,14 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
     enabled: contactMode === 'existing'
   });
 
+  // Fetch users for Owner dropdown
+  const { data: usersData } = useQuery({
+    queryKey: ['users'],
+    queryFn: () => usersAPI.getUsers()
+  });
+
   const existingContacts = contactsData?.contacts || [];
+  const users = usersData?.users || [];
   const filteredContacts = existingContacts.filter(contact =>
     contact.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     contact.email?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -576,9 +583,15 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
                         onChange={(e) => setTransactionForm({ ...transactionForm, owner: e.target.value })}
                         className="select h-9"
                       >
-                        <option>Admin User</option>
-                        <option>Sales User 1</option>
-                        <option>Sales User 2</option>
+                        {users.length > 0 ? (
+                          users.map(user => (
+                            <option key={user.id} value={user.full_name || `${user.first_name} ${user.last_name}`}>
+                              {user.full_name || `${user.first_name} ${user.last_name}`}
+                            </option>
+                          ))
+                        ) : (
+                          <option value={transactionForm.owner}>{transactionForm.owner}</option>
+                        )}
                       </select>
                     </div>
                     <div>
@@ -596,8 +609,8 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
                         type="text"
                         value={transactionForm.source}
                         onChange={(e) => setTransactionForm({ ...transactionForm, source: e.target.value })}
-                        className="input h-9 bg-gray-50"
-                        readOnly
+                        className="input h-9"
+                        placeholder="Lead source"
                       />
                     </div>
                     <div>
