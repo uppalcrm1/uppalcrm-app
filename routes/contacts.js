@@ -799,7 +799,7 @@ router.post('/convert-from-lead/:leadId',
 
 /**
  * GET /contacts/:id/detail
- * Get contact with related data (accounts, stats)
+ * Get contact with related data (accounts, stats, custom fields, tasks)
  */
 router.get('/:id/detail',
   validateUuidParam,
@@ -807,6 +807,7 @@ router.get('/:id/detail',
     try {
       const { id } = req.params;
       const organizationId = req.organizationId;
+      const { query } = require('../database/connection');
 
       // Fetch contact
       const contact = await Contact.findById(id, organizationId);
@@ -822,10 +823,61 @@ router.get('/:id/detail',
         contact_id: id
       });
 
-      // Return aggregated data
+      // Fetch custom fields for this contact
+      const customFieldsResult = await query(
+        `SELECT cfv.*, cfd.field_name, cfd.field_type, cfd.field_label
+         FROM custom_field_values cfv
+         JOIN custom_field_definitions cfd ON cfv.field_definition_id = cfd.id
+         WHERE cfv.entity_id = $1
+         AND cfv.entity_type = 'contacts'
+         AND cfd.is_active = true
+         ORDER BY cfd.display_order, cfd.field_label`,
+        [id],
+        organizationId
+      );
+
+      // Fetch task stats from contact_interactions
+      const taskStatsResult = await query(
+        `SELECT
+          COUNT(*) FILTER (WHERE subject LIKE '[Task]%' OR interaction_type = 'note') as total_tasks,
+          COUNT(*) FILTER (WHERE (subject LIKE '[Task]%' OR interaction_type = 'note')
+                                 AND subject LIKE '%Completed%') as completed_tasks,
+          COUNT(*) FILTER (WHERE (subject LIKE '[Task]%' OR interaction_type = 'note')
+                                 AND (subject LIKE '%Scheduled%' OR subject NOT LIKE '%Completed%')) as in_progress_tasks
+         FROM contact_interactions
+         WHERE contact_id = $1 AND organization_id = $2`,
+        [id, organizationId],
+        organizationId
+      );
+
+      const taskStats = taskStatsResult.rows[0] || {
+        total_tasks: 0,
+        completed_tasks: 0,
+        in_progress_tasks: 0
+      };
+
+      // Return aggregated data with all fields
+      const contactData = contact.toJSON();
+
+      // Add assigned_to_name for backwards compatibility
+      if (contact.assigned_user) {
+        contactData.assigned_to_name = contact.assigned_user.full_name;
+      }
+
       res.json({
-        contact: contact.toJSON(),
-        accounts: accounts || []
+        contact: contactData,
+        accounts: accounts || [],
+        customFields: customFieldsResult.rows.map(cf => ({
+          field_name: cf.field_name,
+          field_label: cf.field_label,
+          field_type: cf.field_type,
+          field_value: cf.field_value
+        })),
+        taskStats: {
+          total: parseInt(taskStats.total_tasks) || 0,
+          completed: parseInt(taskStats.completed_tasks) || 0,
+          inProgress: parseInt(taskStats.in_progress_tasks) || 0
+        }
       });
     } catch (error) {
       console.error('Error fetching contact detail:', error);

@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Mail, Phone, Copy, ChevronDown, ChevronUp,
   MessageSquare, Edit, MoreVertical, Calendar, CheckCircle2,
-  CalendarClock, Plus, ClipboardList, Laptop, DollarSign
+  CalendarClock, Plus, ClipboardList, Laptop, DollarSign, TrendingUp
 } from 'lucide-react';
 import { contactsAPI, transactionsAPI } from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -20,6 +20,8 @@ const ContactDetailPage = () => {
   const [accounts, setAccounts] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [interactions, setInteractions] = useState([]);
+  const [customFields, setCustomFields] = useState([]);
+  const [taskStats, setTaskStats] = useState({ total: 0, completed: 0, inProgress: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showEditModal, setShowEditModal] = useState(false);
@@ -45,6 +47,8 @@ const ContactDetailPage = () => {
       const response = await contactsAPI.getContactDetail(id);
       setContact(response.contact);
       setAccounts(response.accounts || []);
+      setCustomFields(response.customFields || []);
+      setTaskStats(response.taskStats || { total: 0, completed: 0, inProgress: 0 });
     } catch (err) {
       setError('Failed to load contact details');
       console.error(err);
@@ -300,7 +304,7 @@ const ContactDetailPage = () => {
                     <div>
                       <p className="text-sm text-gray-600">Owner</p>
                       <p className="text-sm font-medium text-gray-900 mt-1">
-                        {contact.assigned_to_name || 'Admin User'}
+                        {contact.assigned_to_name || contact.assigned_user?.full_name || 'Not assigned'}
                       </p>
                     </div>
                     <div>
@@ -310,23 +314,47 @@ const ContactDetailPage = () => {
                         {contact.created_at ? format(new Date(contact.created_at), 'MMM d, yyyy') : 'N/A'}
                       </p>
                     </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Address</p>
-                      <p className="text-sm font-medium text-gray-900 mt-1">
-                        {contact.address || '123 Market St, San Francisco, CA 94103'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Tags</p>
-                      <div className="flex gap-2 mt-1">
-                        <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-medium">
-                          VIP
-                        </span>
-                        <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">
-                          Tech Industry
-                        </span>
+                    {contact.company && (
+                      <div>
+                        <p className="text-sm text-gray-600">Company</p>
+                        <p className="text-sm font-medium text-gray-900 mt-1">
+                          {contact.company}
+                        </p>
                       </div>
-                    </div>
+                    )}
+                    {contact.title && (
+                      <div>
+                        <p className="text-sm text-gray-600">Title</p>
+                        <p className="text-sm font-medium text-gray-900 mt-1">
+                          {contact.title}
+                        </p>
+                      </div>
+                    )}
+                    {contact.source && (
+                      <div>
+                        <p className="text-sm text-gray-600">Source</p>
+                        <p className="text-sm font-medium text-gray-900 mt-1">
+                          {contact.source}
+                        </p>
+                      </div>
+                    )}
+                    {contact.converted_from_lead && (
+                      <div>
+                        <p className="text-sm text-gray-600">Converted From Lead</p>
+                        <p className="text-sm font-medium text-blue-600 mt-1">
+                          {contact.converted_from_lead.full_name}
+                        </p>
+                      </div>
+                    )}
+                    {/* Custom Fields */}
+                    {customFields.map((field, index) => (
+                      <div key={index}>
+                        <p className="text-sm text-gray-600">{field.field_label || field.field_name}</p>
+                        <p className="text-sm font-medium text-gray-900 mt-1">
+                          {field.field_value || 'N/A'}
+                        </p>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
@@ -511,7 +539,7 @@ const ContactDetailPage = () => {
                   </div>
                   <div>
                     <p className="text-xs text-gray-600 mb-1">Open Tasks</p>
-                    <p className="text-xl font-bold text-orange-600">3</p>
+                    <p className="text-xl font-bold text-orange-600">{taskStats.inProgress}</p>
                   </div>
                 </div>
               </div>
@@ -574,13 +602,13 @@ const ContactDetailPage = () => {
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-600">Completed</span>
                   <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">
-                    12
+                    {taskStats.completed}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-600">In Progress</span>
                   <span className="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-sm font-medium">
-                    3
+                    {taskStats.inProgress}
                   </span>
                 </div>
               </div>
