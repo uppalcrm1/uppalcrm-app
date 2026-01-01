@@ -651,12 +651,12 @@ router.post('/convert-from-lead/:leadId',
             [
               req.organizationId,
               contactId,
-              task.user_id,
+              task.user_id || null, // Handle NULL/empty user_id
               'note', // Convert task to note type
               direction,
               taskSubject,
               taskContent,
-              task.duration_minutes,
+              task.duration_minutes || null, // Handle NULL duration
               task.completed_at || task.created_at // Use completion time if available
             ]
           );
@@ -685,12 +685,12 @@ router.post('/convert-from-lead/:leadId',
             [
               req.organizationId,
               contactId,
-              activity.user_id,
+              activity.user_id || null, // Handle NULL/empty user_id
               interactionType,
               direction,
-              activity.subject,
-              activity.description,
-              activity.duration_minutes,
+              activity.subject || null, // Handle NULL subject
+              activity.description || null, // Handle NULL description
+              activity.duration_minutes || null, // Handle NULL duration
               activity.created_at
             ]
           );
