@@ -33,7 +33,9 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
   const [transactionForm, setTransactionForm] = useState({
     paymentMethod: 'Credit Card',
     amount: '',
-    owner: lead?.assigned_user?.full_name || 'Admin User',
+    owner: (lead?.assigned_first_name && lead?.assigned_last_name)
+      ? `${lead.assigned_first_name} ${lead.assigned_last_name}`
+      : '',
     paymentDate: new Date().toISOString().split('T')[0],
     source: lead?.source_name || lead?.source || 'website',
     term: 'Monthly',
@@ -92,6 +94,20 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
       term: accountForm.term
     }));
   }, [accountForm.term]);
+
+  // Sync owner when users load - ensure it matches the dropdown options format
+  useEffect(() => {
+    if (users.length > 0 && lead?.assigned_to) {
+      const assignedUser = users.find(u => u.id === lead.assigned_to);
+      if (assignedUser) {
+        const ownerName = assignedUser.full_name || `${assignedUser.first_name} ${assignedUser.last_name}`;
+        setTransactionForm(prev => ({
+          ...prev,
+          owner: ownerName
+        }));
+      }
+    }
+  }, [users, lead?.assigned_to]);
 
   // Auto-fill transaction amount based on product (mock pricing)
   useEffect(() => {
