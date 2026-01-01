@@ -509,8 +509,9 @@ router.post('/convert-from-lead/:leadId',
         const contactInsertResult = await query(
           `INSERT INTO contacts (
             organization_id, first_name, last_name, email, phone,
-            contact_status, company, title, converted_from_lead_id, created_by
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            contact_status, contact_source, company, title,
+            converted_from_lead_id, created_by, assigned_to, priority
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
           RETURNING *`,
           [
             req.organizationId,
@@ -519,10 +520,13 @@ router.post('/convert-from-lead/:leadId',
             contactData?.email || lead.email,
             contactData?.phone || lead.phone,
             'customer',
+            lead.source || null, // Preserve source
             lead.company,
             lead.title,
             leadId,
-            req.user.id
+            req.user.id,
+            lead.assigned_to || req.user.id, // Preserve owner (assigned_to)
+            lead.priority || 'medium'
           ]
         );
         contact = contactInsertResult.rows[0];
@@ -573,6 +577,126 @@ router.post('/convert-from-lead/:leadId',
         ON CONFLICT (lead_id, contact_id) DO NOTHING`,
         [leadId, contactId, 'conversion', req.user.id]
       );
+
+      // Step 4a: Transfer ALL custom field values from lead to contact
+      const customFieldsResult = await query(
+        `SELECT cfv.*, cfd.field_name
+         FROM custom_field_values cfv
+         JOIN custom_field_definitions cfd ON cfv.field_definition_id = cfd.id
+         WHERE cfv.entity_id = $1
+         AND cfv.entity_type = 'leads'
+         AND cfd.is_active = true`,
+        [leadId]
+      );
+
+      if (customFieldsResult.rows.length > 0) {
+        for (const fieldValue of customFieldsResult.rows) {
+          await query(
+            `INSERT INTO custom_field_values (
+              organization_id, field_definition_id, entity_type, entity_id, field_value,
+              created_by, updated_by
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+            ON CONFLICT (field_definition_id, entity_id) DO UPDATE
+            SET field_value = $5, updated_at = NOW(), updated_by = $7`,
+            [
+              req.organizationId,
+              fieldValue.field_definition_id,
+              'contacts',
+              contactId,
+              fieldValue.field_value,
+              req.user.id,
+              req.user.id
+            ]
+          );
+        }
+        console.log(`✅ Transferred ${customFieldsResult.rows.length} custom field(s):`,
+          customFieldsResult.rows.map(f => f.field_name).join(', '));
+      }
+
+      // Step 4b: Transfer tasks from lead_interactions to contact_interactions
+      // Note: Tasks are converted to 'note' type since contact_interactions doesn't support 'task' type
+      const tasksResult = await query(
+        `SELECT * FROM lead_interactions
+         WHERE lead_id = $1 AND interaction_type = 'task'`,
+        [leadId]
+      );
+
+      if (tasksResult.rows.length > 0) {
+        for (const task of tasksResult.rows) {
+          // Determine direction based on task status
+          const direction = 'outbound'; // Tasks are typically outbound actions
+
+          // Build subject that indicates this was a task
+          const taskSubject = task.subject
+            ? `[Task] ${task.subject}`
+            : `[Task] ${task.status === 'completed' ? 'Completed' : 'Scheduled'} task`;
+
+          // Build content that preserves task information
+          let taskContent = task.description || '';
+          if (task.outcome) {
+            taskContent += `\n\nOutcome: ${task.outcome}`;
+          }
+          if (task.scheduled_at) {
+            taskContent += `\n\nScheduled for: ${new Date(task.scheduled_at).toLocaleString()}`;
+          }
+          if (task.status) {
+            taskContent += `\n\nStatus: ${task.status}`;
+          }
+
+          await query(
+            `INSERT INTO contact_interactions (
+              organization_id, contact_id, user_id, interaction_type,
+              direction, subject, content, duration_minutes, created_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+            [
+              req.organizationId,
+              contactId,
+              task.user_id,
+              'note', // Convert task to note type
+              direction,
+              taskSubject,
+              taskContent,
+              task.duration_minutes,
+              task.completed_at || task.created_at // Use completion time if available
+            ]
+          );
+        }
+        console.log(`✅ Transferred ${tasksResult.rows.length} task(s) as notes`);
+      }
+
+      // Step 4c: Transfer lead interactions (activities) to contact_interactions
+      const activitiesResult = await query(
+        `SELECT * FROM lead_interactions
+         WHERE lead_id = $1 AND interaction_type != 'task'`,
+        [leadId]
+      );
+
+      if (activitiesResult.rows.length > 0) {
+        for (const activity of activitiesResult.rows) {
+          // Map lead interaction types to contact interaction types
+          let interactionType = activity.interaction_type;
+          let direction = 'outbound'; // Default direction
+
+          await query(
+            `INSERT INTO contact_interactions (
+              organization_id, contact_id, user_id, interaction_type,
+              direction, subject, content, duration_minutes, created_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+            [
+              req.organizationId,
+              contactId,
+              activity.user_id,
+              interactionType,
+              direction,
+              activity.subject,
+              activity.description,
+              activity.duration_minutes,
+              activity.created_at
+            ]
+          );
+        }
+        console.log(`✅ Transferred ${activitiesResult.rows.length} activities`);
+      }
 
       let account = null;
       let accountId = null;
