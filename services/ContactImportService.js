@@ -190,6 +190,8 @@ class ContactImportService {
    * Process entire import file
    */
   static async processImport(importId, organizationId, userId, fileBuffer, fieldMapping, duplicateHandling, matchField) {
+    const BATCH_SIZE = 50; // Process 50 contacts at a time
+
     try {
       const rows = await this.parseCSVFile(fileBuffer);
 
@@ -197,44 +199,89 @@ class ContactImportService {
         throw new Error('CSV file is empty');
       }
 
+      console.log(`[Import ${importId}] Starting import of ${rows.length} rows`);
+
       let successCount = 0;
       let failCount = 0;
       const errorDetails = [];
 
-      for (let i = 0; i < rows.length; i++) {
-        const row = rows[i];
-        const rowNumber = i + 2;
+      // Process in batches to avoid timeout
+      for (let batchStart = 0; batchStart < rows.length; batchStart += BATCH_SIZE) {
+        const batchEnd = Math.min(batchStart + BATCH_SIZE, rows.length);
+        const batch = rows.slice(batchStart, batchEnd);
 
-        const result = await this.processRow(
-          row,
-          rowNumber,
-          organizationId,
-          userId,
-          fieldMapping,
-          duplicateHandling,
-          matchField
-        );
+        console.log(`[Import ${importId}] Processing batch ${batchStart + 1}-${batchEnd} of ${rows.length}`);
 
-        await ContactImport.recordImportedContact(
-          importId,
-          organizationId,
-          result.contactId,
-          rowNumber,
-          result.action,
-          row,
-          result.error
-        );
+        // Process batch concurrently (but limit concurrency)
+        const batchPromises = batch.map(async (row, batchIndex) => {
+          const rowNumber = batchStart + batchIndex + 2; // +2 for header row and 0-index
 
-        if (result.action === 'created' || result.action === 'updated') {
-          successCount++;
-        } else if (result.action === 'failed') {
-          failCount++;
-          errorDetails.push({
-            row: rowNumber,
-            error: result.error
-          });
-        }
+          try {
+            const result = await this.processRow(
+              row,
+              rowNumber,
+              organizationId,
+              userId,
+              fieldMapping,
+              duplicateHandling,
+              matchField
+            );
+
+            // Record the import result
+            await ContactImport.recordImportedContact(
+              importId,
+              organizationId,
+              result.contactId,
+              rowNumber,
+              result.action,
+              row,
+              result.error
+            );
+
+            return { rowNumber, result };
+          } catch (error) {
+            console.error(`[Import ${importId}] Error processing row ${rowNumber}:`, error);
+            // Record failed row
+            await ContactImport.recordImportedContact(
+              importId,
+              organizationId,
+              null,
+              rowNumber,
+              'failed',
+              row,
+              error.message
+            );
+            return {
+              rowNumber,
+              result: {
+                action: 'failed',
+                contactId: null,
+                error: error.message
+              }
+            };
+          }
+        });
+
+        // Wait for all rows in this batch to complete
+        const batchResults = await Promise.all(batchPromises);
+
+        // Count successes and failures
+        batchResults.forEach(({ rowNumber, result }) => {
+          if (result.action === 'created' || result.action === 'updated') {
+            successCount++;
+          } else if (result.action === 'failed') {
+            failCount++;
+            errorDetails.push({
+              row: rowNumber,
+              error: result.error
+            });
+          }
+        });
+
+        console.log(`[Import ${importId}] Batch complete. Success: ${successCount}, Failed: ${failCount}`);
       }
+
+      console.log(`[Import ${importId}] Completing import. Total Success: ${successCount}, Total Failed: ${failCount}`);
 
       const importResult = await ContactImport.completeImport(
         importId,
@@ -245,9 +292,10 @@ class ContactImportService {
         errorDetails
       );
 
+      console.log(`[Import ${importId}] Import completed successfully`);
       return importResult;
     } catch (error) {
-      console.error('Error processing import:', error);
+      console.error(`[Import ${importId}] Error processing import:`, error);
       await ContactImport.updateImportStatus(importId, organizationId, 'failed');
       throw error;
     }

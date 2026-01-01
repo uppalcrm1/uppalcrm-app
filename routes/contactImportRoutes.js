@@ -170,6 +170,59 @@ router.get('/:importId', authenticateToken, async (req, res) => {
 });
 
 /**
+ * GET /api/imports/contacts/:importId/details
+ * Get detailed import logs with individual row results
+ */
+router.get('/:importId/details', authenticateToken, async (req, res) => {
+  try {
+    const organizationId = req.organizationId;
+    const { importId } = req.params;
+    const { limit = 100, offset = 0 } = req.query;
+
+    const importRecord = await ContactImport.getImportById(importId, organizationId);
+    if (!importRecord) {
+      return res.status(404).json({ message: 'Import not found' });
+    }
+
+    // Get detailed records for this import
+    const { query } = require('../database/connection');
+    const records = await query(
+      `SELECT
+        id,
+        contact_id,
+        row_number,
+        action,
+        imported_data,
+        error_message,
+        created_at
+      FROM contact_import_records
+      WHERE import_id = $1 AND organization_id = $2
+      ORDER BY row_number
+      LIMIT $3 OFFSET $4`,
+      [importId, organizationId, parseInt(limit), parseInt(offset)],
+      organizationId
+    );
+
+    // Get count of records
+    const countResult = await query(
+      `SELECT COUNT(*) as total FROM contact_import_records
+      WHERE import_id = $1 AND organization_id = $2`,
+      [importId, organizationId],
+      organizationId
+    );
+
+    res.json({
+      import: importRecord,
+      records: records.rows,
+      total: parseInt(countResult.rows[0].total)
+    });
+  } catch (error) {
+    console.error('Error getting import details:', error);
+    res.status(400).json({ message: error.message });
+  }
+});
+
+/**
  * GET /api/imports/contacts
  * Get all imports for organization
  */
