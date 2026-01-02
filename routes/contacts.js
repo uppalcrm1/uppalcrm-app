@@ -57,7 +57,7 @@ const contactSchemas = {
       assigned_to: Joi.string().guid({ version: 'uuidv4' }).allow(null).optional(),
       last_contact_date: Joi.date().iso().allow(null).optional(),
       next_follow_up: Joi.date().iso().allow(null).optional()
-    }),
+    }).unknown(true),
     params: Joi.object({
       id: Joi.string().guid({ version: 'uuidv4' }).required()
     })
