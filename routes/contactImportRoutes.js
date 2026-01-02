@@ -54,12 +54,16 @@ router.post('/upload', authenticateToken, upload.single('file'), async (req, res
       return res.status(400).json({ message: 'No file uploaded' });
     }
 
+    console.log(`[ContactImport Upload] File received: ${file.originalname}, size: ${file.size} bytes`);
+
     // Get CSV headers
     const headers = await ContactImportService.getCSVHeaders(file.buffer);
+    console.log(`[ContactImport Upload] Headers:`, headers);
 
     // Count total rows in file
     const rows = await ContactImportService.parseCSVFile(file.buffer);
     const totalRows = rows.length;
+    console.log(`[ContactImport Upload] Total rows parsed: ${totalRows}`);
 
     // Check if file exceeds limit
     if (totalRows > MAX_CONTACTS_PER_IMPORT) {

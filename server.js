@@ -98,8 +98,8 @@ app.use(securityLogger);
 app.use(cors(configureCORS()));
 
 // Body parsing middleware
-app.use(express.json({ limit: '1mb' }));
-app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+app.use(express.json({ limit: '20mb' })); // Increased for large CSV imports
+app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 
 // Input sanitization
 app.use(sanitizeInput);
