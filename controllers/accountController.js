@@ -117,7 +117,11 @@ class AccountController {
           END as days_until_expiry,
           -- Computed status
           a.account_type as computed_status,
-          a.license_status as status
+          a.license_status as status,
+          -- Total accounts for this contact
+          (SELECT COUNT(*) FROM accounts WHERE contact_id = a.contact_id AND organization_id = a.organization_id) as total_accounts_for_contact,
+          -- Transaction count for THIS account
+          (SELECT COUNT(*) FROM transactions WHERE account_id = a.id AND organization_id = a.organization_id) as transaction_count
         FROM accounts a
         JOIN contacts c ON a.contact_id = c.id
         WHERE ${whereClause}

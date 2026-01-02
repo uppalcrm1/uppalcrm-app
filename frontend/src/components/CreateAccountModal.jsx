@@ -65,8 +65,8 @@ const CreateAccountModal = ({ isOpen, onClose, onSuccess }) => {
   const loadContacts = async () => {
     setLoadingContacts(true)
     try {
-      // Load all contacts without pagination limit
-      const response = await contactsAPI.getContacts({ limit: 1000 })
+      // Load all contacts (no limit - same as ContactsPage)
+      const response = await contactsAPI.getContacts()
       const contactsArray = response.contacts || []
 
       console.log('📥 Contacts loaded:', contactsArray.length)
