@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('../database/connection');
 const { authenticateToken, validateOrganizationContext } = require('../middleware/auth');
 const accountController = require('../backend/controllers/accountController');
+const crypto = require('crypto');
 
 // Apply authentication middleware to all routes
 router.use(authenticateToken);
@@ -277,6 +278,176 @@ router.get('/:id', async (req, res) => {
     console.error('Error fetching account:', error);
     res.status(500).json({
       error: 'Failed to fetch account',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/accounts
+ * Create a new account manually
+ */
+router.post('/', async (req, res) => {
+  try {
+    const { organization_id, id: user_id } = req.user;
+    const {
+      contact_id,
+      account_name,
+      edition,
+      device_name,
+      mac_address,
+      billing_cycle,
+      price = 0,
+      license_status = 'pending',
+      account_type = 'trial',
+      is_trial = false,
+      notes
+    } = req.body;
+
+    // Validate required fields
+    if (!contact_id || !account_name || !billing_cycle) {
+      return res.status(400).json({
+        error: 'Missing required fields',
+        message: 'contact_id, account_name, and billing_cycle are required'
+      });
+    }
+
+    // Verify contact exists and belongs to organization
+    const contactCheck = await db.query(
+      'SELECT id FROM contacts WHERE id = $1 AND organization_id = $2',
+      [contact_id, organization_id],
+      organization_id
+    );
+
+    if (contactCheck.rows.length === 0) {
+      return res.status(400).json({
+        error: 'Invalid contact',
+        message: 'Contact not found or does not belong to your organization'
+      });
+    }
+
+    // Generate unique license key
+    const licenseKey = crypto.randomBytes(16).toString('hex').toUpperCase();
+
+    // Create account
+    const accountQuery = `
+      INSERT INTO accounts (
+        organization_id, contact_id, account_name, account_type,
+        edition, device_name, mac_address,
+        license_key, license_status, billing_cycle, price, currency,
+        is_trial, notes, created_by
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+      RETURNING *
+    `;
+
+    const accountResult = await db.query(accountQuery, [
+      organization_id,
+      contact_id,
+      account_name,
+      account_type,
+      edition || null,
+      device_name || null,
+      mac_address || null,
+      licenseKey,
+      license_status,
+      billing_cycle,
+      price,
+      'USD',
+      is_trial,
+      notes || null,
+      user_id
+    ], organization_id);
+
+    const account = accountResult.rows[0];
+
+    // Fetch complete account data with contact info
+    const completeQuery = `
+      SELECT
+        a.*,
+        c.first_name,
+        c.last_name,
+        c.email,
+        CONCAT(c.first_name, ' ', c.last_name) as contact_name,
+        (SELECT COUNT(*) FROM accounts WHERE contact_id = a.contact_id AND deleted_at IS NULL) as total_accounts_for_contact
+      FROM accounts a
+      JOIN contacts c ON a.contact_id = c.id
+      WHERE a.id = $1
+    `;
+
+    const completeResult = await db.query(completeQuery, [account.id], organization_id);
+
+    res.status(201).json({
+      success: true,
+      message: 'Account created successfully',
+      account: completeResult.rows[0]
+    });
+  } catch (error) {
+    console.error('Error creating account:', error);
+    res.status(500).json({
+      error: 'Failed to create account',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * PUT /api/accounts/:id
+ * Update an account
+ */
+router.put('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { organization_id, id: user_id } = req.user;
+    const updates = req.body;
+
+    // Build dynamic update query
+    const allowedFields = [
+      'account_name', 'edition', 'device_name', 'mac_address',
+      'billing_cycle', 'price', 'license_status', 'account_type',
+      'is_trial', 'notes'
+    ];
+
+    const setClause = [];
+    const values = [id, organization_id];
+    let paramCount = 2;
+
+    for (const [key, value] of Object.entries(updates)) {
+      if (allowedFields.includes(key)) {
+        paramCount++;
+        setClause.push(`${key} = $${paramCount}`);
+        values.push(value);
+      }
+    }
+
+    if (setClause.length === 0) {
+      return res.status(400).json({
+        error: 'No valid fields to update'
+      });
+    }
+
+    const query = `
+      UPDATE accounts
+      SET ${setClause.join(', ')}, updated_at = NOW()
+      WHERE id = $1 AND organization_id = $2
+      RETURNING *
+    `;
+
+    const result = await db.query(query, values, organization_id);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        error: 'Account not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      account: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Error updating account:', error);
+    res.status(500).json({
+      error: 'Failed to update account',
       message: error.message
     });
   }
