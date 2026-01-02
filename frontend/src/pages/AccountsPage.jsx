@@ -19,6 +19,7 @@ import InlineEditCell from '../components/InlineEditCell'
 import CreateTransactionModal from '../components/CreateTransactionModal'
 import AccountSelectorModal from '../components/AccountSelectorModal'
 import { AccountActions } from '../components/accounts/AccountActions'
+import CreateAccountModal from '../components/CreateAccountModal'
 import { accountsAPI } from '../services/api'
 import toast from 'react-hot-toast'
 import { formatDateOnly } from '../utils/dateUtils'
@@ -98,6 +99,7 @@ const AccountsPage = () => {
   const [selectedAccount, setSelectedAccount] = useState(null)
   const [showCreateTransactionModal, setShowCreateTransactionModal] = useState(false)
   const [selectedAccountForTransaction, setSelectedAccountForTransaction] = useState(null)
+  const [showCreateAccountModal, setShowCreateAccountModal] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
   const [showDeleted, setShowDeleted] = useState(false)
@@ -258,6 +260,12 @@ const AccountsPage = () => {
     toast.success('Transaction created successfully')
   }
 
+  const handleAccountCreated = () => {
+    setShowCreateAccountModal(false)
+    fetchAccounts() // Refresh the accounts list
+    toast.success('Account created successfully')
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -266,19 +274,28 @@ const AccountsPage = () => {
           <h1 className="text-2xl font-bold text-gray-900">Account Management</h1>
           <p className="text-gray-600 mt-1">Track software licenses, device registrations, and billing for customer accounts</p>
         </div>
-        <button
-          onClick={() => {
-            if (!accounts || accounts.length === 0) {
-              toast.error('No accounts available. Please create an account first.')
-              return
-            }
-            setShowAccountSelector(true)
-          }}
-          className="btn btn-primary btn-md"
-        >
-          <DollarSign size={16} className="mr-2" />
-          Record Payment
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowCreateAccountModal(true)}
+            className="btn btn-primary btn-md"
+          >
+            <Plus size={16} className="mr-2" />
+            Create Account
+          </button>
+          <button
+            onClick={() => {
+              if (!accounts || accounts.length === 0) {
+                toast.error('No accounts available. Please create an account first.')
+                return
+              }
+              setShowAccountSelector(true)
+            }}
+            className="btn btn-secondary btn-md"
+          >
+            <DollarSign size={16} className="mr-2" />
+            Record Payment
+          </button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -580,6 +597,13 @@ const AccountsPage = () => {
           isOpen={showCreateTransactionModal}
         />
       )}
+
+      {/* Create Account Modal */}
+      <CreateAccountModal
+        isOpen={showCreateAccountModal}
+        onClose={() => setShowCreateAccountModal(false)}
+        onSuccess={handleAccountCreated}
+      />
     </div>
   )
 }

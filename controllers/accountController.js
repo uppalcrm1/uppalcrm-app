@@ -368,188 +368,107 @@ class AccountController {
 
   // Create new account subscription
   async createAccountSubscription(req, res) {
-    const client = await pool.connect();
+    const client = await db.pool.connect();
 
     try {
       await client.query('BEGIN');
 
+      // Set RLS context for organization isolation
+      await client.query('SELECT set_config($1, $2, true)', [
+        'app.current_organization_id',
+        req.user.organization_id
+      ]);
+
       const {
         contact_id,
-        software_edition_id,
-        device_registration_id,
+        account_name,
+        edition,
+        device_name,
+        mac_address,
         billing_cycle,
-        purchase_price,
-        start_date = new Date(),
-        auto_renew = true,
-        payment_method,
-        payment_reference,
-        converted_from_trial_id,
+        price = 0,
+        license_status = 'pending',
+        account_type = 'trial',
+        is_trial = false,
         notes
       } = req.body;
 
       // Validate required fields
-      if (!contact_id || !software_edition_id || !device_registration_id || !billing_cycle || purchase_price === undefined) {
+      if (!contact_id || !account_name || !billing_cycle) {
         await client.query('ROLLBACK');
         return res.status(400).json({
-          message: 'Missing required fields: contact_id, software_edition_id, device_registration_id, billing_cycle, purchase_price'
+          message: 'Missing required fields: contact_id, account_name, billing_cycle'
         });
       }
 
-      // Check if device already has an active subscription
-      const existingSubscriptionQuery = `
-        SELECT id FROM account_subscriptions
-        WHERE device_registration_id = $1
-        AND status IN ('active', 'trial')
-        AND end_date > NOW()
-        AND organization_id = $2
-      `;
+      // Verify contact exists and belongs to organization
+      const contactCheck = await client.query(
+        'SELECT id FROM contacts WHERE id = $1 AND organization_id = $2',
+        [contact_id, req.user.organization_id]
+      );
 
-      const existingResult = await client.query(existingSubscriptionQuery, [device_registration_id, req.user.organization_id]);
-
-      if (existingResult.rows.length > 0) {
+      if (contactCheck.rows.length === 0) {
         await client.query('ROLLBACK');
         return res.status(400).json({
-          message: 'Device already has an active subscription'
+          message: 'Contact not found or does not belong to your organization'
         });
       }
 
-      // Generate unique subscription key
-      let subscriptionKey;
-      let keyExists = true;
-      let attempts = 0;
+      // Generate unique license key if not provided
+      const licenseKey = crypto.randomBytes(16).toString('hex').toUpperCase();
 
-      while (keyExists && attempts < 10) {
-        subscriptionKey = this.generateSubscriptionKey();
-        const keyCheckResult = await client.query(
-          'SELECT id FROM account_subscriptions WHERE subscription_key = $1',
-          [subscriptionKey]
-        );
-        keyExists = keyCheckResult.rows.length > 0;
-        attempts++;
-      }
-
-      if (keyExists) {
-        await client.query('ROLLBACK');
-        return res.status(500).json({ message: 'Unable to generate unique subscription key' });
-      }
-
-      // Calculate end date based on billing cycle
-      const endDate = this.calculateEndDate(new Date(start_date), billing_cycle);
-
-      // Create subscription
-      const subscriptionQuery = `
-        INSERT INTO account_subscriptions (
-          organization_id, contact_id, software_edition_id, device_registration_id,
-          subscription_key, billing_cycle, purchase_price, start_date, end_date,
-          is_auto_renew, converted_from_trial_id, created_by, notes
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      // Create account in the simple accounts table
+      const accountQuery = `
+        INSERT INTO accounts (
+          organization_id, contact_id, account_name, account_type,
+          edition, device_name, mac_address,
+          license_key, license_status, billing_cycle, price, currency,
+          is_trial, notes, created_by
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
         RETURNING *
       `;
 
-      const subscriptionResult = await client.query(subscriptionQuery, [
+      const accountResult = await client.query(accountQuery, [
         req.user.organization_id,
         contact_id,
-        software_edition_id,
-        device_registration_id,
-        subscriptionKey,
+        account_name,
+        account_type,
+        edition || null,
+        device_name || null,
+        mac_address || null,
+        licenseKey,
+        license_status,
         billing_cycle,
-        purchase_price,
-        start_date,
-        endDate,
-        auto_renew,
-        converted_from_trial_id,
-        req.user.id,
-        notes
+        price,
+        'USD',
+        is_trial,
+        notes || null,
+        req.user.id
       ]);
 
-      const subscription = subscriptionResult.rows[0];
-
-      // Create renewal record if auto-renew is enabled
-      if (auto_renew) {
-        const renewalQuery = `
-          INSERT INTO account_renewals (
-            organization_id, contact_id, account_subscription_id,
-            current_period_start, current_period_end, next_renewal_date,
-            billing_cycle, renewal_price, auto_renew
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-        `;
-
-        await client.query(renewalQuery, [
-          req.user.organization_id,
-          contact_id,
-          subscription.id,
-          start_date,
-          endDate,
-          endDate,
-          billing_cycle,
-          purchase_price,
-          true
-        ]);
-      }
-
-      // Create payment record if payment info provided
-      if (payment_reference) {
-        const paymentQuery = `
-          INSERT INTO account_billing_payments (
-            organization_id, contact_id, account_subscription_id,
-            payment_reference, payment_method, amount, total_amount,
-            billing_period_start, billing_period_end, billing_cycle,
-            status, payment_date, processed_by
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-        `;
-
-        await client.query(paymentQuery, [
-          req.user.organization_id,
-          contact_id,
-          subscription.id,
-          payment_reference,
-          payment_method || 'manual',
-          purchase_price,
-          purchase_price,
-          start_date,
-          endDate,
-          billing_cycle,
-          'completed',
-          new Date(),
-          req.user.id
-        ]);
-      }
-
-      // Update trial status if converted from trial
-      if (converted_from_trial_id) {
-        await client.query(
-          'UPDATE trials SET status = $1, converted_to_subscription_id = $2, conversion_date = $3 WHERE id = $4',
-          ['converted', subscription.id, new Date(), converted_from_trial_id]
-        );
-      }
-
-      // Schedule renewal alerts
-      await this.scheduleRenewalAlerts(client, subscription.id, contact_id, endDate, req.user.organization_id);
+      const account = accountResult.rows[0];
 
       await client.query('COMMIT');
 
-      // Fetch complete subscription data
+      // Fetch complete account data with contact info
       const completeQuery = `
         SELECT
-          s.*,
+          a.*,
           c.first_name,
           c.last_name,
           c.email,
-          se.name as edition_name,
-          dr.mac_address,
-          dr.device_name
-        FROM account_subscriptions s
-        JOIN contacts c ON s.contact_id = c.id
-        JOIN software_editions se ON s.software_edition_id = se.id
-        JOIN device_registrations dr ON s.device_registration_id = dr.id
-        WHERE s.id = $1
+          CONCAT(c.first_name, ' ', c.last_name) as contact_name,
+          (SELECT COUNT(*) FROM accounts WHERE contact_id = a.contact_id) as total_accounts_for_contact
+        FROM accounts a
+        JOIN contacts c ON a.contact_id = c.id
+        WHERE a.id = $1
       `;
 
-      const completeResult = await pool.query(completeQuery, [subscription.id]);
+      const completeResult = await client.query(completeQuery, [account.id]);
 
       res.status(201).json({
-        message: 'Account subscription created successfully',
-        subscription: completeResult.rows[0]
+        message: 'Account created successfully',
+        account: completeResult.rows[0]
       });
     } catch (error) {
       await client.query('ROLLBACK');
