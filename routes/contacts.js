@@ -580,42 +580,56 @@ router.post('/convert-from-lead/:leadId',
       );
 
       // Step 4a: Transfer custom field values (if custom_field_values table exists)
-      try {
-        const customFieldsResult = await query(
-          `SELECT cfv.*, cfd.field_name
-           FROM custom_field_values cfv
-           JOIN custom_field_definitions cfd ON cfv.field_definition_id = cfd.id
-           WHERE cfv.entity_id = $1
-           AND cfv.entity_type = 'leads'
-           AND cfd.is_active = true`,
-          [leadId]
-        );
+      // First check if the table exists to avoid transaction errors
+      const tableCheckResult = await query(
+        `SELECT EXISTS (
+          SELECT FROM information_schema.tables
+          WHERE table_schema = 'public'
+          AND table_name = 'custom_field_values'
+        )`
+      );
 
-        if (customFieldsResult.rows.length > 0) {
-          for (const fieldValue of customFieldsResult.rows) {
-            await query(
-              `INSERT INTO custom_field_values (
-                organization_id, field_definition_id, entity_type, entity_id, field_value,
-                created_by, updated_by
-              ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-              ON CONFLICT (field_definition_id, entity_id) DO UPDATE
-              SET field_value = $5, updated_at = NOW(), updated_by = $7`,
-              [
-                req.organizationId,
-                fieldValue.field_definition_id,
-                'contacts',
-                contactId,
-                fieldValue.field_value,
-                req.user.id,
-                req.user.id
-              ]
-            );
+      if (tableCheckResult.rows[0].exists) {
+        try {
+          const customFieldsResult = await query(
+            `SELECT cfv.*, cfd.field_name
+             FROM custom_field_values cfv
+             JOIN custom_field_definitions cfd ON cfv.field_definition_id = cfd.id
+             WHERE cfv.entity_id = $1
+             AND cfv.entity_type = 'leads'
+             AND cfd.is_active = true`,
+            [leadId]
+          );
+
+          if (customFieldsResult.rows.length > 0) {
+            for (const fieldValue of customFieldsResult.rows) {
+              await query(
+                `INSERT INTO custom_field_values (
+                  organization_id, field_definition_id, entity_type, entity_id, field_value,
+                  created_by, updated_by
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+                ON CONFLICT (field_definition_id, entity_id) DO UPDATE
+                SET field_value = $5, updated_at = NOW(), updated_by = $7`,
+                [
+                  req.organizationId,
+                  fieldValue.field_definition_id,
+                  'contacts',
+                  contactId,
+                  fieldValue.field_value,
+                  req.user.id,
+                  req.user.id
+                ]
+              );
+            }
+            console.log(`✅ Transferred ${customFieldsResult.rows.length} custom field(s):`,
+              customFieldsResult.rows.map(f => f.field_name).join(', '));
           }
-          console.log(`✅ Transferred ${customFieldsResult.rows.length} custom field(s):`,
-            customFieldsResult.rows.map(f => f.field_name).join(', '));
+        } catch (customFieldsError) {
+          // If there's an error, rollback and re-throw to handle properly
+          console.error('❌ Error transferring custom fields:', customFieldsError);
+          throw customFieldsError;
         }
-      } catch (customFieldsError) {
-        // Table doesn't exist - custom fields stored in JSONB column instead
+      } else {
         console.log('ℹ️ Custom fields stored in contact.custom_fields JSONB column');
       }
 
