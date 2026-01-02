@@ -170,7 +170,7 @@ class Contact {
       }
 
       const {
-        limit = 50,
+        limit = 10000,
         offset = 0,
         status,
         type,
