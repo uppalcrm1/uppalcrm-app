@@ -150,8 +150,8 @@ class ContactImportService {
       const contactData = {
         first_name: row[fieldMapping.first_name]?.trim() || '',
         last_name: row[fieldMapping.last_name]?.trim() || '',
-        email: row[fieldMapping.email]?.trim() || '',
-        phone: row[fieldMapping.phone]?.trim() || '',
+        email: row[fieldMapping.email]?.trim() || null, // null instead of '' for empty emails
+        phone: row[fieldMapping.phone]?.trim() || null, // null instead of '' for empty phones
         company: row[fieldMapping.company]?.trim() || '',
         title: row[fieldMapping.title]?.trim() || '',
         notes: row[fieldMapping.notes]?.trim() || ''
