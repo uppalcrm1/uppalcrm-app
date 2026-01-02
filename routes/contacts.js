@@ -230,9 +230,9 @@ router.get('/',
         });
       }
 
-      const { 
-        page = 1, 
-        limit = 20,
+      const {
+        page = 1,
+        limit = 10000,
         status,
         type,
         priority,
