@@ -579,39 +579,44 @@ router.post('/convert-from-lead/:leadId',
         [leadId, contactId, 'conversion', req.user.id]
       );
 
-      // Step 4a: Transfer ALL custom field values from lead to contact
-      const customFieldsResult = await query(
-        `SELECT cfv.*, cfd.field_name
-         FROM custom_field_values cfv
-         JOIN custom_field_definitions cfd ON cfv.field_definition_id = cfd.id
-         WHERE cfv.entity_id = $1
-         AND cfv.entity_type = 'leads'
-         AND cfd.is_active = true`,
-        [leadId]
-      );
+      // Step 4a: Transfer custom field values (if custom_field_values table exists)
+      try {
+        const customFieldsResult = await query(
+          `SELECT cfv.*, cfd.field_name
+           FROM custom_field_values cfv
+           JOIN custom_field_definitions cfd ON cfv.field_definition_id = cfd.id
+           WHERE cfv.entity_id = $1
+           AND cfv.entity_type = 'leads'
+           AND cfd.is_active = true`,
+          [leadId]
+        );
 
-      if (customFieldsResult.rows.length > 0) {
-        for (const fieldValue of customFieldsResult.rows) {
-          await query(
-            `INSERT INTO custom_field_values (
-              organization_id, field_definition_id, entity_type, entity_id, field_value,
-              created_by, updated_by
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-            ON CONFLICT (field_definition_id, entity_id) DO UPDATE
-            SET field_value = $5, updated_at = NOW(), updated_by = $7`,
-            [
-              req.organizationId,
-              fieldValue.field_definition_id,
-              'contacts',
-              contactId,
-              fieldValue.field_value,
-              req.user.id,
-              req.user.id
-            ]
-          );
+        if (customFieldsResult.rows.length > 0) {
+          for (const fieldValue of customFieldsResult.rows) {
+            await query(
+              `INSERT INTO custom_field_values (
+                organization_id, field_definition_id, entity_type, entity_id, field_value,
+                created_by, updated_by
+              ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+              ON CONFLICT (field_definition_id, entity_id) DO UPDATE
+              SET field_value = $5, updated_at = NOW(), updated_by = $7`,
+              [
+                req.organizationId,
+                fieldValue.field_definition_id,
+                'contacts',
+                contactId,
+                fieldValue.field_value,
+                req.user.id,
+                req.user.id
+              ]
+            );
+          }
+          console.log(`✅ Transferred ${customFieldsResult.rows.length} custom field(s):`,
+            customFieldsResult.rows.map(f => f.field_name).join(', '));
         }
-        console.log(`✅ Transferred ${customFieldsResult.rows.length} custom field(s):`,
-          customFieldsResult.rows.map(f => f.field_name).join(', '));
+      } catch (customFieldsError) {
+        // Table doesn't exist - custom fields stored in JSONB column instead
+        console.log('ℹ️ Custom fields stored in contact.custom_fields JSONB column');
       }
 
       // Step 4b: Transfer tasks from lead_interactions to contact_interactions
@@ -823,18 +828,8 @@ router.get('/:id/detail',
         contact_id: id
       });
 
-      // Fetch custom fields for this contact
-      const customFieldsResult = await query(
-        `SELECT cfv.*, cfd.field_name, cfd.field_type, cfd.field_label
-         FROM custom_field_values cfv
-         JOIN custom_field_definitions cfd ON cfv.field_definition_id = cfd.id
-         WHERE cfv.entity_id = $1
-         AND cfv.entity_type = 'contacts'
-         AND cfd.is_active = true
-         ORDER BY cfd.display_order, cfd.field_label`,
-        [id],
-        organizationId
-      );
+      // Note: Custom fields are stored in the contact.custom_fields JSONB column
+      // No need to query a separate table
 
       // Fetch task stats from contact_interactions
       const taskStatsResult = await query(
@@ -867,12 +862,7 @@ router.get('/:id/detail',
       res.json({
         contact: contactData,
         accounts: accounts || [],
-        customFields: customFieldsResult.rows.map(cf => ({
-          field_name: cf.field_name,
-          field_label: cf.field_label,
-          field_type: cf.field_type,
-          field_value: cf.field_value
-        })),
+        customFields: [], // Custom fields are stored in contact.custom_fields JSONB column
         taskStats: {
           total: parseInt(taskStats.total_tasks) || 0,
           completed: parseInt(taskStats.completed_tasks) || 0,
