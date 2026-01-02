@@ -147,9 +147,7 @@ const CreateAccountModal = ({ isOpen, onClose, onSuccess }) => {
       newErrors.billing_cycle = 'Billing cycle is required'
     }
 
-    if (formData.mac_address && !/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/.test(formData.mac_address)) {
-      newErrors.mac_address = 'Invalid MAC address format (XX:XX:XX:XX:XX:XX)'
-    }
+    // MAC address validation removed - accepts any format
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
@@ -374,9 +372,8 @@ const CreateAccountModal = ({ isOpen, onClose, onSuccess }) => {
                     name="mac_address"
                     value={formData.mac_address}
                     onChange={handleChange}
-                    maxLength={17}
                     className={`input font-mono ${errors.mac_address ? 'border-red-500' : ''}`}
-                    placeholder="AA:BB:CC:DD:EE:FF"
+                    placeholder="Enter any identifier"
                   />
                   {errors.mac_address && (
                     <p className="text-red-600 text-sm mt-1">{errors.mac_address}</p>
