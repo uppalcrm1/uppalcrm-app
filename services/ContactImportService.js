@@ -12,21 +12,34 @@ class ContactImportService {
   static async parseCSVFile(fileBuffer) {
     return new Promise((resolve, reject) => {
       const rows = [];
+      let rowCount = 0;
+      const bufferSize = fileBuffer.length;
+
+      console.log(`[CSV Parse] Starting parse. Buffer size: ${bufferSize} bytes (${(bufferSize/1024).toFixed(2)} KB)`);
+
       const stream = Readable.from(fileBuffer.toString());
 
       stream
         .pipe(csv())
         .on('data', (row) => {
+          rowCount++;
           const cleanedRow = {};
           Object.keys(row).forEach(key => {
             cleanedRow[key.trim()] = row[key] ? row[key].trim() : '';
           });
           rows.push(cleanedRow);
+
+          // Log progress every 100 rows
+          if (rowCount % 100 === 0) {
+            console.log(`[CSV Parse] Parsed ${rowCount} rows...`);
+          }
         })
         .on('end', () => {
+          console.log(`[CSV Parse] Complete! Total rows: ${rows.length}`);
           resolve(rows);
         })
         .on('error', (error) => {
+          console.error(`[CSV Parse] Error after ${rowCount} rows:`, error);
           reject(new Error(`Error parsing CSV: ${error.message}`));
         });
     });
