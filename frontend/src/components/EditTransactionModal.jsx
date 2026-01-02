@@ -14,6 +14,7 @@ import {
   Package
 } from 'lucide-react'
 import { transactionsAPI } from '../services/api'
+import api from '../services/api'
 import toast from 'react-hot-toast'
 import {
   PAYMENT_METHODS,
@@ -92,6 +93,9 @@ const EditTransactionModal = ({ transaction, onClose, onSuccess, isOpen }) => {
   })
 
   const [errors, setErrors] = useState({})
+  const [paymentMethodOptions, setPaymentMethodOptions] = useState([
+    'Credit Card', 'Debit Card', 'Bank Transfer', 'PayPal', 'Cash'
+  ]) // Default options, will be replaced by field configuration
   const queryClient = useQueryClient()
 
   // Update form data when transaction changes
@@ -123,6 +127,38 @@ const EditTransactionModal = ({ transaction, onClose, onSuccess, isOpen }) => {
       })
     }
   }, [transaction])
+
+  // Fetch payment method field configuration
+  useEffect(() => {
+    const loadPaymentMethodOptions = async () => {
+      try {
+        const response = await api.get('/custom-fields?entity_type=transactions')
+        const allFields = [
+          ...(response.data.systemFields || []),
+          ...(response.data.customFields || [])
+        ]
+
+        // Find the payment_method field
+        const paymentMethodField = allFields.find(
+          field => field.field_name === 'payment_method' || field.field_name === 'paymentMethod'
+        )
+
+        if (paymentMethodField && paymentMethodField.field_options && paymentMethodField.field_options.length > 0) {
+          // Extract labels from field options
+          const options = paymentMethodField.field_options.map(opt =>
+            typeof opt === 'string' ? opt : opt.label || opt.value
+          )
+          setPaymentMethodOptions(options)
+          console.log('✅ Loaded payment method options from field config:', options)
+        }
+      } catch (error) {
+        console.warn('⚠️ Could not load payment method field config, using defaults:', error)
+        // Keep default options if API call fails
+      }
+    }
+
+    loadPaymentMethodOptions()
+  }, [])
 
   // Mutation for updating transaction
   const updateTransactionMutation = useMutation({
@@ -398,8 +434,8 @@ const EditTransactionModal = ({ transaction, onClose, onSuccess, isOpen }) => {
                     required
                     className={`select ${errors.payment_method ? 'border-red-500' : ''}`}
                   >
-                    {PAYMENT_METHODS.map(method => (
-                      <option key={method} value={method}>{method}</option>
+                    {paymentMethodOptions.map((method, index) => (
+                      <option key={index} value={method}>{method}</option>
                     ))}
                   </select>
                   {errors.payment_method && (
