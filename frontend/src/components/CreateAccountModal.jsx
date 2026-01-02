@@ -225,8 +225,24 @@ const CreateAccountModal = ({ isOpen, onClose, onSuccess }) => {
       })
     } catch (error) {
       console.error('Error creating account:', error)
-      const message = error.response?.data?.message || error.message || 'Failed to create account'
-      toast.error(message)
+
+      // Extract error details from response
+      const errorData = error.response?.data || {}
+      const errorMessage = errorData.message || error.message || 'Failed to create account'
+      const errorType = errorData.error || 'Error'
+
+      // Handle specific error types
+      if (errorType === 'Duplicate MAC Address' || errorMessage.toLowerCase().includes('mac address')) {
+        // Set field-specific error for MAC address
+        setErrors(prev => ({
+          ...prev,
+          mac_address: 'This MAC address is already registered'
+        }))
+        toast.error('This MAC address is already in use. Please check existing accounts or use a different MAC address.')
+      } else {
+        // Show generic error
+        toast.error(errorMessage)
+      }
     } finally {
       setIsSubmitting(false)
     }

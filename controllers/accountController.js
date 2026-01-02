@@ -477,7 +477,35 @@ class AccountController {
     } catch (error) {
       await client.query('ROLLBACK');
       console.error('Error creating account subscription:', error);
-      res.status(500).json({ message: 'Internal server error' });
+
+      // Handle specific database errors
+      if (error.code === '23505') { // Unique constraint violation
+        if (error.constraint === 'accounts_mac_address_key') {
+          return res.status(400).json({
+            error: 'Duplicate MAC Address',
+            message: 'This MAC address is already registered. Each MAC address can only be used once. Please check if this device is already registered or use a different MAC address.'
+          });
+        }
+        // Handle other unique constraint violations
+        return res.status(400).json({
+          error: 'Duplicate Entry',
+          message: 'A record with this information already exists.'
+        });
+      }
+
+      // Handle foreign key violations
+      if (error.code === '23503') {
+        return res.status(400).json({
+          error: 'Invalid Reference',
+          message: 'One or more referenced records do not exist.'
+        });
+      }
+
+      // Generic server error
+      res.status(500).json({
+        error: 'Server Error',
+        message: 'An unexpected error occurred while creating the account. Please try again.'
+      });
     } finally {
       client.release();
     }
