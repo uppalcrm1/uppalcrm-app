@@ -66,7 +66,7 @@ const contactSchemas = {
   listContacts: {
     query: Joi.object({
       page: Joi.number().integer().min(1).default(1),
-      limit: Joi.number().integer().min(1).max(100).default(20),
+      limit: Joi.number().integer().min(1).max(10000).default(10000),
       status: Joi.string().valid('active', 'inactive', 'prospect', 'customer').allow('').optional(),
       type: Joi.string().valid('customer', 'prospect', 'partner', 'vendor').allow('').optional(),
       priority: Joi.string().valid('low', 'medium', 'high').allow('').optional(),
