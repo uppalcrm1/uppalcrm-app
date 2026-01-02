@@ -48,7 +48,7 @@ async function deployMigration() {
         field_label,
         entity_type,
         field_type,
-        array_length(field_options, 1) as options_count
+        jsonb_array_length(field_options) as options_count
       FROM custom_field_definitions
       WHERE field_name = 'payment_method'
         AND entity_type = 'transactions'

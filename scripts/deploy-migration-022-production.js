@@ -94,7 +94,7 @@ async function deployMigration() {
         cfd.field_type,
         cfd.is_required,
         cfd.is_active,
-        array_length(cfd.field_options, 1) as options_count
+        jsonb_array_length(cfd.field_options) as options_count
       FROM custom_field_definitions cfd
       JOIN organizations o ON o.id = cfd.organization_id
       WHERE cfd.field_name = 'payment_method'
