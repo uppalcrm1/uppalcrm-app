@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { X, CheckCircle2, User, Building2, CreditCard, Info, Search } from 'lucide-react';
 import { contactsAPI, usersAPI, productsAPI } from '../services/api';
 import LoadingSpinner from './LoadingSpinner';
+import api from '../services/api';
 
 const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
   console.log('🎯 ConvertLeadModal Version: 2.0 - Tab-Based Workflow - Build:', new Date().toISOString());
@@ -13,6 +14,9 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
   const [contactMode, setContactMode] = useState('new');
   const [selectedContact, setSelectedContact] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [paymentMethodOptions, setPaymentMethodOptions] = useState([
+    'Credit Card', 'Debit Card', 'Bank Transfer', 'PayPal', 'Cash'
+  ]); // Default options, will be replaced by field configuration
 
   // Form state
   const [contactForm, setContactForm] = useState({
@@ -105,6 +109,38 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
       term: accountForm.term
     }));
   }, [accountForm.term]);
+
+  // Fetch payment method field configuration
+  useEffect(() => {
+    const loadPaymentMethodOptions = async () => {
+      try {
+        const response = await api.get('/custom-fields?entity_type=transactions');
+        const allFields = [
+          ...(response.data.systemFields || []),
+          ...(response.data.customFields || [])
+        ];
+
+        // Find the payment_method field
+        const paymentMethodField = allFields.find(
+          field => field.field_name === 'payment_method' || field.field_name === 'paymentMethod'
+        );
+
+        if (paymentMethodField && paymentMethodField.field_options && paymentMethodField.field_options.length > 0) {
+          // Extract labels from field options
+          const options = paymentMethodField.field_options.map(opt =>
+            typeof opt === 'string' ? opt : opt.label || opt.value
+          );
+          setPaymentMethodOptions(options);
+          console.log('✅ Loaded payment method options from field config:', options);
+        }
+      } catch (error) {
+        console.warn('⚠️ Could not load payment method field config, using defaults:', error);
+        // Keep default options if API call fails
+      }
+    };
+
+    loadPaymentMethodOptions();
+  }, []);
 
   // Sync owner when users load - ensure it matches the dropdown options format
   useEffect(() => {
@@ -597,7 +633,7 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
                 <div className="border border-gray-200 rounded-lg p-4">
                   <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
                     <CreditCard className="w-4 h-4 text-blue-600" />
-                    Payment Details
+                    Payment Method
                   </h3>
                   <div className="grid grid-cols-3 gap-3">
                     <div>
@@ -607,11 +643,9 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
                         onChange={(e) => setTransactionForm({ ...transactionForm, paymentMethod: e.target.value })}
                         className="select h-9"
                       >
-                        <option>Credit Card</option>
-                        <option>Debit Card</option>
-                        <option>Bank Transfer</option>
-                        <option>PayPal</option>
-                        <option>Cash</option>
+                        {paymentMethodOptions.map((option, index) => (
+                          <option key={index} value={option}>{option}</option>
+                        ))}
                       </select>
                     </div>
                     <div>

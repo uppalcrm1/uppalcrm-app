@@ -644,28 +644,45 @@ router.get('/', async (req, res) => {
         notes: { label: 'Notes', type: 'textarea', required: false, editable: true }
       },
       transactions: {
-        dealName: { label: 'Deal Name', type: 'text', required: true, editable: false },
-        amount: { label: 'Amount ($)', type: 'number', required: false, editable: true },
-        stage: {
-          label: 'Stage',
+        transaction_id: { label: 'Transaction ID', type: 'text', required: false, editable: true },
+        amount: { label: 'Amount', type: 'number', required: true, editable: true },
+        currency: {
+          label: 'Currency',
           type: 'select',
           required: false,
           editable: true,
-          options: ['prospecting', 'qualification', 'proposal', 'negotiation', 'closed-won', 'closed-lost']
+          options: ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'INR']
         },
-        probability: { label: 'Probability (%)', type: 'number', required: false, editable: true },
-        expectedCloseDate: { label: 'Expected Close Date', type: 'date', required: false, editable: true },
-        actualCloseDate: { label: 'Actual Close Date', type: 'date', required: false, editable: true },
-        account: { label: 'Account', type: 'text', required: false, editable: true },
-        contact: { label: 'Contact', type: 'text', required: false, editable: true },
+        payment_method: {
+          label: 'Payment Method',
+          type: 'select',
+          required: true,
+          editable: true,
+          options: ['Credit Card', 'Debit Card', 'Bank Transfer', 'PayPal', 'Cash', 'Check', 'Stripe', 'Other']
+        },
+        payment_date: { label: 'Payment Date', type: 'date', required: true, editable: true },
+        status: {
+          label: 'Status',
+          type: 'select',
+          required: true,
+          editable: true,
+          options: ['pending', 'completed', 'failed', 'refunded']
+        },
+        term: {
+          label: 'Billing Term',
+          type: 'select',
+          required: true,
+          editable: true,
+          options: ['1', '3', '6', '12']
+        },
         source: {
           label: 'Source',
           type: 'select',
           required: false,
           editable: true,
-          options: ['Inbound', 'Outbound', 'Partner', 'Referral', 'Event']
+          options: ['manual', 'website', 'phone', 'email', 'referral', 'walk-in', 'partner']
         },
-        assignedTo: { label: 'Deal Owner', type: 'user_select', required: false, editable: true },
+        transaction_reference: { label: 'Transaction Reference', type: 'text', required: false, editable: true },
         notes: { label: 'Notes', type: 'textarea', required: false, editable: true }
       },
       product: {
