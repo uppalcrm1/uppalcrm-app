@@ -49,7 +49,10 @@ const CreateAccountModal = ({ isOpen, onClose, onSuccess }) => {
     if (formData.contact_id && contacts.length > 0) {
       const selectedContact = contacts.find(c => c.id === formData.contact_id)
       if (selectedContact && !formData.account_name) {
-        const contactName = `${selectedContact.first_name || ''} ${selectedContact.last_name || ''}`.trim()
+        // Handle both snake_case and camelCase field names
+        const firstName = selectedContact.first_name || selectedContact.firstName || ''
+        const lastName = selectedContact.last_name || selectedContact.lastName || ''
+        const contactName = `${firstName} ${lastName}`.trim()
         const devicePart = formData.device_name ? ` - ${formData.device_name}` : ''
         setFormData(prev => ({
           ...prev,
@@ -62,10 +65,28 @@ const CreateAccountModal = ({ isOpen, onClose, onSuccess }) => {
   const loadContacts = async () => {
     setLoadingContacts(true)
     try {
-      const response = await contactsAPI.getContacts()
-      setContacts(response.contacts || [])
+      // Load all contacts without pagination limit
+      const response = await contactsAPI.getContacts({ limit: 1000 })
+      const contactsArray = response.contacts || []
+
+      console.log('📥 Contacts loaded:', contactsArray.length)
+      console.log('📥 First contact sample:', contactsArray[0])
+
+      // Debug: Log all contact names to verify data
+      contactsArray.forEach((contact, index) => {
+        console.log(`Contact ${index + 1}:`, {
+          id: contact.id,
+          first_name: contact.first_name,
+          firstName: contact.firstName,
+          last_name: contact.last_name,
+          lastName: contact.lastName,
+          email: contact.email
+        })
+      })
+
+      setContacts(contactsArray)
     } catch (error) {
-      console.error('Error loading contacts:', error)
+      console.error('❌ Error loading contacts:', error)
       toast.error('Failed to load contacts')
     } finally {
       setLoadingContacts(false)
@@ -214,11 +235,23 @@ const CreateAccountModal = ({ isOpen, onClose, onSuccess }) => {
   // Filter contacts based on search
   const filteredContacts = contacts.filter(contact => {
     if (!contactSearch) return true
-    const searchLower = contactSearch.toLowerCase()
-    const fullName = `${contact.first_name || ''} ${contact.last_name || ''}`.toLowerCase()
-    const email = (contact.email || '').toLowerCase()
-    const company = (contact.company || '').toLowerCase()
-    return fullName.includes(searchLower) || email.includes(searchLower) || company.includes(searchLower)
+    const searchLower = contactSearch.toLowerCase().trim()
+
+    // Handle both snake_case and camelCase field names
+    const firstName = (contact.first_name || contact.firstName || '').toLowerCase().trim()
+    const lastName = (contact.last_name || contact.lastName || '').toLowerCase().trim()
+    const fullName = `${firstName} ${lastName}`.trim()
+    const email = (contact.email || '').toLowerCase().trim()
+    const company = (contact.company || '').toLowerCase().trim()
+    const phone = (contact.phone || '').toLowerCase().trim()
+
+    // Search across all relevant fields
+    return fullName.includes(searchLower) ||
+           firstName.includes(searchLower) ||
+           lastName.includes(searchLower) ||
+           email.includes(searchLower) ||
+           company.includes(searchLower) ||
+           phone.includes(searchLower)
   })
 
   if (!isOpen) return null
@@ -277,13 +310,20 @@ const CreateAccountModal = ({ isOpen, onClose, onSuccess }) => {
                   <option value="">
                     {loadingContacts ? 'Loading contacts...' : 'Select a contact'}
                   </option>
-                  {filteredContacts.map((contact) => (
-                    <option key={contact.id} value={contact.id}>
-                      {contact.first_name} {contact.last_name}
-                      {contact.email && ` (${contact.email})`}
-                      {contact.company && ` - ${contact.company}`}
-                    </option>
-                  ))}
+                  {filteredContacts.map((contact) => {
+                    // Handle both snake_case and camelCase field names
+                    const firstName = contact.first_name || contact.firstName || ''
+                    const lastName = contact.last_name || contact.lastName || ''
+                    const fullName = `${firstName} ${lastName}`.trim()
+
+                    return (
+                      <option key={contact.id} value={contact.id}>
+                        {fullName || 'Unnamed Contact'}
+                        {contact.email && ` (${contact.email})`}
+                        {contact.company && ` - ${contact.company}`}
+                      </option>
+                    )
+                  })}
                 </select>
                 {filteredContacts.length === 0 && contactSearch && (
                   <p className="text-sm text-gray-500">No contacts found matching "{contactSearch}"</p>

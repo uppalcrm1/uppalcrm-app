@@ -199,7 +199,7 @@ const ContactImport = () => {
   // Poll import status
   const pollImportStatus = async () => {
     const token = localStorage.getItem('authToken');
-    const maxAttempts = 60; // 60 attempts = 30 seconds max
+    const maxAttempts = 600; // 600 attempts = 5 minutes max (enough for large imports)
     let attempts = 0;
 
     const poll = setInterval(async () => {
