@@ -114,16 +114,17 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
   useEffect(() => {
     const loadPaymentMethodOptions = async () => {
       try {
-        const response = await api.get('/custom-fields?entity_type=transactions');
-        const allFields = [
-          ...(response.data.systemFields || []),
-          ...(response.data.customFields || [])
-        ];
+        const response = await api.get('/custom-fields?entityType=transactions');
+        const allFields = response.data.fields || [];
+
+        console.log('📋 All transaction fields:', allFields);
 
         // Find the payment_method field
         const paymentMethodField = allFields.find(
           field => field.field_name === 'payment_method' || field.field_name === 'paymentMethod'
         );
+
+        console.log('🔍 Payment method field found:', paymentMethodField);
 
         if (paymentMethodField && paymentMethodField.field_options && paymentMethodField.field_options.length > 0) {
           // Extract labels from field options
@@ -132,6 +133,8 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
           );
           setPaymentMethodOptions(options);
           console.log('✅ Loaded payment method options from field config:', options);
+        } else {
+          console.log('⚠️ No payment_method field found or no options configured, using defaults');
         }
       } catch (error) {
         console.warn('⚠️ Could not load payment method field config, using defaults:', error);
