@@ -1070,6 +1070,83 @@ router.put('/default/:fieldName', async (req, res) => {
         nextFollowUp: { label: 'Next Follow Up', type: 'date', required: false, editable: true },
         notes: { label: 'Notes', type: 'textarea', required: false, editable: true }
       },
+      contacts: {
+        firstName: { label: 'First Name', type: 'text', required: false, editable: true },
+        lastName: { label: 'Last Name', type: 'text', required: false, editable: true },
+        email: { label: 'Email', type: 'email', required: false, editable: true },
+        phone: { label: 'Phone', type: 'tel', required: false, editable: true },
+        company: { label: 'Company', type: 'text', required: false, editable: true },
+        title: { label: 'Job Title', type: 'text', required: false, editable: true },
+        department: { label: 'Department', type: 'text', required: false, editable: true },
+        linkedIn: { label: 'LinkedIn Profile', type: 'url', required: false, editable: true },
+        status: {
+          label: 'Status',
+          type: 'select',
+          required: false,
+          editable: true,
+          options: ['active', 'inactive', 'prospect']
+        },
+        assignedTo: { label: 'Assign To', type: 'user_select', required: false, editable: true },
+        lastContactDate: { label: 'Last Contact Date', type: 'date', required: false, editable: true },
+        notes: { label: 'Notes', type: 'textarea', required: false, editable: true }
+      },
+      accounts: {
+        companyName: { label: 'Company Name', type: 'text', required: true, editable: false },
+        industry: { label: 'Industry', type: 'text', required: false, editable: true },
+        website: { label: 'Website', type: 'url', required: false, editable: true },
+        phone: { label: 'Phone', type: 'tel', required: false, editable: true },
+        email: { label: 'Email', type: 'email', required: false, editable: true },
+        address: { label: 'Address', type: 'text', required: false, editable: true },
+        city: { label: 'City', type: 'text', required: false, editable: true },
+        state: { label: 'State', type: 'text', required: false, editable: true },
+        country: { label: 'Country', type: 'text', required: false, editable: true },
+        employeeCount: { label: 'Employee Count', type: 'number', required: false, editable: true },
+        annualRevenue: { label: 'Annual Revenue ($)', type: 'number', required: false, editable: true },
+        assignedTo: { label: 'Account Owner', type: 'user_select', required: false, editable: true },
+        notes: { label: 'Notes', type: 'textarea', required: false, editable: true }
+      },
+      transactions: {
+        transaction_id: { label: 'Transaction ID', type: 'text', required: false, editable: true },
+        amount: { label: 'Amount', type: 'number', required: true, editable: true },
+        currency: {
+          label: 'Currency',
+          type: 'select',
+          required: false,
+          editable: true,
+          options: ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'INR']
+        },
+        payment_method: {
+          label: 'Payment Method',
+          type: 'select',
+          required: true,
+          editable: true,
+          options: ['Credit Card', 'Debit Card', 'Bank Transfer', 'PayPal', 'Cash', 'Check', 'Stripe', 'Other']
+        },
+        payment_date: { label: 'Payment Date', type: 'date', required: true, editable: true },
+        status: {
+          label: 'Status',
+          type: 'select',
+          required: true,
+          editable: true,
+          options: ['pending', 'completed', 'failed', 'refunded']
+        },
+        term: {
+          label: 'Billing Term',
+          type: 'select',
+          required: true,
+          editable: true,
+          options: ['1', '3', '6', '12']
+        },
+        source: {
+          label: 'Source',
+          type: 'select',
+          required: false,
+          editable: true,
+          options: ['manual', 'website', 'phone', 'email', 'referral', 'walk-in', 'partner']
+        },
+        transaction_reference: { label: 'Transaction Reference', type: 'text', required: false, editable: true },
+        notes: { label: 'Notes', type: 'textarea', required: false, editable: true }
+      },
       product: {
         product_name: { label: 'Product Name', type: 'text', required: true, editable: false },
         name: { label: 'Product Name', type: 'text', required: true, editable: false },

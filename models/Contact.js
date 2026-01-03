@@ -56,6 +56,9 @@ class Contact {
       throw new Error('Missing required fields: first_name, last_name');
     }
 
+    // Convert empty email string to null to avoid unique constraint issues
+    const normalizedEmail = email && email.trim() !== '' ? email : null;
+
     try {
       const result = await query(`
         INSERT INTO contacts (
@@ -71,7 +74,7 @@ class Contact {
         company,
         first_name,
         last_name,
-        email,
+        normalizedEmail,
         phone,
         status, // maps to contact_status
         source, // maps to contact_source
@@ -85,7 +88,8 @@ class Contact {
 
       return new Contact(result.rows[0]);
     } catch (error) {
-      if (error.message.includes('duplicate key')) {
+      // Only throw "email already exists" error if email was actually provided and the error is about duplicate key
+      if (error.message.includes('duplicate key') && normalizedEmail) {
         throw new Error('Contact with this email already exists in organization');
       }
       throw error;

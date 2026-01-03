@@ -36,7 +36,7 @@ const CreateTransactionModal = ({ account, onClose, onSuccess, isOpen }) => {
     term: '',
     transaction_reference: '',
     notes: '',
-    currency: 'USD'
+    currency: 'CAD'
   })
 
   const [isAmountOverridden, setIsAmountOverridden] = useState(false)
@@ -128,16 +128,17 @@ const CreateTransactionModal = ({ account, onClose, onSuccess, isOpen }) => {
   useEffect(() => {
     const loadPaymentMethodOptions = async () => {
       try {
-        const response = await api.get('/custom-fields?entity_type=transactions')
-        const allFields = [
-          ...(response.data.systemFields || []),
-          ...(response.data.customFields || [])
-        ]
+        const response = await api.get('/custom-fields?entityType=transactions')
+        const allFields = response.data.fields || []
+
+        console.log('📋 All transaction fields:', allFields)
 
         // Find the payment_method field
         const paymentMethodField = allFields.find(
           field => field.field_name === 'payment_method' || field.field_name === 'paymentMethod'
         )
+
+        console.log('🔍 Payment method field found:', paymentMethodField)
 
         if (paymentMethodField && paymentMethodField.field_options && paymentMethodField.field_options.length > 0) {
           // Extract labels from field options
@@ -146,6 +147,8 @@ const CreateTransactionModal = ({ account, onClose, onSuccess, isOpen }) => {
           )
           setPaymentMethodOptions(options)
           console.log('✅ Loaded payment method options from field config:', options)
+        } else {
+          console.log('⚠️ No payment_method field found or no options configured, using defaults')
         }
       } catch (error) {
         console.warn('⚠️ Could not load payment method field config, using defaults:', error)
@@ -444,6 +447,29 @@ const CreateTransactionModal = ({ account, onClose, onSuccess, isOpen }) => {
                   )}
                   {errors.amount && (
                     <p className="text-red-600 text-sm mt-1">{errors.amount}</p>
+                  )}
+                </div>
+
+                {/* Currency Field */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Currency <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    name="currency"
+                    value={formData.currency}
+                    onChange={handleChange}
+                    required
+                    className={`select ${errors.currency ? 'border-red-500' : ''}`}
+                  >
+                    <option value="CAD">CAD - Canadian Dollar</option>
+                    <option value="USD">USD - US Dollar</option>
+                  </select>
+                  <span className="text-xs text-gray-500 mt-1">
+                    Select the transaction currency
+                  </span>
+                  {errors.currency && (
+                    <p className="text-red-600 text-sm mt-1">{errors.currency}</p>
                   )}
                 </div>
 
