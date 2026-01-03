@@ -36,7 +36,9 @@ const ContactForm = ({ contact = null, onClose, onSubmit, users = [], isLoading 
     const loadSourceOptions = async () => {
       try {
         const response = await customFieldsAPI.getFields('contacts')
-        const sourceField = response.fields?.find(f => f.field_name === 'source')
+        // Check both customFields and systemFields arrays
+        const allFields = [...(response.customFields || []), ...(response.systemFields || [])]
+        const sourceField = allFields.find(f => f.field_name === 'source')
         if (sourceField?.field_options) {
           setSourceOptions(sourceField.field_options)
         }
