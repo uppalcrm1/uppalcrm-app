@@ -1,4 +1,4 @@
-require('dotenv').config({ path: '.env.staging' });
+require('dotenv').config();
 const { Pool } = require('pg');
 const fs = require('fs').promises;
 const path = require('path');
@@ -9,8 +9,8 @@ async function deployCurrencyMigrationStaging() {
 
   // Check for staging database URL
   if (!process.env.DATABASE_URL) {
-    console.error('❌ ERROR: DATABASE_URL not found in .env.staging');
-    console.error('   Please ensure .env.staging exists with DATABASE_URL');
+    console.error('❌ ERROR: DATABASE_URL not found in .env');
+    console.error('   Please ensure .env exists with DATABASE_URL');
     process.exit(1);
   }
 
