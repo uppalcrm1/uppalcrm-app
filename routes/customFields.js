@@ -1564,7 +1564,7 @@ router.get('/form-config', async (req, res) => {
         SELECT field_name, field_options, is_enabled, is_required, field_label, field_type
         FROM custom_field_definitions
         WHERE organization_id = $1
-          AND entity_type = 'leads'
+          AND (entity_type = 'leads' OR entity_type IS NULL)
         ORDER BY created_at ASC
       `, [req.organizationId]);
 
