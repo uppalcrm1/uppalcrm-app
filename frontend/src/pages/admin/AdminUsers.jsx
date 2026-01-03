@@ -26,6 +26,8 @@ const AdminUsers = () => {
   const [searchQuery, setSearchQuery] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
   const [showAddModal, setShowAddModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [selectedUser, setSelectedUser] = useState(null)
 
   // Add User Form State
   const [formData, setFormData] = useState({
@@ -202,6 +204,45 @@ const AdminUsers = () => {
     } catch (error) {
       console.error('❌ Error deleting user:', error)
       const errorMessage = error.response?.data?.message || error.message || 'Failed to delete user'
+      toast.error(errorMessage)
+    }
+  }
+
+  const handleEditUser = (user) => {
+    console.log('✏️ Opening edit modal for user:', user.id, user.email)
+    setSelectedUser(user)
+    setShowEditModal(true)
+  }
+
+  const handleCloseEditModal = () => {
+    setShowEditModal(false)
+    setSelectedUser(null)
+  }
+
+  const handleUpdateUser = async (updatedRole) => {
+    if (!selectedUser) return
+
+    try {
+      console.log('📤 Updating user role:', selectedUser.id, 'to', updatedRole)
+
+      const loadingToast = toast.loading(`Updating ${selectedUser.first_name} ${selectedUser.last_name}...`)
+
+      await usersAPI.updateUser(selectedUser.id, { role: updatedRole })
+
+      console.log('✅ User updated successfully')
+
+      toast.dismiss(loadingToast)
+      toast.success(`${selectedUser.first_name} ${selectedUser.last_name} has been updated to ${updatedRole}`)
+
+      // Refresh the user list and stats
+      await fetchUsers()
+      await fetchStats()
+
+      // Close modal
+      handleCloseEditModal()
+    } catch (error) {
+      console.error('❌ Error updating user:', error)
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to update user'
       toast.error(errorMessage)
     }
   }
@@ -493,6 +534,7 @@ const AdminUsers = () => {
                         {currentUser?.role === 'admin' && user.id !== currentUser.id && (
                           <>
                             <button
+                              onClick={() => handleEditUser(user)}
                               className="btn btn-sm btn-outline"
                               title="Edit user"
                             >
@@ -706,6 +748,135 @@ const AdminUsers = () => {
                 </div>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit User Modal */}
+      {showEditModal && selectedUser && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Edit User Role</h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Update role for {selectedUser.first_name} {selectedUser.last_name}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCloseEditModal}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <XCircle size={20} />
+                </button>
+              </div>
+
+              {/* User Info */}
+              <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                <div className="flex items-center">
+                  <div className="w-12 h-12 bg-primary-600 rounded-full flex items-center justify-center text-white font-medium">
+                    {selectedUser.first_name?.[0]}{selectedUser.last_name?.[0]}
+                  </div>
+                  <div className="ml-3">
+                    <p className="font-medium text-gray-900">
+                      {selectedUser.first_name} {selectedUser.last_name}
+                    </p>
+                    <p className="text-sm text-gray-600">{selectedUser.email}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Role Selection */}
+              <div className="space-y-3 mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Select New Role
+                </label>
+
+                <button
+                  onClick={() => handleUpdateUser('admin')}
+                  className={`w-full text-left p-4 rounded-lg border-2 transition-colors ${
+                    selectedUser.role === 'admin'
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-200 hover:border-blue-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center">
+                        <Shield size={16} className="mr-2 text-blue-600" />
+                        <span className="font-medium text-gray-900">Admin</span>
+                      </div>
+                      <p className="text-sm text-gray-600 mt-1">
+                        Full system access and configuration
+                      </p>
+                    </div>
+                    {selectedUser.role === 'admin' && (
+                      <CheckCircle size={20} className="text-blue-600" />
+                    )}
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => handleUpdateUser('manager')}
+                  className={`w-full text-left p-4 rounded-lg border-2 transition-colors ${
+                    selectedUser.role === 'manager'
+                      ? 'border-purple-500 bg-purple-50'
+                      : 'border-gray-200 hover:border-purple-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center">
+                        <Users size={16} className="mr-2 text-purple-600" />
+                        <span className="font-medium text-gray-900">Manager</span>
+                      </div>
+                      <p className="text-sm text-gray-600 mt-1">
+                        User permissions plus team management
+                      </p>
+                    </div>
+                    {selectedUser.role === 'manager' && (
+                      <CheckCircle size={20} className="text-purple-600" />
+                    )}
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => handleUpdateUser('user')}
+                  className={`w-full text-left p-4 rounded-lg border-2 transition-colors ${
+                    selectedUser.role === 'user'
+                      ? 'border-gray-500 bg-gray-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center">
+                        <Users size={16} className="mr-2 text-gray-600" />
+                        <span className="font-medium text-gray-900">User</span>
+                      </div>
+                      <p className="text-sm text-gray-600 mt-1">
+                        Standard access to leads and contacts
+                      </p>
+                    </div>
+                    {selectedUser.role === 'user' && (
+                      <CheckCircle size={20} className="text-gray-600" />
+                    )}
+                  </div>
+                </button>
+              </div>
+
+              {/* Cancel Button */}
+              <div className="flex justify-end pt-4 border-t border-gray-200">
+                <button
+                  onClick={handleCloseEditModal}
+                  className="btn btn-outline"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
