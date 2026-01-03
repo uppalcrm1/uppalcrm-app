@@ -129,12 +129,14 @@ const CreateTransactionModal = ({ account, onClose, onSuccess, isOpen }) => {
     const loadFieldOptions = async () => {
       try {
         const response = await api.get('/custom-fields?entityType=transactions')
+        const customFields = response.data.customFields || []
         const systemFields = response.data.systemFields || []
+        const allFields = [...customFields, ...systemFields]
 
-        console.log('📋 All transaction system fields:', systemFields)
+        console.log('📋 All transaction fields:', allFields)
 
         // Find the payment_method field
-        const paymentMethodField = systemFields.find(
+        const paymentMethodField = allFields.find(
           field => field.field_name === 'payment_method' || field.field_name === 'paymentMethod'
         )
 
@@ -151,8 +153,8 @@ const CreateTransactionModal = ({ account, onClose, onSuccess, isOpen }) => {
           console.log('⚠️ No payment_method field found or no options configured, using defaults')
         }
 
-        // Find the source field
-        const sourceField = systemFields.find(
+        // Find the source field (check both customFields and systemFields)
+        const sourceField = allFields.find(
           field => field.field_name === 'source'
         )
 
