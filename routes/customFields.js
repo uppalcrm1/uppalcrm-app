@@ -1556,21 +1556,43 @@ router.get('/form-config', async (req, res) => {
       notes: { label: 'Notes', type: 'textarea', required: false, editable: true }
     };
 
-    // Get any stored configurations for system fields from default_field_configurations
+    // Get any stored configurations for system fields from custom_field_definitions (new approach)
     let storedConfigs = {};
     try {
-      const configResult = await db.query(`
+      // First, try to load from custom_field_definitions (new standardized approach)
+      const systemFieldsQuery = await db.query(`
+        SELECT field_name, field_options, is_enabled, is_required, field_label, field_type
+        FROM custom_field_definitions
+        WHERE organization_id = $1
+          AND entity_type = 'leads'
+        ORDER BY created_at ASC
+      `, [req.organizationId]);
+
+      systemFieldsQuery.rows.forEach(config => {
+        storedConfigs[config.field_name] = config;
+      });
+      console.log('Form config: loaded', Object.keys(storedConfigs).length, 'system field configs from custom_field_definitions');
+    } catch (configError) {
+      console.log('Could not fetch system fields from custom_field_definitions:', configError.message);
+    }
+
+    // Fallback: check legacy default_field_configurations table for backward compatibility
+    try {
+      const legacyConfigResult = await db.query(`
         SELECT field_name, field_options, is_enabled, is_required
         FROM default_field_configurations
         WHERE organization_id = $1
       `, [req.organizationId]);
 
-      configResult.rows.forEach(config => {
-        storedConfigs[config.field_name] = config;
+      // Only use legacy configs if no new configs found for that field
+      legacyConfigResult.rows.forEach(config => {
+        if (!storedConfigs[config.field_name]) {
+          storedConfigs[config.field_name] = config;
+        }
       });
-      console.log('Form config stored configs found:', Object.keys(storedConfigs).length);
-    } catch (configError) {
-      console.log('No stored system field configs found for form');
+      console.log('Form config: total configs after legacy merge:', Object.keys(storedConfigs).length);
+    } catch (legacyError) {
+      console.log('No legacy system field configs found');
     }
 
     // Build complete system fields list for form (only enabled fields)
