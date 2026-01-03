@@ -1,7 +1,8 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { X } from 'lucide-react'
 import LoadingSpinner from './LoadingSpinner'
+import { customFieldsAPI } from '../services/api'
 
 const CONTACT_STATUSES = [
   { value: 'active', label: 'Active' },
@@ -23,12 +24,28 @@ const CONTACT_PRIORITIES = [
   { value: 'high', label: 'High' }
 ]
 
-const CONTACT_SOURCES = [
-  'website', 'referral', 'social', 'cold-call', 'email', 'advertisement', 'trade-show', 'other'
-]
+// DEPRECATED: Source options now loaded from custom_field_definitions table
+const CONTACT_SOURCES = []
 
 const ContactForm = ({ contact = null, onClose, onSubmit, users = [], isLoading = false }) => {
   const isEditing = !!contact
+  const [sourceOptions, setSourceOptions] = useState([])
+
+  // Load source options from API
+  useEffect(() => {
+    const loadSourceOptions = async () => {
+      try {
+        const response = await customFieldsAPI.getFields('contacts')
+        const sourceField = response.fields?.find(f => f.field_name === 'source')
+        if (sourceField?.field_options) {
+          setSourceOptions(sourceField.field_options)
+        }
+      } catch (error) {
+        console.error('Failed to load source options:', error)
+      }
+    }
+    loadSourceOptions()
+  }, [])
 
   const { register, handleSubmit, formState: { errors }, watch } = useForm({
     defaultValues: contact ? {
@@ -166,9 +183,9 @@ const ContactForm = ({ contact = null, onClose, onSubmit, users = [], isLoading 
                 <label className="block text-sm font-medium text-gray-700 mb-2">Source</label>
                 <select {...register('source')} className="select">
                   <option value="">Select source</option>
-                  {CONTACT_SOURCES.map(source => (
-                    <option key={source} value={source}>
-                      {source.charAt(0).toUpperCase() + source.slice(1)}
+                  {sourceOptions.map(option => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
                     </option>
                   ))}
                 </select>
