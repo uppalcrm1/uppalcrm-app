@@ -96,6 +96,7 @@ const EditTransactionModal = ({ transaction, onClose, onSuccess, isOpen }) => {
   const [paymentMethodOptions, setPaymentMethodOptions] = useState([
     'Credit Card', 'Debit Card', 'Bank Transfer', 'PayPal', 'Cash'
   ]) // Default options, will be replaced by field configuration
+  const [sourceOptions, setSourceOptions] = useState(TRANSACTION_SOURCES) // Default options, will be replaced by field configuration
   const queryClient = useQueryClient()
 
   // Update form data when transaction changes
@@ -128,17 +129,17 @@ const EditTransactionModal = ({ transaction, onClose, onSuccess, isOpen }) => {
     }
   }, [transaction])
 
-  // Fetch payment method field configuration
+  // Fetch field configuration for payment_method and source
   useEffect(() => {
-    const loadPaymentMethodOptions = async () => {
+    const loadFieldOptions = async () => {
       try {
         const response = await api.get('/custom-fields?entityType=transactions')
-        const allFields = response.data.fields || []
+        const systemFields = response.data.systemFields || []
 
-        console.log('📋 All transaction fields:', allFields)
+        console.log('📋 All transaction system fields:', systemFields)
 
         // Find the payment_method field
-        const paymentMethodField = allFields.find(
+        const paymentMethodField = systemFields.find(
           field => field.field_name === 'payment_method' || field.field_name === 'paymentMethod'
         )
 
@@ -154,13 +155,34 @@ const EditTransactionModal = ({ transaction, onClose, onSuccess, isOpen }) => {
         } else {
           console.log('⚠️ No payment_method field found or no options configured, using defaults')
         }
+
+        // Find the source field
+        const sourceField = systemFields.find(
+          field => field.field_name === 'source'
+        )
+
+        console.log('🔍 Source field found:', sourceField)
+
+        if (sourceField && sourceField.field_options && sourceField.field_options.length > 0) {
+          // Extract value/label pairs from field options
+          const options = sourceField.field_options.map(opt => {
+            if (typeof opt === 'string') {
+              return { value: opt.toLowerCase().replace(/\s+/g, '-'), label: opt }
+            }
+            return { value: opt.value || opt.label, label: opt.label || opt.value }
+          })
+          setSourceOptions(options)
+          console.log('✅ Loaded source options from field config:', options)
+        } else {
+          console.log('⚠️ No source field found or no options configured, using defaults')
+        }
       } catch (error) {
-        console.warn('⚠️ Could not load payment method field config, using defaults:', error)
+        console.warn('⚠️ Could not load field config, using defaults:', error)
         // Keep default options if API call fails
       }
     }
 
-    loadPaymentMethodOptions()
+    loadFieldOptions()
   }, [])
 
   // Mutation for updating transaction
@@ -457,7 +479,7 @@ const EditTransactionModal = ({ transaction, onClose, onSuccess, isOpen }) => {
                     onChange={handleChange}
                     className="select"
                   >
-                    {TRANSACTION_SOURCES.map(source => (
+                    {sourceOptions.map(source => (
                       <option key={source.value} value={source.value}>
                         {source.label}
                       </option>
