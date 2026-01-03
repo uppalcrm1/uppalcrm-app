@@ -96,7 +96,7 @@ const FieldManager = () => {
           required: false,
           editable: true,
           deletable: true,
-          options: ['Website', 'Referral', 'Social', 'Cold-call', 'Email', 'Advertisement', 'Trade-show', 'Other']
+          options: null  // Will be loaded from API via system field configuration (custom_field_definitions)
         },
         {
           name: 'status',

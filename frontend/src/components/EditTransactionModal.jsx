@@ -18,7 +18,6 @@ import api from '../services/api'
 import toast from 'react-hot-toast'
 import {
   PAYMENT_METHODS,
-  TRANSACTION_SOURCES,
   BILLING_TERMS
 } from '../constants/transactions'
 
@@ -96,7 +95,7 @@ const EditTransactionModal = ({ transaction, onClose, onSuccess, isOpen }) => {
   const [paymentMethodOptions, setPaymentMethodOptions] = useState([
     'Credit Card', 'Debit Card', 'Bank Transfer', 'PayPal', 'Cash'
   ]) // Default options, will be replaced by field configuration
-  const [sourceOptions, setSourceOptions] = useState(TRANSACTION_SOURCES) // Default options, will be replaced by field configuration
+  const [sourceOptions, setSourceOptions] = useState([]) // Will be loaded from custom_field_definitions via API
   const queryClient = useQueryClient()
 
   // Update form data when transaction changes
