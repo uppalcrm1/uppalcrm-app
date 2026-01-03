@@ -30,6 +30,7 @@ const COLUMN_DEFINITIONS = [
   { key: 'account_name', label: 'Account Name', description: 'Associated account', required: false },
   { key: 'contact_name', label: 'Contact Name', description: 'Associated contact', required: false },
   { key: 'amount', label: 'Amount', description: 'Transaction amount', required: true },
+  { key: 'currency', label: 'Currency', description: 'Transaction currency (CAD or USD)', required: false },
   { key: 'status', label: 'Status', description: 'Transaction status', required: false },
   { key: 'source', label: 'Source', description: 'Payment source', required: false },
   { key: 'payment_method', label: 'Payment Method', description: 'Payment method used', required: false },
@@ -43,6 +44,7 @@ const DEFAULT_VISIBLE_COLUMNS = {
   account_name: true,
   contact_name: true,
   amount: true,
+  currency: true,
   status: true,
   source: true,
   payment_method: true,
@@ -422,6 +424,7 @@ const TransactionsPage = () => {
                   {visibleColumns.account_name && <th className="text-left py-3 px-4 font-medium text-gray-900">Account Name</th>}
                   {visibleColumns.contact_name && <th className="text-left py-3 px-4 font-medium text-gray-900">Contact Name</th>}
                   {visibleColumns.amount && <th className="text-left py-3 px-4 font-medium text-gray-900">Amount</th>}
+                  {visibleColumns.currency && <th className="text-left py-3 px-4 font-medium text-gray-900">Currency</th>}
                   {visibleColumns.status && <th className="text-left py-3 px-4 font-medium text-gray-900">Status</th>}
                   {visibleColumns.source && <th className="text-left py-3 px-4 font-medium text-gray-900">Source</th>}
                   {visibleColumns.payment_method && <th className="text-left py-3 px-4 font-medium text-gray-900">Payment Method</th>}
@@ -493,7 +496,20 @@ const TransactionsPage = () => {
                         </td>
                       )}
 
-                      {/* Column 6: Status */}
+                      {/* Column 6: Currency */}
+                      {visibleColumns.currency && (
+                        <td className="py-4 px-4">
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                            transaction.currency === 'USD'
+                              ? 'bg-blue-100 text-blue-800'
+                              : 'bg-green-100 text-green-800'
+                          }`}>
+                            {transaction.currency || 'CAD'}
+                          </span>
+                        </td>
+                      )}
+
+                      {/* Column 7: Status */}
                       {visibleColumns.status && (
                         <td className="py-4 px-4">
                           <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${statusBadge.class}`}>
@@ -503,7 +519,7 @@ const TransactionsPage = () => {
                         </td>
                       )}
 
-                      {/* Column 7: Source */}
+                      {/* Column 8: Source */}
                       {visibleColumns.source && (
                         <td className="py-4 px-4">
                           <span className="text-sm text-gray-700">
@@ -512,7 +528,7 @@ const TransactionsPage = () => {
                         </td>
                       )}
 
-                      {/* Column 8: Payment Method */}
+                      {/* Column 9: Payment Method */}
                       {visibleColumns.payment_method && (
                         <td className="py-4 px-4">
                           <div className="flex items-center text-sm text-gray-700">
@@ -522,7 +538,7 @@ const TransactionsPage = () => {
                         </td>
                       )}
 
-                      {/* Column 9: Actions */}
+                      {/* Column 10: Actions */}
                       {visibleColumns.actions && (
                         <td className="py-4 px-4">
                           <div className="flex items-center gap-2">
