@@ -1219,27 +1219,60 @@ router.put('/default/:fieldName', async (req, res) => {
 
     console.log('🔧 Storing field config:', fieldConfig);
 
-    const result = await db.query(`
-      INSERT INTO default_field_configurations
-      (organization_id, field_name, entity_type, field_options, is_enabled, is_required, sort_order, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
-      ON CONFLICT (organization_id, field_name, entity_type)
-      DO UPDATE SET
-        field_options = EXCLUDED.field_options,
-        is_enabled = EXCLUDED.is_enabled,
-        is_required = EXCLUDED.is_required,
-        sort_order = EXCLUDED.sort_order,
-        updated_at = NOW()
-      RETURNING field_name, field_options, is_enabled, is_required, sort_order
-    `, [
-      req.organizationId,
-      fieldName,
-      entity_type,
-      JSON.stringify(fieldConfig.options),
-      fieldConfig.is_enabled,
-      fieldConfig.is_required,
-      0 // default sort order
-    ]);
+    // First, check if this field exists as a universal field (entity_type = NULL) in custom_field_definitions
+    const universalFieldCheck = await db.query(`
+      SELECT id FROM custom_field_definitions
+      WHERE organization_id = $1 AND field_name = $2 AND entity_type IS NULL
+    `, [req.organizationId, fieldName]);
+
+    let result;
+    if (universalFieldCheck.rows.length > 0) {
+      // Update the universal field in custom_field_definitions
+      console.log('🔧 Updating universal field in custom_field_definitions');
+      result = await db.query(`
+        UPDATE custom_field_definitions
+        SET field_options = $1::jsonb,
+            is_enabled = $2,
+            is_required = $3,
+            field_label = $4,
+            field_type = $5,
+            updated_at = NOW()
+        WHERE organization_id = $6 AND field_name = $7 AND entity_type IS NULL
+        RETURNING field_name, field_options, is_enabled, is_required
+      `, [
+        JSON.stringify(fieldConfig.options),
+        fieldConfig.is_enabled,
+        fieldConfig.is_required,
+        fieldConfig.label,
+        fieldConfig.type,
+        req.organizationId,
+        fieldName
+      ]);
+    } else {
+      // Fall back to default_field_configurations for entity-specific fields
+      console.log('🔧 Updating entity-specific field in default_field_configurations');
+      result = await db.query(`
+        INSERT INTO default_field_configurations
+        (organization_id, field_name, entity_type, field_options, is_enabled, is_required, sort_order, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+        ON CONFLICT (organization_id, field_name, entity_type)
+        DO UPDATE SET
+          field_options = EXCLUDED.field_options,
+          is_enabled = EXCLUDED.is_enabled,
+          is_required = EXCLUDED.is_required,
+          sort_order = EXCLUDED.sort_order,
+          updated_at = NOW()
+        RETURNING field_name, field_options, is_enabled, is_required, sort_order
+      `, [
+        req.organizationId,
+        fieldName,
+        entity_type,
+        JSON.stringify(fieldConfig.options),
+        fieldConfig.is_enabled,
+        fieldConfig.is_required,
+        0 // default sort order
+      ]);
+    }
 
     // Store the complete field configuration (including options) in a separate way
     // For now, we'll return the basic config and handle options in memory
