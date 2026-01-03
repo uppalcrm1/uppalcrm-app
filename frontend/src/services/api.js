@@ -673,6 +673,23 @@ export const transactionsAPI = {
   getStats: async () => {
     const response = await api.get('/transactions/stats')
     return response.data
+  },
+
+  // Currency configuration endpoints
+  getExchangeRate: async () => {
+    const response = await api.get('/transactions/config/exchange-rate')
+    return response.data
+  },
+
+  updateExchangeRate: async (rate) => {
+    const response = await api.put('/transactions/config/exchange-rate', { rate })
+    return response.data
+  },
+
+  // Revenue stats with CAD conversion
+  getRevenueStats: async () => {
+    const response = await api.get('/transactions/stats/revenue')
+    return response.data
   }
 }
 

@@ -36,7 +36,7 @@ const CreateTransactionModal = ({ account, onClose, onSuccess, isOpen }) => {
     term: '',
     transaction_reference: '',
     notes: '',
-    currency: 'USD'
+    currency: 'CAD'
   })
 
   const [isAmountOverridden, setIsAmountOverridden] = useState(false)
@@ -447,6 +447,29 @@ const CreateTransactionModal = ({ account, onClose, onSuccess, isOpen }) => {
                   )}
                   {errors.amount && (
                     <p className="text-red-600 text-sm mt-1">{errors.amount}</p>
+                  )}
+                </div>
+
+                {/* Currency Field */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Currency <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    name="currency"
+                    value={formData.currency}
+                    onChange={handleChange}
+                    required
+                    className={`select ${errors.currency ? 'border-red-500' : ''}`}
+                  >
+                    <option value="CAD">CAD - Canadian Dollar</option>
+                    <option value="USD">USD - US Dollar</option>
+                  </select>
+                  <span className="text-xs text-gray-500 mt-1">
+                    Select the transaction currency
+                  </span>
+                  {errors.currency && (
+                    <p className="text-red-600 text-sm mt-1">{errors.currency}</p>
                   )}
                 </div>
 

@@ -21,6 +21,7 @@ import EditTransactionModal from '../components/EditTransactionModal'
 import ColumnSelector from '../components/ColumnSelector'
 import { formatSource, formatPaymentMethod } from '../constants/transactions'
 import { formatDateOnly } from '../utils/dateUtils'
+import { formatCurrency } from '../utils/currency'
 
 // Define available columns with metadata
 const COLUMN_DEFINITIONS = [
@@ -48,18 +49,8 @@ const DEFAULT_VISIBLE_COLUMNS = {
   actions: true
 }
 
-// Helper function to format currency
-const formatCurrency = (amount) => {
-  if (!amount && amount !== 0) return '$0.00'
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  }).format(amount)
-}
-
 // formatSource and formatPaymentMethod are now imported from constants/transactions.js
+// formatCurrency is imported from utils/currency.js
 
 // Helper function to format date to yyyy-mm-dd (timezone-safe)
 const formatDate = (dateString) => {
@@ -79,6 +70,8 @@ const TransactionsPage = () => {
   const [filterSource, setFilterSource] = useState('all')
   const [showEditModal, setShowEditModal] = useState(false)
   const [selectedTransaction, setSelectedTransaction] = useState(null)
+  const [revenueStats, setRevenueStats] = useState(null)
+  const [loadingRevenue, setLoadingRevenue] = useState(false)
 
   // Load column visibility from localStorage or use defaults
   const [visibleColumns, setVisibleColumns] = useState(() => {
@@ -104,6 +97,7 @@ const TransactionsPage = () => {
   // Fetch transactions on component mount
   useEffect(() => {
     fetchTransactions()
+    fetchRevenueStats()
   }, [])
 
   const fetchTransactions = async () => {
@@ -111,10 +105,24 @@ const TransactionsPage = () => {
       setLoading(true)
       const response = await transactionsAPI.getTransactions()
       setTransactions(response.transactions || [])
+      // Also refresh revenue stats when transactions change
+      fetchRevenueStats()
     } catch (error) {
       console.error('Error fetching transactions:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchRevenueStats = async () => {
+    try {
+      setLoadingRevenue(true)
+      const response = await transactionsAPI.getRevenueStats()
+      setRevenueStats(response)
+    } catch (error) {
+      console.error('Error fetching revenue stats:', error)
+    } finally {
+      setLoadingRevenue(false)
     }
   }
 
@@ -245,14 +253,22 @@ const TransactionsPage = () => {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {/* Total Revenue */}
+        {/* Total Revenue (CAD) */}
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 mb-1">Total Revenue</p>
+              <p className="text-sm text-gray-600 mb-1">Total Revenue (CAD)</p>
               <p className="text-2xl font-bold text-green-600">
-                {formatCurrency(stats.totalRevenue)}
+                {revenueStats && !loadingRevenue
+                  ? formatCurrency(revenueStats.total_revenue_cad, 'CAD')
+                  : formatCurrency(0, 'CAD')
+                }
               </p>
+              {revenueStats && revenueStats.breakdown && (
+                <p className="text-xs text-gray-500 mt-1">
+                  {revenueStats.breakdown.cad_transactions} CAD + {revenueStats.breakdown.usd_transactions} USD transactions
+                </p>
+              )}
             </div>
             <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
               <DollarSign className="text-green-600" size={24} />
@@ -472,7 +488,7 @@ const TransactionsPage = () => {
                       {visibleColumns.amount && (
                         <td className="py-4 px-4">
                           <span className="text-sm font-semibold text-green-600">
-                            {formatCurrency(transaction.amount)}
+                            {formatCurrency(transaction.amount, transaction.currency || 'CAD')}
                           </span>
                         </td>
                       )}
