@@ -38,6 +38,7 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
   const [transactionForm, setTransactionForm] = useState({
     paymentMethod: 'Credit Card',
     amount: '',
+    currency: 'CAD',
     owner: (lead?.assigned_first_name && lead?.assigned_last_name)
       ? `${lead.assigned_first_name} ${lead.assigned_last_name}`
       : null,
@@ -661,6 +662,17 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
                         step="0.01"
                         className="input h-9"
                       />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Currency *</label>
+                      <select
+                        value={transactionForm.currency}
+                        onChange={(e) => setTransactionForm({ ...transactionForm, currency: e.target.value })}
+                        className="select h-9"
+                      >
+                        <option value="CAD">CAD - Canadian Dollar</option>
+                        <option value="USD">USD - US Dollar</option>
+                      </select>
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">Owner *</label>
