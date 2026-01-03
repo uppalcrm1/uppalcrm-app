@@ -379,6 +379,26 @@ const EditTransactionModal = ({ transaction, onClose, onSuccess, isOpen }) => {
                   )}
                 </div>
 
+                {/* Currency Field */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Currency <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    name="currency"
+                    value={formData.currency}
+                    onChange={handleChange}
+                    required
+                    className={`select ${errors.currency ? 'border-red-500' : ''}`}
+                  >
+                    <option value="CAD">CAD - Canadian Dollar</option>
+                    <option value="USD">USD - US Dollar</option>
+                  </select>
+                  {errors.currency && (
+                    <p className="text-red-600 text-sm mt-1">{errors.currency}</p>
+                  )}
+                </div>
+
                 {/* Payment Date Field */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
