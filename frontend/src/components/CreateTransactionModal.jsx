@@ -20,7 +20,6 @@ import api from '../services/api'
 import toast from 'react-hot-toast'
 import {
   PAYMENT_METHODS,
-  TRANSACTION_SOURCES,
   BILLING_TERMS
 } from '../constants/transactions'
 import { formatDateOnly } from '../utils/dateUtils'
@@ -44,7 +43,7 @@ const CreateTransactionModal = ({ account, onClose, onSuccess, isOpen }) => {
   const [paymentMethodOptions, setPaymentMethodOptions] = useState([
     'Credit Card', 'Debit Card', 'Bank Transfer', 'PayPal', 'Cash'
   ]) // Default options, will be replaced by field configuration
-  const [sourceOptions, setSourceOptions] = useState(TRANSACTION_SOURCES) // Default options, will be replaced by field configuration
+  const [sourceOptions, setSourceOptions] = useState([]) // Will be loaded from custom_field_definitions via API
 
   // State for expiry update (Option 4 - Manual Control)
   const [expiryUpdate, setExpiryUpdate] = useState({

@@ -14,15 +14,10 @@ export const PAYMENT_METHODS = [
 ];
 
 // Transaction Sources
-export const TRANSACTION_SOURCES = [
-  { value: 'manual', label: 'Manual Entry' },
-  { value: 'website', label: 'Website' },
-  { value: 'phone', label: 'Phone' },
-  { value: 'email', label: 'Email' },
-  { value: 'referral', label: 'Referral' },
-  { value: 'walk-in', label: 'Walk-in' },
-  { value: 'partner', label: 'Partner' }
-];
+// DEPRECATED: Source options are now loaded from custom_field_definitions table
+// Use customFieldsAPI.getFields('transactions') to get source field configuration
+// Keeping empty array for backward compatibility during migration
+export const TRANSACTION_SOURCES = [];
 
 // Transaction Statuses
 export const TRANSACTION_STATUSES = [
