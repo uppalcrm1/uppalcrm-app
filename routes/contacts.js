@@ -526,7 +526,7 @@ router.post('/convert-from-lead/:leadId',
             lead.title,
             leadId,
             req.user.id,
-            lead.assigned_to || req.user.id, // Preserve owner (assigned_to)
+            sanitizeUUID(lead.assigned_to) || req.user.id, // Preserve owner (assigned_to) - sanitize to convert empty strings to NULL
             lead.priority || 'medium'
           ]
         );
@@ -535,7 +535,16 @@ router.post('/convert-from-lead/:leadId',
         console.log('✅ Created new contact:', contactId);
       } else if (contactMode === 'existing' && existingContactId) {
         // Link to existing contact
-        contactId = existingContactId;
+        contactId = sanitizeUUID(existingContactId); // Sanitize to handle empty strings
+
+        if (!contactId) {
+          await query('ROLLBACK');
+          return res.status(400).json({
+            error: 'Invalid existing contact ID',
+            message: 'Existing contact ID must be a valid UUID'
+          });
+        }
+
         const existingContactResult = await query(
           `SELECT * FROM contacts WHERE id = $1 AND organization_id = $2`,
           [contactId, req.organizationId]
