@@ -128,7 +128,7 @@ const CreateTransactionModal = ({ account, onClose, onSuccess, isOpen }) => {
   useEffect(() => {
     const loadFieldOptions = async () => {
       try {
-        const response = await api.get('/custom-fields?entityType=transactions')
+        const response = await api.get('/custom-fields?entity_type=transactions')
         const customFields = response.data.customFields || []
         const systemFields = response.data.systemFields || []
         const allFields = [...customFields, ...systemFields]

@@ -116,7 +116,7 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
   useEffect(() => {
     const loadPaymentMethodOptions = async () => {
       try {
-        const response = await api.get('/custom-fields?entityType=transactions');
+        const response = await api.get('/custom-fields?entity_type=transactions');
         const allFields = response.data.fields || [];
 
         console.log('📋 All transaction fields:', allFields);
