@@ -426,10 +426,20 @@ class Contact {
 
     const setClause = updateFields.map((field, index) => `${field} = $${index + 3}`).join(', ');
     const values = [id, organizationId, ...updateFields.map(field => {
-      if (field === 'value') {
-        return parseFloat(updates[field]) || 0;
+      let value = updates[field];
+      
+      // Convert empty strings to null for these fields
+      if (['email', 'phone', 'source', 'notes', 'title', 'company'].includes(field)) {
+        if (value === '' || value === undefined) {
+          return null;
+        }
       }
-      return updates[field];
+      
+      if (field === 'value') {
+        return parseFloat(value) || 0;
+      }
+      
+      return value;
     })];
 
     try {
