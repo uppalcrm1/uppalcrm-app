@@ -420,13 +420,11 @@ class Contact {
     
     const updateFields = Object.keys(updates).filter(key => allowedFields.includes(key));
     
-    console.log('📝 Contact.update called with:', { id, organizationId, updateFields, updates });
-    
     if (updateFields.length === 0) {
       throw new Error('No valid fields to update');
     }
 
-    // Build the update clause with proper type casting
+    // Build the update clause
     const setClauses = [];
     const values = [id, organizationId];
     let paramIndex = 3;
@@ -443,45 +441,34 @@ class Contact {
       
       if (field === 'value') {
         value = parseFloat(value) || 0;
-        setClauses.push(`${field} = $${paramIndex}::numeric`);
-      } else {
-        setClauses.push(`${field} = $${paramIndex}`);
       }
       
+      setClauses.push(`${field} = $${paramIndex}`);
       values.push(value);
       paramIndex++;
     }
 
     const setClause = setClauses.join(', ');
-    const query_text = `
-      UPDATE contacts 
-      SET ${setClause}, updated_at = NOW()
-      WHERE id = $1 AND organization_id = $2
-      RETURNING *
-    `;
-
-    console.log('🔧 Update values:', values.map((v, i) => i === 1 ? '***org_id***' : v));
-    console.log('📋 Query:', query_text);
 
     try {
-      const result = await query(query_text, values, organizationId);
-
-      console.log('✅ Contact update successful, rows affected:', result.rowCount);
+      console.log('📝 Updating contact:', id, 'with fields:', updateFields);
+      
+      const result = await query(`
+        UPDATE contacts 
+        SET ${setClause}, updated_at = NOW()
+        WHERE id = $1 AND organization_id = $2
+        RETURNING *
+      `, values, organizationId);
 
       if (result.rows.length === 0) {
-        console.warn('⚠️ Contact update returned no rows - contact not found');
         return null;
       }
 
       return new Contact(result.rows[0]);
     } catch (error) {
-      console.error('❌ Contact.update database error:', error.message);
-      console.error('❌ Error code:', error.code);
-      console.error('❌ Error detail:', error.detail);
-      console.error('❌ Error hint:', error.hint);
-      console.error('❌ Error position:', error.position);
-      console.error('📝 Full error:', error);
-      throw new Error(`Failed to update contact: ${error.message}`);
+      console.error('❌ Contact.update error:', error.message);
+      console.error('Details:', error);
+      throw error;
     }
   }
 
