@@ -408,7 +408,8 @@ const fieldCreationLimit = rateLimit({
 // Validation schemas
 const createFieldSchema = Joi.object({
   entity_type: Joi.string()
-    .valid('leads', 'contacts', 'accounts', 'transactions', 'product')
+    .valid('leads', 'contacts', 'accounts', 'transactions', 'product', null)
+    .allow(null)
     .default('leads'),
   field_name: Joi.string()
     .max(50)
@@ -859,23 +860,30 @@ router.post('/', fieldCreationLimit, async (req, res) => {
 
     const { field_name, field_label, field_type, field_options, is_required, entity_type = 'leads' } = value;
 
-    // Validate entity_type
-    const validEntityTypes = ['leads', 'contacts', 'accounts', 'transactions', 'product'];
+    // Validate entity_type (allow null for universal fields)
+    const validEntityTypes = ['leads', 'contacts', 'accounts', 'transactions', 'product', null];
     if (!validEntityTypes.includes(entity_type)) {
       return res.status(400).json({
         error: 'Invalid entity type',
-        details: `entity_type must be one of: ${validEntityTypes.join(', ')}`
+        details: `entity_type must be one of: ${validEntityTypes.filter(t => t !== null).join(', ')}, or null for universal fields`
       });
     }
 
     // Check if field name already exists for this entity type
+    // Handle NULL entity_type properly (for universal fields)
     const existingField = await db.query(`
       SELECT id FROM custom_field_definitions
-      WHERE organization_id = $1 AND field_name = $2 AND entity_type = $3
+      WHERE organization_id = $1
+        AND field_name = $2
+        AND (
+          (entity_type = $3)
+          OR (entity_type IS NULL AND $3 IS NULL)
+        )
     `, [req.organizationId, field_name, entity_type]);
 
     if (existingField.rows.length > 0) {
-      return res.status(400).json({ error: `Field name already exists for ${entity_type}` });
+      const scopeLabel = entity_type === null ? 'universal fields' : entity_type;
+      return res.status(400).json({ error: `Field name already exists for ${scopeLabel}` });
     }
 
     // Check against system field names

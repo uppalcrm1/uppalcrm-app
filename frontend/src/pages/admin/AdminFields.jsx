@@ -35,11 +35,12 @@ import { CSS } from '@dnd-kit/utilities'
 import api from '../../services/api'
 
 const ENTITY_TYPES = [
+  { id: 'universal', label: 'Universal Fields', icon: '🌐' },  // Universal fields tab
   { id: 'leads', label: 'Leads', icon: '👤' },
   { id: 'contacts', label: 'Contacts', icon: '✉️' },
   { id: 'accounts', label: 'Accounts', icon: '💼' },
   { id: 'transactions', label: 'Transactions', icon: '💰' },
-  { id: 'product', label: 'Products', icon: '📦' }  // Added Products tab
+  { id: 'product', label: 'Products', icon: '📦' }
 ]
 
 const FIELD_TYPES = [
@@ -132,6 +133,7 @@ const AdminFields = () => {
     field_label: '',
     field_description: '',
     field_type: 'text',
+    entity_type: activeTab,  // Will be set to null for universal fields
     is_required: false,
     is_searchable: true,
     is_filterable: true,
@@ -152,20 +154,36 @@ const AdminFields = () => {
       setLoading(true)
       setError(null)
       console.log('🔍 Loading fields for entity type:', entityType)
-      const response = await api.get(`/custom-fields?entity_type=${entityType}`)
-      console.log('📦 API Response:', response.data)
-      console.log('📝 Custom fields received:', response.data.customFields)
-      console.log('🔧 System fields received:', response.data.systemFields)
-      console.log('📊 Number of custom fields:', response.data.customFields?.length || 0)
-      console.log('📊 Number of system fields:', response.data.systemFields?.length || 0)
-      if (response.data.customFields && response.data.customFields.length > 0) {
-        console.log('📋 Custom field names:', response.data.customFields.map(f => f.field_name).join(', '))
+
+      // Special handling for universal fields tab
+      if (entityType === 'universal') {
+        // For universal fields, we need to fetch directly from the backend
+        // We'll use leads as the entity_type parameter but filter for entity_type = null on the frontend
+        const response = await api.get(`/custom-fields?entity_type=leads`)
+        console.log('📦 API Response:', response.data)
+
+        // Filter only fields where entity_type is null (universal fields)
+        const universalFields = (response.data.customFields || []).filter(f => f.entity_type === null)
+        console.log('🌐 Universal fields found:', universalFields.length)
+
+        setFields(universalFields)
+        setSystemFields([])  // No system fields for universal tab
+      } else {
+        const response = await api.get(`/custom-fields?entity_type=${entityType}`)
+        console.log('📦 API Response:', response.data)
+        console.log('📝 Custom fields received:', response.data.customFields)
+        console.log('🔧 System fields received:', response.data.systemFields)
+        console.log('📊 Number of custom fields:', response.data.customFields?.length || 0)
+        console.log('📊 Number of system fields:', response.data.systemFields?.length || 0)
+        if (response.data.customFields && response.data.customFields.length > 0) {
+          console.log('📋 Custom field names:', response.data.customFields.map(f => f.field_name).join(', '))
+        }
+        if (response.data.systemFields && response.data.systemFields.length > 0) {
+          console.log('📋 System field names:', response.data.systemFields.map(f => f.field_name).join(', '))
+        }
+        setFields(response.data.customFields || [])
+        setSystemFields(response.data.systemFields || [])
       }
-      if (response.data.systemFields && response.data.systemFields.length > 0) {
-        console.log('📋 System field names:', response.data.systemFields.map(f => f.field_name).join(', '))
-      }
-      setFields(response.data.customFields || [])
-      setSystemFields(response.data.systemFields || [])
     } catch (err) {
       console.error('❌ Error loading fields:', err)
       console.error('❌ Error response:', err.response?.data)
@@ -233,7 +251,7 @@ const AdminFields = () => {
       } else {
         // Create new field - only send fields the backend expects
         const fieldData = {
-          entity_type: activeTab,
+          entity_type: activeTab === 'universal' ? null : activeTab,
           field_name: formData.field_name,
           field_label: formData.field_label,
           field_type: formData.field_type,
@@ -245,7 +263,8 @@ const AdminFields = () => {
         console.log('✅ Field created:', response.data)
         setFields(prev => [...prev, response.data.field])
         setIsCreating(false)
-        setSuccessMessage(`Custom field "${formData.field_label}" created successfully`)
+        const scope = activeTab === 'universal' ? 'universal field (available in all modules)' : `${activeTab} field`
+        setSuccessMessage(`Custom field "${formData.field_label}" created successfully as ${scope}`)
 
         // Auto-hide success message after 5 seconds
         setTimeout(() => setSuccessMessage(null), 5000)
@@ -595,6 +614,41 @@ const AdminFields = () => {
           </div>
 
           <div className="space-y-6">
+            {/* Universal Field Option - Only show when NOT on universal tab and NOT editing */}
+            {activeTab !== 'universal' && !editingField && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <label className="flex items-start cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.entity_type === null}
+                    onChange={(e) => handleInputChange('entity_type', e.target.checked ? null : activeTab)}
+                    className="mt-1 mr-3 h-4 w-4 text-blue-600 border-blue-300 rounded focus:ring-blue-500"
+                  />
+                  <div>
+                    <span className="text-sm font-medium text-blue-900">🌐 Make this a universal field</span>
+                    <p className="text-xs text-blue-700 mt-1">
+                      This field will be available across all modules (Leads, Contacts, Accounts, Transactions, Products)
+                    </p>
+                  </div>
+                </label>
+              </div>
+            )}
+
+            {/* Warning when editing universal field */}
+            {editingField && editingField.entity_type === null && (
+              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                <div className="flex items-start gap-2">
+                  <AlertCircle size={16} className="text-orange-600 mt-0.5" />
+                  <div>
+                    <span className="text-sm font-medium text-orange-900">Editing Universal Field</span>
+                    <p className="text-xs text-orange-700 mt-1">
+                      Changes to this field will affect all modules where it's used (Leads, Contacts, Accounts, Transactions)
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Basic Information */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
@@ -921,6 +975,7 @@ const AdminFields = () => {
                       <th className="text-left py-3 px-4 font-medium text-gray-900">Field Label</th>
                       <th className="text-left py-3 px-4 font-medium text-gray-900">Field Name</th>
                       <th className="text-left py-3 px-4 font-medium text-gray-900">Type</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-900">Scope</th>
                       <th className="text-left py-3 px-4 font-medium text-gray-900">Required</th>
                       <th className="text-left py-3 px-4 font-medium text-gray-900">
                         <div className="flex items-center gap-2">
@@ -953,6 +1008,14 @@ const AdminFields = () => {
                             {!field.is_enabled && (
                               <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Hidden</span>
                             )}
+                            {field.entity_type === null && activeTab !== 'universal' && (
+                              <span
+                                className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full flex items-center gap-1"
+                                title="This field is available in all modules (Leads, Contacts, Accounts, Transactions)"
+                              >
+                                🌐 Universal
+                              </span>
+                            )}
                             {isProtectedField && (
                               <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full flex items-center gap-1">
                                 <ShieldAlert size={12} />
@@ -972,6 +1035,17 @@ const AdminFields = () => {
                           <span className={`badge ${field.is_enabled ? 'badge-gray' : 'badge-gray opacity-60'}`}>
                             {FIELD_TYPES.find(t => t.value === field.field_type)?.label || field.field_type}
                           </span>
+                        </td>
+                        <td className="py-4 px-4">
+                          {field.entity_type === null ? (
+                            <span className="text-xs bg-gradient-to-r from-blue-100 to-purple-100 text-blue-700 px-2 py-1 rounded-full font-medium">
+                              All Modules
+                            </span>
+                          ) : (
+                            <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">
+                              {field.entity_type ? field.entity_type.charAt(0).toUpperCase() + field.entity_type.slice(1) : activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
+                            </span>
+                          )}
                         </td>
                         <td className="py-4 px-4">
                           {field.is_required ? (
