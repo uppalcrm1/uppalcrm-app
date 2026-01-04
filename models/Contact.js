@@ -414,7 +414,7 @@ class Contact {
   static async update(id, updates, organizationId) {
     const allowedFields = [
       'title', 'company', 'first_name', 'last_name', 'email', 'phone',
-      'type', 'source', 'priority', 'notes', 'assigned_to',
+      'type', 'priority', 'notes', 'assigned_to',
       'last_contact_date', 'next_follow_up'
     ];
     
@@ -433,7 +433,7 @@ class Contact {
       let value = updates[field];
       
       // Convert empty strings to null
-      if (['email', 'phone', 'source', 'notes', 'title', 'company'].includes(field)) {
+      if (['email', 'phone', 'notes', 'title', 'company'].includes(field)) {
         if (value === '' || value === undefined) {
           value = null;
         }

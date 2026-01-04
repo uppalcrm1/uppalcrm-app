@@ -71,7 +71,6 @@ const ContactForm = ({ contact = null, onClose, onSubmit, users = [], isLoading 
       title: data.title || null,
       company: data.company || null,
       notes: data.notes || null,
-      source: data.source || null,
       assigned_to: data.assigned_to || null,
       next_follow_up: data.next_follow_up || null
     }
