@@ -2482,6 +2482,12 @@ router.post('/:id/convert',
         console.log('  accountName:', details.accountName || `${contact.first_name} ${contact.last_name}'s Account`);
         console.log('  productId:', productId);
 
+        // Merge custom fields from lead with any additional fields from the form
+        const accountCustomFields = {
+          ...(lead.custom_fields || {}),  // Start with lead's custom fields
+          ...(details.app && { app: details.app })  // Merge 'app' field from form if provided
+        };
+
         const accountResult = await client.query(
           `INSERT INTO accounts (
             organization_id, contact_id, account_name, edition,
@@ -2503,7 +2509,7 @@ router.post('/:id/convert',
             'pending',
             req.user.id,
             productId,
-            lead.custom_fields || {}  // Copy custom fields from lead (including 'App' field)
+            accountCustomFields  // Use merged custom fields
           ]
         );
 

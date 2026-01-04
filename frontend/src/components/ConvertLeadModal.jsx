@@ -32,7 +32,8 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
     accountName: `${lead?.first_name || ''} ${lead?.last_name || ''}'s Account`.trim(),
     deviceName: '',
     macAddress: '',
-    term: 'Monthly'
+    term: 'Monthly',
+    app: lead?.custom_fields?.app || '' // Pre-populate from lead's custom fields
   });
 
   const [transactionForm, setTransactionForm] = useState({
@@ -598,6 +599,16 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
                         value={accountForm.macAddress}
                         onChange={(e) => setAccountForm({ ...accountForm, macAddress: e.target.value })}
                         placeholder="00:00:00:00:00:00"
+                        className="input h-9"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">App</label>
+                      <input
+                        type="text"
+                        value={accountForm.app}
+                        onChange={(e) => setAccountForm({ ...accountForm, app: e.target.value })}
+                        placeholder="e.g., smart_stb"
                         className="input h-9"
                       />
                     </div>
