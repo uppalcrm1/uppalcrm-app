@@ -420,6 +420,8 @@ class Contact {
     
     const updateFields = Object.keys(updates).filter(key => allowedFields.includes(key));
     
+    console.log('📝 Contact.update called with:', { id, organizationId, updateFields });
+    
     if (updateFields.length === 0) {
       throw new Error('No valid fields to update');
     }
@@ -442,6 +444,8 @@ class Contact {
       return value;
     })];
 
+    console.log('🔧 Update values:', values.map((v, i) => i === 1 ? '***org_id***' : v));
+
     try {
       const result = await query(`
         UPDATE contacts 
@@ -450,14 +454,23 @@ class Contact {
         RETURNING *
       `, values, organizationId);
 
+      console.log('✅ Contact update successful, rows affected:', result.rowCount);
+
       if (result.rows.length === 0) {
+        console.warn('⚠️ Contact update returned no rows - contact not found');
         return null;
       }
 
       return new Contact(result.rows[0]);
     } catch (error) {
       console.error('❌ Contact.update database error:', error.message);
+      console.error('❌ Error code:', error.code);
+      console.error('❌ Error detail:', error.detail);
       console.error('📊 Query:', `UPDATE contacts SET ${setClause} WHERE id = $1 AND organization_id = $2`);
+      console.error('📝 Values:', values.map((v, i) => i === 1 ? '***org_id***' : v));
+      throw new Error(`Failed to update contact: ${error.message}`);
+    }
+  }
       console.error('📝 Values:', values);
       throw new Error(`Failed to update contact: ${error.message}`);
     }
