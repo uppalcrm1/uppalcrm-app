@@ -484,10 +484,6 @@ class Contact {
       throw new Error(`Failed to update contact: ${error.message}`);
     }
   }
-      console.error('📝 Values:', values);
-      throw new Error(`Failed to update contact: ${error.message}`);
-    }
-  }
 
   /**
    * Delete contact (hard delete)
