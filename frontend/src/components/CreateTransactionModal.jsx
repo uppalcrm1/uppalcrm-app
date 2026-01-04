@@ -128,7 +128,13 @@ const CreateTransactionModal = ({ account, onClose, onSuccess, isOpen }) => {
   useEffect(() => {
     const loadFieldOptions = async () => {
       try {
-        const response = await api.get('/custom-fields?entity_type=transactions')
+        // Add cache-busting timestamp to ensure fresh data
+        const timestamp = Date.now();
+        const response = await api.get(`/custom-fields?entity_type=transactions&_t=${timestamp}`, {
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate'
+          }
+        })
         const customFields = response.data.customFields || []
         const systemFields = response.data.systemFields || []
         const allFields = [...customFields, ...systemFields]
@@ -141,6 +147,11 @@ const CreateTransactionModal = ({ account, onClose, onSuccess, isOpen }) => {
         )
 
         console.log('🔍 Payment method field found:', paymentMethodField)
+        if (paymentMethodField) {
+          console.log('   - Field label:', paymentMethodField.field_label)
+          console.log('   - Field type:', paymentMethodField.field_type)
+          console.log('   - Field options:', paymentMethodField.field_options)
+        }
 
         if (paymentMethodField && paymentMethodField.field_options && paymentMethodField.field_options.length > 0) {
           // Extract labels from field options

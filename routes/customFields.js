@@ -720,7 +720,7 @@ router.get('/', async (req, res) => {
 
     const systemFieldDefaults = systemFieldsByEntity[entity_type] || systemFieldsByEntity.leads;
 
-    // Get any stored configurations for system fields
+    // Get any stored configurations for system fields from default_field_configurations
     let storedConfigs = {};
     try {
       const configResult = await db.query(`
@@ -735,6 +735,25 @@ router.get('/', async (req, res) => {
       console.log('Stored system field configs found for', entity_type, ':', Object.keys(storedConfigs).length);
     } catch (configError) {
       console.log('No stored system field configs found for', entity_type, ':', configError.message);
+    }
+
+    // ALSO check custom_field_definitions for system fields that might have been customized there
+    try {
+      const customConfigResult = await db.query(`
+        SELECT field_name, field_options, is_enabled, is_required
+        FROM custom_field_definitions
+        WHERE organization_id = $1 
+          AND entity_type = $2
+          AND field_name IN (${Object.keys(systemFieldDefaults).map((_, i) => `$${i + 3}`).join(',')})
+      `, [req.organizationId, entity_type, ...Object.keys(systemFieldDefaults)]);
+
+      customConfigResult.rows.forEach(config => {
+        // Override with custom_field_definitions settings if they exist
+        storedConfigs[config.field_name] = config;
+      });
+      console.log('Additional system field configs found in custom_field_definitions:', customConfigResult.rows.length);
+    } catch (customConfigError) {
+      console.log('Could not check custom_field_definitions for system field overrides:', customConfigError.message);
     }
 
     // Build complete system fields list
@@ -818,6 +837,12 @@ router.get('/', async (req, res) => {
     };
 
     console.log('Sending response with keys:', Object.keys(response));
+    
+    // Prevent caching of field configuration to ensure live updates
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, public, max-age=0');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    
     res.json(response);
   } catch (error) {
     console.error('Error fetching custom fields:', error);
