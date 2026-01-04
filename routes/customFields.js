@@ -781,6 +781,21 @@ router.get('/', async (req, res) => {
     });
 
     console.log('System fields built:', systemFields.rows.length);
+    
+    // DEBUG: Log payment_method field if it exists
+    const pmField = systemFields.rows.find(f => f.field_name === 'payment_method');
+    if (pmField) {
+      console.log('💳 Payment Method System Field:');
+      console.log('   - Label:', pmField.field_label);
+      console.log('   - Type:', pmField.field_type);
+      console.log('   - Options:', pmField.field_options);
+      console.log('   - Enabled:', pmField.is_enabled);
+    } else {
+      console.log('⚠️ Payment method NOT found in system fields');
+    }
+    
+    // DEBUG: Log all custom fields for transactions
+    console.log('📦 Custom fields returned:', customFields.rows.map(f => `${f.field_name} (${f.field_type})`).join(', '));
 
     // Get default field configurations (for backward compatibility)
     let defaultFields = { rows: [] };
