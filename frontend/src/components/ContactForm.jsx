@@ -64,6 +64,7 @@ const ContactForm = ({ contact = null, onClose, onSubmit, users = [], isLoading 
     // Convert empty strings to null for optional fields
     const cleanData = {
       ...data,
+      source: data.source || null,
       assigned_to: data.assigned_to || null,
       next_follow_up: data.next_follow_up || null,
       value: parseFloat(data.value) || 0

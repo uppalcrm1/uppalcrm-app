@@ -23,40 +23,40 @@ router.use(validateOrganizationContext);
 const contactSchemas = {
   createContact: {
     body: Joi.object({
-      title: Joi.string().max(100).allow('').optional(),
-      company: Joi.string().max(255).allow('').optional(),
-      first_name: Joi.string().min(1).max(100).required(),
-      last_name: Joi.string().min(1).max(100).required(),
-      email: Joi.string().email().allow('').optional(),
-      phone: Joi.string().max(50).allow('').optional(),
-      status: Joi.string().valid('active', 'inactive', 'prospect', 'customer').default('active'),
-      type: Joi.string().valid('customer', 'prospect', 'partner', 'vendor').default('customer'),
-      source: Joi.string().valid('website', 'referral', 'social', 'cold-call', 'email', 'advertisement', 'trade-show', 'other').allow('').optional(),
-      priority: Joi.string().valid('low', 'medium', 'high').default('medium'),
-      value: Joi.number().min(0).default(0),
-      notes: Joi.string().allow('').optional(),
-      assigned_to: Joi.string().guid({ version: 'uuidv4' }).allow(null).optional(),
-      next_follow_up: Joi.date().iso().allow(null).optional()
+      title: Joi.string().max(100).allow('', null).optional(),
+      company: Joi.string().max(255).allow('', null).optional(),
+      first_name: Joi.string().min(1).max(100).allow('', null).optional(),
+      last_name: Joi.string().min(1).max(100).allow('', null).optional(),
+      email: Joi.string().email().allow('', null).optional(),
+      phone: Joi.string().max(50).allow('', null).optional(),
+      status: Joi.string().valid('active', 'inactive', 'prospect', 'customer').allow('', null).optional().default('active'),
+      type: Joi.string().valid('customer', 'prospect', 'partner', 'vendor').allow('', null).optional().default('customer'),
+      source: Joi.string().valid('website', 'referral', 'social', 'cold-call', 'email', 'advertisement', 'trade-show', 'other').allow('', null).optional(),
+      priority: Joi.string().valid('low', 'medium', 'high').allow('', null).optional().default('medium'),
+      value: Joi.number().min(0).allow(null).optional().default(0),
+      notes: Joi.string().allow('', null).optional(),
+      assigned_to: Joi.string().guid({ version: 'uuidv4' }).allow('', null).optional(),
+      next_follow_up: Joi.date().iso().allow('', null).optional()
     })
   },
   
   updateContact: {
     body: Joi.object({
-      title: Joi.string().max(100).allow('').optional(),
-      company: Joi.string().max(255).allow('').optional(),
-      first_name: Joi.string().min(1).max(100).optional(),
-      last_name: Joi.string().min(1).max(100).optional(),
-      email: Joi.string().email().allow('').optional(),
-      phone: Joi.string().max(50).allow('').optional(),
-      status: Joi.string().valid('active', 'inactive', 'prospect', 'customer').optional(),
-      type: Joi.string().valid('customer', 'prospect', 'partner', 'vendor').optional(),
-      source: Joi.string().valid('website', 'referral', 'social', 'cold-call', 'email', 'advertisement', 'trade-show', 'other').allow('').optional(),
-      priority: Joi.string().valid('low', 'medium', 'high').optional(),
-      value: Joi.number().min(0).optional(),
-      notes: Joi.string().allow('').optional(),
-      assigned_to: Joi.string().guid({ version: 'uuidv4' }).allow(null).optional(),
-      last_contact_date: Joi.date().iso().allow(null).optional(),
-      next_follow_up: Joi.date().iso().allow(null).optional()
+      title: Joi.string().max(100).allow('', null).optional(),
+      company: Joi.string().max(255).allow('', null).optional(),
+      first_name: Joi.string().min(1).max(100).allow('', null).optional(),
+      last_name: Joi.string().min(1).max(100).allow('', null).optional(),
+      email: Joi.string().email().allow('', null).optional(),
+      phone: Joi.string().max(50).allow('', null).optional(),
+      status: Joi.string().valid('active', 'inactive', 'prospect', 'customer').allow('', null).optional(),
+      type: Joi.string().valid('customer', 'prospect', 'partner', 'vendor').allow('', null).optional(),
+      source: Joi.string().valid('website', 'referral', 'social', 'cold-call', 'email', 'advertisement', 'trade-show', 'other').allow('', null).optional(),
+      priority: Joi.string().valid('low', 'medium', 'high').allow('', null).optional(),
+      value: Joi.number().min(0).allow(null).optional(),
+      notes: Joi.string().allow('', null).optional(),
+      assigned_to: Joi.string().guid({ version: 'uuidv4' }).allow('', null).optional(),
+      last_contact_date: Joi.date().iso().allow('', null).optional(),
+      next_follow_up: Joi.date().iso().allow('', null).optional()
     }).unknown(true),
     params: Joi.object({
       id: Joi.string().guid({ version: 'uuidv4' }).required()
