@@ -432,18 +432,25 @@ class Contact {
       return updates[field];
     })];
 
-    const result = await query(`
-      UPDATE contacts 
-      SET ${setClause}, updated_at = NOW()
-      WHERE id = $1 AND organization_id = $2
-      RETURNING *
-    `, values, organizationId);
+    try {
+      const result = await query(`
+        UPDATE contacts 
+        SET ${setClause}, updated_at = NOW()
+        WHERE id = $1 AND organization_id = $2
+        RETURNING *
+      `, values, organizationId);
 
-    if (result.rows.length === 0) {
-      return null;
+      if (result.rows.length === 0) {
+        return null;
+      }
+
+      return new Contact(result.rows[0]);
+    } catch (error) {
+      console.error('❌ Contact.update database error:', error.message);
+      console.error('📊 Query:', `UPDATE contacts SET ${setClause} WHERE id = $1 AND organization_id = $2`);
+      console.error('📝 Values:', values);
+      throw new Error(`Failed to update contact: ${error.message}`);
     }
-
-    return new Contact(result.rows[0]);
   }
 
   /**
