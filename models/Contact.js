@@ -414,7 +414,7 @@ class Contact {
   static async update(id, updates, organizationId) {
     const allowedFields = [
       'title', 'company', 'first_name', 'last_name', 'email', 'phone',
-      'status', 'type', 'source', 'priority', 'value', 'notes', 'assigned_to',
+      'type', 'priority', 'notes', 'assigned_to',
       'last_contact_date', 'next_follow_up'
     ];
     
@@ -424,26 +424,48 @@ class Contact {
       throw new Error('No valid fields to update');
     }
 
-    const setClause = updateFields.map((field, index) => `${field} = $${index + 3}`).join(', ');
-    const values = [id, organizationId, ...updateFields.map(field => {
-      if (field === 'value') {
-        return parseFloat(updates[field]) || 0;
+    // Build the update clause
+    const setClauses = [];
+    const values = [id, organizationId];
+    let paramIndex = 3;
+
+    for (const field of updateFields) {
+      let value = updates[field];
+      
+      // Convert empty strings to null
+      if (['email', 'phone', 'notes', 'title', 'company'].includes(field)) {
+        if (value === '' || value === undefined) {
+          value = null;
+        }
       }
-      return updates[field];
-    })];
-
-    const result = await query(`
-      UPDATE contacts 
-      SET ${setClause}, updated_at = NOW()
-      WHERE id = $1 AND organization_id = $2
-      RETURNING *
-    `, values, organizationId);
-
-    if (result.rows.length === 0) {
-      return null;
+      
+      setClauses.push(`${field} = $${paramIndex}`);
+      values.push(value);
+      paramIndex++;
     }
 
-    return new Contact(result.rows[0]);
+    const setClause = setClauses.join(', ');
+
+    try {
+      console.log('📝 Updating contact:', id, 'with fields:', updateFields);
+      
+      const result = await query(`
+        UPDATE contacts 
+        SET ${setClause}, updated_at = NOW()
+        WHERE id = $1 AND organization_id = $2
+        RETURNING *
+      `, values, organizationId);
+
+      if (result.rows.length === 0) {
+        return null;
+      }
+
+      return new Contact(result.rows[0]);
+    } catch (error) {
+      console.error('❌ Contact.update error:', error.message);
+      console.error('Details:', error);
+      throw error;
+    }
   }
 
   /**

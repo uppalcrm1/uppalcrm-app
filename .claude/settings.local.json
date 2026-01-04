@@ -56,7 +56,8 @@
       "Bash(if [ -f .env ])",
       "Bash(elif [ -f .env.local ])",
       "Bash(then cat .env.local)",
-      "Bash(git cherry-pick:*)"
+      "Bash(git cherry-pick:*)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []

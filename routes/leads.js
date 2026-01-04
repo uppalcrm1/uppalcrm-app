@@ -2380,8 +2380,8 @@ router.post('/:id/convert',
               organization_id, first_name, last_name, email, phone,
               company, title, address_line1, address_line2, city,
               state, postal_code, country, converted_from_lead_id,
-              contact_source, notes, created_by, type, contact_status
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+              contact_source, notes, created_by, type, contact_status, custom_fields
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
             RETURNING *`,
             [
               req.organizationId,
@@ -2402,7 +2402,8 @@ router.post('/:id/convert',
               lead.notes,
               req.user.id,
               'customer',       // Maps to type (base column)
-              'active'          // Maps to contact_status (base column)
+              'active',         // Maps to contact_status (base column)
+              lead.custom_fields || {}  // Copy custom fields from lead (including 'App' field)
             ]
           );
 
@@ -2485,8 +2486,8 @@ router.post('/:id/convert',
           `INSERT INTO accounts (
             organization_id, contact_id, account_name, edition,
             device_name, mac_address, billing_cycle, price,
-            is_trial, account_type, license_status, created_by, product_id
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+            is_trial, account_type, license_status, created_by, product_id, custom_fields
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
           RETURNING *`,
           [
             req.organizationId,
@@ -2501,7 +2502,8 @@ router.post('/:id/convert',
             details.isTrial ? 'trial' : 'active',
             'pending',
             req.user.id,
-            productId
+            productId,
+            lead.custom_fields || {}  // Copy custom fields from lead (including 'App' field)
           ]
         );
 

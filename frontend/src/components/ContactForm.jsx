@@ -64,10 +64,15 @@ const ContactForm = ({ contact = null, onClose, onSubmit, users = [], isLoading 
     // Convert empty strings to null for optional fields
     const cleanData = {
       ...data,
-      source: data.source || null,
+      first_name: data.first_name || null,
+      last_name: data.last_name || null,
+      email: data.email || null,
+      phone: data.phone || null,
+      title: data.title || null,
+      company: data.company || null,
+      notes: data.notes || null,
       assigned_to: data.assigned_to || null,
-      next_follow_up: data.next_follow_up || null,
-      value: parseFloat(data.value) || 0
+      next_follow_up: data.next_follow_up || null
     }
     onSubmit(cleanData)
   }
