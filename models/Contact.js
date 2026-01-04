@@ -414,7 +414,7 @@ class Contact {
   static async update(id, updates, organizationId) {
     const allowedFields = [
       'title', 'company', 'first_name', 'last_name', 'email', 'phone',
-      'status', 'type', 'source', 'priority', 'value', 'notes', 'assigned_to',
+      'status', 'type', 'source', 'priority', 'notes', 'assigned_to',
       'last_contact_date', 'next_follow_up'
     ];
     
@@ -437,10 +437,6 @@ class Contact {
         if (value === '' || value === undefined) {
           value = null;
         }
-      }
-      
-      if (field === 'value') {
-        value = parseFloat(value) || 0;
       }
       
       setClauses.push(`${field} = $${paramIndex}`);

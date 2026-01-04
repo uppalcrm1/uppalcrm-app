@@ -73,8 +73,7 @@ const ContactForm = ({ contact = null, onClose, onSubmit, users = [], isLoading 
       notes: data.notes || null,
       source: data.source || null,
       assigned_to: data.assigned_to || null,
-      next_follow_up: data.next_follow_up || null,
-      value: parseFloat(data.value) || 0
+      next_follow_up: data.next_follow_up || null
     }
     onSubmit(cleanData)
   }
