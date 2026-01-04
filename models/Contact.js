@@ -420,39 +420,51 @@ class Contact {
     
     const updateFields = Object.keys(updates).filter(key => allowedFields.includes(key));
     
-    console.log('📝 Contact.update called with:', { id, organizationId, updateFields });
+    console.log('📝 Contact.update called with:', { id, organizationId, updateFields, updates });
     
     if (updateFields.length === 0) {
       throw new Error('No valid fields to update');
     }
 
-    const setClause = updateFields.map((field, index) => `${field} = $${index + 3}`).join(', ');
-    const values = [id, organizationId, ...updateFields.map(field => {
+    // Build the update clause with proper type casting
+    const setClauses = [];
+    const values = [id, organizationId];
+    let paramIndex = 3;
+
+    for (const field of updateFields) {
       let value = updates[field];
       
-      // Convert empty strings to null for these fields
+      // Convert empty strings to null
       if (['email', 'phone', 'source', 'notes', 'title', 'company'].includes(field)) {
         if (value === '' || value === undefined) {
-          return null;
+          value = null;
         }
       }
       
       if (field === 'value') {
-        return parseFloat(value) || 0;
+        value = parseFloat(value) || 0;
+        setClauses.push(`${field} = $${paramIndex}::numeric`);
+      } else {
+        setClauses.push(`${field} = $${paramIndex}`);
       }
       
-      return value;
-    })];
+      values.push(value);
+      paramIndex++;
+    }
+
+    const setClause = setClauses.join(', ');
+    const query_text = `
+      UPDATE contacts 
+      SET ${setClause}, updated_at = NOW()
+      WHERE id = $1 AND organization_id = $2
+      RETURNING *
+    `;
 
     console.log('🔧 Update values:', values.map((v, i) => i === 1 ? '***org_id***' : v));
+    console.log('📋 Query:', query_text);
 
     try {
-      const result = await query(`
-        UPDATE contacts 
-        SET ${setClause}, updated_at = NOW()
-        WHERE id = $1 AND organization_id = $2
-        RETURNING *
-      `, values, organizationId);
+      const result = await query(query_text, values, organizationId);
 
       console.log('✅ Contact update successful, rows affected:', result.rowCount);
 
@@ -466,8 +478,9 @@ class Contact {
       console.error('❌ Contact.update database error:', error.message);
       console.error('❌ Error code:', error.code);
       console.error('❌ Error detail:', error.detail);
-      console.error('📊 Query:', `UPDATE contacts SET ${setClause} WHERE id = $1 AND organization_id = $2`);
-      console.error('📝 Values:', values.map((v, i) => i === 1 ? '***org_id***' : v));
+      console.error('❌ Error hint:', error.hint);
+      console.error('❌ Error position:', error.position);
+      console.error('📝 Full error:', error);
       throw new Error(`Failed to update contact: ${error.message}`);
     }
   }
