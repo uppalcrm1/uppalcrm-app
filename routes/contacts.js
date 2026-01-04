@@ -568,6 +568,9 @@ router.post('/convert-from-lead/:leadId',
       }
 
       // Step 3: Update lead status and link to contact
+      // Set the current user ID for the trigger to use
+      await query(`SELECT set_config('app.current_user_id', $1, true)`, [req.user.id]);
+
       await query(
         `UPDATE leads
          SET status = 'converted',
