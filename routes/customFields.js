@@ -454,6 +454,57 @@ const updateFieldSchema = Joi.object({
 });
 
 // Debug endpoint to check authentication
+// Debug endpoint to check database contents
+router.get('/debug/payment-method', async (req, res) => {
+  try {
+    const { entity_type = 'transactions' } = req.query;
+    
+    console.log('🔍 DEBUG: Checking payment_method field configuration');
+    console.log('   Organization ID:', req.organizationId);
+    console.log('   Entity Type:', entity_type);
+    
+    // Check custom_field_definitions
+    const customDefResult = await db.query(`
+      SELECT id, field_name, field_label, field_type, field_options, is_enabled, is_required, entity_type
+      FROM custom_field_definitions
+      WHERE organization_id = $1 AND field_name = 'payment_method'
+      ORDER BY created_at DESC
+    `, [req.organizationId]);
+    
+    console.log('   Custom field defs found:', customDefResult.rows.length);
+    if (customDefResult.rows.length > 0) {
+      customDefResult.rows.forEach((row, idx) => {
+        console.log(`     [${idx}]`, row);
+      });
+    }
+    
+    // Check default_field_configurations
+    const defaultConfigResult = await db.query(`
+      SELECT field_name, entity_type, field_options, is_enabled, is_required
+      FROM default_field_configurations
+      WHERE organization_id = $1 AND field_name = 'payment_method'
+      ORDER BY created_at DESC
+    `, [req.organizationId]);
+    
+    console.log('   Default configs found:', defaultConfigResult.rows.length);
+    if (defaultConfigResult.rows.length > 0) {
+      defaultConfigResult.rows.forEach((row, idx) => {
+        console.log(`     [${idx}]`, row);
+      });
+    }
+    
+    res.json({
+      organization_id: req.organizationId,
+      custom_field_definitions: customDefResult.rows,
+      default_field_configurations: defaultConfigResult.rows
+    });
+  } catch (error) {
+    console.error('Debug endpoint error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Regular endpoint (existing)
 router.get('/debug', async (req, res) => {
   try {
     const debugInfo = {
