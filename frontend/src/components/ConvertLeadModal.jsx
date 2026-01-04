@@ -118,11 +118,7 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
       try {
         // Add cache-busting timestamp to ensure fresh data
         const timestamp = Date.now();
-        const response = await api.get(`/custom-fields?entity_type=transactions&_t=${timestamp}`, {
-          headers: {
-            'Cache-Control': 'no-cache, no-store, must-revalidate'
-          }
-        });
+        const response = await api.get(`/custom-fields?entity_type=transactions&_t=${timestamp}`);
         const customFields = response.data.customFields || [];
         const systemFields = response.data.systemFields || [];
         const allFields = [...customFields, ...systemFields];
