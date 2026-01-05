@@ -56,7 +56,8 @@ export const BILLING_TERMS = [
   { value: '1', label: 'Monthly (1 month)' },
   { value: '3', label: 'Quarterly (3 months)' },
   { value: '6', label: 'Semi-Annual (6 months)' },
-  { value: '12', label: 'Annual (12 months)' }
+  { value: '12', label: 'Annual (12 months)' },
+  { value: '24', label: 'Biennial (2 years)' }
 ];
 
 /**
@@ -69,7 +70,8 @@ export const formatBillingTerm = (term) => {
     '1': '1 month',
     '3': '3 months',
     '6': '6 months',
-    '12': '1 year'
+    '12': '1 year',
+    '24': '2 years'
   };
   return termMap[String(term)] || term;
 };

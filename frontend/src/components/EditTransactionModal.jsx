@@ -50,7 +50,7 @@ const normalizeTermValue = (termValue) => {
 
   const term = termValue.toString().toLowerCase().trim()
 
-  // Map various term formats to standard values (1, 3, 6, 12)
+  // Map various term formats to standard values (1, 3, 6, 12, 24)
   const termMap = {
     '1': '1',
     '1 month': '1',
@@ -70,7 +70,12 @@ const normalizeTermValue = (termValue) => {
     '1 year': '12',
     'annual': '12',
     'yearly': '12',
-    'year': '12'
+    'year': '12',
+    '24': '24',
+    '24 months': '24',
+    '2 years': '24',
+    'biennial': '24',
+    'bi-annual': '24'
   }
 
   return termMap[term] || termValue.toString()

@@ -4,6 +4,7 @@ import { X, CheckCircle2, User, Building2, CreditCard, Info, Search } from 'luci
 import { contactsAPI, usersAPI, productsAPI } from '../services/api';
 import LoadingSpinner from './LoadingSpinner';
 import api from '../services/api';
+import { BILLING_TERMS } from '../constants/transactions';
 
 const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
   console.log('🎯 ConvertLeadModal Version: 2.0 - Tab-Based Workflow - Build:', new Date().toISOString());
@@ -32,7 +33,7 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
     accountName: `${lead?.first_name || ''} ${lead?.last_name || ''}'s Account`.trim(),
     deviceName: '',
     macAddress: '',
-    term: 'Monthly',
+    term: '1', // Default to Monthly (value = 1)
     app: lead?.custom_fields?.app || '' // Pre-populate from lead's custom fields
   });
 
@@ -45,7 +46,7 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
       : null,
     paymentDate: new Date().toISOString().split('T')[0],
     source: lead?.source_name || lead?.source || 'website',
-    term: 'Monthly',
+    term: '1', // Default to Monthly (value = 1)
     nextRenewalDate: ''
   });
 
@@ -85,15 +86,28 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
       const paymentDate = new Date(transactionForm.paymentDate);
       let renewalDate = new Date(paymentDate);
 
-      switch (transactionForm.term) {
+      // Handle both legacy string values and new numeric values
+      const termValue = transactionForm.term.toString();
+      switch (termValue) {
+        case '1':
         case 'Monthly':
           renewalDate.setMonth(renewalDate.getMonth() + 1);
           break;
+        case '3':
         case 'Quarterly':
           renewalDate.setMonth(renewalDate.getMonth() + 3);
           break;
+        case '6':
+        case 'Semi-Annual':
+          renewalDate.setMonth(renewalDate.getMonth() + 6);
+          break;
+        case '12':
         case 'Annually':
           renewalDate.setFullYear(renewalDate.getFullYear() + 1);
+          break;
+        case '24':
+        case 'Biennial':
+          renewalDate.setFullYear(renewalDate.getFullYear() + 2);
           break;
       }
 
@@ -577,9 +591,11 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
                         onChange={(e) => setAccountForm({ ...accountForm, term: e.target.value })}
                         className="select h-9"
                       >
-                        <option>Monthly</option>
-                        <option>Quarterly</option>
-                        <option>Annually</option>
+                        {BILLING_TERMS.map(term => (
+                          <option key={term.value} value={term.value}>
+                            {term.label}
+                          </option>
+                        ))}
                       </select>
                     </div>
                     <div className="col-span-2">
@@ -738,9 +754,11 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
                         onChange={(e) => setTransactionForm({ ...transactionForm, term: e.target.value })}
                         className="select h-9"
                       >
-                        <option>Monthly</option>
-                        <option>Quarterly</option>
-                        <option>Annually</option>
+                        {BILLING_TERMS.map(term => (
+                          <option key={term.value} value={term.value}>
+                            {term.label}
+                          </option>
+                        ))}
                       </select>
                     </div>
                     <div className="col-span-3">

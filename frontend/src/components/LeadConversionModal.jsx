@@ -61,7 +61,8 @@ const LeadConversionModal = ({ lead, onClose, onConvert, isConverting }) => {
       'monthly': 'Monthly',
       'quarterly': 'Quarterly',
       'semi-annual': 'Semi-Annual',
-      'annual': 'Annual'
+      'annual': 'Annual',
+      'biennial': 'Biennial'
     }
 
     setFormData(prev => ({
@@ -255,8 +256,9 @@ const LeadConversionModal = ({ lead, onClose, onConvert, isConverting }) => {
                       >
                         <option value="monthly">Monthly</option>
                         <option value="quarterly">Quarterly</option>
-                        <option value="semi-annual">Semi-Annual</option>
+                        <option value="semi-annual">Semi-Annual (6 months)</option>
                         <option value="annual">Annual</option>
+                        <option value="biennial">Biennial (2 years)</option>
                       </select>
                     </div>
                     <div>

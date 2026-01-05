@@ -62,7 +62,9 @@ const CreateTransactionModal = ({ account, onClose, onSuccess, isOpen }) => {
       'semi-annual': '6',
       'semi_annual': '6',
       'annual': '12',
-      'yearly': '12'
+      'yearly': '12',
+      'biennial': '24',
+      'bi-annual': '24'
     }
     return mapping[cycle?.toLowerCase()] || '1'
   }
