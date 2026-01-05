@@ -59,6 +59,202 @@ const validate = (schema) => {
   };
 };
 
+// =====================================================
+// SPECIFIC ROUTES - MUST BE DEFINED BEFORE /:id ROUTE
+// =====================================================
+
+/**
+ * GET /api/transactions/stats
+ * Get transaction statistics (includes void stats)
+ */
+router.get('/stats', transactionController.getTransactionStats);
+
+/**
+ * GET /api/transactions/stats/revenue
+ * Get total revenue in CAD (with currency conversion)
+ * All amounts converted to CAD for reporting
+ */
+router.get('/stats/revenue', async (req, res) => {
+  try {
+    const { organization_id } = req.user;
+
+    // Get all completed transactions
+    const result = await db.query(`
+      SELECT
+        amount,
+        currency,
+        status
+      FROM transactions
+      WHERE organization_id = $1 AND status = 'completed'
+    `, [organization_id]);
+
+    // Get exchange rate
+    const exchangeRate = await ConfigService.getExchangeRate(organization_id);
+
+    let totalInCAD = 0;
+    let cadCount = 0;
+    let usdCount = 0;
+    let cadRevenue = 0;
+    let usdRevenue = 0;
+
+    // Process each transaction
+    result.rows.forEach(row => {
+      const amount = parseFloat(row.amount);
+      const currency = row.currency || 'CAD'; // Default to CAD if null
+
+      if (currency === 'CAD') {
+        totalInCAD += amount;
+        cadRevenue += amount;
+        cadCount++;
+      } else if (currency === 'USD') {
+        const convertedAmount = CurrencyHelper.toCAD(amount, 'USD', exchangeRate);
+        totalInCAD += convertedAmount;
+        usdRevenue += amount;
+        usdCount++;
+      }
+    });
+
+    res.json({
+      success: true,
+      total_revenue_cad: parseFloat(totalInCAD.toFixed(2)),
+      breakdown: {
+        cad_transactions: cadCount,
+        cad_revenue: parseFloat(cadRevenue.toFixed(2)),
+        usd_transactions: usdCount,
+        usd_revenue: parseFloat(usdRevenue.toFixed(2)),
+        usd_converted_to_cad: parseFloat((usdRevenue * exchangeRate).toFixed(2))
+      },
+      exchange_rate_used: exchangeRate,
+      reporting_currency: 'CAD'
+    });
+  } catch (error) {
+    console.error('Error calculating revenue:', error);
+    res.status(500).json({
+      error: 'Failed to calculate revenue',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/transactions/voided/list
+ * Get all voided transactions (admin only)
+ */
+router.get('/voided/list', transactionController.getVoidedTransactions);
+
+/**
+ * GET /api/transactions/config/exchange-rate
+ * Get current exchange rate configuration
+ */
+router.get('/config/exchange-rate', async (req, res) => {
+  try {
+    const { organization_id } = req.user;
+
+    const rate = await ConfigService.getExchangeRate(organization_id);
+    const reportingCurrency = await ConfigService.getReportingCurrency(organization_id);
+
+    res.json({
+      success: true,
+      exchange_rate_usd_to_cad: parseFloat(rate),
+      reporting_currency: reportingCurrency,
+      info: {
+        description: '1 USD = ' + rate + ' CAD',
+        example: '100 USD = ' + (100 * rate) + ' CAD'
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching exchange rate:', error);
+    res.status(500).json({
+      error: 'Failed to fetch exchange rate',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * PUT /api/transactions/config/exchange-rate
+ * Update exchange rate (admin only)
+ * Body: { rate: 1.25 }
+ */
+router.put('/config/exchange-rate', async (req, res) => {
+  try {
+    const { organization_id } = req.user;
+    const { rate } = req.body;
+
+    // Validation
+    if (!rate || rate <= 0) {
+      return res.status(400).json({
+        error: 'Invalid exchange rate',
+        message: 'Rate must be a positive number'
+      });
+    }
+
+    // Update configuration
+    await ConfigService.set(
+      organization_id,
+      'exchange_rate_usd_to_cad',
+      rate.toString(),
+      '1 USD = ' + rate + ' CAD'
+    );
+
+    console.log(`✅ Exchange rate updated: 1 USD = ${rate} CAD for org ${organization_id}`);
+
+    res.json({
+      success: true,
+      message: 'Exchange rate updated successfully',
+      exchange_rate_usd_to_cad: parseFloat(rate),
+      info: {
+        description: '1 USD = ' + rate + ' CAD',
+        example: '100 USD = ' + (100 * rate) + ' CAD'
+      }
+    });
+  } catch (error) {
+    console.error('Error updating exchange rate:', error);
+    res.status(500).json({
+      error: 'Failed to update exchange rate',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/transactions/accounts/:accountId
+ * Get all transactions for a specific account
+ */
+router.get('/accounts/:accountId', async (req, res) => {
+  try {
+    const { accountId } = req.params;
+    const { organization_id } = req.user;
+
+    const result = await db.query(`
+      SELECT
+        t.*,
+        p.name as product_name
+      FROM transactions t
+      LEFT JOIN products p ON t.product_id = p.id
+      WHERE t.account_id = $1
+        AND t.organization_id = $2
+      ORDER BY t.transaction_date DESC, t.created_at DESC
+    `, [accountId, organization_id]);
+
+    res.json({
+      success: true,
+      transactions: result.rows,
+      count: result.rows.length
+    });
+  } catch (error) {
+    console.error('Error fetching account transactions:', error);
+    res.status(500).json({
+      error: 'Failed to fetch account transactions',
+      message: error.message
+    });
+  }
+});
+
+// =====================================================
+// GENERAL CRUD ROUTES
+// =====================================================
+
 /**
  * GET /api/transactions
  * Get all transactions for the organization with 8 required columns
@@ -473,180 +669,5 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-// =====================================================
-// SOFT DELETE (VOID) ENDPOINTS
-// =====================================================
-
-/**
- * POST /api/transactions/:id/void
- * Void a transaction (soft delete)
- * Marks transaction as void without permanently deleting it
- */
-router.post('/:id/void', transactionController.voidTransaction);
-
-/**
- * POST /api/transactions/:id/restore
- * Restore a voided transaction
- * WARNING: Use with caution - affects financial reports
- */
-router.post('/:id/restore', transactionController.restoreTransaction);
-
-/**
- * GET /api/transactions/voided/list
- * Get all voided transactions (admin only)
- */
-router.get('/voided/list', transactionController.getVoidedTransactions);
-
-/**
- * GET /api/transactions/stats
- * Get transaction statistics (includes void stats)
- */
-router.get('/stats', transactionController.getTransactionStats);
-
-// =====================================================
-// CURRENCY CONFIGURATION ENDPOINTS
-// =====================================================
-
-/**
- * GET /api/transactions/config/exchange-rate
- * Get current exchange rate configuration
- */
-router.get('/config/exchange-rate', async (req, res) => {
-  try {
-    const { organization_id } = req.user;
-
-    const rate = await ConfigService.getExchangeRate(organization_id);
-    const reportingCurrency = await ConfigService.getReportingCurrency(organization_id);
-
-    res.json({
-      success: true,
-      exchange_rate_usd_to_cad: parseFloat(rate),
-      reporting_currency: reportingCurrency,
-      info: {
-        description: '1 USD = ' + rate + ' CAD',
-        example: '100 USD = ' + (100 * rate) + ' CAD'
-      }
-    });
-  } catch (error) {
-    console.error('Error fetching exchange rate:', error);
-    res.status(500).json({
-      error: 'Failed to fetch exchange rate',
-      message: error.message
-    });
-  }
-});
-
-/**
- * PUT /api/transactions/config/exchange-rate
- * Update exchange rate (admin only)
- * Body: { rate: 1.25 }
- */
-router.put('/config/exchange-rate', async (req, res) => {
-  try {
-    const { organization_id } = req.user;
-    const { rate } = req.body;
-
-    // Validation
-    if (!rate || rate <= 0) {
-      return res.status(400).json({
-        error: 'Invalid exchange rate',
-        message: 'Rate must be a positive number'
-      });
-    }
-
-    // Update configuration
-    await ConfigService.set(
-      organization_id,
-      'exchange_rate_usd_to_cad',
-      rate.toString(),
-      '1 USD = ' + rate + ' CAD'
-    );
-
-    console.log(`✅ Exchange rate updated: 1 USD = ${rate} CAD for org ${organization_id}`);
-
-    res.json({
-      success: true,
-      message: 'Exchange rate updated successfully',
-      exchange_rate_usd_to_cad: parseFloat(rate),
-      info: {
-        description: '1 USD = ' + rate + ' CAD',
-        example: '100 USD = ' + (100 * rate) + ' CAD'
-      }
-    });
-  } catch (error) {
-    console.error('Error updating exchange rate:', error);
-    res.status(500).json({
-      error: 'Failed to update exchange rate',
-      message: error.message
-    });
-  }
-});
-
-/**
- * GET /api/transactions/stats/revenue
- * Get total revenue in CAD (with currency conversion)
- * All amounts converted to CAD for reporting
- */
-router.get('/stats/revenue', async (req, res) => {
-  try {
-    const { organization_id } = req.user;
-
-    // Get all completed transactions
-    const result = await db.query(`
-      SELECT
-        amount,
-        currency,
-        status
-      FROM transactions
-      WHERE organization_id = $1 AND status = 'completed'
-    `, [organization_id]);
-
-    // Get exchange rate
-    const exchangeRate = await ConfigService.getExchangeRate(organization_id);
-
-    let totalInCAD = 0;
-    let cadCount = 0;
-    let usdCount = 0;
-    let cadRevenue = 0;
-    let usdRevenue = 0;
-
-    // Process each transaction
-    result.rows.forEach(row => {
-      const amount = parseFloat(row.amount);
-      const currency = row.currency || 'CAD'; // Default to CAD if null
-
-      if (currency === 'CAD') {
-        totalInCAD += amount;
-        cadRevenue += amount;
-        cadCount++;
-      } else if (currency === 'USD') {
-        const convertedAmount = CurrencyHelper.toCAD(amount, 'USD', exchangeRate);
-        totalInCAD += convertedAmount;
-        usdRevenue += amount;
-        usdCount++;
-      }
-    });
-
-    res.json({
-      success: true,
-      total_revenue_cad: parseFloat(totalInCAD.toFixed(2)),
-      breakdown: {
-        cad_transactions: cadCount,
-        cad_revenue: parseFloat(cadRevenue.toFixed(2)),
-        usd_transactions: usdCount,
-        usd_revenue: parseFloat(usdRevenue.toFixed(2)),
-        usd_converted_to_cad: parseFloat((usdRevenue * exchangeRate).toFixed(2))
-      },
-      exchange_rate_used: exchangeRate,
-      reporting_currency: 'CAD'
-    });
-  } catch (error) {
-    console.error('Error calculating revenue:', error);
-    res.status(500).json({
-      error: 'Failed to calculate revenue',
-      message: error.message
-    });
-  }
-});
 
 module.exports = router;
