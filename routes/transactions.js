@@ -78,14 +78,25 @@ router.get('/stats/revenue', async (req, res) => {
   try {
     const { organization_id } = req.user;
 
-    // Get all completed transactions
+    // Get all completed transactions with dates
     const result = await db.query(`
       SELECT
         amount,
         currency,
-        status
+        status,
+        transaction_date
       FROM transactions
-      WHERE organization_id = $1 AND status = 'completed'
+      WHERE organization_id = $1
+        AND status = 'completed'
+        AND (deleted_at IS NULL OR is_void = FALSE)
+    `, [organization_id]);
+
+    // Get all transactions count (for total count)
+    const countResult = await db.query(`
+      SELECT COUNT(*) as total_count
+      FROM transactions
+      WHERE organization_id = $1
+        AND (deleted_at IS NULL OR is_void = FALSE)
     `, [organization_id]);
 
     // Get exchange rate
@@ -96,27 +107,48 @@ router.get('/stats/revenue', async (req, res) => {
     let usdCount = 0;
     let cadRevenue = 0;
     let usdRevenue = 0;
+    let thisMonthRevenueCAD = 0;
+
+    // Calculate first day of current month
+    const now = new Date();
+    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
     // Process each transaction
     result.rows.forEach(row => {
       const amount = parseFloat(row.amount);
       const currency = row.currency || 'CAD'; // Default to CAD if null
+      const transDate = row.transaction_date ? new Date(row.transaction_date) : null;
 
+      // Convert to CAD based on currency
+      let amountInCAD = 0;
       if (currency === 'CAD') {
+        amountInCAD = amount;
         totalInCAD += amount;
         cadRevenue += amount;
         cadCount++;
       } else if (currency === 'USD') {
-        const convertedAmount = CurrencyHelper.toCAD(amount, 'USD', exchangeRate);
-        totalInCAD += convertedAmount;
+        amountInCAD = CurrencyHelper.toCAD(amount, 'USD', exchangeRate);
+        totalInCAD += amountInCAD;
         usdRevenue += amount;
         usdCount++;
       }
+
+      // Calculate this month revenue (in CAD)
+      if (transDate && transDate >= firstDayOfMonth) {
+        thisMonthRevenueCAD += amountInCAD;
+      }
     });
+
+    // Calculate average transaction amount (in CAD)
+    const totalTransactions = cadCount + usdCount;
+    const averageTransactionCAD = totalTransactions > 0 ? totalInCAD / totalTransactions : 0;
 
     res.json({
       success: true,
       total_revenue_cad: parseFloat(totalInCAD.toFixed(2)),
+      average_transaction_cad: parseFloat(averageTransactionCAD.toFixed(2)),
+      this_month_revenue_cad: parseFloat(thisMonthRevenueCAD.toFixed(2)),
+      total_transactions: parseInt(countResult.rows[0].total_count),
       breakdown: {
         cad_transactions: cadCount,
         cad_revenue: parseFloat(cadRevenue.toFixed(2)),

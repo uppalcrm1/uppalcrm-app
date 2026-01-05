@@ -128,32 +128,18 @@ const TransactionsPage = () => {
     }
   }
 
-  // Calculate statistics
+  // Calculate statistics from frontend data (for filtering/display only)
   const stats = {
-    totalRevenue: transactions
-      .filter(t => t.status === 'completed')
-      .reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0),
-    totalTransactions: transactions.length,
+    // Use API values for accurate currency-converted totals
+    totalRevenue: revenueStats?.total_revenue_cad || 0,
+    totalTransactions: revenueStats?.total_transactions || transactions.length,
+    avgTransaction: revenueStats?.average_transaction_cad || 0,
+    thisMonthRevenue: revenueStats?.this_month_revenue_cad || 0,
+    // Local counts for status badges
     completedTransactions: transactions.filter(t => t.status === 'completed').length,
     pendingTransactions: transactions.filter(t => t.status === 'pending').length,
-    failedTransactions: transactions.filter(t => t.status === 'failed').length,
-    avgTransaction: 0
+    failedTransactions: transactions.filter(t => t.status === 'failed').length
   }
-
-  // Calculate average transaction
-  if (stats.completedTransactions > 0) {
-    stats.avgTransaction = stats.totalRevenue / stats.completedTransactions
-  }
-
-  // Calculate this month revenue
-  const now = new Date()
-  const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-  const monthlyRevenue = transactions
-    .filter(t => {
-      const transDate = new Date(t.payment_date || t.created_at)
-      return t.status === 'completed' && transDate >= firstDayOfMonth
-    })
-    .reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0)
 
   // Filter transactions
   const filteredTransactions = transactions.filter(transaction => {
@@ -297,7 +283,7 @@ const TransactionsPage = () => {
             <div>
               <p className="text-sm text-gray-600 mb-1">This Month</p>
               <p className="text-2xl font-bold text-purple-600">
-                {formatCurrency(monthlyRevenue)}
+                {formatCurrency(stats.thisMonthRevenue, 'CAD')}
               </p>
             </div>
             <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
@@ -312,7 +298,7 @@ const TransactionsPage = () => {
             <div>
               <p className="text-sm text-gray-600 mb-1">Average Transaction</p>
               <p className="text-2xl font-bold text-orange-600">
-                {formatCurrency(stats.avgTransaction)}
+                {formatCurrency(stats.avgTransaction, 'CAD')}
               </p>
             </div>
             <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
