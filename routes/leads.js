@@ -2262,7 +2262,8 @@ router.post('/:id/convert',
         edition: Joi.string().max(100).optional(),
         deviceName: Joi.string().max(255).optional(),
         macAddress: Joi.string().max(17).optional(),
-        billingCycle: Joi.string().valid('monthly', 'quarterly', 'semi-annual', 'annual').optional(),
+        billingCycle: Joi.string().valid('monthly', 'quarterly', 'semi-annual', 'annual', 'biennial').optional(),
+        term: Joi.string().valid('1', '3', '6', '12', '24').optional(), // Standardized numeric months
         price: Joi.number().min(0).optional(),
         isTrial: Joi.boolean().default(false).optional(),
         productId: Joi.string().guid({ version: 'uuidv4' }).optional()
@@ -2482,6 +2483,34 @@ router.post('/:id/convert',
         console.log('  accountName:', details.accountName || `${contact.first_name} ${contact.last_name}'s Account`);
         console.log('  productId:', productId);
 
+        // Convert term (numeric) to billing_cycle (string) if term is provided
+        let finalBillingCycle = details.billingCycle;
+        let billingTermMonths = null;
+
+        if (details.term) {
+          // Term provided as numeric months - convert to billing_cycle string
+          const termMap = {
+            '1': 'monthly',
+            '3': 'quarterly',
+            '6': 'semi-annual',
+            '12': 'annual',
+            '24': 'biennial'
+          };
+          finalBillingCycle = termMap[details.term.toString()] || 'monthly';
+          billingTermMonths = parseInt(details.term);
+        } else if (details.billingCycle) {
+          // Legacy billing_cycle provided - convert to months
+          const cycleToMonths = {
+            'monthly': 1,
+            'quarterly': 3,
+            'semi-annual': 6,
+            'semi_annual': 6,
+            'annual': 12,
+            'biennial': 24
+          };
+          billingTermMonths = cycleToMonths[details.billingCycle] || 1;
+        }
+
         // Merge custom fields from lead with any additional fields from the form
         const accountCustomFields = {
           ...(lead.custom_fields || {}),  // Start with lead's custom fields
@@ -2491,9 +2520,9 @@ router.post('/:id/convert',
         const accountResult = await client.query(
           `INSERT INTO accounts (
             organization_id, contact_id, account_name, edition,
-            device_name, mac_address, billing_cycle, price,
+            device_name, mac_address, billing_cycle, billing_term_months, price,
             is_trial, account_type, license_status, created_by, product_id, custom_fields
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
           RETURNING *`,
           [
             req.organizationId,
@@ -2502,7 +2531,8 @@ router.post('/:id/convert',
             details.edition,
             details.deviceName,
             details.macAddress,
-            details.billingCycle,
+            finalBillingCycle, // Use converted billing_cycle
+            billingTermMonths, // Store numeric months
             details.price || 0,
             details.isTrial || false,
             details.isTrial ? 'trial' : 'active',

@@ -296,7 +296,8 @@ router.post('/', async (req, res) => {
       edition,
       device_name,
       mac_address,
-      billing_cycle,
+      billing_cycle, // Legacy field (string: 'monthly', 'quarterly', etc.)
+      term, // New standardized field (numeric months: 1, 3, 6, 12, 24)
       price = 0,
       license_status = 'pending',
       account_type = 'trial',
@@ -304,11 +305,39 @@ router.post('/', async (req, res) => {
       notes
     } = req.body;
 
+    // Convert term (numeric) to billing_cycle (string) if term is provided
+    let finalBillingCycle = billing_cycle;
+    let billingTermMonths = null;
+
+    if (term) {
+      // Term provided as numeric months - convert to billing_cycle string
+      const termMap = {
+        '1': 'monthly',
+        '3': 'quarterly',
+        '6': 'semi-annual',
+        '12': 'annual',
+        '24': 'biennial'
+      };
+      finalBillingCycle = termMap[term.toString()] || 'monthly';
+      billingTermMonths = parseInt(term);
+    } else if (billing_cycle) {
+      // Legacy billing_cycle provided - convert to months
+      const cycleToMonths = {
+        'monthly': 1,
+        'quarterly': 3,
+        'semi-annual': 6,
+        'semi_annual': 6,
+        'annual': 12,
+        'biennial': 24
+      };
+      billingTermMonths = cycleToMonths[billing_cycle] || 1;
+    }
+
     // Validate required fields
-    if (!contact_id || !account_name || !billing_cycle) {
+    if (!contact_id || !account_name || (!billing_cycle && !term)) {
       return res.status(400).json({
         error: 'Missing required fields',
-        message: 'contact_id, account_name, and billing_cycle are required'
+        message: 'contact_id, account_name, and either term or billing_cycle are required'
       });
     }
 
@@ -334,9 +363,9 @@ router.post('/', async (req, res) => {
       INSERT INTO accounts (
         organization_id, contact_id, account_name, account_type,
         edition, device_name, mac_address,
-        license_key, license_status, billing_cycle, price, currency,
+        license_key, license_status, billing_cycle, billing_term_months, price, currency,
         is_trial, notes, created_by
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
       RETURNING *
     `;
 
@@ -350,7 +379,8 @@ router.post('/', async (req, res) => {
       mac_address || null,
       licenseKey,
       license_status,
-      billing_cycle,
+      finalBillingCycle, // Use converted billing_cycle
+      billingTermMonths, // Store numeric months
       price,
       'USD',
       is_trial,
