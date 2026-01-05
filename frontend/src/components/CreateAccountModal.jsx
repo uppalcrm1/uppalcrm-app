@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { accountsAPI, contactsAPI, productsAPI } from '../services/api'
 import toast from 'react-hot-toast'
+import { BILLING_TERMS } from '../constants/transactions'
 
 const CreateAccountModal = ({ isOpen, onClose, onSuccess }) => {
   const [formData, setFormData] = useState({
@@ -20,7 +21,7 @@ const CreateAccountModal = ({ isOpen, onClose, onSuccess }) => {
     edition: '',
     device_name: '',
     mac_address: '',
-    billing_cycle: 'monthly',
+    term: '1', // Standardized: numeric months (1 = Monthly)
     price: '',
     license_status: 'pending',
     account_type: 'trial',
@@ -164,8 +165,8 @@ const CreateAccountModal = ({ isOpen, onClose, onSuccess }) => {
       newErrors.edition = 'Product is required'
     }
 
-    if (!formData.billing_cycle) {
-      newErrors.billing_cycle = 'Billing cycle is required'
+    if (!formData.term) {
+      newErrors.term = 'Term is required'
     }
 
     // MAC address validation removed - accepts any format
@@ -192,7 +193,7 @@ const CreateAccountModal = ({ isOpen, onClose, onSuccess }) => {
         edition: formData.edition,
         device_name: formData.device_name?.trim() || null,
         mac_address: formData.mac_address?.trim() || null,
-        billing_cycle: formData.billing_cycle,
+        term: formData.term, // Standardized: numeric months
         price: parseFloat(formData.price) || 0,
         license_status: formData.license_status,
         account_type: formData.is_trial ? 'trial' : formData.account_type,
@@ -216,7 +217,7 @@ const CreateAccountModal = ({ isOpen, onClose, onSuccess }) => {
         edition: '',
         device_name: '',
         mac_address: '',
-        billing_cycle: 'monthly',
+        term: '1', // Standardized: numeric months (1 = Monthly)
         price: '',
         license_status: 'pending',
         account_type: 'trial',
@@ -439,25 +440,26 @@ const CreateAccountModal = ({ isOpen, onClose, onSuccess }) => {
 
               {/* Right Column */}
               <div className="space-y-4">
-                {/* Billing Cycle */}
+                {/* Term */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Billing Cycle <span className="text-red-500">*</span>
+                    Term <span className="text-red-500">*</span>
                   </label>
                   <select
-                    name="billing_cycle"
-                    value={formData.billing_cycle}
+                    name="term"
+                    value={formData.term}
                     onChange={handleChange}
                     required
-                    className={`select ${errors.billing_cycle ? 'border-red-500' : ''}`}
+                    className={`select ${errors.term ? 'border-red-500' : ''}`}
                   >
-                    <option value="monthly">Monthly</option>
-                    <option value="quarterly">Quarterly (3 months)</option>
-                    <option value="semi-annual">Semi-Annual (6 months)</option>
-                    <option value="annual">Annual (12 months)</option>
+                    {BILLING_TERMS.map(term => (
+                      <option key={term.value} value={term.value}>
+                        {term.label}
+                      </option>
+                    ))}
                   </select>
-                  {errors.billing_cycle && (
-                    <p className="text-red-600 text-sm mt-1">{errors.billing_cycle}</p>
+                  {errors.term && (
+                    <p className="text-red-600 text-sm mt-1">{errors.term}</p>
                   )}
                 </div>
 

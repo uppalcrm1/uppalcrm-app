@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { X, UserCheck, CreditCard, Package, DollarSign } from 'lucide-react'
 import { productsAPI } from '../services/api'
 import LoadingSpinner from './LoadingSpinner'
+import { BILLING_TERMS } from '../constants/transactions'
 
 const LeadConversionModal = ({ lead, onClose, onConvert, isConverting }) => {
   const [createAccount, setCreateAccount] = useState(false)
@@ -11,12 +12,11 @@ const LeadConversionModal = ({ lead, onClose, onConvert, isConverting }) => {
     edition: '',
     deviceName: '',
     macAddress: '',
-    billingCycle: 'monthly',
+    term: '1', // Standardized: numeric months (1 = Monthly)
     price: '',
     productId: '',
     // Transaction fields
     paymentMethod: 'Credit Card',
-    term: 'Monthly',
     amount: ''
   })
 
@@ -54,23 +54,6 @@ const LeadConversionModal = ({ lead, onClose, onConvert, isConverting }) => {
     }))
   }
 
-  const handleBillingCycleChange = (e) => {
-    const billingCycle = e.target.value
-    // Map billing cycle to term
-    const termMap = {
-      'monthly': 'Monthly',
-      'quarterly': 'Quarterly',
-      'semi-annual': 'Semi-Annual',
-      'annual': 'Annual',
-      'biennial': 'Biennial'
-    }
-
-    setFormData(prev => ({
-      ...prev,
-      billingCycle,
-      term: termMap[billingCycle] || 'Monthly'
-    }))
-  }
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -83,13 +66,13 @@ const LeadConversionModal = ({ lead, onClose, onConvert, isConverting }) => {
         edition: formData.edition,
         deviceName: formData.deviceName,
         macAddress: formData.macAddress,
-        billingCycle: formData.billingCycle,
+        term: formData.term, // Standardized: numeric months
         price: parseFloat(formData.price) || 0,
         productId: formData.productId || defaultProduct?.id || null
       } : undefined,
       transactionDetails: createAccount ? {
         paymentMethod: formData.paymentMethod,
-        term: formData.term,
+        term: formData.term, // Standardized: numeric months
         amount: parseFloat(formData.amount) || 0,
         currency: 'USD',
         status: 'completed'
@@ -246,19 +229,19 @@ const LeadConversionModal = ({ lead, onClose, onConvert, isConverting }) => {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Billing Cycle
+                        Term
                       </label>
                       <select
-                        name="billingCycle"
-                        value={formData.billingCycle}
-                        onChange={handleBillingCycleChange}
+                        name="term"
+                        value={formData.term}
+                        onChange={handleInputChange}
                         className="select w-full"
                       >
-                        <option value="monthly">Monthly</option>
-                        <option value="quarterly">Quarterly</option>
-                        <option value="semi-annual">Semi-Annual (6 months)</option>
-                        <option value="annual">Annual</option>
-                        <option value="biennial">Biennial (2 years)</option>
+                        {BILLING_TERMS.map(term => (
+                          <option key={term.value} value={term.value}>
+                            {term.label}
+                          </option>
+                        ))}
                       </select>
                     </div>
                     <div>
@@ -312,46 +295,28 @@ const LeadConversionModal = ({ lead, onClose, onConvert, isConverting }) => {
                         </select>
                       </div>
 
-                      {/* Term and Amount */}
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Term
-                          </label>
+                      {/* Amount */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Amount <span className="text-red-500">*</span>
+                        </label>
+                        <div className="relative">
+                          <DollarSign size={16} className="absolute left-3 top-3 text-gray-400" />
                           <input
-                            type="text"
-                            name="term"
-                            value={formData.term}
-                            readOnly
-                            className="input w-full bg-gray-50"
-                            placeholder="Auto-filled from billing cycle"
+                            type="number"
+                            name="amount"
+                            value={formData.amount}
+                            onChange={handleInputChange}
+                            placeholder="0.00"
+                            step="0.01"
+                            min="0"
+                            className="input w-full pl-9"
+                            required
                           />
-                          <p className="mt-1 text-xs text-gray-500">
-                            Auto-set from billing cycle
-                          </p>
                         </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Amount <span className="text-red-500">*</span>
-                          </label>
-                          <div className="relative">
-                            <DollarSign size={16} className="absolute left-3 top-3 text-gray-400" />
-                            <input
-                              type="number"
-                              name="amount"
-                              value={formData.amount}
-                              onChange={handleInputChange}
-                              placeholder="0.00"
-                              step="0.01"
-                              min="0"
-                              className="input w-full pl-9"
-                              required
-                            />
-                          </div>
-                          <p className="mt-1 text-xs text-gray-500">
-                            Auto-filled from product price
-                          </p>
-                        </div>
+                        <p className="mt-1 text-xs text-gray-500">
+                          Auto-filled from product price
+                        </p>
                       </div>
                     </div>
                   </div>
