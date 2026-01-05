@@ -721,11 +721,11 @@ router.get('/', async (req, res) => {
           options: ['pending', 'completed', 'failed', 'refunded']
         },
         term: {
-          label: 'Billing Term',
+          label: 'Term',
           type: 'select',
           required: true,
           editable: true,
-          options: ['1', '3', '6', '12']
+          options: ['1', '3', '6', '12', '24']
         },
         source: {
           label: 'Source',
@@ -1230,11 +1230,11 @@ router.put('/default/:fieldName', async (req, res) => {
           options: ['pending', 'completed', 'failed', 'refunded']
         },
         term: {
-          label: 'Billing Term',
+          label: 'Term',
           type: 'select',
           required: true,
           editable: true,
-          options: ['1', '3', '6', '12']
+          options: ['1', '3', '6', '12', '24']
         },
         source: {
           label: 'Source',

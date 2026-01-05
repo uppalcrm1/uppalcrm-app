@@ -547,7 +547,7 @@ const CreateTransactionModal = ({ account, onClose, onSuccess, isOpen }) => {
                 {/* Term Field */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Billing Term <span className="text-red-500">*</span>
+                    Term <span className="text-red-500">*</span>
                   </label>
                   <select
                     name="term"
