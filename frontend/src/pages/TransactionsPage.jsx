@@ -275,7 +275,7 @@ const TransactionsPage = () => {
               </p>
               {revenueStats && revenueStats.breakdown && (
                 <p className="text-xs text-gray-500 mt-1">
-                  {revenueStats.breakdown.cad_transactions} CAD + {revenueStats.breakdown.usd_transactions} USD transactions
+                  ${revenueStats.breakdown.cad_revenue.toFixed(2)} CAD + ${revenueStats.breakdown.usd_revenue.toFixed(2)} USD
                 </p>
               )}
             </div>
@@ -306,6 +306,11 @@ const TransactionsPage = () => {
               <p className="text-2xl font-bold text-purple-600">
                 {formatCurrency(stats.thisMonthRevenue, 'CAD')}
               </p>
+              {revenueStats && revenueStats.this_month_breakdown && (
+                <p className="text-xs text-gray-500 mt-1">
+                  ${revenueStats.this_month_breakdown.cad_revenue.toFixed(2)} CAD + ${revenueStats.this_month_breakdown.usd_revenue.toFixed(2)} USD
+                </p>
+              )}
             </div>
             <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
               <Calendar className="text-purple-600" size={24} />

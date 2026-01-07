@@ -108,6 +108,8 @@ router.get('/stats/revenue', async (req, res) => {
     let cadRevenue = 0;
     let usdRevenue = 0;
     let thisMonthRevenueCAD = 0;
+    let thisMonthCADRevenue = 0;
+    let thisMonthUSDRevenue = 0;
 
     // Calculate first day of current month
     const now = new Date();
@@ -126,16 +128,23 @@ router.get('/stats/revenue', async (req, res) => {
         totalInCAD += amount;
         cadRevenue += amount;
         cadCount++;
+        
+        // Track this month
+        if (transDate && transDate >= firstDayOfMonth) {
+          thisMonthCADRevenue += amount;
+          thisMonthRevenueCAD += amount;
+        }
       } else if (currency === 'USD') {
         amountInCAD = CurrencyHelper.toCAD(amount, 'USD', exchangeRate);
         totalInCAD += amountInCAD;
         usdRevenue += amount;
         usdCount++;
-      }
-
-      // Calculate this month revenue (in CAD)
-      if (transDate && transDate >= firstDayOfMonth) {
-        thisMonthRevenueCAD += amountInCAD;
+        
+        // Track this month
+        if (transDate && transDate >= firstDayOfMonth) {
+          thisMonthUSDRevenue += amount;
+          thisMonthRevenueCAD += amountInCAD;
+        }
       }
     });
 
@@ -155,6 +164,11 @@ router.get('/stats/revenue', async (req, res) => {
         usd_transactions: usdCount,
         usd_revenue: parseFloat(usdRevenue.toFixed(2)),
         usd_converted_to_cad: parseFloat((usdRevenue * exchangeRate).toFixed(2))
+      },
+      this_month_breakdown: {
+        cad_revenue: parseFloat(thisMonthCADRevenue.toFixed(2)),
+        usd_revenue: parseFloat(thisMonthUSDRevenue.toFixed(2)),
+        usd_converted_to_cad: parseFloat((thisMonthUSDRevenue * exchangeRate).toFixed(2))
       },
       exchange_rate_used: exchangeRate,
       reporting_currency: 'CAD'
