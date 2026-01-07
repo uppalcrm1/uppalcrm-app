@@ -1,5 +1,5 @@
 const db = require('../database/connection');
-const ConfigService = require('./configService');
+const ConfigService = require('./ConfigService');
 const CurrencyHelper = require('../utils/currency');
 
 /**
