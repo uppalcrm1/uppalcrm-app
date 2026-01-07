@@ -1,4 +1,6 @@
 const db = require('../database/connection');
+const ConfigService = require('./configService');
+const CurrencyHelper = require('../utils/currency');
 
 /**
  * Reporting Service
@@ -9,16 +11,18 @@ const db = require('../database/connection');
  * - Contacts: Customers
  * - Accounts: Software licenses (one per device/MAC address)
  * - Transactions: Payment records
+ * 
+ * NOTE: All revenue values are converted to CAD for consistency
  */
 
 /**
- * Get total revenue (all time)
+ * Get total revenue (all time) - converted to CAD
  * @param {string} organizationId - Organization ID
- * @returns {Promise<number>} Total revenue
+ * @returns {Promise<number>} Total revenue in CAD
  */
 const getTotalRevenue = async (organizationId) => {
   const result = await db.query(
-    `SELECT COALESCE(SUM(amount), 0) as total_revenue
+    `SELECT amount, currency
      FROM transactions
      WHERE organization_id = $1
        AND deleted_at IS NULL
@@ -28,17 +32,31 @@ const getTotalRevenue = async (organizationId) => {
     organizationId
   );
 
-  return parseFloat(result.rows[0].total_revenue) || 0;
+  const exchangeRate = await ConfigService.getExchangeRate(organizationId);
+  let totalInCAD = 0;
+
+  result.rows.forEach(row => {
+    const amount = parseFloat(row.amount);
+    const currency = row.currency || 'CAD';
+    
+    if (currency === 'CAD') {
+      totalInCAD += amount;
+    } else if (currency === 'USD') {
+      totalInCAD += CurrencyHelper.toCAD(amount, 'USD', exchangeRate);
+    }
+  });
+
+  return parseFloat(totalInCAD.toFixed(2));
 };
 
 /**
- * Get revenue for current month
+ * Get revenue for current month - converted to CAD
  * @param {string} organizationId - Organization ID
- * @returns {Promise<number>} Revenue this month
+ * @returns {Promise<number>} Revenue this month in CAD
  */
 const getRevenueThisMonth = async (organizationId) => {
   const result = await db.query(
-    `SELECT COALESCE(SUM(amount), 0) as monthly_revenue
+    `SELECT amount, currency
      FROM transactions
      WHERE organization_id = $1
        AND deleted_at IS NULL
@@ -49,17 +67,31 @@ const getRevenueThisMonth = async (organizationId) => {
     organizationId
   );
 
-  return parseFloat(result.rows[0].monthly_revenue) || 0;
+  const exchangeRate = await ConfigService.getExchangeRate(organizationId);
+  let totalInCAD = 0;
+
+  result.rows.forEach(row => {
+    const amount = parseFloat(row.amount);
+    const currency = row.currency || 'CAD';
+    
+    if (currency === 'CAD') {
+      totalInCAD += amount;
+    } else if (currency === 'USD') {
+      totalInCAD += CurrencyHelper.toCAD(amount, 'USD', exchangeRate);
+    }
+  });
+
+  return parseFloat(totalInCAD.toFixed(2));
 };
 
 /**
- * Get revenue for last month
+ * Get revenue for last month - converted to CAD
  * @param {string} organizationId - Organization ID
- * @returns {Promise<number>} Revenue last month
+ * @returns {Promise<number>} Revenue last month in CAD
  */
 const getRevenueLastMonth = async (organizationId) => {
   const result = await db.query(
-    `SELECT COALESCE(SUM(amount), 0) as monthly_revenue
+    `SELECT amount, currency
      FROM transactions
      WHERE organization_id = $1
        AND deleted_at IS NULL
@@ -70,7 +102,21 @@ const getRevenueLastMonth = async (organizationId) => {
     organizationId
   );
 
-  return parseFloat(result.rows[0].monthly_revenue) || 0;
+  const exchangeRate = await ConfigService.getExchangeRate(organizationId);
+  let totalInCAD = 0;
+
+  result.rows.forEach(row => {
+    const amount = parseFloat(row.amount);
+    const currency = row.currency || 'CAD';
+    
+    if (currency === 'CAD') {
+      totalInCAD += amount;
+    } else if (currency === 'USD') {
+      totalInCAD += CurrencyHelper.toCAD(amount, 'USD', exchangeRate);
+    }
+  });
+
+  return parseFloat(totalInCAD.toFixed(2));
 };
 
 /**
@@ -222,13 +268,13 @@ const getUpcomingRenewals = async (organizationId, days = 30) => {
 };
 
 /**
- * Get average transaction value
+ * Get average transaction value - converted to CAD
  * @param {string} organizationId - Organization ID
- * @returns {Promise<number>} Average transaction value
+ * @returns {Promise<number>} Average transaction value in CAD
  */
 const getAverageTransactionValue = async (organizationId) => {
   const result = await db.query(
-    `SELECT ROUND(AVG(amount), 2) as avg_transaction_value
+    `SELECT amount, currency
      FROM transactions
      WHERE organization_id = $1
        AND deleted_at IS NULL
@@ -238,7 +284,24 @@ const getAverageTransactionValue = async (organizationId) => {
     organizationId
   );
 
-  return parseFloat(result.rows[0].avg_transaction_value) || 0;
+  if (result.rows.length === 0) return 0;
+
+  const exchangeRate = await ConfigService.getExchangeRate(organizationId);
+  let totalInCAD = 0;
+
+  result.rows.forEach(row => {
+    const amount = parseFloat(row.amount);
+    const currency = row.currency || 'CAD';
+    
+    if (currency === 'CAD') {
+      totalInCAD += amount;
+    } else if (currency === 'USD') {
+      totalInCAD += CurrencyHelper.toCAD(amount, 'USD', exchangeRate);
+    }
+  });
+
+  const average = totalInCAD / result.rows.length;
+  return parseFloat(average.toFixed(2));
 };
 
 /**
