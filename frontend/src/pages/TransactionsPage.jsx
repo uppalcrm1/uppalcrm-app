@@ -14,7 +14,10 @@ import {
   Edit,
   Trash2,
   FileText,
-  RotateCcw
+  RotateCcw,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react'
 import { transactionsAPI } from '../services/api'
 import EditTransactionModal from '../components/EditTransactionModal'
@@ -74,6 +77,7 @@ const TransactionsPage = () => {
   const [selectedTransaction, setSelectedTransaction] = useState(null)
   const [revenueStats, setRevenueStats] = useState(null)
   const [loadingRevenue, setLoadingRevenue] = useState(false)
+  const [sortDirection, setSortDirection] = useState('desc') // 'asc' or 'desc'
 
   // Load column visibility from localStorage or use defaults
   const [visibleColumns, setVisibleColumns] = useState(() => {
@@ -141,6 +145,11 @@ const TransactionsPage = () => {
     failedTransactions: transactions.filter(t => t.status === 'failed').length
   }
 
+  // Toggle sort direction
+  const handleToggleSort = () => {
+    setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')
+  }
+
   // Filter transactions
   const filteredTransactions = transactions.filter(transaction => {
     // Search filter
@@ -169,6 +178,18 @@ const TransactionsPage = () => {
     }
 
     return true
+  })
+
+  // Sort transactions by payment date
+  const sortedTransactions = [...filteredTransactions].sort((a, b) => {
+    const dateA = new Date(a.payment_date || 0)
+    const dateB = new Date(b.payment_date || 0)
+    
+    if (sortDirection === 'asc') {
+      return dateA - dateB
+    } else {
+      return dateB - dateA
+    }
   })
 
   const getStatusBadge = (status) => {
@@ -405,7 +426,21 @@ const TransactionsPage = () => {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-200">
-                  {visibleColumns.payment_date && <th className="text-left py-3 px-4 font-medium text-gray-900">Payment Date</th>}
+                  {visibleColumns.payment_date && (
+                    <th className="text-left py-3 px-4 font-medium text-gray-900">
+                      <button
+                        onClick={handleToggleSort}
+                        className="flex items-center gap-2 hover:text-primary-600 transition-colors"
+                      >
+                        Payment Date
+                        {sortDirection === 'asc' ? (
+                          <ArrowUp size={16} className="text-primary-600" />
+                        ) : (
+                          <ArrowDown size={16} className="text-primary-600" />
+                        )}
+                      </button>
+                    </th>
+                  )}
                   {visibleColumns.transaction_id && <th className="text-left py-3 px-4 font-medium text-gray-900">Transaction ID</th>}
                   {visibleColumns.account_name && <th className="text-left py-3 px-4 font-medium text-gray-900">Account Name</th>}
                   {visibleColumns.contact_name && <th className="text-left py-3 px-4 font-medium text-gray-900">Contact Name</th>}
@@ -418,7 +453,7 @@ const TransactionsPage = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredTransactions.map((transaction) => {
+                {sortedTransactions.map((transaction) => {
                   const statusBadge = getStatusBadge(transaction.status)
                   return (
                     <tr key={transaction.id} className="border-b border-gray-100 hover:bg-gray-50">
