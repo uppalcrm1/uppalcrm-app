@@ -669,6 +669,13 @@ router.get('/', async (req, res) => {
         title: { label: 'Job Title', type: 'text', required: false, editable: true },
         department: { label: 'Department', type: 'text', required: false, editable: true },
         linkedIn: { label: 'LinkedIn Profile', type: 'url', required: false, editable: true },
+        source: {
+          label: 'Source',
+          type: 'select',
+          required: false,
+          editable: true,
+          options: []
+        },
         status: {
           label: 'Status',
           type: 'select',
@@ -1178,6 +1185,13 @@ router.put('/default/:fieldName', async (req, res) => {
         title: { label: 'Job Title', type: 'text', required: false, editable: true },
         department: { label: 'Department', type: 'text', required: false, editable: true },
         linkedIn: { label: 'LinkedIn Profile', type: 'url', required: false, editable: true },
+        source: {
+          label: 'Source',
+          type: 'select',
+          required: false,
+          editable: true,
+          options: []
+        },
         status: {
           label: 'Status',
           type: 'select',
