@@ -4,49 +4,31 @@ import { X } from 'lucide-react'
 import LoadingSpinner from './LoadingSpinner'
 import { customFieldsAPI } from '../services/api'
 
-const CONTACT_STATUSES = [
-  { value: 'active', label: 'Active' },
-  { value: 'inactive', label: 'Inactive' },
-  { value: 'prospect', label: 'Prospect' },
-  { value: 'customer', label: 'Customer' }
-]
-
-const CONTACT_TYPES = [
-  { value: 'customer', label: 'Customer' },
-  { value: 'prospect', label: 'Prospect' },
-  { value: 'partner', label: 'Partner' },
-  { value: 'vendor', label: 'Vendor' }
-]
-
-const CONTACT_PRIORITIES = [
-  { value: 'low', label: 'Low' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'high', label: 'High' }
-]
-
-// DEPRECATED: Source options now loaded from custom_field_definitions table
-const CONTACT_SOURCES = []
-
 const ContactForm = ({ contact = null, onClose, onSubmit, users = [], isLoading = false }) => {
   const isEditing = !!contact
-  const [sourceOptions, setSourceOptions] = useState([])
+  const [fieldConfig, setFieldConfig] = useState(null)
+  const [loadingConfig, setLoadingConfig] = useState(true)
 
-  // Load source options from API
+  // Load field configuration from API
   useEffect(() => {
-    const loadSourceOptions = async () => {
+    const loadFieldConfig = async () => {
       try {
         const response = await customFieldsAPI.getFields('contacts')
-        // Check both customFields and systemFields arrays
-        const allFields = [...(response.customFields || []), ...(response.systemFields || [])]
-        const sourceField = allFields.find(f => f.field_name === 'source')
-        if (sourceField?.field_options) {
-          setSourceOptions(sourceField.field_options)
-        }
+        // Combine system and custom fields, filter enabled ones
+        const systemFields = (response.systemFields || []).filter(f => f.is_enabled !== false)
+        const customFields = (response.customFields || []).filter(f => f.is_enabled !== false)
+        
+        setFieldConfig({
+          systemFields,
+          customFields
+        })
       } catch (error) {
-        console.error('Failed to load source options:', error)
+        console.error('Failed to load field configuration:', error)
+      } finally {
+        setLoadingConfig(false)
       }
     }
-    loadSourceOptions()
+    loadFieldConfig()
   }, [])
 
   const { register, handleSubmit, formState: { errors }, watch } = useForm({
@@ -62,19 +44,153 @@ const ContactForm = ({ contact = null, onClose, onSubmit, users = [], isLoading 
 
   const handleFormSubmit = (data) => {
     // Convert empty strings to null for optional fields
-    const cleanData = {
-      ...data,
-      first_name: data.first_name || null,
-      last_name: data.last_name || null,
-      email: data.email || null,
-      phone: data.phone || null,
-      title: data.title || null,
-      company: data.company || null,
-      notes: data.notes || null,
-      assigned_to: data.assigned_to || null,
-      next_follow_up: data.next_follow_up || null
-    }
+    const cleanData = Object.keys(data).reduce((acc, key) => {
+      acc[key] = data[key] || null
+      return acc
+    }, {})
     onSubmit(cleanData)
+  }
+
+  // Helper function to render field based on configuration
+  const renderField = (field) => {
+    const { field_name, field_label, field_type, field_options, is_required } = field
+    const fieldKey = field_name
+
+    // Map database field types to HTML input types
+    const inputTypeMap = {
+      text: 'text',
+      email: 'email',
+      tel: 'tel',
+      url: 'url',
+      number: 'number',
+      date: 'date',
+      datetime: 'datetime-local'
+    }
+
+    // Textarea fields
+    if (field_type === 'textarea') {
+      return (
+        <div key={fieldKey} className={field_name === 'notes' ? 'md:col-span-2' : ''}>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            {field_label}
+            {is_required && <span className="text-red-500 ml-1">*</span>}
+          </label>
+          <textarea
+            {...register(fieldKey, { required: is_required ? `${field_label} is required` : false })}
+            rows={4}
+            className={`input resize-none ${errors[fieldKey] ? 'border-red-500' : ''}`}
+            placeholder={`Enter ${field_label.toLowerCase()}...`}
+          />
+          {errors[fieldKey] && (
+            <p className="mt-1 text-sm text-red-600">{errors[fieldKey].message}</p>
+          )}
+        </div>
+      )
+    }
+
+    // Select fields
+    if (field_type === 'select') {
+      const options = Array.isArray(field_options) ? field_options : []
+      // Handle both array formats: ['option1', 'option2'] and [{value, label}]
+      const formattedOptions = options.map(opt => 
+        typeof opt === 'string' ? { value: opt, label: opt.charAt(0).toUpperCase() + opt.slice(1) } : opt
+      )
+
+      return (
+        <div key={fieldKey}>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            {field_label}
+            {is_required && <span className="text-red-500 ml-1">*</span>}
+          </label>
+          <select 
+            {...register(fieldKey, { required: is_required ? `${field_label} is required` : false })}
+            className={`select ${errors[fieldKey] ? 'border-red-500' : ''}`}
+          >
+            <option value="">Select {field_label.toLowerCase()}</option>
+            {formattedOptions.map(option => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+          {errors[fieldKey] && (
+            <p className="mt-1 text-sm text-red-600">{errors[fieldKey].message}</p>
+          )}
+        </div>
+      )
+    }
+
+    // User select field
+    if (field_type === 'user_select') {
+      return (
+        <div key={fieldKey}>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            {field_label}
+            {is_required && <span className="text-red-500 ml-1">*</span>}
+          </label>
+          <select 
+            {...register(fieldKey, { required: is_required ? `${field_label} is required` : false })}
+            className={`select ${errors[fieldKey] ? 'border-red-500' : ''}`}
+          >
+            <option value="">Unassigned</option>
+            {users.map(user => (
+              <option key={user.id} value={user.id}>{user.full_name}</option>
+            ))}
+          </select>
+          {errors[fieldKey] && (
+            <p className="mt-1 text-sm text-red-600">{errors[fieldKey].message}</p>
+          )}
+        </div>
+      )
+    }
+
+    // Standard input fields
+    const inputType = inputTypeMap[field_type] || 'text'
+    const validationRules = { required: is_required ? `${field_label} is required` : false }
+    
+    // Add specific validation for email
+    if (field_type === 'email') {
+      validationRules.pattern = {
+        value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+        message: 'Please enter a valid email'
+      }
+    }
+    
+    // Add validation for numbers
+    if (field_type === 'number') {
+      validationRules.min = { value: 0, message: 'Value must be positive' }
+    }
+
+    return (
+      <div key={fieldKey}>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          {field_label}
+          {is_required && <span className="text-red-500 ml-1">*</span>}
+        </label>
+        <input
+          {...register(fieldKey, validationRules)}
+          type={inputType}
+          className={`input ${errors[fieldKey] ? 'border-red-500' : ''}`}
+          placeholder={field_type === 'number' ? '0' : `Enter ${field_label.toLowerCase()}`}
+          step={field_type === 'number' ? '0.01' : undefined}
+          min={field_type === 'number' ? '0' : undefined}
+        />
+        {errors[fieldKey] && (
+          <p className="mt-1 text-sm text-red-600">{errors[fieldKey].message}</p>
+        )}
+      </div>
+    )
+  }
+
+  if (loadingConfig) {
+    return (
+      <div className="fixed inset-0 z-50 overflow-y-auto">
+        <div className="flex items-center justify-center min-h-screen px-4">
+          <div className="inline-block w-full max-w-2xl px-6 py-6 my-8 text-center bg-white shadow-xl rounded-lg">
+            <LoadingSpinner size="lg" />
+            <p className="mt-4 text-gray-600">Loading form...</p>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -96,180 +212,8 @@ const ContactForm = ({ contact = null, onClose, onSubmit, users = [], isLoading 
 
           <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* First Name */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">First Name</label>
-                <input
-                  {...register('first_name')}
-                  className="input"
-                  placeholder="John"
-                />
-              </div>
-
-              {/* Last Name */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
-                <input
-                  {...register('last_name')}
-                  className="input"
-                  placeholder="Doe"
-                />
-              </div>
-
-              {/* Title */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Title</label>
-                <input
-                  {...register('title')}
-                  className="input"
-                  placeholder="CEO, CTO, Manager, etc."
-                />
-              </div>
-
-              {/* Company */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Company</label>
-                <input
-                  {...register('company')}
-                  className="input"
-                  placeholder="Acme Inc"
-                />
-              </div>
-
-              {/* Email */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-                <input
-                  {...register('email', {
-                    pattern: {
-                      value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-                      message: 'Please enter a valid email'
-                    }
-                  })}
-                  type="email"
-                  className={`input ${errors.email ? 'border-red-500' : ''}`}
-                  placeholder="john@company.com"
-                />
-                {errors.email && (
-                  <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
-                )}
-              </div>
-
-              {/* Phone */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Phone</label>
-                <input
-                  {...register('phone')}
-                  type="tel"
-                  className="input"
-                  placeholder="+1 (555) 123-4567"
-                />
-              </div>
-
-              {/* Status */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-                <select {...register('status')} className="select">
-                  {CONTACT_STATUSES.map(status => (
-                    <option key={status.value} value={status.value}>{status.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Type */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Type</label>
-                <select {...register('type')} className="select">
-                  {CONTACT_TYPES.map(type => (
-                    <option key={type.value} value={type.value}>{type.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Source */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Source</label>
-                <select {...register('source')} className="select">
-                  <option value="">Select source</option>
-                  {sourceOptions.map(option => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Priority */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
-                <select {...register('priority')} className="select">
-                  {CONTACT_PRIORITIES.map(priority => (
-                    <option key={priority.value} value={priority.value}>{priority.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Value */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Customer Value ($)</label>
-                <input
-                  {...register('value', {
-                    min: { value: 0, message: 'Value must be positive' }
-                  })}
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  className={`input ${errors.value ? 'border-red-500' : ''}`}
-                  placeholder="10000"
-                />
-                {errors.value && (
-                  <p className="mt-1 text-sm text-red-600">{errors.value.message}</p>
-                )}
-              </div>
-
-              {/* Assigned To */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Assign To</label>
-                <select {...register('assigned_to')} className="select">
-                  <option value="">Unassigned</option>
-                  {users.map(user => (
-                    <option key={user.id} value={user.id}>{user.full_name}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Next Follow Up */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Next Follow Up</label>
-                <input
-                  {...register('next_follow_up')}
-                  type="datetime-local"
-                  className="input"
-                />
-              </div>
-
-              {/* Last Contact Date - Only show when editing */}
-              {isEditing && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Last Contact Date</label>
-                  <input
-                    {...register('last_contact_date')}
-                    type="datetime-local"
-                    className="input"
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* Notes */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Notes</label>
-              <textarea
-                {...register('notes')}
-                rows={4}
-                className="input resize-none"
-                placeholder="Additional notes about this contact..."
-              />
+              {fieldConfig?.systemFields?.map(field => renderField(field))}
+              {fieldConfig?.customFields?.map(field => renderField(field))}
             </div>
 
             {/* Actions */}
