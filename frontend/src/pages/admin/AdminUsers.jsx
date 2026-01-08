@@ -550,7 +550,11 @@ const AdminUsers = () => {
                           </>
                         )}
                         {user.id === currentUser?.id && (
-                          <button className="btn btn-sm btn-outline">
+                          <button 
+                            onClick={() => handleEditUser(user)}
+                            className="btn btn-sm btn-outline"
+                            title="Edit your profile"
+                          >
                             <Edit2 size={14} />
                             Edit Profile
                           </button>
