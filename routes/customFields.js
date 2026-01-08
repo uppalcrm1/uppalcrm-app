@@ -661,14 +661,14 @@ router.get('/', async (req, res) => {
         notes: { label: 'Notes', type: 'textarea', required: false, editable: true }
       },
       contacts: {
-        firstName: { label: 'First Name', type: 'text', required: false, editable: true },
-        lastName: { label: 'Last Name', type: 'text', required: false, editable: true },
+        first_name: { label: 'First Name', type: 'text', required: false, editable: true },
+        last_name: { label: 'Last Name', type: 'text', required: false, editable: true },
         email: { label: 'Email', type: 'email', required: false, editable: true },
         phone: { label: 'Phone', type: 'tel', required: false, editable: true },
         company: { label: 'Company', type: 'text', required: false, editable: true },
         title: { label: 'Job Title', type: 'text', required: false, editable: true },
         department: { label: 'Department', type: 'text', required: false, editable: true },
-        linkedIn: { label: 'LinkedIn Profile', type: 'url', required: false, editable: true },
+        linkedin: { label: 'LinkedIn Profile', type: 'url', required: false, editable: true },
         type: {
           label: 'Type',
           type: 'select',
@@ -698,9 +698,9 @@ router.get('/', async (req, res) => {
           options: ['low', 'medium', 'high']
         },
         value: { label: 'Customer Value ($)', type: 'number', required: false, editable: true },
-        assignedTo: { label: 'Assign To', type: 'user_select', required: false, editable: true },
-        nextFollowUp: { label: 'Next Follow Up', type: 'datetime', required: false, editable: true },
-        lastContactDate: { label: 'Last Contact Date', type: 'date', required: false, editable: true },
+        assigned_to: { label: 'Assign To', type: 'user_select', required: false, editable: true },
+        next_follow_up: { label: 'Next Follow Up', type: 'datetime', required: false, editable: true },
+        last_contact_date: { label: 'Last Contact Date', type: 'date', required: false, editable: true },
         notes: { label: 'Notes', type: 'textarea', required: false, editable: true }
       },
       accounts: {
@@ -1193,14 +1193,14 @@ router.put('/default/:fieldName', async (req, res) => {
         notes: { label: 'Notes', type: 'textarea', required: false, editable: true }
       },
       contacts: {
-        firstName: { label: 'First Name', type: 'text', required: false, editable: true },
-        lastName: { label: 'Last Name', type: 'text', required: false, editable: true },
+        first_name: { label: 'First Name', type: 'text', required: false, editable: true },
+        last_name: { label: 'Last Name', type: 'text', required: false, editable: true },
         email: { label: 'Email', type: 'email', required: false, editable: true },
         phone: { label: 'Phone', type: 'tel', required: false, editable: true },
         company: { label: 'Company', type: 'text', required: false, editable: true },
         title: { label: 'Job Title', type: 'text', required: false, editable: true },
         department: { label: 'Department', type: 'text', required: false, editable: true },
-        linkedIn: { label: 'LinkedIn Profile', type: 'url', required: false, editable: true },
+        linkedin: { label: 'LinkedIn Profile', type: 'url', required: false, editable: true },
         type: {
           label: 'Type',
           type: 'select',
@@ -1234,9 +1234,9 @@ router.put('/default/:fieldName', async (req, res) => {
           ]
         },
         value: { label: 'Customer Value ($)', type: 'number', required: false, editable: true },
-        assignedTo: { label: 'Assign To', type: 'user_select', required: false, editable: true },
-        nextFollowUp: { label: 'Next Follow Up', type: 'datetime', required: false, editable: true },
-        lastContactDate: { label: 'Last Contact Date', type: 'date', required: false, editable: true },
+        assigned_to: { label: 'Assign To', type: 'user_select', required: false, editable: true },
+        next_follow_up: { label: 'Next Follow Up', type: 'datetime', required: false, editable: true },
+        last_contact_date: { label: 'Last Contact Date', type: 'date', required: false, editable: true },
         notes: { label: 'Notes', type: 'textarea', required: false, editable: true }
       },
       accounts: {
