@@ -815,6 +815,7 @@ router.get('/', async (req, res) => {
     }
 
     // ALSO check custom_field_definitions for system fields that might have been customized there
+    // BUT only if they're NOT already in storedConfigs from default_field_configurations
     try {
       const customConfigResult = await db.query(`
         SELECT field_name, field_options, is_enabled, is_required
@@ -825,10 +826,17 @@ router.get('/', async (req, res) => {
       `, [req.organizationId, entity_type, ...Object.keys(systemFieldDefaults)]);
 
       customConfigResult.rows.forEach(config => {
-        // Override with custom_field_definitions settings if they exist
-        storedConfigs[config.field_name] = config;
+        // Only use custom_field_definitions if NOT already configured in default_field_configurations
+        // This gives priority to the explicit system field configurations
+        if (!storedConfigs[config.field_name]) {
+          storedConfigs[config.field_name] = config;
+        }
       });
       console.log('Additional system field configs found in custom_field_definitions:', customConfigResult.rows.length);
+      if (customConfigResult.rows.length > 0) {
+        console.log('Custom field overrides (only used if not in default_field_configurations):', 
+          customConfigResult.rows.map(c => `${c.field_name}:enabled=${c.is_enabled}`).join(', '));
+      }
     } catch (customConfigError) {
       console.log('Could not check custom_field_definitions for system field overrides:', customConfigError.message);
     }
