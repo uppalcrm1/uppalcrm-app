@@ -363,9 +363,9 @@ router.post('/', async (req, res) => {
       INSERT INTO accounts (
         organization_id, contact_id, account_name, account_type,
         edition, device_name, mac_address,
-        license_key, license_status, billing_cycle, billing_term_months, price, currency,
+        license_key, license_status, billing_cycle, price, currency,
         is_trial, notes, created_by
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
       RETURNING *
     `;
 
@@ -380,7 +380,6 @@ router.post('/', async (req, res) => {
       licenseKey,
       license_status,
       finalBillingCycle, // Use converted billing_cycle
-      billingTermMonths, // Store numeric months
       price,
       'USD',
       is_trial,
