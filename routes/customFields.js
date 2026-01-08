@@ -614,9 +614,7 @@ router.get('/', async (req, res) => {
 
     const orderBy = hasSortOrder ? 'ORDER BY sort_order ASC, created_at ASC' : 'ORDER BY created_at ASC';
 
-    // Filter by entity_type if column exists (include universal fields with entity_type = NULL)
-    const whereClause = hasEntityType
-      ? 'WHERE organization_id = $1 AND (entity_type = $2 OR entity_type IS NULL)'
+    // Filter by entity_type and exclude system field names
     const whereClause = hasEntityType
       ? 'WHERE organization_id = $1 AND entity_type = $2 AND field_name != ALL($3)'
       : 'WHERE organization_id = $1 AND field_name != ALL($2)';
