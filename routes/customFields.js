@@ -6,6 +6,18 @@ const Joi = require('joi');
 const rateLimit = require('express-rate-limit');
 const nodemailer = require('nodemailer');
 
+// System field names that should NOT exist as custom fields
+const SYSTEM_FIELD_NAMES = [
+  'source', 'first_name', 'last_name', 'email', 'phone', 'company',
+  'status', 'priority', 'assigned_to', 'next_follow_up', 'last_contact_date',
+  'type', 'value', 'notes', 'description', 'linkedin', 'title', 'website',
+  'address', 'city', 'state', 'country', 'postal_code', 'industry',
+  'employees', 'revenue', 'created_at', 'updated_at', 'created_by',
+  'id', 'organization_id', 'product_name', 'sku', 'category', 'unit_price',
+  'quantity', 'payment_method', 'payment_status', 'payment_date', 'amount',
+  'transaction_date', 'due_date', 'paid_date'
+];
+
 // Apply authentication and organization validation to all routes
 router.use(authenticateToken);
 router.use(validateOrganizationContext);
@@ -605,9 +617,13 @@ router.get('/', async (req, res) => {
     // Filter by entity_type if column exists (include universal fields with entity_type = NULL)
     const whereClause = hasEntityType
       ? 'WHERE organization_id = $1 AND (entity_type = $2 OR entity_type IS NULL)'
-      : 'WHERE organization_id = $1';
+    const whereClause = hasEntityType
+      ? 'WHERE organization_id = $1 AND entity_type = $2 AND field_name != ALL($3)'
+      : 'WHERE organization_id = $1 AND field_name != ALL($2)';
 
-    const queryParams = hasEntityType ? [req.organizationId, entity_type] : [req.organizationId];
+    const queryParams = hasEntityType 
+      ? [req.organizationId, entity_type, SYSTEM_FIELD_NAMES] 
+      : [req.organizationId, SYSTEM_FIELD_NAMES];
 
     const customFields = await db.query(`
       SELECT ${selectColumns}
@@ -616,7 +632,7 @@ router.get('/', async (req, res) => {
       ${orderBy}
     `, queryParams);
 
-    console.log('Custom fields found:', customFields.rows.length);
+    console.log('Custom fields found (excluding system field names):', customFields.rows.length);
 
     // Normalize customFields to add missing columns with defaults
     customFields.rows = customFields.rows.map(field => ({
@@ -814,32 +830,9 @@ router.get('/', async (req, res) => {
       console.log('No stored system field configs found for', entity_type, ':', configError.message);
     }
 
-    // ALSO check custom_field_definitions for system fields that might have been customized there
-    // BUT only if they're NOT already in storedConfigs from default_field_configurations
-    try {
-      const customConfigResult = await db.query(`
-        SELECT field_name, field_options, is_enabled, is_required
-        FROM custom_field_definitions
-        WHERE organization_id = $1 
-          AND entity_type = $2
-          AND field_name IN (${Object.keys(systemFieldDefaults).map((_, i) => `$${i + 3}`).join(',')})
-      `, [req.organizationId, entity_type, ...Object.keys(systemFieldDefaults)]);
-
-      customConfigResult.rows.forEach(config => {
-        // Only use custom_field_definitions if NOT already configured in default_field_configurations
-        // This gives priority to the explicit system field configurations
-        if (!storedConfigs[config.field_name]) {
-          storedConfigs[config.field_name] = config;
-        }
-      });
-      console.log('Additional system field configs found in custom_field_definitions:', customConfigResult.rows.length);
-      if (customConfigResult.rows.length > 0) {
-        console.log('Custom field overrides (only used if not in default_field_configurations):', 
-          customConfigResult.rows.map(c => `${c.field_name}:enabled=${c.is_enabled}`).join(', '));
-      }
-    } catch (customConfigError) {
-      console.log('Could not check custom_field_definitions for system field overrides:', customConfigError.message);
-    }
+    // CRITICAL: System fields should NEVER come from custom_field_definitions
+    // Custom fields with system field names should have been cleaned up
+    // This code block is removed to prevent any possibility of custom fields overriding system fields
 
     // Build complete system fields list
     const systemFields = { rows: [] };
@@ -1011,10 +1004,11 @@ router.post('/', fieldCreationLimit, async (req, res) => {
       return res.status(400).json({ error: `Field name already exists for ${scopeLabel}` });
     }
 
-    // Check against system field names
-    const systemFields = ['firstName', 'lastName', 'email', 'phone', 'company', 'source', 'status', 'priority'];
-    if (systemFields.includes(field_name)) {
-      return res.status(400).json({ error: 'Field name conflicts with system field' });
+    // Check against system field names - CRITICAL: Prevent custom fields from shadowing system fields
+    if (SYSTEM_FIELD_NAMES.includes(field_name)) {
+      return res.status(400).json({ 
+        error: `Field name "${field_name}" is reserved as a system field and cannot be used for custom fields` 
+      });
     }
 
     // CRITICAL DEBUG: Log field_options before INSERT
