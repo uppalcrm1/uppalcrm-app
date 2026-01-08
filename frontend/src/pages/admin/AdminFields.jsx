@@ -128,6 +128,7 @@ const AdminFields = () => {
   const [error, setError] = useState(null)
   const [successMessage, setSuccessMessage] = useState(null)
   const [isReorderMode, setIsReorderMode] = useState(false)
+  const [pendingChanges, setPendingChanges] = useState({}) // Track unsaved visibility changes
   const [formData, setFormData] = useState({
     field_name: '',
     field_label: '',
@@ -333,47 +334,82 @@ const AdminFields = () => {
     }
   }
 
-  const handleToggleVisibility = async (field) => {
+  const handleToggleVisibility = (field, newValue) => {
+    // Track the pending change instead of saving immediately
+    const fieldKey = field.isSystemField ? `system_${field.field_name}` : `custom_${field.id}`
+    setPendingChanges(prev => ({
+      ...prev,
+      [fieldKey]: {
+        field,
+        newValue
+      }
+    }))
+  }
+
+  const handleSaveVisibilityChanges = async () => {
+    if (Object.keys(pendingChanges).length === 0) {
+      setError('No changes to save')
+      return
+    }
+
     try {
-      const newIsEnabled = !field.is_enabled
+      setLoading(true)
       setError(null)
       setSuccessMessage(null)
 
-      if (field.isSystemField) {
-        // For system fields, update via the system field configuration API
-        const response = await api.put(`/custom-fields/default/${field.field_name}`, {
-          is_enabled: newIsEnabled,
-          entity_type: activeTab  // Pass the current entity type
-        })
-        setSystemFields(prev => prev.map(f =>
-          f.field_name === field.field_name ? { ...f, is_enabled: newIsEnabled } : f
-        ))
-        const message = newIsEnabled
-          ? `${field.field_label} is now visible in forms`
-          : `${field.field_label} is now hidden from forms`
-        setSuccessMessage(message)
-        console.log(`✅ System field ${field.field_name} ${newIsEnabled ? 'enabled' : 'disabled'} for ${activeTab}`)
-      } else {
-        // For custom fields, update via the API
-        const response = await api.put(`/custom-fields/${field.id}`, {
-          is_enabled: newIsEnabled
-        })
-        setFields(prev => prev.map(f =>
-          f.id === field.id ? { ...f, is_enabled: newIsEnabled } : f
-        ))
-        const message = newIsEnabled
-          ? `${field.field_label} is now visible in forms`
-          : `${field.field_label} is now hidden from forms`
-        setSuccessMessage(message)
-        console.log(`✅ Custom field ${field.field_name} ${newIsEnabled ? 'enabled' : 'disabled'}`)
+      // Save all pending changes
+      for (const [fieldKey, change] of Object.entries(pendingChanges)) {
+        const { field, newValue } = change
+
+        if (field.isSystemField) {
+          await api.put(`/custom-fields/default/${field.field_name}`, {
+            is_enabled: newValue,
+            entity_type: activeTab
+          })
+          setSystemFields(prev => prev.map(f =>
+            f.field_name === field.field_name ? { ...f, is_enabled: newValue } : f
+          ))
+        } else {
+          await api.put(`/custom-fields/${field.id}`, {
+            is_enabled: newValue
+          })
+          setFields(prev => prev.map(f =>
+            f.id === field.id ? { ...f, is_enabled: newValue } : f
+          ))
+        }
       }
+
+      setSuccessMessage(`Successfully saved ${Object.keys(pendingChanges).length} field visibility change(s)`)
+      setPendingChanges({})
 
       // Auto-hide success message after 3 seconds
       setTimeout(() => setSuccessMessage(null), 3000)
     } catch (err) {
-      console.error('Error toggling field visibility:', err)
-      setError(err.response?.data?.error || 'Failed to update field visibility')
+      console.error('Error saving visibility changes:', err)
+      setError(err.response?.data?.error || 'Failed to save changes')
+    } finally {
+      setLoading(false)
     }
+  }
+
+  const handleCancelChanges = () => {
+    setPendingChanges({})
+    setSuccessMessage(null)
+    setError(null)
+  }
+
+  // Get the display value for a field (considering pending changes)
+  const getFieldVisibility = (field) => {
+    const fieldKey = field.isSystemField ? `system_${field.field_name}` : `custom_${field.id}`
+    if (pendingChanges[fieldKey]) {
+      return pendingChanges[fieldKey].newValue
+    }
+    return field.is_enabled
+  }
+
+  const hasPendingChange = (field) => {
+    const fieldKey = field.isSystemField ? `system_${field.field_name}` : `custom_${field.id}`
+    return pendingChanges[fieldKey] !== undefined
   }
 
   const resetForm = () => {
@@ -922,13 +958,34 @@ const AdminFields = () => {
                 />
               </div>
             </div>
-            <button
-              onClick={() => setIsReorderMode(!isReorderMode)}
-              className={`ml-4 btn ${isReorderMode ? 'btn-primary' : 'btn-outline'} flex items-center gap-2`}
-            >
-              <Move size={16} />
-              {isReorderMode ? 'Done Reordering' : 'Reorder Fields'}
-            </button>
+            <div className="flex items-center gap-3 ml-4">
+              {Object.keys(pendingChanges).length > 0 && (
+                <>
+                  <button
+                    onClick={handleCancelChanges}
+                    className="btn btn-outline flex items-center gap-2"
+                  >
+                    <X size={16} />
+                    Cancel Changes
+                  </button>
+                  <button
+                    onClick={handleSaveVisibilityChanges}
+                    disabled={loading}
+                    className="btn btn-primary flex items-center gap-2"
+                  >
+                    <Save size={16} />
+                    Save {Object.keys(pendingChanges).length} Change{Object.keys(pendingChanges).length > 1 ? 's' : ''}
+                  </button>
+                </>
+              )}
+              <button
+                onClick={() => setIsReorderMode(!isReorderMode)}
+                className={`btn ${isReorderMode ? 'btn-primary' : 'btn-outline'} flex items-center gap-2`}
+              >
+                <Move size={16} />
+                {isReorderMode ? 'Done Reordering' : 'Reorder Fields'}
+              </button>
+            </div>
           </div>
 
           {/* Fields Table */}
@@ -1002,10 +1059,10 @@ const AdminFields = () => {
                           >
                         <td className="py-4 px-4">
                           <div className="flex items-center gap-2">
-                            <span className={`font-medium ${field.is_enabled ? 'text-gray-900' : 'text-gray-500 line-through'}`}>
+                            <span className={`font-medium ${getFieldVisibility(field) ? 'text-gray-900' : 'text-gray-500'}`}>
                               {field.field_label}
                             </span>
-                            {!field.is_enabled && (
+                            {!getFieldVisibility(field) && (
                               <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Hidden</span>
                             )}
                             {field.entity_type === null && activeTab !== 'universal' && (
@@ -1055,31 +1112,23 @@ const AdminFields = () => {
                           )}
                         </td>
                         <td className="py-4 px-4">
-                          <button
-                            onClick={() => handleToggleVisibility(field)}
-                            className={`relative group flex items-center gap-2 px-3 py-2 rounded-lg transition-all font-medium ${
-                              field.is_enabled
-                                ? 'bg-green-50 text-green-700 hover:bg-green-100 border border-green-200'
-                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-300'
-                            }`}
-                            title={field.is_enabled ? 'Click to hide this field from forms' : 'Click to show this field in forms'}
-                          >
-                            {field.is_enabled ? (
-                              <>
-                                <Eye size={18} />
-                                <span className="text-sm">Visible</span>
-                              </>
-                            ) : (
-                              <>
-                                <EyeOff size={18} />
-                                <span className="text-sm">Hidden</span>
-                              </>
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={getFieldVisibility(field) ? 'visible' : 'hidden'}
+                              onChange={(e) => handleToggleVisibility(field, e.target.value === 'visible')}
+                              className={`input py-1.5 text-sm min-w-[120px] ${
+                                hasPendingChange(field) ? 'border-orange-500 border-2' : ''
+                              }`}
+                            >
+                              <option value="visible">👁️ Visible</option>
+                              <option value="hidden">🚫 Hidden</option>
+                            </select>
+                            {hasPendingChange(field) && (
+                              <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-full font-medium">
+                                Unsaved
+                              </span>
                             )}
-                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-                              {field.is_enabled ? 'Click to hide from forms' : 'Click to show in forms'}
-                              <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900"></div>
-                            </div>
-                          </button>
+                          </div>
                         </td>
                         <td className="py-4 px-4">
                           <div className="flex items-center gap-2">
