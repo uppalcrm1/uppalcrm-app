@@ -192,6 +192,11 @@ export const usersAPI = {
   getUsersForAssignment: async () => {
     const response = await api.get('/custom-fields/users-for-assignment')
     return response.data
+  },
+
+  resetPassword: async (id, passwordData) => {
+    const response = await api.put(`/users/${id}/reset-password`, passwordData)
+    return response.data
   }
 }
 
