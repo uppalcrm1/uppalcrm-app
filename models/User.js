@@ -46,10 +46,47 @@ class User {
       throw new Error('Invalid role specified');
     }
 
-    // Hash password
-    const passwordHash = await bcrypt.hash(password, parseInt(process.env.BCRYPT_ROUNDS) || 12);
-
     try {
+      // Check if a soft-deleted user with this email exists
+      const existingUser = await query(`
+        SELECT * FROM users 
+        WHERE organization_id = $1 AND LOWER(email) = LOWER($2)
+      `, [organizationId, email], organizationId);
+
+      if (existingUser.rows.length > 0) {
+        const user = existingUser.rows[0];
+        
+        // If user is soft-deleted, reactivate them
+        if (user.deleted_at) {
+          const passwordHash = await bcrypt.hash(password, parseInt(process.env.BCRYPT_ROUNDS) || 12);
+          
+          const reactivated = await query(`
+            UPDATE users 
+            SET 
+              password_hash = $1,
+              first_name = $2,
+              last_name = $3,
+              role = $4,
+              is_active = true,
+              deleted_at = NULL,
+              deleted_by = NULL,
+              updated_at = NOW()
+            WHERE id = $5 AND organization_id = $6
+            RETURNING *
+          `, [passwordHash, first_name, last_name, role, user.id, organizationId], organizationId);
+          
+          console.log(`✅ Reactivated soft-deleted user: ${email}`);
+          return new User(reactivated.rows[0]);
+        } else {
+          // User exists and is active
+          throw new Error('Email already exists in this organization');
+        }
+      }
+
+      // Hash password
+      const passwordHash = await bcrypt.hash(password, parseInt(process.env.BCRYPT_ROUNDS) || 12);
+
+      // Create new user
       const result = await query(`
         INSERT INTO users (
           organization_id, email, password_hash, first_name, last_name,
