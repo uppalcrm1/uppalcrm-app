@@ -669,6 +669,13 @@ router.get('/', async (req, res) => {
         title: { label: 'Job Title', type: 'text', required: false, editable: true },
         department: { label: 'Department', type: 'text', required: false, editable: true },
         linkedIn: { label: 'LinkedIn Profile', type: 'url', required: false, editable: true },
+        type: {
+          label: 'Type',
+          type: 'select',
+          required: false,
+          editable: true,
+          options: []
+        },
         source: {
           label: 'Source',
           type: 'select',
@@ -681,9 +688,18 @@ router.get('/', async (req, res) => {
           type: 'select',
           required: false,
           editable: true,
-          options: ['active', 'inactive', 'prospect']
+          options: []
         },
+        priority: {
+          label: 'Priority',
+          type: 'select',
+          required: false,
+          editable: true,
+          options: ['low', 'medium', 'high']
+        },
+        value: { label: 'Customer Value ($)', type: 'number', required: false, editable: true },
         assignedTo: { label: 'Assign To', type: 'user_select', required: false, editable: true },
+        nextFollowUp: { label: 'Next Follow Up', type: 'datetime', required: false, editable: true },
         lastContactDate: { label: 'Last Contact Date', type: 'date', required: false, editable: true },
         notes: { label: 'Notes', type: 'textarea', required: false, editable: true }
       },
@@ -1185,6 +1201,13 @@ router.put('/default/:fieldName', async (req, res) => {
         title: { label: 'Job Title', type: 'text', required: false, editable: true },
         department: { label: 'Department', type: 'text', required: false, editable: true },
         linkedIn: { label: 'LinkedIn Profile', type: 'url', required: false, editable: true },
+        type: {
+          label: 'Type',
+          type: 'select',
+          required: false,
+          editable: true,
+          options: []
+        },
         source: {
           label: 'Source',
           type: 'select',
@@ -1197,9 +1220,22 @@ router.put('/default/:fieldName', async (req, res) => {
           type: 'select',
           required: false,
           editable: true,
-          options: ['active', 'inactive', 'prospect']
+          options: []
         },
+        priority: {
+          label: 'Priority',
+          type: 'select',
+          required: false,
+          editable: true,
+          options: [
+            { value: 'low', label: 'Low' },
+            { value: 'medium', label: 'Medium' },
+            { value: 'high', label: 'High' }
+          ]
+        },
+        value: { label: 'Customer Value ($)', type: 'number', required: false, editable: true },
         assignedTo: { label: 'Assign To', type: 'user_select', required: false, editable: true },
+        nextFollowUp: { label: 'Next Follow Up', type: 'datetime', required: false, editable: true },
         lastContactDate: { label: 'Last Contact Date', type: 'date', required: false, editable: true },
         notes: { label: 'Notes', type: 'textarea', required: false, editable: true }
       },
