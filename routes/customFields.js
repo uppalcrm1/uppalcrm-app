@@ -807,6 +807,9 @@ router.get('/', async (req, res) => {
         storedConfigs[config.field_name] = config;
       });
       console.log('Stored system field configs found for', entity_type, ':', Object.keys(storedConfigs).length);
+      if (configResult.rows.length > 0) {
+        console.log('Stored configs:', configResult.rows.map(c => `${c.field_name}:enabled=${c.is_enabled}`).join(', '));
+      }
     } catch (configError) {
       console.log('No stored system field configs found for', entity_type, ':', configError.message);
     }
@@ -1400,6 +1403,15 @@ router.put('/default/:fieldName', async (req, res) => {
     } else {
       // Fall back to default_field_configurations for entity-specific fields
       console.log('🔧 Updating entity-specific field in default_field_configurations');
+      console.log('🔧 Parameters:', {
+        org: req.organizationId,
+        fieldName,
+        entity_type,
+        options: fieldConfig.options,
+        is_enabled: fieldConfig.is_enabled,
+        is_required: fieldConfig.is_required
+      });
+      
       result = await db.query(`
         INSERT INTO default_field_configurations
         (organization_id, field_name, entity_type, field_options, is_enabled, is_required, sort_order, updated_at)
@@ -1421,6 +1433,8 @@ router.put('/default/:fieldName', async (req, res) => {
         fieldConfig.is_required,
         0 // default sort order
       ]);
+      
+      console.log('🔧 Database result:', result.rows[0]);
     }
 
     // Store the complete field configuration (including options) in a separate way
