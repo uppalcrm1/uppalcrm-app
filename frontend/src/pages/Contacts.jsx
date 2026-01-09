@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import {
@@ -103,7 +103,8 @@ const Contacts = () => {
   const [showFilters, setShowFilters] = useState(false)
   const [viewMode, setViewMode] = useState('list') // 'list' or 'detail'
   const [fieldLabels, setFieldLabels] = useState({})
-  const [searchInput, setSearchInput] = useState('') // Local state for search input
+  const [searchInput, setSearchInput] = useState(searchParams.get('search') || '') // Local state for search input
+  const isTypingRef = useRef(false) // Track if user is actively typing
 
   // Load column visibility from localStorage or use defaults
   const [visibleColumns, setVisibleColumns] = useState(() => {
@@ -134,17 +135,30 @@ const Contacts = () => {
     loadFieldConfiguration()
   }, [])
 
-  // Initialize search input from URL params
+  // Sync search input from URL only when not typing
   useEffect(() => {
-    setSearchInput(searchParams.get('search') || '')
-  }, [searchParams.get('search')])
+    const urlSearch = searchParams.get('search') || ''
+    if (!isTypingRef.current && urlSearch !== searchInput) {
+      setSearchInput(urlSearch)
+    }
+  }, [searchParams])
 
   // Debounce search input to update URL
   useEffect(() => {
+    isTypingRef.current = true
     const timer = setTimeout(() => {
-      if (searchInput !== currentFilters.search) {
-        updateFilters({ search: searchInput, page: 1 })
+      const urlSearch = searchParams.get('search') || ''
+      if (searchInput !== urlSearch) {
+        const params = new URLSearchParams(searchParams)
+        if (searchInput) {
+          params.set('search', searchInput)
+        } else {
+          params.delete('search')
+        }
+        params.set('page', '1') // Reset to first page
+        setSearchParams(params)
       }
+      isTypingRef.current = false
     }, 300) // 300ms debounce
 
     return () => clearTimeout(timer)
