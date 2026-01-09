@@ -103,6 +103,7 @@ const Contacts = () => {
   const [showFilters, setShowFilters] = useState(false)
   const [viewMode, setViewMode] = useState('list') // 'list' or 'detail'
   const [fieldLabels, setFieldLabels] = useState({})
+  const [searchInput, setSearchInput] = useState('') // Local state for search input
 
   // Load column visibility from localStorage or use defaults
   const [visibleColumns, setVisibleColumns] = useState(() => {
@@ -132,6 +133,22 @@ const Contacts = () => {
     }
     loadFieldConfiguration()
   }, [])
+
+  // Initialize search input from URL params
+  useEffect(() => {
+    setSearchInput(searchParams.get('search') || '')
+  }, [searchParams.get('search')])
+
+  // Debounce search input to update URL
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchInput !== currentFilters.search) {
+        updateFilters({ search: searchInput, page: 1 })
+      }
+    }, 300) // 300ms debounce
+
+    return () => clearTimeout(timer)
+  }, [searchInput])
 
   // Get current filters from URL
   const currentFilters = {
@@ -317,8 +334,8 @@ const Contacts = () => {
               <input
                 type="text"
                 placeholder="Search contacts..."
-                value={currentFilters.search}
-                onChange={(e) => updateFilters({ search: e.target.value, page: 1 })}
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
                 className="input pl-10"
               />
             </div>
