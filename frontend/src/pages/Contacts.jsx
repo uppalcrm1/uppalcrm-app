@@ -145,14 +145,19 @@ const Contacts = () => {
     source: searchParams.get('source') || '',
   }), [searchParams])
 
-  // Update URL with new filters
-  const updateFilters = (newFilters) => {
+  // Update URL with new filters - memoized to prevent re-creating function
+  const updateFilters = React.useCallback((newFilters) => {
     const params = new URLSearchParams()
     Object.entries({ ...currentFilters, ...newFilters }).forEach(([key, value]) => {
       if (value) params.set(key, value.toString())
     })
     setSearchParams(params)
-  }
+  }, [currentFilters, setSearchParams])
+
+  // Memoize active filter count
+  const activeFilterCount = React.useMemo(() => {
+    return Object.values(currentFilters).filter(v => v && v !== 1 && v !== 20 && v !== '').length
+  }, [currentFilters])
 
   // Column visibility handlers
   const handleColumnToggle = (columnKey) => {
@@ -332,9 +337,9 @@ const Contacts = () => {
           >
             <Filter size={16} className="mr-2" />
             Filters
-            {Object.values(currentFilters).filter(v => v && v !== 1 && v !== 20 && v !== '').length > 0 && (
+            {activeFilterCount > 0 && (
               <span className="ml-2 bg-primary-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
-                {Object.values(currentFilters).filter(v => v && v !== 1 && v !== 20 && v !== '').length}
+                {activeFilterCount}
               </span>
             )}
           </button>
