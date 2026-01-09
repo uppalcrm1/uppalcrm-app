@@ -18,7 +18,7 @@ const transactionSchemas = {
     contact_id: Joi.string().uuid().required(), // REQUIRED: Every transaction must have a contact
     product_id: Joi.string().uuid().allow(null),
     payment_method: Joi.string().max(50).default('Credit Card'),
-    source: Joi.string().max(50).default('manual'), // Default to 'manual' for manually created transactions
+    source: Joi.string().max(50).required(), // REQUIRED: Source must be provided
     term: Joi.string().max(50).required(), // REQUIRED: Billing term
     amount: Joi.number().min(0).required(),
     currency: Joi.string().valid('CAD', 'USD').default('CAD'),

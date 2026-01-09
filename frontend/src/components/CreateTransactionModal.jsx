@@ -31,7 +31,7 @@ const CreateTransactionModal = ({ account, onClose, onSuccess, isOpen }) => {
     payment_date: new Date().toISOString().split('T')[0], // Default to today
     status: 'completed',
     payment_method: 'Credit Card',
-    source: 'manual',
+    source: '', // Will be set after source options load
     term: '',
     transaction_reference: '',
     notes: '',
@@ -179,6 +179,15 @@ const CreateTransactionModal = ({ account, onClose, onSuccess, isOpen }) => {
           })
           setSourceOptions(options)
           console.log('✅ Loaded source options from field config:', options)
+          
+          // Set default source value to first option if not already set
+          if (!formData.source && options.length > 0) {
+            setFormData(prev => ({
+              ...prev,
+              source: options[0].value
+            }))
+            console.log('✅ Set default source to:', options[0].value)
+          }
         } else {
           console.log('⚠️ No source field found or no options configured, using defaults')
         }
@@ -237,6 +246,10 @@ const CreateTransactionModal = ({ account, onClose, onSuccess, isOpen }) => {
 
     if (!formData.payment_method) {
       newErrors.payment_method = 'Payment method is required'
+    }
+
+    if (!formData.source) {
+      newErrors.source = 'Source is required'
     }
 
     if (!formData.term) {
@@ -601,20 +614,25 @@ const CreateTransactionModal = ({ account, onClose, onSuccess, isOpen }) => {
                 {/* Source Field */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Source
+                    Source <span className="text-red-500">*</span>
                   </label>
                   <select
                     name="source"
                     value={formData.source}
                     onChange={handleChange}
-                    className="select"
+                    required
+                    className={`select ${errors.source ? 'border-red-500' : ''}`}
                   >
+                    <option value="">Select source</option>
                     {sourceOptions.map(source => (
                       <option key={source.value} value={source.value}>
                         {source.label}
                       </option>
                     ))}
                   </select>
+                  {errors.source && (
+                    <p className="text-red-600 text-sm mt-1">{errors.source}</p>
+                  )}
                   <span className="text-xs text-gray-500 mt-1">Where this payment came from</span>
                 </div>
 
