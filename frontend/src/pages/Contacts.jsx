@@ -95,7 +95,8 @@ const Contacts = () => {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const searchInputRef = useRef(null)
-  const [localSearch, setLocalSearch] = useState('')
+  const [localSearch, setLocalSearch] = useState(searchParams.get('search') || '')
+  const isTypingRef = useRef(false)
   
   // State
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -112,9 +113,14 @@ const Contacts = () => {
     return saved ? JSON.parse(saved) : DEFAULT_VISIBLE_COLUMNS
   })
 
-  // Sync local search with URL on mount
+  // Sync local search with URL on mount (but not while typing)
   useEffect(() => {
-    setLocalSearch(searchParams.get('search') || '')
+    if (!isTypingRef.current) {
+      const urlSearch = searchParams.get('search') || ''
+      if (urlSearch !== localSearch) {
+        setLocalSearch(urlSearch)
+      }
+    }
   }, [searchParams])
 
   // Debounce local search to URL
@@ -130,6 +136,7 @@ const Contacts = () => {
         }
         params.set('page', '1')
         setSearchParams(params, { replace: true })
+        isTypingRef.current = false
       }
     }, 300)
     return () => clearTimeout(timer)
@@ -349,7 +356,10 @@ const Contacts = () => {
                 type="text"
                 placeholder="Search contacts..."
                 value={localSearch}
-                onChange={(e) => setLocalSearch(e.target.value)}
+                onChange={(e) => {
+                  isTypingRef.current = true
+                  setLocalSearch(e.target.value)
+                }}
                 className="input pl-10"
               />
             </div>
