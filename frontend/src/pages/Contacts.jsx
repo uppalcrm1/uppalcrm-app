@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import {
@@ -94,6 +94,8 @@ const Contacts = () => {
   const [searchParams, setSearchParams] = useSearchParams()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
+  const searchInputRef = useRef(null)
+  const [localSearch, setLocalSearch] = useState('')
   
   // State
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -109,6 +111,29 @@ const Contacts = () => {
     const saved = localStorage.getItem('contacts_visible_columns')
     return saved ? JSON.parse(saved) : DEFAULT_VISIBLE_COLUMNS
   })
+
+  // Sync local search with URL on mount
+  useEffect(() => {
+    setLocalSearch(searchParams.get('search') || '')
+  }, [searchParams])
+
+  // Debounce local search to URL
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const currentUrlSearch = searchParams.get('search') || ''
+      if (localSearch !== currentUrlSearch) {
+        const params = new URLSearchParams(searchParams)
+        if (localSearch) {
+          params.set('search', localSearch)
+        } else {
+          params.delete('search')
+        }
+        params.set('page', '1')
+        setSearchParams(params, { replace: true })
+      }
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [localSearch])
 
   // Fetch field configuration to get dynamic column labels
   useEffect(() => {
@@ -320,11 +345,11 @@ const Contacts = () => {
             <div className="relative">
               <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
               <input
-                key="contact-search-input"
+                ref={searchInputRef}
                 type="text"
                 placeholder="Search contacts..."
-                value={currentFilters.search}
-                onChange={(e) => updateFilters({ search: e.target.value, page: 1 })}
+                value={localSearch}
+                onChange={(e) => setLocalSearch(e.target.value)}
                 className="input pl-10"
               />
             </div>
