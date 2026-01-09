@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import {
@@ -94,9 +94,6 @@ const Contacts = () => {
   const [searchParams, setSearchParams] = useSearchParams()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
-  const searchInputRef = useRef(null)
-  const [localSearch, setLocalSearch] = useState(searchParams.get('search') || '')
-  const isTypingRef = useRef(false)
   
   // State
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -112,35 +109,6 @@ const Contacts = () => {
     const saved = localStorage.getItem('contacts_visible_columns')
     return saved ? JSON.parse(saved) : DEFAULT_VISIBLE_COLUMNS
   })
-
-  // Sync local search with URL on mount (but not while typing)
-  useEffect(() => {
-    if (!isTypingRef.current) {
-      const urlSearch = searchParams.get('search') || ''
-      if (urlSearch !== localSearch) {
-        setLocalSearch(urlSearch)
-      }
-    }
-  }, [searchParams])
-
-  // Debounce local search to URL
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      const currentUrlSearch = searchParams.get('search') || ''
-      if (localSearch !== currentUrlSearch) {
-        const params = new URLSearchParams(searchParams)
-        if (localSearch) {
-          params.set('search', localSearch)
-        } else {
-          params.delete('search')
-        }
-        params.set('page', '1')
-        setSearchParams(params, { replace: true })
-        isTypingRef.current = false
-      }
-    }, 300)
-    return () => clearTimeout(timer)
-  }, [localSearch])
 
   // Fetch field configuration to get dynamic column labels
   useEffect(() => {
@@ -177,14 +145,14 @@ const Contacts = () => {
     source: searchParams.get('source') || '',
   }), [searchParams])
 
-  // Update URL with new filters - memoized to prevent re-creating function
-  const updateFilters = React.useCallback((newFilters) => {
+  // Update URL with new filters
+  const updateFilters = (newFilters) => {
     const params = new URLSearchParams()
     Object.entries({ ...currentFilters, ...newFilters }).forEach(([key, value]) => {
       if (value) params.set(key, value.toString())
     })
-    setSearchParams(params, { replace: true })
-  }, [currentFilters, setSearchParams])
+    setSearchParams(params)
+  }
 
   // Memoize active filter count
   const activeFilterCount = React.useMemo(() => {
@@ -352,14 +320,10 @@ const Contacts = () => {
             <div className="relative">
               <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
               <input
-                ref={searchInputRef}
                 type="text"
                 placeholder="Search contacts..."
-                value={localSearch}
-                onChange={(e) => {
-                  isTypingRef.current = true
-                  setLocalSearch(e.target.value)
-                }}
+                value={currentFilters.search}
+                onChange={(e) => updateFilters({ search: e.target.value, page: 1 })}
                 className="input pl-10"
               />
             </div>
