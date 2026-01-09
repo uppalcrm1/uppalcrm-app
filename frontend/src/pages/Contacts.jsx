@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import {
@@ -103,8 +103,6 @@ const Contacts = () => {
   const [showFilters, setShowFilters] = useState(false)
   const [viewMode, setViewMode] = useState('list') // 'list' or 'detail'
   const [fieldLabels, setFieldLabels] = useState({})
-  const [searchInput, setSearchInput] = useState(searchParams.get('search') || '') // Local state for search input
-  const isTypingRef = useRef(false) // Track if user is actively typing
 
   // Load column visibility from localStorage or use defaults
   const [visibleColumns, setVisibleColumns] = useState(() => {
@@ -135,37 +133,8 @@ const Contacts = () => {
     loadFieldConfiguration()
   }, [])
 
-  // Sync search input from URL only when not typing
-  useEffect(() => {
-    const urlSearch = searchParams.get('search') || ''
-    if (!isTypingRef.current && urlSearch !== searchInput) {
-      setSearchInput(urlSearch)
-    }
-  }, [searchParams])
-
-  // Debounce search input to update URL
-  useEffect(() => {
-    isTypingRef.current = true
-    const timer = setTimeout(() => {
-      const urlSearch = searchParams.get('search') || ''
-      if (searchInput !== urlSearch) {
-        const params = new URLSearchParams(searchParams)
-        if (searchInput) {
-          params.set('search', searchInput)
-        } else {
-          params.delete('search')
-        }
-        params.set('page', '1') // Reset to first page
-        setSearchParams(params)
-      }
-      isTypingRef.current = false
-    }, 300) // 300ms debounce
-
-    return () => clearTimeout(timer)
-  }, [searchInput])
-
-  // Get current filters from URL
-  const currentFilters = {
+  // Get current filters from URL - memoized to prevent unnecessary re-renders
+  const currentFilters = React.useMemo(() => ({
     page: parseInt(searchParams.get('page')) || 1,
     limit: parseInt(searchParams.get('limit')) || 20,
     search: searchParams.get('search') || '',
@@ -174,7 +143,7 @@ const Contacts = () => {
     priority: searchParams.get('priority') || '',
     assigned_to: searchParams.get('assigned_to') || '',
     source: searchParams.get('source') || '',
-  }
+  }), [searchParams])
 
   // Update URL with new filters
   const updateFilters = (newFilters) => {
@@ -348,8 +317,8 @@ const Contacts = () => {
               <input
                 type="text"
                 placeholder="Search contacts..."
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
+                value={currentFilters.search}
+                onChange={(e) => updateFilters({ search: e.target.value, page: 1 })}
                 className="input pl-10"
               />
             </div>
