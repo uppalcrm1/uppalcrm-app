@@ -315,6 +315,7 @@ const Contacts = () => {
             <div className="relative">
               <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
               <input
+                key="contact-search-input"
                 type="text"
                 placeholder="Search contacts..."
                 value={currentFilters.search}
