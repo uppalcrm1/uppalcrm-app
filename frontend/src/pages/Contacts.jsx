@@ -151,7 +151,7 @@ const Contacts = () => {
     Object.entries({ ...currentFilters, ...newFilters }).forEach(([key, value]) => {
       if (value) params.set(key, value.toString())
     })
-    setSearchParams(params)
+    setSearchParams(params, { replace: true })
   }, [currentFilters, setSearchParams])
 
   // Memoize active filter count
