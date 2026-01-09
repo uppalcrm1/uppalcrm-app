@@ -182,9 +182,11 @@ const Contacts = () => {
   }
 
   // Fetch contacts
-  const { data: contactsData, isLoading: contactsLoading } = useQuery({
+  const { data: contactsData, isLoading: contactsLoading, isFetching: contactsFetching } = useQuery({
     queryKey: ['contacts', currentFilters],
     queryFn: () => contactsAPI.getContacts(currentFilters),
+    keepPreviousData: true,
+    staleTime: 30000,
   })
 
   // Fetch users for assignment
@@ -259,7 +261,7 @@ const Contacts = () => {
     setSelectedContact(null)
   }
 
-  if (contactsLoading) {
+  if (contactsLoading && !contactsData) {
     return <LoadingSpinner className="mt-8" />
   }
 
