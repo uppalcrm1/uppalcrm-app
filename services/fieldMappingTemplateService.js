@@ -338,51 +338,6 @@ exports.applyTemplate = async (organizationId, templateId, options = {}) => {
     client.release();
   }
 };
-          item.target_field,
-          item.target_field_type,
-          item.target_field_path,
-          item.transformation_type,
-          item.transformation_rule_id,
-          item.default_value,
-          item.is_editable_on_convert !== false,
-          item.is_required_on_convert === true,
-          item.is_visible_on_convert !== false,
-          item.display_order,
-          item.display_label,
-          item.help_text
-        ]);
-
-        created++;
-      }
-    }
-
-    // Track template usage
-    const usageQuery = `
-      INSERT INTO field_mapping_statistics (
-        organization_id, template_id, event_type, event_count
-      ) VALUES ($1, $2, 'template_applied', 1)
-      ON CONFLICT (organization_id, template_id, event_type)
-      DO UPDATE SET
-        event_count = field_mapping_statistics.event_count + 1,
-        last_event_at = CURRENT_TIMESTAMP
-    `;
-
-    await client.query(usageQuery, [organizationId, templateId]);
-
-    await client.query('COMMIT');
-
-    return {
-      created,
-      skipped,
-      total: template.mappings.length
-    };
-  } catch (error) {
-    await client.query('ROLLBACK');
-    throw error;
-  } finally {
-    client.release();
-  }
-};
 
 /**
  * Delete a custom template
