@@ -1274,7 +1274,7 @@ export const fieldMappingAPI = {
   // Get all field mappings
   getAll: async () => {
     const response = await api.get('/field-mappings')
-    return response.data
+    return { fieldMappings: response.data.data || [] }
   },
 
   // Get a single field mapping
@@ -1313,7 +1313,7 @@ export const fieldMappingTemplateAPI = {
   // Get all templates
   getAll: async () => {
     const response = await api.get('/field-mapping-templates')
-    return response.data
+    return { templates: response.data.data || [] }
   },
 
   // Get a single template
