@@ -247,38 +247,6 @@ const AdminUsers = () => {
     }
   }
 
-  const handleResetPassword = async () => {
-    if (!selectedUser) return
-
-    const newPassword = prompt(`Enter new password for ${selectedUser.first_name} ${selectedUser.last_name}:`, '')
-    if (!newPassword) return
-
-    if (newPassword.length < 8) {
-      toast.error('Password must be at least 8 characters long')
-      return
-    }
-
-    try {
-      console.log('🔐 Resetting password for user:', selectedUser.id)
-
-      const loadingToast = toast.loading('Resetting password...')
-
-      await usersAPI.resetPassword(selectedUser.id, { password: newPassword })
-
-      console.log('✅ Password reset successfully')
-
-      toast.dismiss(loadingToast)
-      toast.success(`Password reset successfully for ${selectedUser.first_name} ${selectedUser.last_name}`)
-
-      // Close modal
-      handleCloseEditModal()
-    } catch (error) {
-      console.error('❌ Error resetting password:', error)
-      const errorMessage = error.response?.data?.message || error.message || 'Failed to reset password'
-      toast.error(errorMessage)
-    }
-  }
-
   const getRoleBadgeClass = (role) => {
     const badges = {
       admin: 'bg-blue-100 text-blue-800',
@@ -903,19 +871,8 @@ const AdminUsers = () => {
                 </button>
               </div>
 
-              {/* Reset Password */}
-              <div className="mb-4 pt-4 border-t border-gray-200">
-                <button
-                  onClick={handleResetPassword}
-                  className="w-full btn btn-outline text-orange-600 hover:bg-orange-50 border-orange-300"
-                >
-                  <Mail size={16} className="mr-2" />
-                  Reset Password
-                </button>
-              </div>
-
               {/* Cancel Button */}
-              <div className="flex justify-end">
+              <div className="flex justify-end pt-4 border-t border-gray-200">
                 <button
                   onClick={handleCloseEditModal}
                   className="btn btn-outline"
