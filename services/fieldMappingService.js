@@ -11,41 +11,46 @@ const { AppError } = require('../utils/errors');
  * Get all field mappings for an organization
  */
 exports.getAllMappings = async (organizationId, filters = {}) => {
-  const {
-    target_entity_type,
-    source_entity_type,
-    include_inactive = false
-  } = filters;
+  try {
+    const {
+      target_entity_type,
+      source_entity_type,
+      include_inactive = false
+    } = filters;
 
-  let query = `
-    SELECT *
-    FROM field_mappings
-    WHERE organization_id = $1
-  `;
+    let query = `
+      SELECT *
+      FROM field_mappings
+      WHERE organization_id = $1
+    `;
 
-  const params = [organizationId];
-  let paramIndex = 2;
+    const params = [organizationId];
+    let paramIndex = 2;
 
-  if (!include_inactive) {
-    query += ` AND is_active = true`;
+    if (!include_inactive) {
+      query += ` AND is_active = true`;
+    }
+
+    if (source_entity_type) {
+      query += ` AND source_entity_type = $${paramIndex}`;
+      params.push(source_entity_type);
+      paramIndex++;
+    }
+
+    if (target_entity_type) {
+      query += ` AND target_entity_type = $${paramIndex}`;
+      params.push(target_entity_type);
+      paramIndex++;
+    }
+
+    query += ` ORDER BY priority ASC, created_at DESC`;
+
+    const result = await pool.query(query, params);
+    return result.rows;
+  } catch (error) {
+    console.error('Error in getAllMappings:', error);
+    throw error;
   }
-
-  if (source_entity_type) {
-    query += ` AND source_entity_type = $${paramIndex}`;
-    params.push(source_entity_type);
-    paramIndex++;
-  }
-
-  if (target_entity_type) {
-    query += ` AND target_entity_type = $${paramIndex}`;
-    params.push(target_entity_type);
-    paramIndex++;
-  }
-
-  query += ` ORDER BY priority ASC, created_at DESC`;
-
-  const result = await pool.query(query, params);
-  return result.rows;
 };
 
 /**
