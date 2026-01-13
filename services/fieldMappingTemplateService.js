@@ -250,84 +250,94 @@ exports.applyTemplate = async (organizationId, templateId, options = {}) => {
     let skipped = 0;
 
     for (const item of template.mappings) {
-      // Skip if not in include list (when specified)
-      if (field_mappings_to_include && !field_mappings_to_include.includes(item.source_mapping_id)) {
-        skipped++;
-        continue;
-      }
-
       // Check if mapping already exists
       const existingQuery = `
-        SELECT id FROM field_mapping_configurations
+        SELECT id FROM field_mappings
         WHERE organization_id = $1
-          AND source_field = $2
-          AND target_field = $3
-          AND target_entity = $4
+          AND source_entity_type = $2
+          AND target_entity_type = $3
+          AND source_field_name = $4
+          AND target_field_name = $5
           AND is_active = true
       `;
 
       const existingResult = await client.query(existingQuery, [
         organizationId,
-        item.source_field,
-        item.target_field,
-        item.applies_to_entity
+        item.source_entity_type || 'lead',
+        item.target_entity_type,
+        item.source_field_name,
+        item.target_field_name
       ]);
 
       if (existingResult.rows.length > 0) {
         if (override_existing) {
           // Update existing mapping
           const updateQuery = `
-            UPDATE field_mapping_configurations
+            UPDATE field_mappings
             SET
-              source_field_type = $1,
-              source_field_path = $2,
-              target_field_type = $3,
-              target_field_path = $4,
-              transformation_type = $5,
-              transformation_rule_id = $6,
-              default_value = $7,
-              display_label = $8,
-              help_text = $9,
+              transformation_rule = $1,
+              is_required = $2,
+              priority = $3,
               updated_at = CURRENT_TIMESTAMP
-            WHERE id = $10
+            WHERE id = $4
           `;
 
           await client.query(updateQuery, [
-            item.source_field_type,
-            item.source_field_path,
-            item.target_field_type,
-            item.target_field_path,
-            item.transformation_type,
-            item.transformation_rule_id,
-            item.default_value,
-            item.display_label,
-            item.help_text,
+            item.transformation_rule,
+            item.is_required || false,
+            item.priority || 100,
             existingResult.rows[0].id
           ]);
 
-          created++; // Count as created for reporting
+          created++;
         } else {
           skipped++;
         }
       } else {
         // Create new mapping
         const createQuery = `
-          INSERT INTO field_mapping_configurations (
-            organization_id, source_entity, source_field, source_field_type, source_field_path,
-            target_entity, target_field, target_field_type, target_field_path,
-            transformation_type, transformation_rule_id, default_value,
-            is_editable_on_convert, is_required_on_convert, is_visible_on_convert,
-            display_order, display_label, help_text
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+          INSERT INTO field_mappings (
+            organization_id,
+            source_entity_type,
+            target_entity_type,
+            source_field_name,
+            target_field_name,
+            transformation_rule,
+            is_required,
+            priority,
+            is_active
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true)
         `;
 
         await client.query(createQuery, [
           organizationId,
-          'leads', // Default source entity
-          item.source_field,
-          item.source_field_type,
-          item.source_field_path,
-          item.applies_to_entity,
+          item.source_entity_type || 'lead',
+          item.target_entity_type,
+          item.source_field_name,
+          item.target_field_name,
+          item.transformation_rule,
+          item.is_required || false,
+          item.priority || 100
+        ]);
+
+        created++;
+      }
+    }
+
+    await client.query('COMMIT');
+
+    return {
+      appliedMappings: created,
+      skipped: skipped,
+      total: template.mappings.length
+    };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+};
           item.target_field,
           item.target_field_type,
           item.target_field_path,

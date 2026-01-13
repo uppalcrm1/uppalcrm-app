@@ -146,6 +146,16 @@ router.post(
 // ============================================================================
 
 /**
+ * GET /api/field-mappings/fields/:entityType
+ * Get available fields for an entity type (simplified for frontend)
+ */
+router.get(
+  '/fields/:entityType',
+  authenticateToken,
+  fieldMappingController.getEntityFields
+);
+
+/**
  * GET /api/field-mappings/available-sources
  * Get available source fields that can be mapped
  */

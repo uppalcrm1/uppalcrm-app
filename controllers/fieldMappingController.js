@@ -299,6 +299,37 @@ exports.getAvailableTargetFields = async (req, res, next) => {
 };
 
 /**
+ * GET /api/field-mappings/fields/:entityType
+ * Get available fields for an entity type (for frontend dropdowns)
+ */
+exports.getEntityFields = async (req, res, next) => {
+  try {
+    const { organization_id } = req.user;
+    const { entityType } = req.params;
+
+    // Normalize entity type
+    const normalizedType = entityType.toLowerCase();
+    
+    let fields;
+    if (normalizedType === 'lead' || normalizedType === 'leads') {
+      fields = await fieldMappingService.getAvailableSourceFields(organization_id, 'leads');
+    } else if (['contact', 'contacts', 'account', 'accounts'].includes(normalizedType)) {
+      const targetEntity = normalizedType.endsWith('s') ? normalizedType : normalizedType + 's';
+      fields = await fieldMappingService.getAvailableTargetFields(organization_id, targetEntity);
+    } else {
+      throw new AppError('Invalid entity type. Must be lead, contact, or account', 400);
+    }
+
+    res.json({
+      success: true,
+      fields: fields || []
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * POST /api/field-mappings/preview
  * Generate a preview of the conversion modal with current mappings
  */
