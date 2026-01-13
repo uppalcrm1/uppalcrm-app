@@ -333,14 +333,16 @@ DROP POLICY IF EXISTS field_mappings_org_isolation ON field_mapping_configuratio
 CREATE POLICY field_mappings_org_isolation
   ON field_mapping_configurations
   FOR ALL
-  USING (organization_id = current_setting('app.current_organization_id', true)::UUID);
+  USING (organization_id = current_setting('app.current_organization_id', true)::UUID)
+  WITH CHECK (organization_id = current_setting('app.current_organization_id', true)::UUID);
 
 -- RLS Policies for field_transformation_rules
 DROP POLICY IF EXISTS transformation_rules_org_isolation ON field_transformation_rules;
 CREATE POLICY transformation_rules_org_isolation
   ON field_transformation_rules
   FOR ALL
-  USING (organization_id = current_setting('app.current_organization_id', true)::UUID);
+  USING (organization_id = current_setting('app.current_organization_id', true)::UUID)
+  WITH CHECK (organization_id = current_setting('app.current_organization_id', true)::UUID);
 
 -- RLS Policies for field_mapping_templates (system + org templates)
 DROP POLICY IF EXISTS templates_visibility ON field_mapping_templates;
@@ -356,7 +358,7 @@ DROP POLICY IF EXISTS templates_org_modify ON field_mapping_templates;
 CREATE POLICY templates_org_modify
   ON field_mapping_templates
   FOR INSERT
-  USING (
+  WITH CHECK (
     is_system_template = false AND
     organization_id = current_setting('app.current_organization_id', true)::UUID
   );
@@ -366,6 +368,10 @@ CREATE POLICY templates_org_update
   ON field_mapping_templates
   FOR UPDATE
   USING (
+    is_system_template = false AND
+    organization_id = current_setting('app.current_organization_id', true)::UUID
+  )
+  WITH CHECK (
     is_system_template = false AND
     organization_id = current_setting('app.current_organization_id', true)::UUID
   );
@@ -384,14 +390,16 @@ DROP POLICY IF EXISTS conversion_history_org_isolation ON conversion_field_histo
 CREATE POLICY conversion_history_org_isolation
   ON conversion_field_history
   FOR ALL
-  USING (organization_id = current_setting('app.current_organization_id', true)::UUID);
+  USING (organization_id = current_setting('app.current_organization_id', true)::UUID)
+  WITH CHECK (organization_id = current_setting('app.current_organization_id', true)::UUID);
 
 -- RLS Policies for field_mapping_statistics
 DROP POLICY IF EXISTS mapping_stats_org_isolation ON field_mapping_statistics;
 CREATE POLICY mapping_stats_org_isolation
   ON field_mapping_statistics
   FOR ALL
-  USING (organization_id = current_setting('app.current_organization_id', true)::UUID);
+  USING (organization_id = current_setting('app.current_organization_id', true)::UUID)
+  WITH CHECK (organization_id = current_setting('app.current_organization_id', true)::UUID);
 
 -- ============================================================================
 -- 5. INSERT DEFAULT SYSTEM TEMPLATES
