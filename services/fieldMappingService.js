@@ -12,42 +12,41 @@ const { AppError } = require('../utils/errors');
  */
 exports.getAllMappings = async (organizationId, filters = {}) => {
   const {
-    target_entity,
-    source_entity = 'leads',
-    include_system = true,
-    search
+    target_entity_type,
+    source_entity_type,
+    include_inactive = false
   } = filters;
 
   let query = `
-    SELECT
-      fmc.*,
-      ftr.rule_name as transformation_rule_name,
-      ftr.description as transformation_rule_description
-    FROM field_mapping_configurations fmc
-    LEFT JOIN field_transformation_rules ftr ON fmc.transformation_rule_id = ftr.id
-    WHERE fmc.organization_id = $1
-      AND fmc.source_entity = $2
-      AND fmc.is_active = true
+    SELECT *
+    FROM field_mappings
+    WHERE organization_id = $1
   `;
 
-  const params = [organizationId, source_entity];
-  let paramIndex = 3;
+  const params = [organizationId];
+  let paramIndex = 2;
 
-  if (target_entity) {
-    query += ` AND fmc.target_entity = $${paramIndex}`;
-    params.push(target_entity);
+  if (!include_inactive) {
+    query += ` AND is_active = true`;
+  }
+
+  if (source_entity_type) {
+    query += ` AND source_entity_type = $${paramIndex}`;
+    params.push(source_entity_type);
     paramIndex++;
   }
 
-  if (!include_system) {
-    query += ` AND fmc.is_system_mapping = false`;
+  if (target_entity_type) {
+    query += ` AND target_entity_type = $${paramIndex}`;
+    params.push(target_entity_type);
+    paramIndex++;
   }
 
-  if (search) {
-    query += ` AND (
-      fmc.source_field ILIKE $${paramIndex} OR
-      fmc.target_field ILIKE $${paramIndex} OR
-      fmc.display_label ILIKE $${paramIndex}
+  query += ` ORDER BY priority ASC, created_at DESC`;
+
+  const result = await pool.query(query, params);
+  return result.rows;
+};
     )`;
     params.push(`%${search}%`);
     paramIndex++;
@@ -84,43 +83,33 @@ exports.getMappingById = async (organizationId, mappingId) => {
 exports.createMapping = async (mappingData) => {
   const {
     organization_id,
-    source_entity = 'leads',
-    source_field,
-    source_field_type,
-    source_field_path,
-    target_entity,
-    target_field,
-    target_field_type,
-    target_field_path,
-    is_editable_on_convert = true,
-    is_required_on_convert = false,
-    is_visible_on_convert = true,
-    transformation_type = 'none',
-    transformation_rule_id,
-    default_value,
-    default_value_type = 'static',
-    display_order = 0,
-    display_label,
-    help_text
+    source_entity_type,
+    target_entity_type,
+    source_field_name,
+    target_field_name,
+    transformation_rule,
+    priority = 100,
+    is_active = true
   } = mappingData;
 
   const query = `
-    INSERT INTO field_mapping_configurations (
-      organization_id, source_entity, source_field, source_field_type, source_field_path,
-      target_entity, target_field, target_field_type, target_field_path,
-      is_editable_on_convert, is_required_on_convert, is_visible_on_convert,
-      transformation_type, transformation_rule_id, default_value, default_value_type,
-      display_order, display_label, help_text
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+    INSERT INTO field_mappings (
+      organization_id, source_entity_type, target_entity_type,
+      source_field_name, target_field_name,
+      transformation_rule, priority, is_active
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     RETURNING *
   `;
 
   const params = [
-    organization_id, source_entity, source_field, source_field_type, source_field_path,
-    target_entity, target_field, target_field_type, target_field_path,
-    is_editable_on_convert, is_required_on_convert, is_visible_on_convert,
-    transformation_type, transformation_rule_id, default_value, default_value_type,
-    display_order, display_label, help_text
+    organization_id,
+    source_entity_type,
+    target_entity_type,
+    source_field_name,
+    target_field_name,
+    transformation_rule || null,
+    priority,
+    is_active
   ];
 
   const result = await pool.query(query, params);
@@ -235,59 +224,28 @@ exports.validateMappingConfiguration = async (mappingData) => {
   const errors = [];
   const warnings = [];
 
-  // Check field type compatibility
-  if (mappingData.source_field_type && mappingData.target_field_type) {
-    const compatible = areFieldTypesCompatible(
-      mappingData.source_field_type,
-      mappingData.target_field_type
-    );
-
-    if (!compatible) {
-      errors.push(
-        `Field type mismatch: ${mappingData.source_field_type} cannot be mapped to ${mappingData.target_field_type}`
-      );
-    }
-  }
-
-  // Check for duplicate mappings
-  if (mappingData.organization_id && mappingData.source_field && mappingData.target_field) {
+  // Basic validation - check for duplicate mappings
+  if (mappingData.organization_id && mappingData.source_field_name && mappingData.target_field_name) {
     const query = `
-      SELECT id FROM field_mapping_configurations
+      SELECT id FROM field_mappings
       WHERE organization_id = $1
-        AND source_field = $2
-        AND target_field = $3
-        AND target_entity = $4
+        AND source_entity_type = $2
+        AND target_entity_type = $3
+        AND source_field_name = $4
+        AND target_field_name = $5
         AND is_active = true
     `;
 
     const result = await pool.query(query, [
       mappingData.organization_id,
-      mappingData.source_field,
-      mappingData.target_field,
-      mappingData.target_entity
+      mappingData.source_entity_type,
+      mappingData.target_entity_type,
+      mappingData.source_field_name,
+      mappingData.target_field_name
     ]);
 
     if (result.rows.length > 0) {
-      warnings.push('A mapping with the same source and target fields already exists');
-    }
-  }
-
-  // Validate transformation rule if specified
-  if (mappingData.transformation_rule_id) {
-    const ruleQuery = `
-      SELECT id, is_validated FROM field_transformation_rules
-      WHERE id = $1 AND organization_id = $2
-    `;
-
-    const ruleResult = await pool.query(ruleQuery, [
-      mappingData.transformation_rule_id,
-      mappingData.organization_id
-    ]);
-
-    if (ruleResult.rows.length === 0) {
-      errors.push('Specified transformation rule not found');
-    } else if (!ruleResult.rows[0].is_validated) {
-      warnings.push('The selected transformation rule has not been validated');
+      errors.push('A mapping with the same source and target fields already exists');
     }
   }
 
