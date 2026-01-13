@@ -125,6 +125,54 @@ async function applyMigration024() {
         ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
     `);
 
+    // If legacy columns exist, backfill to new columns
+    await client.query(`
+      DO $$
+      BEGIN
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'field_mapping_template_items'
+          AND column_name = 'source_field'
+        ) THEN
+          UPDATE field_mapping_template_items
+          SET source_field_name = COALESCE(source_field_name, source_field);
+        END IF;
+
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'field_mapping_template_items'
+          AND column_name = 'target_field'
+        ) THEN
+          UPDATE field_mapping_template_items
+          SET target_field_name = COALESCE(target_field_name, target_field);
+        END IF;
+      END $$;
+    `);
+
+    // Relax legacy NOT NULL constraints if present
+    await client.query(`
+      DO $$
+      BEGIN
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'field_mapping_template_items'
+          AND column_name = 'source_field'
+        ) THEN
+          ALTER TABLE field_mapping_template_items
+            ALTER COLUMN source_field DROP NOT NULL;
+        END IF;
+
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'field_mapping_template_items'
+          AND column_name = 'target_field'
+        ) THEN
+          ALTER TABLE field_mapping_template_items
+            ALTER COLUMN target_field DROP NOT NULL;
+        END IF;
+      END $$;
+    `);
+
     console.log('✅ field_mapping_template_items table ensured\n');
     
     // 4. Create conversion_field_history table
