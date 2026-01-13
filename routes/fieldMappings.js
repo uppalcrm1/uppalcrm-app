@@ -7,31 +7,17 @@ const Joi = require('joi');
 
 // Validation schemas
 const fieldMappingSchema = Joi.object({
-  source_entity: Joi.string().valid('leads', 'contacts', 'accounts').default('leads'),
-  source_field: Joi.string().required().max(100),
-  source_field_type: Joi.string().max(50),
-  source_field_path: Joi.string().max(255).allow(null, ''),
-  target_entity: Joi.string().valid('contacts', 'accounts', 'transactions').required(),
-  target_field: Joi.string().required().max(100),
-  target_field_type: Joi.string().max(50),
-  target_field_path: Joi.string().max(255).allow(null, ''),
-  is_editable_on_convert: Joi.boolean().default(true),
-  is_required_on_convert: Joi.boolean().default(false),
-  is_visible_on_convert: Joi.boolean().default(true),
-  transformation_type: Joi.string().valid(
-    'none', 'lowercase', 'uppercase', 'titlecase', 'sentencecase',
-    'trim', 'remove_special_chars', 'replace', 'concatenate', 'custom'
-  ).default('none'),
-  transformation_rule_id: Joi.string().uuid().allow(null),
-  default_value: Joi.string().allow(null, ''),
-  default_value_type: Joi.string().valid('static', 'dynamic', 'formula').default('static'),
-  display_order: Joi.number().integer().min(0).default(0),
-  display_label: Joi.string().max(255).allow(null, ''),
-  help_text: Joi.string().allow(null, '')
+  source_entity_type: Joi.string().valid('lead', 'leads', 'contact', 'contacts', 'account', 'accounts').required(),
+  target_entity_type: Joi.string().valid('lead', 'leads', 'contact', 'contacts', 'account', 'accounts').required(),
+  source_field_name: Joi.string().required().max(100),
+  target_field_name: Joi.string().required().max(100),
+  transformation_rule: Joi.string().valid('none', 'uppercase', 'lowercase', 'trim', 'capitalize').allow(null, ''),
+  priority: Joi.number().integer().min(0).default(100),
+  is_active: Joi.boolean().default(true)
 });
 
 const updateFieldMappingSchema = fieldMappingSchema.fork(
-  ['source_field', 'target_field', 'target_entity'],
+  ['source_entity_type', 'target_entity_type', 'source_field_name', 'target_field_name'],
   (schema) => schema.optional()
 );
 
