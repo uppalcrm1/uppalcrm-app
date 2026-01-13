@@ -47,18 +47,10 @@ exports.getAllMappings = async (organizationId, filters = {}) => {
   const result = await pool.query(query, params);
   return result.rows;
 };
-    )`;
-    params.push(`%${search}%`);
-    paramIndex++;
-  }
-
-  query += ` ORDER BY fmc.display_order ASC, fmc.created_at ASC`;
-
-  const result = await pool.query(query, params);
-  return result.rows;
-};
 
 /**
+ * Get a single field mapping by ID
+ *//**
  * Get a specific field mapping by ID
  */
 exports.getMappingById = async (organizationId, mappingId) => {
