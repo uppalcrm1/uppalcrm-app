@@ -55,14 +55,9 @@ exports.getAllMappings = async (organizationId, filters = {}) => {
  */
 exports.getMappingById = async (organizationId, mappingId) => {
   const query = `
-    SELECT
-      fmc.*,
-      ftr.rule_name as transformation_rule_name,
-      ftr.transformation_code,
-      ftr.description as transformation_rule_description
-    FROM field_mapping_configurations fmc
-    LEFT JOIN field_transformation_rules ftr ON fmc.transformation_rule_id = ftr.id
-    WHERE fmc.id = $1 AND fmc.organization_id = $2
+    SELECT *
+    FROM field_mappings
+    WHERE id = $1 AND organization_id = $2
   `;
 
   const result = await pool.query(query, [mappingId, organizationId]);
@@ -138,7 +133,7 @@ exports.updateMapping = async (organizationId, mappingId, updates) => {
   }
 
   const query = `
-    UPDATE field_mapping_configurations
+    UPDATE field_mappings
     SET ${setClauses.join(', ')}, updated_at = CURRENT_TIMESTAMP
     WHERE id = $1 AND organization_id = $2
     RETURNING *
@@ -153,7 +148,7 @@ exports.updateMapping = async (organizationId, mappingId, updates) => {
  */
 exports.deleteMapping = async (organizationId, mappingId) => {
   const query = `
-    UPDATE field_mapping_configurations
+    UPDATE field_mappings
     SET is_active = false, updated_at = CURRENT_TIMESTAMP
     WHERE id = $1 AND organization_id = $2
     RETURNING id
@@ -190,7 +185,7 @@ exports.bulkUpdateMappings = async (organizationId, updates) => {
 
       if (setClauses.length > 0) {
         const query = `
-          UPDATE field_mapping_configurations
+          UPDATE field_mappings
           SET ${setClauses.join(', ')}, updated_at = CURRENT_TIMESTAMP
           WHERE id = $1 AND organization_id = $2
         `;
@@ -366,9 +361,9 @@ exports.generateConversionPreview = async (organizationId, leadId, templateId = 
   if (templateId) {
     // Get mappings from template
     const templateQuery = `
-      SELECT fmti.*, fmc.*
+      SELECT fmti.*, fm.*
       FROM field_mapping_template_items fmti
-      JOIN field_mapping_configurations fmc ON fmti.source_mapping_id = fmc.id
+      JOIN field_mappings fm ON fmti.source_mapping_id = fm.id
       WHERE fmti.template_id = $1
     `;
     const templateResult = await pool.query(templateQuery, [templateId]);
