@@ -44,9 +44,11 @@ async function applyMigration024() {
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
         template_name VARCHAR(100) NOT NULL,
+        template_slug VARCHAR(150) NOT NULL UNIQUE,
         description TEXT,
         template_type VARCHAR(20) DEFAULT 'custom',
         is_system_template BOOLEAN DEFAULT false,
+        applies_to_entities TEXT[] DEFAULT ARRAY['contacts','accounts','transactions'],
         icon VARCHAR(50),
         color VARCHAR(20),
         is_active BOOLEAN DEFAULT true,
@@ -126,12 +128,21 @@ async function applyMigration024() {
     // Full Conversion Template
     const fullTemplateResult = await client.query(`
       INSERT INTO field_mapping_templates (
-        template_name, description, template_type, is_system_template, icon, color
+        template_name,
+        template_slug,
+        description,
+        template_type,
+        is_system_template,
+        applies_to_entities,
+        icon,
+        color
       ) VALUES (
         'Full Lead Conversion',
+        'full-lead-conversion',
         'Complete field mapping for lead to contact/account conversion',
         'system',
         true,
+        ARRAY['contacts','accounts','transactions'],
         '🔄',
         'blue'
       )
