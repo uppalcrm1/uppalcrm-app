@@ -242,6 +242,9 @@ exports.applyTemplate = async (organizationId, templateId, options = {}) => {
     // Get template with all mappings
     const template = await exports.getTemplateById(organizationId, templateId);
 
+    console.log('applyTemplate - template:', template);
+    console.log('applyTemplate - mappings count:', template?.mappings?.length);
+
     if (!template) {
       throw new AppError('Template not found', 404);
     }
@@ -325,6 +328,8 @@ exports.applyTemplate = async (organizationId, templateId, options = {}) => {
     }
 
     await client.query('COMMIT');
+
+    console.log('applyTemplate - final counts:', { created, skipped, total: template.mappings.length });
 
     return {
       appliedMappings: created,

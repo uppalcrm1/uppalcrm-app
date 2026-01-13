@@ -145,7 +145,7 @@ exports.applyTemplate = async (req, res, next) => {
     res.json({
       success: true,
       data: result,
-      message: `Template applied successfully. ${result.created} mapping(s) created, ${result.skipped} skipped.`
+      message: `Template applied successfully. ${result.appliedMappings} mapping(s) created, ${result.skipped} skipped.`
     });
   } catch (error) {
     next(error);
