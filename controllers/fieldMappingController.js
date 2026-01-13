@@ -304,25 +304,52 @@ exports.getAvailableTargetFields = async (req, res, next) => {
  */
 exports.getEntityFields = async (req, res, next) => {
   try {
-    const { organization_id } = req.user;
     const { entityType } = req.params;
 
     // Normalize entity type
     const normalizedType = entityType.toLowerCase();
     
-    let fields;
+    let fields = [];
+    
+    // Define standard fields for each entity type
     if (normalizedType === 'lead' || normalizedType === 'leads') {
-      fields = await fieldMappingService.getAvailableSourceFields(organization_id, 'leads');
-    } else if (['contact', 'contacts', 'account', 'accounts'].includes(normalizedType)) {
-      const targetEntity = normalizedType.endsWith('s') ? normalizedType : normalizedType + 's';
-      fields = await fieldMappingService.getAvailableTargetFields(organization_id, targetEntity);
+      fields = [
+        { name: 'first_name', type: 'text', label: 'First Name' },
+        { name: 'last_name', type: 'text', label: 'Last Name' },
+        { name: 'email', type: 'email', label: 'Email' },
+        { name: 'phone', type: 'tel', label: 'Phone' },
+        { name: 'company', type: 'text', label: 'Company' },
+        { name: 'title', type: 'text', label: 'Title' },
+        { name: 'source', type: 'text', label: 'Source' },
+        { name: 'status', type: 'text', label: 'Status' },
+        { name: 'notes', type: 'textarea', label: 'Notes' }
+      ];
+    } else if (normalizedType === 'contact' || normalizedType === 'contacts') {
+      fields = [
+        { name: 'first_name', type: 'text', label: 'First Name' },
+        { name: 'last_name', type: 'text', label: 'Last Name' },
+        { name: 'email', type: 'email', label: 'Email' },
+        { name: 'phone', type: 'tel', label: 'Phone' },
+        { name: 'company', type: 'text', label: 'Company' },
+        { name: 'title', type: 'text', label: 'Title' },
+        { name: 'notes', type: 'textarea', label: 'Notes' }
+      ];
+    } else if (normalizedType === 'account' || normalizedType === 'accounts') {
+      fields = [
+        { name: 'account_name', type: 'text', label: 'Account Name' },
+        { name: 'email', type: 'email', label: 'Email' },
+        { name: 'phone', type: 'tel', label: 'Phone' },
+        { name: 'website', type: 'url', label: 'Website' },
+        { name: 'industry', type: 'text', label: 'Industry' },
+        { name: 'notes', type: 'textarea', label: 'Notes' }
+      ];
     } else {
       throw new AppError('Invalid entity type. Must be lead, contact, or account', 400);
     }
 
     res.json({
       success: true,
-      fields: fields || []
+      fields: fields
     });
   } catch (error) {
     next(error);
