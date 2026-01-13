@@ -147,23 +147,6 @@ async function applyMigration024() {
           SET target_field_name = COALESCE(target_field_name, target_field);
         END IF;
 
-        IF EXISTS (
-          SELECT 1 FROM information_schema.columns
-          WHERE table_name = 'field_mapping_template_items'
-          AND column_name = 'source_entity'
-        ) THEN
-          UPDATE field_mapping_template_items
-          SET source_entity = COALESCE(source_entity, source_entity_type);
-        END IF;
-
-        IF EXISTS (
-          SELECT 1 FROM information_schema.columns
-          WHERE table_name = 'field_mapping_template_items'
-          AND column_name = 'target_entity'
-        ) THEN
-          UPDATE field_mapping_template_items
-          SET target_entity = COALESCE(target_entity, target_entity_type);
-        END IF;
       END $$;
     `);
 
@@ -189,22 +172,29 @@ async function applyMigration024() {
             ALTER COLUMN target_field DROP NOT NULL;
         END IF;
 
+      END $$;
+    `);
+
+    // Drop legacy check constraints if present
+    await client.query(`
+      DO $$
+      BEGIN
         IF EXISTS (
-          SELECT 1 FROM information_schema.columns
+          SELECT 1 FROM information_schema.table_constraints
           WHERE table_name = 'field_mapping_template_items'
-          AND column_name = 'source_entity'
+          AND constraint_name = 'field_mapping_template_items_target_entity_check'
         ) THEN
           ALTER TABLE field_mapping_template_items
-            ALTER COLUMN source_entity DROP NOT NULL;
+            DROP CONSTRAINT field_mapping_template_items_target_entity_check;
         END IF;
 
         IF EXISTS (
-          SELECT 1 FROM information_schema.columns
+          SELECT 1 FROM information_schema.table_constraints
           WHERE table_name = 'field_mapping_template_items'
-          AND column_name = 'target_entity'
+          AND constraint_name = 'field_mapping_template_items_source_entity_check'
         ) THEN
           ALTER TABLE field_mapping_template_items
-            ALTER COLUMN target_entity DROP NOT NULL;
+            DROP CONSTRAINT field_mapping_template_items_source_entity_check;
         END IF;
       END $$;
     `);
