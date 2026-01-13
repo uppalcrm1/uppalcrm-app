@@ -58,6 +58,41 @@ async function applyMigration024() {
       );
     `);
     console.log('✅ field_mapping_templates table created\n');
+
+    // Ensure new columns exist (idempotent) and are populated
+    await client.query(`
+      ALTER TABLE field_mapping_templates
+      ADD COLUMN IF NOT EXISTS template_slug VARCHAR(150),
+      ADD COLUMN IF NOT EXISTS applies_to_entities TEXT[] DEFAULT ARRAY['contacts','accounts','transactions'];
+    `);
+
+    // Backfill slug for existing rows then enforce NOT NULL/UNIQUE
+    await client.query(`
+      UPDATE field_mapping_templates
+      SET template_slug = COALESCE(
+        template_slug,
+        lower(regexp_replace(template_name, '[^a-zA-Z0-9]+', '-', 'g'))
+      )
+      WHERE template_slug IS NULL;
+    `);
+
+    await client.query(`
+      ALTER TABLE field_mapping_templates
+      ALTER COLUMN template_slug SET NOT NULL;
+    `);
+
+    await client.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conname = 'field_mapping_templates_template_slug_key'
+        ) THEN
+          ALTER TABLE field_mapping_templates
+          ADD CONSTRAINT field_mapping_templates_template_slug_key UNIQUE (template_slug);
+        END IF;
+      END $$;
+    `);
     
     // 3. Create field_mapping_template_items table
     console.log('📝 Creating field_mapping_template_items table...');
