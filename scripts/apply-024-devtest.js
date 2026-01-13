@@ -259,6 +259,7 @@ async function applyMigration024() {
     console.log('📝 Inserting system templates...');
     
     // Full Conversion Template
+    // Upsert system template and items
     const fullTemplateResult = await client.query(`
       INSERT INTO field_mapping_templates (
         template_name,
@@ -279,13 +280,26 @@ async function applyMigration024() {
         '🔄',
         'blue'
       )
-      ON CONFLICT DO NOTHING
+      ON CONFLICT (template_slug) DO UPDATE SET
+        description = EXCLUDED.description,
+        applies_to_entities = EXCLUDED.applies_to_entities,
+        icon = EXCLUDED.icon,
+        color = EXCLUDED.color,
+        updated_at = CURRENT_TIMESTAMP
       RETURNING id;
     `);
-    
+
+    let templateId;
     if (fullTemplateResult.rows.length > 0) {
-      const templateId = fullTemplateResult.rows[0].id;
-      
+      templateId = fullTemplateResult.rows[0].id;
+    } else {
+      const existing = await client.query(
+        `SELECT id FROM field_mapping_templates WHERE template_slug = 'full-lead-conversion'`
+      );
+      templateId = existing.rows[0]?.id;
+    }
+
+    if (templateId) {
       await client.query(`
         INSERT INTO field_mapping_template_items (
           template_id, source_entity_type, target_entity_type, applies_to_entity,
@@ -301,8 +315,10 @@ async function applyMigration024() {
           ($1, 'lead', 'account', 'accounts', 'email', 'email', 30)
         ON CONFLICT DO NOTHING;
       `, [templateId]);
-      
-      console.log('✅ Full Conversion template created\n');
+
+      console.log('✅ Full Conversion template created/ensured\n');
+    } else {
+      console.log('⚠️ Could not ensure Full Conversion template (no templateId)');
     }
     
     await client.query('COMMIT');
