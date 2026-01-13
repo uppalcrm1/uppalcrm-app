@@ -108,12 +108,10 @@ exports.createMapping = async (mappingData) => {
  */
 exports.updateMapping = async (organizationId, mappingId, updates) => {
   const allowedFields = [
-    'source_field_type', 'source_field_path',
-    'target_field_type', 'target_field_path',
-    'is_editable_on_convert', 'is_required_on_convert', 'is_visible_on_convert',
-    'transformation_type', 'transformation_rule_id',
-    'default_value', 'default_value_type',
-    'display_order', 'display_label', 'help_text'
+    'transformation_rule',
+    'is_required',
+    'priority',
+    'is_active'
   ];
 
   const setClauses = [];
@@ -176,7 +174,7 @@ exports.bulkUpdateMappings = async (organizationId, updates) => {
       let paramIndex = 3;
 
       for (const [key, value] of Object.entries(fields)) {
-        if (['display_order', 'is_visible_on_convert', 'is_editable_on_convert', 'is_required_on_convert'].includes(key)) {
+        if (['priority', 'is_required', 'is_active'].includes(key)) {
           setClauses.push(`${key} = $${paramIndex}`);
           params.push(value);
           paramIndex++;
