@@ -14,16 +14,16 @@ exports.getAllTemplates = async (organizationId, filters = {}) => {
 
   let query = `
     SELECT
-      fmt.*,
-      COUNT(fmti.id) as mapping_count,
-      COALESCE(
-        json_agg(
-          DISTINCT jsonb_build_object(
-            'entity', fmti.applies_to_entity
-          )
-        ) FILTER (WHERE fmti.applies_to_entity IS NOT NULL),
-        '[]'
-      ) as applies_to_entities
+      fmt.id,
+      fmt.template_name,
+      fmt.description,
+      fmt.template_type,
+      fmt.is_system_template,
+      fmt.icon,
+      fmt.color,
+      fmt.created_at,
+      fmt.updated_at,
+      COUNT(fmti.id) as mapping_count
     FROM field_mapping_templates fmt
     LEFT JOIN field_mapping_template_items fmti ON fmt.id = fmti.template_id
     WHERE (fmt.is_system_template = true OR fmt.organization_id = $1)
@@ -56,12 +56,26 @@ exports.getAllTemplates = async (organizationId, filters = {}) => {
   }
 
   query += `
-    GROUP BY fmt.id
+    GROUP BY fmt.id, fmt.template_name, fmt.description, fmt.template_type, 
+             fmt.is_system_template, fmt.icon, fmt.color, fmt.created_at, fmt.updated_at
     ORDER BY fmt.is_system_template DESC, fmt.template_name ASC
   `;
 
   const result = await pool.query(query, params);
-  return result.rows;
+  
+  // Transform to match frontend expectations
+  return result.rows.map(row => ({
+    id: row.id,
+    name: row.template_name,
+    description: row.description,
+    template_type: row.template_type,
+    is_system: row.is_system_template,
+    icon: row.icon,
+    color: row.color,
+    mapping_count: parseInt(row.mapping_count) || 0,
+    created_at: row.created_at,
+    updated_at: row.updated_at
+  }));
 };
 
 /**
@@ -69,7 +83,16 @@ exports.getAllTemplates = async (organizationId, filters = {}) => {
  */
 exports.getTemplateById = async (organizationId, templateId) => {
   const templateQuery = `
-    SELECT *
+    SELECT 
+      id,
+      template_name,
+      description,
+      template_type,
+      is_system_template,
+      icon,
+      color,
+      created_at,
+      updated_at
     FROM field_mapping_templates
     WHERE id = $1
       AND (is_system_template = true OR organization_id = $2)
@@ -84,32 +107,38 @@ exports.getTemplateById = async (organizationId, templateId) => {
 
   const template = templateResult.rows[0];
 
-  // Get template items with source mapping details
+  // Get template items (mappings)
   const itemsQuery = `
     SELECT
-      fmti.*,
-      fmc.source_field,
-      fmc.source_field_type,
-      fmc.source_field_path,
-      fmc.target_field,
-      fmc.target_field_type,
-      fmc.target_field_path,
-      fmc.transformation_type,
-      fmc.transformation_rule_id,
-      fmc.default_value,
-      fmc.display_label,
-      fmc.help_text
-    FROM field_mapping_template_items fmti
-    LEFT JOIN field_mapping_configurations fmc ON fmti.source_mapping_id = fmc.id
-    WHERE fmti.template_id = $1
-    ORDER BY fmti.display_order ASC
+      id,
+      source_entity_type,
+      target_entity_type,
+      applies_to_entity,
+      source_field_name,
+      target_field_name,
+      transformation_rule,
+      is_required,
+      priority
+    FROM field_mapping_template_items
+    WHERE template_id = $1
+    ORDER BY priority ASC, source_field_name ASC
   `;
 
   const itemsResult = await pool.query(itemsQuery, [templateId]);
 
-  template.mappings = itemsResult.rows;
-
-  return template;
+  // Transform to match frontend expectations
+  return {
+    id: template.id,
+    name: template.template_name,
+    description: template.description,
+    template_type: template.template_type,
+    is_system: template.is_system_template,
+    icon: template.icon,
+    color: template.color,
+    created_at: template.created_at,
+    updated_at: template.updated_at,
+    mappings: itemsResult.rows
+  };
 };
 
 /**
