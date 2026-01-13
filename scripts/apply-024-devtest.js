@@ -146,6 +146,24 @@ async function applyMigration024() {
           UPDATE field_mapping_template_items
           SET target_field_name = COALESCE(target_field_name, target_field);
         END IF;
+
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'field_mapping_template_items'
+          AND column_name = 'source_entity'
+        ) THEN
+          UPDATE field_mapping_template_items
+          SET source_entity = COALESCE(source_entity, source_entity_type);
+        END IF;
+
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'field_mapping_template_items'
+          AND column_name = 'target_entity'
+        ) THEN
+          UPDATE field_mapping_template_items
+          SET target_entity = COALESCE(target_entity, target_entity_type);
+        END IF;
       END $$;
     `);
 
@@ -169,6 +187,24 @@ async function applyMigration024() {
         ) THEN
           ALTER TABLE field_mapping_template_items
             ALTER COLUMN target_field DROP NOT NULL;
+        END IF;
+
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'field_mapping_template_items'
+          AND column_name = 'source_entity'
+        ) THEN
+          ALTER TABLE field_mapping_template_items
+            ALTER COLUMN source_entity DROP NOT NULL;
+        END IF;
+
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'field_mapping_template_items'
+          AND column_name = 'target_entity'
+        ) THEN
+          ALTER TABLE field_mapping_template_items
+            ALTER COLUMN target_entity DROP NOT NULL;
         END IF;
       END $$;
     `);
