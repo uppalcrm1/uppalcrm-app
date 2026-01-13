@@ -94,24 +94,38 @@ async function applyMigration024() {
       END $$;
     `);
     
-    // 3. Create field_mapping_template_items table
+    // 3. Create/ensure field_mapping_template_items table and columns
     console.log('📝 Creating field_mapping_template_items table...');
     await client.query(`
       CREATE TABLE IF NOT EXISTS field_mapping_template_items (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         template_id UUID NOT NULL REFERENCES field_mapping_templates(id) ON DELETE CASCADE,
-        source_entity_type VARCHAR(50) NOT NULL,
-        target_entity_type VARCHAR(50) NOT NULL,
-        applies_to_entity VARCHAR(50) NOT NULL,
-        source_field_name VARCHAR(100) NOT NULL,
-        target_field_name VARCHAR(100) NOT NULL,
+        source_entity_type VARCHAR(50),
+        target_entity_type VARCHAR(50),
+        applies_to_entity VARCHAR(50),
+        source_field_name VARCHAR(100),
+        target_field_name VARCHAR(100),
         transformation_rule VARCHAR(50),
         is_required BOOLEAN DEFAULT false,
         priority INTEGER DEFAULT 100,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    console.log('✅ field_mapping_template_items table created\n');
+
+    await client.query(`
+      ALTER TABLE field_mapping_template_items
+        ADD COLUMN IF NOT EXISTS source_entity_type VARCHAR(50),
+        ADD COLUMN IF NOT EXISTS target_entity_type VARCHAR(50),
+        ADD COLUMN IF NOT EXISTS applies_to_entity VARCHAR(50),
+        ADD COLUMN IF NOT EXISTS source_field_name VARCHAR(100),
+        ADD COLUMN IF NOT EXISTS target_field_name VARCHAR(100),
+        ADD COLUMN IF NOT EXISTS transformation_rule VARCHAR(50),
+        ADD COLUMN IF NOT EXISTS is_required BOOLEAN DEFAULT false,
+        ADD COLUMN IF NOT EXISTS priority INTEGER DEFAULT 100,
+        ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+    `);
+
+    console.log('✅ field_mapping_template_items table ensured\n');
     
     // 4. Create conversion_field_history table
     console.log('📝 Creating conversion_field_history table...');
