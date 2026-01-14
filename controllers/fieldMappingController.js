@@ -14,17 +14,15 @@ exports.getAllMappings = async (req, res, next) => {
   try {
     const { organization_id } = req.user;
     const {
-      target_entity,
-      source_entity = 'leads',
-      include_system = true,
-      search
+      target_entity_type,
+      source_entity_type,
+      include_inactive
     } = req.query;
 
     const filters = {
-      target_entity,
-      source_entity,
-      include_system: include_system === 'true',
-      search
+      target_entity_type,
+      source_entity_type,
+      include_inactive: include_inactive === 'true'
     };
 
     const mappings = await fieldMappingService.getAllMappings(organization_id, filters);
