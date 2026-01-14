@@ -131,26 +131,36 @@ exports.createMapping = async (mappingData) => {
  * Update an existing field mapping
  */
 exports.updateMapping = async (organizationId, mappingId, updates) => {
-  const allowedFields = [
-    'transformation_type',
-    'is_required_on_convert',
-    'display_order',
-    'is_active'
-  ];
+  console.log('updateMapping called with:', { organizationId, mappingId, updates });
+
+  // Map API field names to database column names
+  const fieldMapping = {
+    'source_entity_type': 'source_entity',
+    'target_entity_type': 'target_entity',
+    'source_field_name': 'source_field',
+    'target_field_name': 'target_field',
+    'transformation_type': 'transformation_type',
+    'is_required_on_convert': 'is_required_on_convert',
+    'display_order': 'display_order',
+    'is_active': 'is_active'
+  };
 
   const setClauses = [];
   const params = [mappingId, organizationId];
   let paramIndex = 3;
 
-  for (const [key, value] of Object.entries(updates)) {
-    if (allowedFields.includes(key)) {
-      setClauses.push(`${key} = $${paramIndex}`);
+  for (const [apiKey, value] of Object.entries(updates)) {
+    const dbColumn = fieldMapping[apiKey];
+    if (dbColumn && value !== undefined) {
+      setClauses.push(`${dbColumn} = $${paramIndex}`);
       params.push(value);
       paramIndex++;
+      console.log(`Mapping ${apiKey} -> ${dbColumn} = ${value}`);
     }
   }
 
   if (setClauses.length === 0) {
+    console.log('No valid fields to update from:', updates);
     throw new AppError('No valid fields to update', 400);
   }
 
@@ -161,7 +171,11 @@ exports.updateMapping = async (organizationId, mappingId, updates) => {
     RETURNING *
   `;
 
+  console.log('Executing UPDATE query:', query);
+  console.log('With params:', params);
+
   const result = await pool.query(query, params);
+  console.log('UPDATE result:', result.rows[0]);
   return result.rows[0];
 };
 
