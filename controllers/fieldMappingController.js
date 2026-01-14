@@ -341,8 +341,16 @@ exports.getEntityFields = async (req, res, next) => {
         { name: 'industry', type: 'text', label: 'Industry' },
         { name: 'notes', type: 'textarea', label: 'Notes' }
       ];
+    } else if (normalizedType === 'transaction' || normalizedType === 'transactions') {
+      fields = [
+        { name: 'description', type: 'text', label: 'Description' },
+        { name: 'amount', type: 'number', label: 'Amount' },
+        { name: 'transaction_type', type: 'text', label: 'Transaction Type' },
+        { name: 'status', type: 'text', label: 'Status' },
+        { name: 'notes', type: 'textarea', label: 'Notes' }
+      ];
     } else {
-      throw new AppError('Invalid entity type. Must be lead, contact, or account', 400);
+      throw new AppError('Invalid entity type. Must be lead, contact, account, or transaction', 400);
     }
 
     res.json({

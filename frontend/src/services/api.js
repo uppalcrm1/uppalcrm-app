@@ -1308,43 +1308,4 @@ export const fieldMappingAPI = {
   }
 }
 
-// Field Mapping Templates API
-export const fieldMappingTemplateAPI = {
-  // Get all templates
-  getAll: async () => {
-    const response = await api.get('/field-mapping-templates')
-    return { templates: response.data.data || [] }
-  },
-
-  // Get a single template
-  getById: async (id) => {
-    const response = await api.get(`/field-mapping-templates/${id}`)
-    return response.data
-  },
-
-  // Apply a template to create mappings
-  apply: async (templateId) => {
-    const response = await api.post(`/field-mapping-templates/${templateId}/apply`)
-    return response.data
-  },
-
-  // Create a custom template
-  create: async (templateData) => {
-    const response = await api.post('/field-mapping-templates', templateData)
-    return response.data
-  },
-
-  // Update a template
-  update: async (id, templateData) => {
-    const response = await api.put(`/field-mapping-templates/${id}`, templateData)
-    return response.data
-  },
-
-  // Delete a template
-  delete: async (id) => {
-    const response = await api.delete(`/field-mapping-templates/${id}`)
-    return response.data
-  }
-}
-
 export default api

@@ -8,36 +8,47 @@ const CreateEditMappingModal = ({ mapping, onClose, onSuccess }) => {
   const isEditing = !!mapping
 
   const [formData, setFormData] = useState({
-    source_entity_type: mapping?.source_entity_type || 'lead',
-    target_entity_type: mapping?.target_entity_type || 'contact',
-    source_field_name: mapping?.source_field_name || '',
-    target_field_name: mapping?.target_field_name || '',
-    transformation_rule: mapping?.transformation_rule || '',
-    is_required: mapping?.is_required || false,
-    priority: mapping?.priority || 100
+    source_entity: mapping?.source_entity || mapping?.source_entity_type || 'leads',
+    target_entity: mapping?.target_entity || mapping?.target_entity_type || 'contacts',
+    source_field: mapping?.source_field || mapping?.source_field_name || '',
+    target_field: mapping?.target_field || mapping?.target_field_name || '',
+    transformation_type: mapping?.transformation_type || 'none',
+    is_required_on_convert: mapping?.is_required_on_convert || mapping?.is_required || false,
+    display_order: mapping?.display_order || mapping?.priority || 100
   })
 
   // Fetch available fields for source entity
   const { data: sourceFields, isLoading: loadingSourceFields } = useQuery({
-    queryKey: ['entity-fields', formData.source_entity_type],
-    queryFn: () => fieldMappingAPI.getEntityFields(formData.source_entity_type),
-    enabled: !!formData.source_entity_type
+    queryKey: ['entity-fields', formData.source_entity],
+    queryFn: () => fieldMappingAPI.getEntityFields(formData.source_entity),
+    enabled: !!formData.source_entity
   })
 
   // Fetch available fields for target entity
   const { data: targetFields, isLoading: loadingTargetFields } = useQuery({
-    queryKey: ['entity-fields', formData.target_entity_type],
-    queryFn: () => fieldMappingAPI.getEntityFields(formData.target_entity_type),
-    enabled: !!formData.target_entity_type
+    queryKey: ['entity-fields', formData.target_entity],
+    queryFn: () => fieldMappingAPI.getEntityFields(formData.target_entity),
+    enabled: !!formData.target_entity
   })
 
   // Create/Update mutation
   const saveMutation = useMutation({
     mutationFn: (data) => {
-      if (isEditing) {
-        return fieldMappingAPI.update(mapping.id, data)
+      // Map to API field names
+      const apiData = {
+        source_entity_type: data.source_entity,
+        target_entity_type: data.target_entity,
+        source_field_name: data.source_field,
+        target_field_name: data.target_field,
+        transformation_type: data.transformation_type,
+        is_required_on_convert: data.is_required_on_convert,
+        display_order: data.display_order
       }
-      return fieldMappingAPI.create(data)
+
+      if (isEditing) {
+        return fieldMappingAPI.update(mapping.id, apiData)
+      }
+      return fieldMappingAPI.create(apiData)
     },
     onSuccess: () => {
       toast.success(isEditing ? 'Mapping updated successfully' : 'Mapping created successfully')
@@ -50,9 +61,9 @@ const CreateEditMappingModal = ({ mapping, onClose, onSuccess }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    
+
     // Validate required fields
-    if (!formData.source_field_name || !formData.target_field_name) {
+    if (!formData.source_field || !formData.target_field) {
       toast.error('Please select both source and target fields')
       return
     }
@@ -64,12 +75,18 @@ const CreateEditMappingModal = ({ mapping, onClose, onSuccess }) => {
     setFormData(prev => ({ ...prev, [field]: value }))
   }
 
-  const transformationRules = [
-    { value: '', label: 'None (Direct Copy)' },
+  const transformationTypes = [
+    { value: 'none', label: 'None (Direct Copy)' },
     { value: 'uppercase', label: 'Convert to Uppercase' },
     { value: 'lowercase', label: 'Convert to Lowercase' },
     { value: 'trim', label: 'Trim Whitespace' },
-    { value: 'capitalize', label: 'Capitalize First Letter' }
+    { value: 'titlecase', label: 'Title Case' }
+  ]
+
+  const targetEntities = [
+    { value: 'contacts', label: 'Contact' },
+    { value: 'accounts', label: 'Account' },
+    { value: 'transactions', label: 'Transaction' }
   ]
 
   return (
@@ -97,12 +114,12 @@ const CreateEditMappingModal = ({ mapping, onClose, onSuccess }) => {
                 Source Entity
               </label>
               <select
-                value={formData.source_entity_type}
-                onChange={(e) => handleChange('source_entity_type', e.target.value)}
+                value={formData.source_entity}
+                onChange={(e) => handleChange('source_entity', e.target.value)}
                 disabled={isEditing}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100"
               >
-                <option value="lead">Lead</option>
+                <option value="leads">Lead</option>
               </select>
             </div>
 
@@ -111,13 +128,19 @@ const CreateEditMappingModal = ({ mapping, onClose, onSuccess }) => {
                 Target Entity
               </label>
               <select
-                value={formData.target_entity_type}
-                onChange={(e) => handleChange('target_entity_type', e.target.value)}
+                value={formData.target_entity}
+                onChange={(e) => {
+                  handleChange('target_entity', e.target.value)
+                  handleChange('target_field', '') // Reset target field when entity changes
+                }}
                 disabled={isEditing}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100"
               >
-                <option value="contact">Contact</option>
-                <option value="account">Account</option>
+                {targetEntities.map((entity) => (
+                  <option key={entity.value} value={entity.value}>
+                    {entity.label}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
@@ -136,8 +159,8 @@ const CreateEditMappingModal = ({ mapping, onClose, onSuccess }) => {
                   </div>
                 ) : (
                   <select
-                    value={formData.source_field_name}
-                    onChange={(e) => handleChange('source_field_name', e.target.value)}
+                    value={formData.source_field}
+                    onChange={(e) => handleChange('source_field', e.target.value)}
                     required
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   >
@@ -166,8 +189,8 @@ const CreateEditMappingModal = ({ mapping, onClose, onSuccess }) => {
                   </div>
                 ) : (
                   <select
-                    value={formData.target_field_name}
-                    onChange={(e) => handleChange('target_field_name', e.target.value)}
+                    value={formData.target_field}
+                    onChange={(e) => handleChange('target_field', e.target.value)}
                     required
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   >
@@ -183,17 +206,17 @@ const CreateEditMappingModal = ({ mapping, onClose, onSuccess }) => {
             </div>
           </div>
 
-          {/* Transformation Rule */}
+          {/* Transformation Type */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Transformation Rule (Optional)
             </label>
             <select
-              value={formData.transformation_rule}
-              onChange={(e) => handleChange('transformation_rule', e.target.value)}
+              value={formData.transformation_type}
+              onChange={(e) => handleChange('transformation_type', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             >
-              {transformationRules.map((rule) => (
+              {transformationTypes.map((rule) => (
                 <option key={rule.value} value={rule.value}>
                   {rule.label}
                 </option>
@@ -204,21 +227,21 @@ const CreateEditMappingModal = ({ mapping, onClose, onSuccess }) => {
             </p>
           </div>
 
-          {/* Priority */}
+          {/* Display Order */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Priority
+              Display Order
             </label>
             <input
               type="number"
-              value={formData.priority}
-              onChange={(e) => handleChange('priority', parseInt(e.target.value))}
+              value={formData.display_order}
+              onChange={(e) => handleChange('display_order', parseInt(e.target.value))}
               min="1"
               max="1000"
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             />
             <p className="text-sm text-gray-500 mt-1">
-              Lower numbers are processed first (default: 100)
+              Lower numbers are displayed first (default: 100)
             </p>
           </div>
 
@@ -226,12 +249,12 @@ const CreateEditMappingModal = ({ mapping, onClose, onSuccess }) => {
           <div className="flex items-center gap-2">
             <input
               type="checkbox"
-              id="is_required"
-              checked={formData.is_required}
-              onChange={(e) => handleChange('is_required', e.target.checked)}
+              id="is_required_on_convert"
+              checked={formData.is_required_on_convert}
+              onChange={(e) => handleChange('is_required_on_convert', e.target.checked)}
               className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
             />
-            <label htmlFor="is_required" className="text-sm font-medium text-gray-700">
+            <label htmlFor="is_required_on_convert" className="text-sm font-medium text-gray-700">
               Required field (conversion will fail if source field is empty)
             </label>
           </div>

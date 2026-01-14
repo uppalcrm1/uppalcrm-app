@@ -41,8 +41,6 @@ const dashboardsRoutes = require('./routes/dashboards');
 
 // Field Mapping System Routes
 const fieldMappingsRoutes = require('./routes/fieldMappings');
-const transformationRulesRoutes = require('./routes/transformationRules');
-const fieldMappingTemplatesRoutes = require('./routes/fieldMappingTemplates');
 
 // Import scheduled jobs
 const scheduledJobs = require('./services/scheduledJobs');
@@ -254,8 +252,6 @@ app.use('/api/subscription', rateLimiters.general, subscriptionRoutes);
 
 // Field Mapping System routes
 app.use('/api/field-mappings', rateLimiters.general, fieldMappingsRoutes);
-app.use('/api/transformation-rules', rateLimiters.general, transformationRulesRoutes);
-app.use('/api/field-mapping-templates', rateLimiters.general, fieldMappingTemplatesRoutes);
 
 // Twilio integration routes
 app.use('/api/twilio', twilioRoutes);
