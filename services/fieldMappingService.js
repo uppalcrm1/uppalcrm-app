@@ -1,5 +1,4 @@
 const { pool } = require('../database/connection');
-const transformationEngine = require('./transformationEngine');
 const { AppError } = require('../utils/errors');
 
 /**
@@ -355,7 +354,7 @@ function formatFieldLabel(fieldName) {
 /**
  * Generate conversion preview with field mappings applied
  */
-exports.generateConversionPreview = async (organizationId, leadId, templateId = null) => {
+exports.generateConversionPreview = async (organizationId, leadId) => {
   // Get lead data
   const leadQuery = `SELECT * FROM leads WHERE id = $1 AND organization_id = $2`;
   const leadResult = await pool.query(leadQuery, [leadId, organizationId]);
@@ -366,22 +365,8 @@ exports.generateConversionPreview = async (organizationId, leadId, templateId = 
 
   const lead = leadResult.rows[0];
 
-  // Get field mappings (from template or organization defaults)
-  let mappings;
-  if (templateId) {
-    // Get mappings from template
-    const templateQuery = `
-      SELECT fmti.*, fm.*
-      FROM field_mapping_template_items fmti
-      JOIN field_mappings fm ON fmti.source_mapping_id = fm.id
-      WHERE fmti.template_id = $1
-    `;
-    const templateResult = await pool.query(templateQuery, [templateId]);
-    mappings = templateResult.rows;
-  } else {
-    // Get organization's active mappings
-    mappings = await exports.getAllMappings(organizationId, { include_system: true });
-  }
+  // Get organization's active mappings
+  const mappings = await exports.getAllMappings(organizationId);
 
   // Apply mappings to lead data
   const preview = {
@@ -391,38 +376,40 @@ exports.generateConversionPreview = async (organizationId, leadId, templateId = 
   };
 
   for (const mapping of mappings) {
-    if (!mapping.is_visible_on_convert) continue;
+    const sourceValue = lead[mapping.source_field];
 
-    const sourceValue = getNestedValue(lead, mapping.source_field, mapping.source_field_path);
-
+    // Simple transformation support
     let transformedValue = sourceValue;
-
-    // Apply transformation
-    if (sourceValue !== null && sourceValue !== undefined) {
-      transformedValue = await transformationEngine.applyTransformation(
-        sourceValue,
-        mapping.transformation_type,
-        mapping.transformation_rule_id,
-        lead
-      );
+    if (sourceValue && mapping.transformation_type) {
+      switch (mapping.transformation_type) {
+        case 'uppercase':
+          transformedValue = String(sourceValue).toUpperCase();
+          break;
+        case 'lowercase':
+          transformedValue = String(sourceValue).toLowerCase();
+          break;
+        case 'titlecase':
+          transformedValue = String(sourceValue).replace(/\w\S*/g, txt =>
+            txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase()
+          );
+          break;
+        case 'trim':
+          transformedValue = String(sourceValue).trim();
+          break;
+        default:
+          transformedValue = sourceValue;
+      }
     }
 
-    // Use default value if no source value
-    if ((transformedValue === null || transformedValue === undefined) && mapping.default_value) {
-      transformedValue = mapping.default_value;
-    }
-
-    // Add to preview
+    // Add to preview by target entity
     const entity = mapping.target_entity;
-    preview[entity][mapping.target_field] = {
-      value: transformedValue,
-      is_editable: mapping.is_editable_on_convert,
-      is_required: mapping.is_required_on_convert,
-      display_label: mapping.display_label || formatFieldLabel(mapping.target_field),
-      help_text: mapping.help_text,
-      source_field: mapping.source_field,
-      was_auto_filled: transformedValue !== null && transformedValue !== undefined
-    };
+    if (preview[entity]) {
+      preview[entity][mapping.target_field] = {
+        value: transformedValue,
+        source_field: mapping.source_field,
+        display_label: mapping.display_label || formatFieldLabel(mapping.target_field)
+      };
+    }
   }
 
   return preview;
