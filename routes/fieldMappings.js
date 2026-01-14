@@ -8,12 +8,13 @@ const Joi = require('joi');
 // Validation schemas
 const fieldMappingSchema = Joi.object({
   source_entity_type: Joi.string().valid('lead', 'leads', 'contact', 'contacts', 'account', 'accounts').required(),
-  target_entity_type: Joi.string().valid('lead', 'leads', 'contact', 'contacts', 'account', 'accounts').required(),
+  target_entity_type: Joi.string().valid('lead', 'leads', 'contact', 'contacts', 'account', 'accounts', 'transaction', 'transactions').required(),
   source_field_name: Joi.string().required().max(100),
   target_field_name: Joi.string().required().max(100),
-  transformation_rule: Joi.string().valid('none', 'uppercase', 'lowercase', 'trim', 'capitalize').allow(null, ''),
-  priority: Joi.number().integer().min(0).default(100),
-  is_active: Joi.boolean().default(true)
+  transformation_type: Joi.string().valid('none', 'uppercase', 'lowercase', 'trim', 'titlecase').allow(null, ''),
+  display_order: Joi.number().integer().min(0).default(100),
+  is_active: Joi.boolean().default(true),
+  is_required_on_convert: Joi.boolean().default(false)
 });
 
 const updateFieldMappingSchema = fieldMappingSchema.fork(
