@@ -291,6 +291,12 @@ export const leadsAPI = {
     return response.data
   },
 
+  // Get lead conversion preview (shows field mappings)
+  getConversionPreview: async (leadId) => {
+    const response = await api.post(`/leads/${leadId}/conversion-preview`)
+    return response.data
+  },
+
   /**
    * Get all tasks for a specific lead with optional filtering
    * @param {string} leadId - The lead UUID
@@ -1254,6 +1260,45 @@ export const dashboardsAPI = {
   // Execute a widget
   executeWidget: async (widgetConfig) => {
     const response = await api.post('/dashboards/widgets/execute', widgetConfig)
+    return response.data
+  }
+}
+
+// Field Mapping API
+export const fieldMappingAPI = {
+  // Get all field mappings
+  getAll: async () => {
+    const response = await api.get('/field-mappings')
+    return { fieldMappings: response.data.data || [] }
+  },
+
+  // Get a single field mapping
+  getById: async (id) => {
+    const response = await api.get(`/field-mappings/${id}`)
+    return response.data
+  },
+
+  // Create a new field mapping
+  create: async (mappingData) => {
+    const response = await api.post('/field-mappings', mappingData)
+    return response.data
+  },
+
+  // Update a field mapping
+  update: async (id, mappingData) => {
+    const response = await api.put(`/field-mappings/${id}`, mappingData)
+    return response.data
+  },
+
+  // Delete a field mapping
+  delete: async (id) => {
+    const response = await api.delete(`/field-mappings/${id}`)
+    return response.data
+  },
+
+  // Get available fields for an entity
+  getEntityFields: async (entityType) => {
+    const response = await api.get(`/field-mappings/fields/${entityType}`)
     return response.data
   }
 }

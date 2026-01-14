@@ -14,7 +14,8 @@ import {
   Sliders,
   Package,
   Save,
-  AlertCircle
+  AlertCircle,
+  ArrowRightLeft
 } from 'lucide-react'
 import { organizationsAPI, authAPI } from '../services/api'
 import LoadingSpinner from '../components/LoadingSpinner'
@@ -24,6 +25,7 @@ import { useAuth } from '../contexts/AuthContext'
 import AdminFields from './admin/AdminFields'
 import AdminUsers from './admin/AdminUsers'
 import AdminProducts from './admin/AdminProducts'
+import AdminFieldMappings from './admin/AdminFieldMappings'
 import ContactImport from './ContactImport'
 
 const SettingsPage = () => {
@@ -39,6 +41,7 @@ const SettingsPage = () => {
     if (path.includes('/integrations')) return 'integrations'
     if (path.includes('/import')) return 'import'
     if (path.includes('/field-configuration')) return 'field-configuration'
+    if (path.includes('/field-mappings')) return 'field-mappings'
     if (path.includes('/products')) return 'products'
     return 'organization'
   })
@@ -51,6 +54,7 @@ const SettingsPage = () => {
     else if (path.includes('/integrations')) setActiveTab('integrations')
     else if (path.includes('/import')) setActiveTab('import')
     else if (path.includes('/field-configuration')) setActiveTab('field-configuration')
+    else if (path.includes('/field-mappings')) setActiveTab('field-mappings')
     else if (path.includes('/products')) setActiveTab('products')
     else setActiveTab('organization')
   }, [location.pathname])
@@ -74,6 +78,7 @@ const SettingsPage = () => {
     { id: 'integrations', label: 'Integrations', icon: Plug },
     { id: 'import', label: 'Import', icon: Upload },
     { id: 'field-configuration', label: 'Field Configuration', icon: Sliders },
+    { id: 'field-mappings', label: 'Field Mappings', icon: ArrowRightLeft },
     { id: 'products', label: 'Products', icon: Package },
   ]
 
@@ -128,6 +133,7 @@ const SettingsPage = () => {
             {activeTab === 'integrations' && <IntegrationsSettings />}
             {activeTab === 'import' && <ImportSettings />}
             {activeTab === 'field-configuration' && <FieldConfigurationSettings />}
+            {activeTab === 'field-mappings' && <FieldMappingsSettings />}
             {activeTab === 'products' && <ProductsSettings />}
           </div>
         </div>
@@ -402,6 +408,11 @@ const ImportSettings = () => {
 // Field Configuration Settings Component
 const FieldConfigurationSettings = () => {
   return <AdminFields />
+}
+
+// Field Mappings Settings Component
+const FieldMappingsSettings = () => {
+  return <AdminFieldMappings />
 }
 
 // Products Settings Component

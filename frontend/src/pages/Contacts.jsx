@@ -133,8 +133,8 @@ const Contacts = () => {
     loadFieldConfiguration()
   }, [])
 
-  // Get current filters from URL
-  const currentFilters = {
+  // Get current filters from URL - memoized to prevent unnecessary re-renders
+  const currentFilters = React.useMemo(() => ({
     page: parseInt(searchParams.get('page')) || 1,
     limit: parseInt(searchParams.get('limit')) || 20,
     search: searchParams.get('search') || '',
@@ -143,7 +143,7 @@ const Contacts = () => {
     priority: searchParams.get('priority') || '',
     assigned_to: searchParams.get('assigned_to') || '',
     source: searchParams.get('source') || '',
-  }
+  }), [searchParams])
 
   // Update URL with new filters
   const updateFilters = (newFilters) => {
@@ -153,6 +153,11 @@ const Contacts = () => {
     })
     setSearchParams(params)
   }
+
+  // Memoize active filter count
+  const activeFilterCount = React.useMemo(() => {
+    return Object.values(currentFilters).filter(v => v && v !== 1 && v !== 20 && v !== '').length
+  }, [currentFilters])
 
   // Column visibility handlers
   const handleColumnToggle = (columnKey) => {
@@ -177,9 +182,11 @@ const Contacts = () => {
   }
 
   // Fetch contacts
-  const { data: contactsData, isLoading: contactsLoading } = useQuery({
+  const { data: contactsData, isLoading: contactsLoading, isFetching: contactsFetching } = useQuery({
     queryKey: ['contacts', currentFilters],
     queryFn: () => contactsAPI.getContacts(currentFilters),
+    keepPreviousData: true,
+    staleTime: 30000,
   })
 
   // Fetch users for assignment
@@ -254,7 +261,7 @@ const Contacts = () => {
     setSelectedContact(null)
   }
 
-  if (contactsLoading) {
+  if (contactsLoading && !contactsData) {
     return <LoadingSpinner className="mt-8" />
   }
 
@@ -331,9 +338,9 @@ const Contacts = () => {
           >
             <Filter size={16} className="mr-2" />
             Filters
-            {Object.values(currentFilters).filter(v => v && v !== 1 && v !== 20 && v !== '').length > 0 && (
+            {activeFilterCount > 0 && (
               <span className="ml-2 bg-primary-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
-                {Object.values(currentFilters).filter(v => v && v !== 1 && v !== 20 && v !== '').length}
+                {activeFilterCount}
               </span>
             )}
           </button>

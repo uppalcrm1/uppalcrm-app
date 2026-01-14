@@ -26,6 +26,7 @@
     "migrate:user-management": "node migrations/add-user-management-fields.js",
     "fix:lead-trigger": "node scripts/fix-lead-trigger.js",
     "fix:lead-history-tables": "node scripts/apply-lead-history-tables.js",
+    "migrate:field-mappings": "node scripts/apply-024-devtest.js",
     "test:subscription-api": "node test/super-admin-subscription-api.test.js",
     "test:super-admin-auth": "node test/super-admin-middleware.test.js"
   },
@@ -50,7 +51,8 @@
     "nodemailer": "^6.10.1",
     "pg": "^8.11.0",
     "twilio": "^5.10.5",
-    "uuid": "^9.0.0"
+    "uuid": "^9.0.0",
+    "vm2": "^3.10.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"

@@ -39,6 +39,9 @@ const reportingRoutes = require('./routes/reporting');
 const reportsRoutes = require('./routes/reports');
 const dashboardsRoutes = require('./routes/dashboards');
 
+// Field Mapping System Routes
+const fieldMappingsRoutes = require('./routes/fieldMappings');
+
 // Import scheduled jobs
 const scheduledJobs = require('./services/scheduledJobs');
 
@@ -246,6 +249,9 @@ app.use('/api/products', rateLimiters.general, productsRoutes);
 
 // Subscription management routes
 app.use('/api/subscription', rateLimiters.general, subscriptionRoutes);
+
+// Field Mapping System routes
+app.use('/api/field-mappings', rateLimiters.general, fieldMappingsRoutes);
 
 // Twilio integration routes
 app.use('/api/twilio', twilioRoutes);

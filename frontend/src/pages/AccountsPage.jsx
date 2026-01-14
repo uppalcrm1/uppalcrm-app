@@ -180,6 +180,29 @@ const AccountsPage = () => {
   // Use localAccounts for display (optimistic updates), fallback to accounts
   const displayAccounts = localAccounts.length > 0 ? localAccounts : accounts
 
+  // Apply search and status filters
+  const filteredAccounts = React.useMemo(() => {
+    let filtered = displayAccounts
+
+    // Apply search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase()
+      filtered = filtered.filter(account => 
+        (account.contact_name?.toLowerCase().includes(query)) ||
+        (account.device?.toLowerCase().includes(query)) ||
+        (account.mac_address?.toLowerCase().includes(query)) ||
+        (account.account_name?.toLowerCase().includes(query))
+      )
+    }
+
+    // Apply status filter
+    if (filterStatus !== 'all') {
+      filtered = filtered.filter(account => account.status === filterStatus)
+    }
+
+    return filtered
+  }, [displayAccounts, searchQuery, filterStatus])
+
   // Initialize localAccounts when accounts changes
   React.useEffect(() => {
     setLocalAccounts(accounts)
@@ -207,14 +230,14 @@ const AccountsPage = () => {
 
   // Calculate statistics
   const stats = {
-    totalRevenue: displayAccounts.reduce((sum, acc) => {
+    totalRevenue: filteredAccounts.reduce((sum, acc) => {
       if (acc.status === 'active' || acc.status === 'expiring_soon') {
         return sum + (parseFloat(acc.price) || 0)
       }
       return sum
     }, 0),
-    totalAccounts: displayAccounts.length,
-    activeUsers: displayAccounts.filter(acc => acc.status === 'active').length
+    totalAccounts: filteredAccounts.length,
+    activeUsers: filteredAccounts.filter(acc => acc.status === 'active').length
   }
 
   const getStatusBadge = (status, daysUntilExpiry) => {
@@ -431,7 +454,7 @@ const AccountsPage = () => {
                 </tr>
               </thead>
               <tbody>
-                {displayAccounts.map((account) => {
+                {filteredAccounts.map((account) => {
                   const renewalColor = getRenewalColor(account.days_until_renewal)
                   return (
                     <tr key={account.id} className="border-b border-gray-100 hover:bg-gray-50">

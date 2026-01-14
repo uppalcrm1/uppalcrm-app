@@ -2249,8 +2249,44 @@ router.get('/:id/status-progression',
 );
 
 /**
+ * POST /leads/:id/conversion-preview
+ * Generate a preview of field mappings for conversion modal
+ */
+router.post('/:id/conversion-preview',
+  validateUuidParam,
+  validate({
+    body: Joi.object({
+      templateId: Joi.string().guid({ version: 'uuidv4' }).optional()
+    }).unknown(false)
+  }),
+  async (req, res) => {
+    try {
+      const fieldMappingService = require('../services/fieldMappingService');
+
+      const preview = await fieldMappingService.generateConversionPreview(
+        req.organizationId,
+        req.params.id,
+        req.body.templateId
+      );
+
+      res.json({
+        success: true,
+        data: preview
+      });
+    } catch (error) {
+      console.error('Error generating conversion preview:', error);
+      res.status(500).json({
+        error: 'Preview generation failed',
+        message: error.message
+      });
+    }
+  }
+);
+
+/**
  * POST /leads/:id/convert
  * Convert a lead to a contact (and optionally create an account)
+ * Enhanced with field mapping support
  */
 router.post('/:id/convert',
   validateUuidParam,
@@ -2277,15 +2313,19 @@ router.post('/:id/convert',
       }).optional(),
       existingContactId: Joi.string().guid({ version: 'uuidv4' }).optional(),
       relationshipType: Joi.string().valid('new_customer', 'existing_customer', 'additional_device').default('new_customer').optional(),
-      interestType: Joi.string().valid('first_account', 'additional_device', 'upgrade').optional()
+      interestType: Joi.string().valid('first_account', 'additional_device', 'upgrade').optional(),
+      templateId: Joi.string().guid({ version: 'uuidv4' }).optional() // Field mapping template
     }).unknown(false)
   }),
   async (req, res) => {
-    console.log('🔄 Lead conversion started');
+    console.log('🔄 Lead conversion started (with field mapping support)');
     console.log('Lead ID:', req.params.id);
     console.log('Organization ID:', req.organizationId);
     console.log('User ID:', req.user.id);
     console.log('Request body:', req.body);
+
+    // Import the enhanced conversion service
+    const leadConversionService = require('../services/leadConversionService');
 
     const client = await db.pool.connect();
 
@@ -2304,286 +2344,25 @@ router.post('/:id/convert',
       );
       console.log('✅ Session variables set');
 
-      // 1. Get the lead
-      console.log('📋 Fetching lead...');
-      const leadResult = await client.query(
-        `SELECT * FROM leads WHERE id = $1 AND organization_id = $2`,
-        [req.params.id, req.organizationId]
+
+      // Use the enhanced conversion service with field mapping support
+      const result = await leadConversionService.convertLeadWithMappings(
+        req.organizationId,
+        req.params.id,
+        req.user.id,
+        {
+          createAccount: req.body.createAccount,
+          accountDetails: req.body.accountDetails,
+          transactionDetails: req.body.transactionDetails,
+          existingContactId: req.body.existingContactId,
+          relationshipType: req.body.relationshipType,
+          interestType: req.body.interestType,
+          templateId: req.body.templateId
+        },
+        client
       );
-      console.log('Lead query result:', leadResult.rows.length > 0 ? 'Found' : 'Not found');
 
-      if (leadResult.rows.length === 0) {
-        await client.query('ROLLBACK');
-        return res.status(404).json({
-          error: 'Lead not found',
-          message: 'Lead does not exist in this organization'
-        });
-      }
-
-      const lead = leadResult.rows[0];
-
-      if (lead.status === 'converted') {
-        await client.query('ROLLBACK');
-        return res.status(400).json({
-          error: 'Lead already converted',
-          message: 'This lead has already been converted to a contact'
-        });
-      }
-
-      let contact;
-      let isNewContact = true;
-
-      // 2. Check if linking to existing contact or creating new one
-      if (req.body.existingContactId) {
-        const existingContactResult = await client.query(
-          `SELECT * FROM contacts WHERE id = $1 AND organization_id = $2`,
-          [req.body.existingContactId, req.organizationId]
-        );
-
-        if (existingContactResult.rows.length === 0) {
-          await client.query('ROLLBACK');
-          return res.status(404).json({
-            error: 'Contact not found',
-            message: 'The specified contact does not exist'
-          });
-        }
-
-        contact = existingContactResult.rows[0];
-        isNewContact = false;
-
-        await client.query(
-          `INSERT INTO lead_contact_relationships
-           (lead_id, contact_id, relationship_type, interest_type, created_by)
-           VALUES ($1, $2, $3, $4, $5)`,
-          [
-            lead.id,
-            contact.id,
-            req.body.relationshipType || 'existing_customer',
-            req.body.interestType,
-            req.user.id
-          ]
-        );
-
-      } else {
-        // 3. Create new contact from lead
-        console.log('📝 Creating new contact from lead...');
-        console.log('Lead data:', {
-          first_name: lead.first_name,
-          last_name: lead.last_name,
-          email: lead.email,
-          phone: lead.phone,
-          company: lead.company
-        });
-
-        try {
-          const contactResult = await client.query(
-            `INSERT INTO contacts (
-              organization_id, first_name, last_name, email, phone,
-              company, title, address_line1, address_line2, city,
-              state, postal_code, country, converted_from_lead_id,
-              contact_source, notes, created_by, type, contact_status, custom_fields
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
-            RETURNING *`,
-            [
-              req.organizationId,
-              lead.first_name,
-              lead.last_name,
-              lead.email,
-              lead.phone,
-              lead.company,
-              lead.title,
-              lead.address_line1,
-              lead.address_line2,
-              lead.city,
-              lead.state,
-              lead.postal_code,
-              lead.country,
-              lead.id,
-              lead.source,      // Maps to contact_source (base column)
-              lead.notes,
-              req.user.id,
-              'customer',       // Maps to type (base column)
-              'active',         // Maps to contact_status (base column)
-              lead.custom_fields || {}  // Copy custom fields from lead (including 'App' field)
-            ]
-          );
-
-          contact = contactResult.rows[0];
-          console.log('✅ Contact created successfully:', contact.id);
-        } catch (insertError) {
-          console.error('❌ Contact INSERT failed:', insertError.message);
-          console.error('❌ Error code:', insertError.code);
-          console.error('❌ Error detail:', insertError.detail);
-          throw insertError;
-        }
-      }
-
-      // 4. Update lead status to converted
-      console.log('📝 Updating lead status to converted...');
-      await client.query(
-        `UPDATE leads
-         SET status = 'converted',
-             converted_date = NOW(),
-             linked_contact_id = $1,
-             relationship_type = $2,
-             interest_type = $3,
-             updated_at = NOW()
-         WHERE id = $4 AND organization_id = $5`,
-        [
-          contact.id,
-          req.body.relationshipType || 'new_customer',
-          req.body.interestType,
-          lead.id,
-          req.organizationId
-        ]
-      );
-      console.log('✅ Lead status updated');
-
-      // 5. Optionally create an account
-      let account = null;
-      if (req.body.createAccount && req.body.accountDetails) {
-        console.log('📝 Creating account...');
-        console.log('Contact ID:', contact?.id);
-        console.log('Contact object:', contact);
-
-        if (!contact || !contact.id) {
-          await client.query('ROLLBACK');
-          return res.status(500).json({
-            error: 'Contact creation failed',
-            message: 'Contact was not properly created before account creation'
-          });
-        }
-
-        const details = req.body.accountDetails;
-
-        // Get product_id: use provided value or get organization's default product
-        let productId = details.productId;
-        if (!productId) {
-          console.log('📦 No product_id provided, fetching default product...');
-          const defaultProductResult = await client.query(
-            `SELECT id FROM products
-             WHERE organization_id = $1
-             AND is_active = true
-             AND is_default = true
-             LIMIT 1`,
-            [req.organizationId]
-          );
-
-          if (defaultProductResult.rows.length > 0) {
-            productId = defaultProductResult.rows[0].id;
-            console.log('✅ Using default product:', productId);
-          } else {
-            console.log('⚠️ No default product found, account will have NULL product_id');
-          }
-        }
-
-        console.log('📝 Account insert values:');
-        console.log('  organization_id:', req.organizationId);
-        console.log('  contact_id:', contact.id);
-        console.log('  accountName:', details.accountName || `${contact.first_name} ${contact.last_name}'s Account`);
-        console.log('  productId:', productId);
-
-        // Convert term (numeric) to billing_cycle (string) if term is provided
-        let finalBillingCycle = details.billingCycle;
-        let billingTermMonths = null;
-
-        if (details.term) {
-          // Term provided as numeric months - convert to billing_cycle string
-          const termMap = {
-            '1': 'monthly',
-            '3': 'quarterly',
-            '6': 'semi-annual',
-            '12': 'annual',
-            '24': 'biennial'
-          };
-          finalBillingCycle = termMap[details.term.toString()] || 'monthly';
-          billingTermMonths = parseInt(details.term);
-        } else if (details.billingCycle) {
-          // Legacy billing_cycle provided - convert to months
-          const cycleToMonths = {
-            'monthly': 1,
-            'quarterly': 3,
-            'semi-annual': 6,
-            'semi_annual': 6,
-            'annual': 12,
-            'biennial': 24
-          };
-          billingTermMonths = cycleToMonths[details.billingCycle] || 1;
-        }
-
-        // Merge custom fields from lead with any additional fields from the form
-        const accountCustomFields = {
-          ...(lead.custom_fields || {}),  // Start with lead's custom fields
-          ...(details.app && { app: details.app })  // Merge 'app' field from form if provided
-        };
-
-        const accountResult = await client.query(
-          `INSERT INTO accounts (
-            organization_id, contact_id, account_name, edition,
-            device_name, mac_address, billing_cycle, billing_term_months, price,
-            is_trial, account_type, license_status, created_by, product_id, custom_fields
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-          RETURNING *`,
-          [
-            req.organizationId,
-            contact.id,
-            details.accountName || `${contact.first_name} ${contact.last_name}'s Account`,
-            details.edition,
-            details.deviceName,
-            details.macAddress,
-            finalBillingCycle, // Use converted billing_cycle
-            billingTermMonths, // Store numeric months
-            details.price || 0,
-            details.isTrial || false,
-            details.isTrial ? 'trial' : 'active',
-            'pending',
-            req.user.id,
-            productId,
-            accountCustomFields  // Use merged custom fields
-          ]
-        );
-
-        account = accountResult.rows[0];
-
-        if (details.isTrial) {
-          const trialStart = new Date();
-          const trialEnd = new Date(trialStart.getTime() + (30 * 24 * 60 * 60 * 1000));
-
-          await client.query(
-            `UPDATE accounts
-             SET trial_start_date = $1, trial_end_date = $2
-             WHERE id = $3`,
-            [trialStart, trialEnd, account.id]
-          );
-        }
-
-        // 6. Create transaction if transactionDetails are provided
-        if (req.body.transactionDetails) {
-          console.log('💳 Creating transaction...');
-          const txnDetails = req.body.transactionDetails;
-
-          await client.query(
-            `INSERT INTO transactions (
-              organization_id, account_id, contact_id, product_id,
-              payment_method, term, amount, currency, status,
-              transaction_date, created_by
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), $10)`,
-            [
-              req.organizationId,
-              account.id,
-              contact.id,
-              productId, // Use the same productId we determined for the account
-              txnDetails.paymentMethod || 'Credit Card',
-              txnDetails.term,
-              txnDetails.amount,
-              txnDetails.currency || 'USD',
-              txnDetails.status || 'completed',
-              req.user.id
-            ]
-          );
-          console.log('✅ Transaction created successfully');
-        }
-      }
+      const { contact, account, isNewContact, usedFieldMappings } = result;
 
       await client.query('COMMIT');
       console.log('✅ Transaction committed successfully');
@@ -2597,7 +2376,7 @@ router.post('/:id/convert',
           email: contact.email,
           phone: contact.phone,
           company: contact.company,
-          status: contact.status
+          status: contact.contact_status
         },
         account: account ? {
           id: account.id,
@@ -2607,7 +2386,8 @@ router.post('/:id/convert',
           isTrial: account.is_trial,
           productId: account.product_id
         } : null,
-        isNewContact
+        isNewContact,
+        usedFieldMappings
       };
 
       console.log('📤 Sending response:', response);
