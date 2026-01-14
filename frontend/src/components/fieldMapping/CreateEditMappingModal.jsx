@@ -165,11 +165,24 @@ const CreateEditMappingModal = ({ mapping, onClose, onSuccess }) => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   >
                     <option value="">Select a field...</option>
-                    {sourceFields?.fields?.map((field) => (
-                      <option key={field.name} value={field.name}>
-                        {field.label || field.name} ({field.type})
-                      </option>
-                    ))}
+                    {sourceFields?.fields?.filter(f => !f.is_custom).length > 0 && (
+                      <optgroup label="Standard Fields">
+                        {sourceFields.fields.filter(f => !f.is_custom).map((field) => (
+                          <option key={field.name} value={field.name}>
+                            {field.label || field.name} ({field.type})
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {sourceFields?.fields?.filter(f => f.is_custom).length > 0 && (
+                      <optgroup label="Custom Fields">
+                        {sourceFields.fields.filter(f => f.is_custom).map((field) => (
+                          <option key={field.name} value={field.name}>
+                            {field.label || field.name} ({field.type})
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
                   </select>
                 )}
               </div>
@@ -195,11 +208,24 @@ const CreateEditMappingModal = ({ mapping, onClose, onSuccess }) => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   >
                     <option value="">Select a field...</option>
-                    {targetFields?.fields?.map((field) => (
-                      <option key={field.name} value={field.name}>
-                        {field.label || field.name} ({field.type})
-                      </option>
-                    ))}
+                    {targetFields?.fields?.filter(f => !f.is_custom).length > 0 && (
+                      <optgroup label="Standard Fields">
+                        {targetFields.fields.filter(f => !f.is_custom).map((field) => (
+                          <option key={field.name} value={field.name}>
+                            {field.label || field.name} ({field.type})
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {targetFields?.fields?.filter(f => f.is_custom).length > 0 && (
+                      <optgroup label="Custom Fields">
+                        {targetFields.fields.filter(f => f.is_custom).map((field) => (
+                          <option key={field.name} value={field.name}>
+                            {field.label || field.name} ({field.type})
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
                   </select>
                 )}
               </div>

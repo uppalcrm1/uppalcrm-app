@@ -1,5 +1,6 @@
 const fieldMappingService = require('../services/fieldMappingService');
 const { AppError } = require('../utils/errors');
+const { pool } = require('../database/connection');
 
 /**
  * Field Mapping Controller
@@ -299,63 +300,103 @@ exports.getAvailableTargetFields = async (req, res, next) => {
 /**
  * GET /api/field-mappings/fields/:entityType
  * Get available fields for an entity type (for frontend dropdowns)
+ * Includes both standard fields and organization's custom fields
  */
 exports.getEntityFields = async (req, res, next) => {
   try {
     const { entityType } = req.params;
+    const { organization_id } = req.user;
 
-    // Normalize entity type
-    const normalizedType = entityType.toLowerCase();
-    
-    let fields = [];
-    
+    // Normalize entity type to plural form for database query
+    let normalizedType = entityType.toLowerCase();
+    if (normalizedType === 'lead') normalizedType = 'leads';
+    if (normalizedType === 'contact') normalizedType = 'contacts';
+    if (normalizedType === 'account') normalizedType = 'accounts';
+    if (normalizedType === 'transaction') normalizedType = 'transactions';
+
+    let standardFields = [];
+
     // Define standard fields for each entity type
-    if (normalizedType === 'lead' || normalizedType === 'leads') {
-      fields = [
-        { name: 'first_name', type: 'text', label: 'First Name' },
-        { name: 'last_name', type: 'text', label: 'Last Name' },
-        { name: 'email', type: 'email', label: 'Email' },
-        { name: 'phone', type: 'tel', label: 'Phone' },
-        { name: 'company', type: 'text', label: 'Company' },
-        { name: 'title', type: 'text', label: 'Title' },
-        { name: 'source', type: 'text', label: 'Source' },
-        { name: 'status', type: 'text', label: 'Status' },
-        { name: 'notes', type: 'textarea', label: 'Notes' }
+    if (normalizedType === 'leads') {
+      standardFields = [
+        { name: 'first_name', type: 'text', label: 'First Name', is_custom: false },
+        { name: 'last_name', type: 'text', label: 'Last Name', is_custom: false },
+        { name: 'email', type: 'email', label: 'Email', is_custom: false },
+        { name: 'phone', type: 'tel', label: 'Phone', is_custom: false },
+        { name: 'company', type: 'text', label: 'Company', is_custom: false },
+        { name: 'title', type: 'text', label: 'Title', is_custom: false },
+        { name: 'source', type: 'text', label: 'Source', is_custom: false },
+        { name: 'status', type: 'text', label: 'Status', is_custom: false },
+        { name: 'priority', type: 'select', label: 'Priority', is_custom: false },
+        { name: 'potentialValue', type: 'number', label: 'Potential Value', is_custom: false },
+        { name: 'notes', type: 'textarea', label: 'Notes', is_custom: false }
       ];
-    } else if (normalizedType === 'contact' || normalizedType === 'contacts') {
-      fields = [
-        { name: 'first_name', type: 'text', label: 'First Name' },
-        { name: 'last_name', type: 'text', label: 'Last Name' },
-        { name: 'email', type: 'email', label: 'Email' },
-        { name: 'phone', type: 'tel', label: 'Phone' },
-        { name: 'company', type: 'text', label: 'Company' },
-        { name: 'title', type: 'text', label: 'Title' },
-        { name: 'notes', type: 'textarea', label: 'Notes' }
+    } else if (normalizedType === 'contacts') {
+      standardFields = [
+        { name: 'first_name', type: 'text', label: 'First Name', is_custom: false },
+        { name: 'last_name', type: 'text', label: 'Last Name', is_custom: false },
+        { name: 'email', type: 'email', label: 'Email', is_custom: false },
+        { name: 'phone', type: 'tel', label: 'Phone', is_custom: false },
+        { name: 'company', type: 'text', label: 'Company', is_custom: false },
+        { name: 'title', type: 'text', label: 'Title', is_custom: false },
+        { name: 'notes', type: 'textarea', label: 'Notes', is_custom: false }
       ];
-    } else if (normalizedType === 'account' || normalizedType === 'accounts') {
-      fields = [
-        { name: 'account_name', type: 'text', label: 'Account Name' },
-        { name: 'email', type: 'email', label: 'Email' },
-        { name: 'phone', type: 'tel', label: 'Phone' },
-        { name: 'website', type: 'url', label: 'Website' },
-        { name: 'industry', type: 'text', label: 'Industry' },
-        { name: 'notes', type: 'textarea', label: 'Notes' }
+    } else if (normalizedType === 'accounts') {
+      standardFields = [
+        { name: 'account_name', type: 'text', label: 'Account Name', is_custom: false },
+        { name: 'email', type: 'email', label: 'Email', is_custom: false },
+        { name: 'phone', type: 'tel', label: 'Phone', is_custom: false },
+        { name: 'website', type: 'url', label: 'Website', is_custom: false },
+        { name: 'industry', type: 'text', label: 'Industry', is_custom: false },
+        { name: 'notes', type: 'textarea', label: 'Notes', is_custom: false }
       ];
-    } else if (normalizedType === 'transaction' || normalizedType === 'transactions') {
-      fields = [
-        { name: 'description', type: 'text', label: 'Description' },
-        { name: 'amount', type: 'number', label: 'Amount' },
-        { name: 'transaction_type', type: 'text', label: 'Transaction Type' },
-        { name: 'status', type: 'text', label: 'Status' },
-        { name: 'notes', type: 'textarea', label: 'Notes' }
+    } else if (normalizedType === 'transactions') {
+      standardFields = [
+        { name: 'description', type: 'text', label: 'Description', is_custom: false },
+        { name: 'amount', type: 'number', label: 'Amount', is_custom: false },
+        { name: 'transaction_type', type: 'text', label: 'Transaction Type', is_custom: false },
+        { name: 'status', type: 'text', label: 'Status', is_custom: false },
+        { name: 'notes', type: 'textarea', label: 'Notes', is_custom: false }
       ];
     } else {
       throw new AppError('Invalid entity type. Must be lead, contact, account, or transaction', 400);
     }
 
+    // Query custom fields for this organization and entity type
+    let customFields = [];
+    try {
+      const customFieldsQuery = `
+        SELECT field_name, field_type, field_label
+        FROM custom_field_definitions
+        WHERE organization_id = $1
+          AND entity_type = $2
+          AND is_active = true
+        ORDER BY display_order, field_label
+      `;
+      const customFieldsResult = await pool.query(customFieldsQuery, [organization_id, normalizedType]);
+
+      customFields = customFieldsResult.rows.map(cf => ({
+        name: cf.field_name,
+        type: cf.field_type,
+        label: cf.field_label,
+        is_custom: true
+      }));
+    } catch (dbError) {
+      // If custom_field_definitions table doesn't exist, just continue with standard fields
+      console.log('Custom fields query failed (table may not exist):', dbError.message);
+    }
+
+    // Combine standard and custom fields
+    const allFields = [...standardFields, ...customFields];
+
     res.json({
       success: true,
-      fields: fields
+      fields: allFields,
+      counts: {
+        standard: standardFields.length,
+        custom: customFields.length,
+        total: allFields.length
+      }
     });
   } catch (error) {
     next(error);
