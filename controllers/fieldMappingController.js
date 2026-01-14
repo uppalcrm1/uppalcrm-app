@@ -349,23 +349,43 @@ exports.getEntityFields = async (req, res, next) => {
         { name: 'phone', type: 'tel', label: 'Phone', is_custom: false },
         { name: 'company', type: 'text', label: 'Company', is_custom: false },
         { name: 'title', type: 'text', label: 'Title', is_custom: false },
+        { name: 'address_line1', type: 'text', label: 'Address Line 1', is_custom: false },
+        { name: 'address_line2', type: 'text', label: 'Address Line 2', is_custom: false },
+        { name: 'city', type: 'text', label: 'City', is_custom: false },
+        { name: 'state', type: 'text', label: 'State', is_custom: false },
+        { name: 'postal_code', type: 'text', label: 'Postal Code', is_custom: false },
+        { name: 'country', type: 'text', label: 'Country', is_custom: false },
+        { name: 'contact_type', type: 'select', label: 'Contact Type', is_custom: false },
+        { name: 'status', type: 'select', label: 'Status', is_custom: false },
+        { name: 'source', type: 'text', label: 'Source', is_custom: false },
         { name: 'notes', type: 'textarea', label: 'Notes', is_custom: false }
       ];
     } else if (normalizedType === 'accounts') {
       standardFields = [
         { name: 'account_name', type: 'text', label: 'Account Name', is_custom: false },
-        { name: 'email', type: 'email', label: 'Email', is_custom: false },
-        { name: 'phone', type: 'tel', label: 'Phone', is_custom: false },
-        { name: 'website', type: 'url', label: 'Website', is_custom: false },
-        { name: 'industry', type: 'text', label: 'Industry', is_custom: false },
+        { name: 'account_type', type: 'select', label: 'Account Type', is_custom: false },
+        { name: 'edition', type: 'text', label: 'Edition', is_custom: false },
+        { name: 'device_name', type: 'text', label: 'Device Name', is_custom: false },
+        { name: 'mac_address', type: 'text', label: 'MAC Address', is_custom: false },
+        { name: 'license_key', type: 'text', label: 'License Key', is_custom: false },
+        { name: 'license_status', type: 'select', label: 'License Status', is_custom: false },
+        { name: 'billing_cycle', type: 'select', label: 'Billing Cycle', is_custom: false },
+        { name: 'price', type: 'number', label: 'Price', is_custom: false },
+        { name: 'currency', type: 'select', label: 'Currency', is_custom: false },
+        { name: 'is_trial', type: 'boolean', label: 'Is Trial', is_custom: false },
         { name: 'notes', type: 'textarea', label: 'Notes', is_custom: false }
       ];
     } else if (normalizedType === 'transactions') {
       standardFields = [
-        { name: 'description', type: 'text', label: 'Description', is_custom: false },
+        { name: 'transaction_id', type: 'text', label: 'Transaction ID', is_custom: false },
         { name: 'amount', type: 'number', label: 'Amount', is_custom: false },
-        { name: 'transaction_type', type: 'text', label: 'Transaction Type', is_custom: false },
-        { name: 'status', type: 'text', label: 'Status', is_custom: false },
+        { name: 'currency', type: 'select', label: 'Currency', is_custom: false },
+        { name: 'payment_method', type: 'select', label: 'Payment Method', is_custom: false },
+        { name: 'payment_date', type: 'date', label: 'Payment Date', is_custom: false },
+        { name: 'status', type: 'select', label: 'Status', is_custom: false },
+        { name: 'term', type: 'select', label: 'Billing Term', is_custom: false },
+        { name: 'source', type: 'select', label: 'Source', is_custom: false },
+        { name: 'transaction_reference', type: 'text', label: 'Transaction Reference', is_custom: false },
         { name: 'notes', type: 'textarea', label: 'Notes', is_custom: false }
       ];
     } else {
