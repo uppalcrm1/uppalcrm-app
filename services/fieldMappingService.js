@@ -12,6 +12,8 @@ const { AppError } = require('../utils/errors');
  */
 exports.getAllMappings = async (organizationId, filters = {}) => {
   try {
+    console.log('getAllMappings called with:', { organizationId, filters });
+    
     const {
       target_entity_type,
       source_entity_type,
@@ -20,7 +22,7 @@ exports.getAllMappings = async (organizationId, filters = {}) => {
 
     let query = `
       SELECT *
-      FROM field_mappings
+      FROM field_mapping_configurations
       WHERE organization_id = $1
     `;
 
@@ -32,23 +34,28 @@ exports.getAllMappings = async (organizationId, filters = {}) => {
     }
 
     if (source_entity_type) {
-      query += ` AND source_entity_type = $${paramIndex}`;
+      query += ` AND source_entity = $${paramIndex}`;
       params.push(source_entity_type);
       paramIndex++;
     }
 
     if (target_entity_type) {
-      query += ` AND target_entity_type = $${paramIndex}`;
+      query += ` AND target_entity = $${paramIndex}`;
       params.push(target_entity_type);
       paramIndex++;
     }
 
-    query += ` ORDER BY priority ASC, created_at DESC`;
+    query += ` ORDER BY display_order ASC, created_at DESC`;
+
+    console.log('Executing query:', query);
+    console.log('With params:', params);
 
     const result = await pool.query(query, params);
+    console.log('Query result:', result.rows.length, 'rows');
     return result.rows;
   } catch (error) {
-    console.error('Error in getAllMappings:', error);
+    console.error('Error in getAllMappings:', error.message);
+    console.error('Error stack:', error.stack);
     throw error;
   }
 };
@@ -61,7 +68,7 @@ exports.getAllMappings = async (organizationId, filters = {}) => {
 exports.getMappingById = async (organizationId, mappingId) => {
   const query = `
     SELECT *
-    FROM field_mappings
+    FROM field_mapping_configurations
     WHERE id = $1 AND organization_id = $2
   `;
 
@@ -79,28 +86,28 @@ exports.createMapping = async (mappingData) => {
     target_entity_type,
     source_field_name,
     target_field_name,
-    transformation_rule,
-    priority = 100,
+    transformation_type = 'none',
+    display_order = 100,
     is_active = true
   } = mappingData;
 
   const query = `
-    INSERT INTO field_mappings (
-      organization_id, source_entity_type, target_entity_type,
-      source_field_name, target_field_name,
-      transformation_rule, priority, is_active
+    INSERT INTO field_mapping_configurations (
+      organization_id, source_entity, target_entity,
+      source_field, target_field,
+      transformation_type, display_order, is_active
     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     RETURNING *
   `;
 
   const params = [
     organization_id,
-    source_entity_type,
+    source_entity_type || 'leads',
     target_entity_type,
     source_field_name,
     target_field_name,
-    transformation_rule || null,
-    priority,
+    transformation_type,
+    display_order,
     is_active
   ];
 
@@ -113,9 +120,9 @@ exports.createMapping = async (mappingData) => {
  */
 exports.updateMapping = async (organizationId, mappingId, updates) => {
   const allowedFields = [
-    'transformation_rule',
-    'is_required',
-    'priority',
+    'transformation_type',
+    'is_required_on_convert',
+    'display_order',
     'is_active'
   ];
 
@@ -136,7 +143,7 @@ exports.updateMapping = async (organizationId, mappingId, updates) => {
   }
 
   const query = `
-    UPDATE field_mappings
+    UPDATE field_mapping_configurations
     SET ${setClauses.join(', ')}, updated_at = CURRENT_TIMESTAMP
     WHERE id = $1 AND organization_id = $2
     RETURNING *
@@ -151,7 +158,7 @@ exports.updateMapping = async (organizationId, mappingId, updates) => {
  */
 exports.deleteMapping = async (organizationId, mappingId) => {
   const query = `
-    UPDATE field_mappings
+    UPDATE field_mapping_configurations
     SET is_active = false, updated_at = CURRENT_TIMESTAMP
     WHERE id = $1 AND organization_id = $2
     RETURNING id
@@ -179,7 +186,7 @@ exports.bulkUpdateMappings = async (organizationId, updates) => {
       let paramIndex = 3;
 
       for (const [key, value] of Object.entries(fields)) {
-        if (['priority', 'is_required', 'is_active'].includes(key)) {
+        if (['display_order', 'is_required_on_convert', 'is_active'].includes(key)) {
           setClauses.push(`${key} = $${paramIndex}`);
           params.push(value);
           paramIndex++;
@@ -188,7 +195,7 @@ exports.bulkUpdateMappings = async (organizationId, updates) => {
 
       if (setClauses.length > 0) {
         const query = `
-          UPDATE field_mappings
+          UPDATE field_mapping_configurations
           SET ${setClauses.join(', ')}, updated_at = CURRENT_TIMESTAMP
           WHERE id = $1 AND organization_id = $2
         `;
@@ -217,18 +224,18 @@ exports.validateMappingConfiguration = async (mappingData) => {
   // Basic validation - check for duplicate mappings
   if (mappingData.organization_id && mappingData.source_field_name && mappingData.target_field_name) {
     const query = `
-      SELECT id FROM field_mappings
+      SELECT id FROM field_mapping_configurations
       WHERE organization_id = $1
-        AND source_entity_type = $2
-        AND target_entity_type = $3
-        AND source_field_name = $4
-        AND target_field_name = $5
+        AND source_entity = $2
+        AND target_entity = $3
+        AND source_field = $4
+        AND target_field = $5
         AND is_active = true
     `;
 
     const result = await pool.query(query, [
       mappingData.organization_id,
-      mappingData.source_entity_type,
+      mappingData.source_entity_type || 'leads',
       mappingData.target_entity_type,
       mappingData.source_field_name,
       mappingData.target_field_name
