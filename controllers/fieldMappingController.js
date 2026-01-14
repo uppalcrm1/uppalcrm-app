@@ -370,8 +370,8 @@ exports.getEntityFields = async (req, res, next) => {
         FROM custom_field_definitions
         WHERE organization_id = $1
           AND entity_type = $2
-          AND is_active = true
-        ORDER BY display_order, field_label
+          AND is_enabled = true
+        ORDER BY sort_order, field_label
       `;
       const customFieldsResult = await pool.query(customFieldsQuery, [organization_id, normalizedType]);
 
