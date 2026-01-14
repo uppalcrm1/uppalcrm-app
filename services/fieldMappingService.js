@@ -79,6 +79,8 @@ exports.getMappingById = async (organizationId, mappingId) => {
  * Create a new field mapping
  */
 exports.createMapping = async (mappingData) => {
+  console.log('createMapping service called with:', JSON.stringify(mappingData, null, 2));
+
   const {
     organization_id,
     source_entity_type,
@@ -87,15 +89,16 @@ exports.createMapping = async (mappingData) => {
     target_field_name,
     transformation_type = 'none',
     display_order = 100,
-    is_active = true
+    is_active = true,
+    is_required_on_convert = false
   } = mappingData;
 
   const query = `
     INSERT INTO field_mapping_configurations (
       organization_id, source_entity, target_entity,
       source_field, target_field,
-      transformation_type, display_order, is_active
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      transformation_type, display_order, is_active, is_required_on_convert
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
     RETURNING *
   `;
 
@@ -107,11 +110,21 @@ exports.createMapping = async (mappingData) => {
     target_field_name,
     transformation_type,
     display_order,
-    is_active
+    is_active,
+    is_required_on_convert
   ];
 
-  const result = await pool.query(query, params);
-  return result.rows[0];
+  console.log('Executing INSERT query with params:', params);
+
+  try {
+    const result = await pool.query(query, params);
+    console.log('INSERT result:', result.rows[0]);
+    return result.rows[0];
+  } catch (error) {
+    console.error('createMapping DB error:', error.message);
+    console.error('createMapping DB error detail:', error.detail);
+    throw error;
+  }
 };
 
 /**

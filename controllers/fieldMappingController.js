@@ -71,6 +71,8 @@ exports.createMapping = async (req, res, next) => {
   try {
     const { organization_id, role } = req.user;
 
+    console.log('createMapping called with body:', JSON.stringify(req.body, null, 2));
+
     // Check admin permission
     if (role !== 'admin') {
       throw new AppError('Only administrators can create field mappings', 403);
@@ -81,13 +83,19 @@ exports.createMapping = async (req, res, next) => {
       ...req.body
     };
 
+    console.log('mappingData prepared:', JSON.stringify(mappingData, null, 2));
+
     // Validate the mapping configuration
     const validation = await fieldMappingService.validateMappingConfiguration(mappingData);
+    console.log('Validation result:', JSON.stringify(validation, null, 2));
+
     if (!validation.valid) {
-      throw new AppError(validation.error, 400);
+      const errorMessage = validation.errors?.join(', ') || 'Invalid mapping configuration';
+      throw new AppError(errorMessage, 400);
     }
 
     const newMapping = await fieldMappingService.createMapping(mappingData);
+    console.log('New mapping created:', JSON.stringify(newMapping, null, 2));
 
     res.status(201).json({
       success: true,
@@ -95,6 +103,8 @@ exports.createMapping = async (req, res, next) => {
       message: 'Field mapping created successfully'
     });
   } catch (error) {
+    console.error('createMapping error:', error.message);
+    console.error('createMapping error stack:', error.stack);
     next(error);
   }
 };
@@ -316,7 +326,7 @@ exports.getEntityFields = async (req, res, next) => {
 
     let standardFields = [];
 
-    // Define standard fields for each entity type
+    // Define standard fields for each entity type (using snake_case to match DB columns)
     if (normalizedType === 'leads') {
       standardFields = [
         { name: 'first_name', type: 'text', label: 'First Name', is_custom: false },
@@ -328,7 +338,7 @@ exports.getEntityFields = async (req, res, next) => {
         { name: 'source', type: 'text', label: 'Source', is_custom: false },
         { name: 'status', type: 'text', label: 'Status', is_custom: false },
         { name: 'priority', type: 'select', label: 'Priority', is_custom: false },
-        { name: 'potentialValue', type: 'number', label: 'Potential Value', is_custom: false },
+        { name: 'potential_value', type: 'number', label: 'Potential Value', is_custom: false },
         { name: 'notes', type: 'textarea', label: 'Notes', is_custom: false }
       ];
     } else if (normalizedType === 'contacts') {
