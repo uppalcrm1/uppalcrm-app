@@ -1,7 +1,29 @@
 const { pool } = require('../database/connection');
 const fieldMappingService = require('./fieldMappingService');
-const transformationEngine = require('./transformationEngine');
 const { AppError } = require('../utils/errors');
+
+/**
+ * Simple transformation function (replaces transformationEngine)
+ */
+function applySimpleTransformation(value, transformationType) {
+  if (value === null || value === undefined) return value;
+
+  const strValue = String(value);
+  switch (transformationType) {
+    case 'uppercase':
+      return strValue.toUpperCase();
+    case 'lowercase':
+      return strValue.toLowerCase();
+    case 'titlecase':
+      return strValue.replace(/\w\S*/g, txt =>
+        txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase()
+      );
+    case 'trim':
+      return strValue.trim();
+    default:
+      return value;
+  }
+}
 
 /**
  * Lead Conversion Service with Field Mapping Support
@@ -60,19 +82,8 @@ exports.applyFieldMappingsToLead = async (organizationId, lead, templateId = nul
 
       // Apply transformation if value exists
       if (sourceValue !== null && sourceValue !== undefined) {
-        try {
-          transformedValue = await transformationEngine.applyTransformation(
-            sourceValue,
-            mapping.transformation_type,
-            mapping.transformation_rule_id,
-            { ...lead, organization_id: organizationId }
-          );
-          wasTransformed = (transformedValue !== sourceValue);
-        } catch (error) {
-          console.error(`Transformation error for mapping ${mapping.id}:`, error);
-          // Fall back to original value on error
-          transformedValue = sourceValue;
-        }
+        transformedValue = applySimpleTransformation(sourceValue, mapping.transformation_type);
+        wasTransformed = (transformedValue !== sourceValue);
       }
 
       // Use default value if no source value
@@ -439,51 +450,8 @@ exports.convertLeadWithMappings = async (
       }
     }
 
-    // 6. Record conversion history if field mappings were used
-    if (useFieldMappings && conversionHistory.length > 0) {
-      for (const history of conversionHistory) {
-        await client.query(
-          `INSERT INTO conversion_field_history (
-            organization_id, lead_id, contact_id, account_id,
-            field_mapping_id, source_field, target_field, target_entity,
-            source_value, transformed_value, final_value,
-            was_transformed, was_edited_by_user, transformation_type,
-            converted_by
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
-          [
-            organizationId,
-            lead.id,
-            contact.id,
-            account?.id,
-            history.field_mapping_id,
-            history.source_field,
-            history.target_field,
-            history.target_entity,
-            JSON.stringify(history.source_value),
-            JSON.stringify(history.transformed_value),
-            JSON.stringify(history.transformed_value), // Same as transformed unless user edited
-            history.was_transformed,
-            history.was_edited_by_user,
-            history.transformation_type,
-            userId
-          ]
-        );
-      }
-
-      // Update statistics
-      for (const history of conversionHistory) {
-        await client.query(
-          `INSERT INTO field_mapping_statistics (
-            organization_id, field_mapping_id, event_type, event_count
-          ) VALUES ($1, $2, 'field_used_in_conversion', 1)
-          ON CONFLICT (organization_id, field_mapping_id, event_type)
-          DO UPDATE SET
-            event_count = field_mapping_statistics.event_count + 1,
-            last_event_at = CURRENT_TIMESTAMP`,
-          [organizationId, history.field_mapping_id]
-        );
-      }
-    }
+    // Note: conversion_field_history and field_mapping_statistics tables were removed
+    // Field mapping history tracking has been simplified
 
     if (shouldManageTransaction) {
       await client.query('COMMIT');
