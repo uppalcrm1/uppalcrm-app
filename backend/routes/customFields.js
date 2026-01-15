@@ -6,6 +6,166 @@ const { authenticateToken } = require('../middleware/auth')
 // Apply authentication middleware to all routes
 router.use(authenticateToken)
 
+// System field defaults - these are the standard fields that should always be available
+const SYSTEM_FIELD_DEFAULTS = {
+  first_name: {
+    field_name: 'first_name',
+    field_label: 'First Name',
+    field_type: 'text',
+    is_required: true,
+    is_enabled: true,
+    show_in_create_form: true,
+    show_in_edit_form: true,
+    show_in_detail_view: true,
+    show_in_list_view: true,
+    field_options: null,
+    display_order: 1
+  },
+  last_name: {
+    field_name: 'last_name',
+    field_label: 'Last Name',
+    field_type: 'text',
+    is_required: true,
+    is_enabled: true,
+    show_in_create_form: true,
+    show_in_edit_form: true,
+    show_in_detail_view: true,
+    show_in_list_view: true,
+    field_options: null,
+    display_order: 2
+  },
+  email: {
+    field_name: 'email',
+    field_label: 'Email',
+    field_type: 'email',
+    is_required: true,
+    is_enabled: true,
+    show_in_create_form: true,
+    show_in_edit_form: true,
+    show_in_detail_view: true,
+    show_in_list_view: true,
+    field_options: null,
+    display_order: 3
+  },
+  phone: {
+    field_name: 'phone',
+    field_label: 'Phone',
+    field_type: 'text',
+    is_required: false,
+    is_enabled: true,
+    show_in_create_form: true,
+    show_in_edit_form: true,
+    show_in_detail_view: true,
+    show_in_list_view: false,
+    field_options: null,
+    display_order: 4
+  },
+  company: {
+    field_name: 'company',
+    field_label: 'Company',
+    field_type: 'text',
+    is_required: false,
+    is_enabled: true,
+    show_in_create_form: true,
+    show_in_edit_form: true,
+    show_in_detail_view: true,
+    show_in_list_view: false,
+    field_options: null,
+    display_order: 5
+  },
+  source: {
+    field_name: 'source',
+    field_label: 'Source',
+    field_type: 'select',
+    is_required: false,
+    is_enabled: true,
+    show_in_create_form: true,
+    show_in_edit_form: true,
+    show_in_detail_view: true,
+    show_in_list_view: true,
+    field_options: ['website', 'referral', 'phone', 'email', 'social_media', 'event', 'manual'],
+    display_order: 6
+  },
+  status: {
+    field_name: 'status',
+    field_label: 'Status',
+    field_type: 'select',
+    is_required: false,
+    is_enabled: true,
+    show_in_create_form: true,
+    show_in_edit_form: true,
+    show_in_detail_view: true,
+    show_in_list_view: true,
+    field_options: ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'won', 'lost'],
+    display_order: 7
+  },
+  priority: {
+    field_name: 'priority',
+    field_label: 'Priority',
+    field_type: 'select',
+    is_required: false,
+    is_enabled: true,
+    show_in_create_form: true,
+    show_in_edit_form: true,
+    show_in_detail_view: true,
+    show_in_list_view: true,
+    field_options: ['low', 'medium', 'high'],
+    display_order: 8
+  },
+  value: {
+    field_name: 'value',
+    field_label: 'Potential Value ($)',
+    field_type: 'number',
+    is_required: false,
+    is_enabled: true,
+    show_in_create_form: true,
+    show_in_edit_form: true,
+    show_in_detail_view: true,
+    show_in_list_view: false,
+    field_options: null,
+    display_order: 9
+  },
+  assigned_to: {
+    field_name: 'assigned_to',
+    field_label: 'Assign To',
+    field_type: 'user_select',
+    is_required: false,
+    is_enabled: true,
+    show_in_create_form: true,
+    show_in_edit_form: true,
+    show_in_detail_view: true,
+    show_in_list_view: false,
+    field_options: null,
+    display_order: 10
+  },
+  next_follow_up: {
+    field_name: 'next_follow_up',
+    field_label: 'Next Follow Up',
+    field_type: 'date',
+    is_required: false,
+    is_enabled: true,
+    show_in_create_form: true,
+    show_in_edit_form: true,
+    show_in_detail_view: true,
+    show_in_list_view: false,
+    field_options: null,
+    display_order: 11
+  },
+  notes: {
+    field_name: 'notes',
+    field_label: 'Notes',
+    field_type: 'textarea',
+    is_required: false,
+    is_enabled: true,
+    show_in_create_form: true,
+    show_in_edit_form: true,
+    show_in_detail_view: true,
+    show_in_list_view: false,
+    field_options: null,
+    display_order: 12
+  }
+}
+
 // ========================================
 // FIELD DEFINITIONS ROUTES
 // ========================================
@@ -1066,30 +1226,90 @@ router.get('/form-config', async (req, res) => {
 
     // Fetch system fields from default_field_configurations with visibility flags
     let systemFieldsResult = []
+    let storedConfigs = {}
+
     try {
-      const systemFieldsQuery = `
-        SELECT
-          id,
-          field_name,
-          field_label,
-          field_type,
-          field_options,
-          is_required,
-          is_enabled,
-          show_in_create_form,
-          show_in_edit_form,
-          show_in_detail_view,
-          show_in_list_view,
-          display_order
-        FROM default_field_configurations
-        WHERE organization_id = $1
-        ORDER BY display_order ASC, field_name ASC
-      `
-      const systemFieldsRes = await require('../database/connection').query(systemFieldsQuery, [organizationId])
-      systemFieldsResult = systemFieldsRes.rows
+      // Try to fetch with visibility flags first (if columns exist)
+      try {
+        const systemFieldsQuery = `
+          SELECT
+            id,
+            field_name,
+            field_label,
+            field_type,
+            field_options,
+            is_required,
+            is_enabled,
+            COALESCE(show_in_create_form, true) as show_in_create_form,
+            COALESCE(show_in_edit_form, true) as show_in_edit_form,
+            COALESCE(show_in_detail_view, true) as show_in_detail_view,
+            COALESCE(show_in_list_view, false) as show_in_list_view,
+            display_order
+          FROM default_field_configurations
+          WHERE organization_id = $1
+          ORDER BY display_order ASC, field_name ASC
+        `
+        const systemFieldsRes = await require('../database/connection').query(systemFieldsQuery, [organizationId])
+
+        // Store configs by field_name for merging with defaults
+        systemFieldsRes.rows.forEach(row => {
+          storedConfigs[row.field_name] = row
+        })
+      } catch (innerError) {
+        // If visibility columns don't exist, fetch without them and add defaults
+        console.warn('⚠️ Could not fetch with visibility flags, trying without:', innerError.message)
+        try {
+          const fallbackQuery = `
+            SELECT
+              id,
+              field_name,
+              field_label,
+              field_type,
+              field_options,
+              is_required,
+              is_enabled,
+              display_order
+            FROM default_field_configurations
+            WHERE organization_id = $1
+            ORDER BY display_order ASC, field_name ASC
+          `
+          const fallbackRes = await require('../database/connection').query(fallbackQuery, [organizationId])
+          fallbackRes.rows.forEach(row => {
+            storedConfigs[row.field_name] = {
+              ...row,
+              show_in_create_form: true,
+              show_in_edit_form: true,
+              show_in_detail_view: true,
+              show_in_list_view: false
+            }
+          })
+        } catch (fallbackError) {
+          console.warn('⚠️ Could not fetch from default_field_configurations table:', fallbackError.message)
+        }
+      }
+
+      // Build final system fields by merging defaults with stored configs
+      systemFieldsResult = Object.values(SYSTEM_FIELD_DEFAULTS).map(defaultField => {
+        const stored = storedConfigs[defaultField.field_name] || {}
+        return {
+          ...defaultField,
+          // Override defaults with stored values if they exist
+          ...(stored.id && { id: stored.id }),
+          ...(stored.field_label && { field_label: stored.field_label }),
+          ...(stored.is_required !== undefined && { is_required: stored.is_required }),
+          ...(stored.is_enabled !== undefined && { is_enabled: stored.is_enabled }),
+          ...(stored.show_in_create_form !== undefined && { show_in_create_form: stored.show_in_create_form }),
+          ...(stored.show_in_edit_form !== undefined && { show_in_edit_form: stored.show_in_edit_form }),
+          ...(stored.show_in_detail_view !== undefined && { show_in_detail_view: stored.show_in_detail_view }),
+          ...(stored.show_in_list_view !== undefined && { show_in_list_view: stored.show_in_list_view }),
+          ...(stored.display_order !== undefined && { display_order: stored.display_order })
+        }
+      }).filter(field => field.is_enabled !== false)
+
     } catch (error) {
       console.warn('⚠️ Could not fetch system fields from default_field_configurations:', error.message)
-      systemFieldsResult = []
+      // Even if there's an error, provide the defaults
+      systemFieldsResult = Object.values(SYSTEM_FIELD_DEFAULTS).filter(field => field.is_enabled !== false)
     }
 
     console.log(`✅ Retrieved ${customFieldsResult.length} custom fields and ${systemFieldsResult.length} system fields`)
