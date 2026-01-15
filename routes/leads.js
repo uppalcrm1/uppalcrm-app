@@ -154,28 +154,60 @@ View in CRM Dashboard: https://uppalcrm-frontend.onrender.com/dashboard
 // Add this helper function to get field configurations
 const getFieldConfigurations = async (organizationId) => {
   try {
+    // Fetch custom fields with ALL visibility flags
     const customFields = await db.query(`
-      SELECT field_name, field_label, field_type, field_options, is_required, created_at
+      SELECT
+        id,
+        field_name,
+        field_label,
+        field_type,
+        field_options,
+        is_required,
+        is_active,
+        is_enabled,
+        show_in_create_form,
+        show_in_edit_form,
+        show_in_detail_view,
+        show_in_list_view,
+        display_order,
+        created_at
       FROM custom_field_definitions
-      WHERE organization_id = $1
-      ORDER BY created_at ASC
+      WHERE organization_id = $1 AND is_active = true
+      ORDER BY display_order ASC, created_at ASC
     `, [organizationId]);
 
-    const defaultFields = await db.query(`
-      SELECT field_name, is_required
+    // Fetch system fields with ALL visibility flags from default_field_configurations
+    const systemFields = await db.query(`
+      SELECT
+        id,
+        field_name,
+        field_label,
+        field_type,
+        field_options,
+        is_required,
+        is_enabled,
+        show_in_create_form,
+        show_in_edit_form,
+        show_in_detail_view,
+        show_in_list_view,
+        display_order
       FROM default_field_configurations
       WHERE organization_id = $1
+      ORDER BY display_order ASC
     `, [organizationId]);
 
     return {
       customFields: customFields.rows,
-      defaultFields: defaultFields.rows
+      systemFields: systemFields.rows,
+      defaultFields: systemFields.rows // Maintain backward compatibility
     };
   } catch (error) {
     console.log('⚠️ Error fetching field configurations, returning empty config:', error.message);
+    console.error('Error details:', error);
     // Return empty configuration if tables don't exist or have schema issues
     return {
       customFields: [],
+      systemFields: [],
       defaultFields: []
     };
   }

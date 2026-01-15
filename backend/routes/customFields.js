@@ -1039,4 +1039,78 @@ router.post('/values/batch', async (req, res) => {
   }
 })
 
+/**
+ * GET /api/custom-fields/form-config
+ * Get complete form configuration including system fields and custom fields
+ * with all visibility flags needed for dynamic form rendering
+ */
+router.get('/form-config', async (req, res) => {
+  try {
+    console.log('📥 GET /api/custom-fields/form-config')
+
+    const organizationId = req.user.organization_id
+
+    if (!organizationId) {
+      return res.status(400).json({
+        error: 'Missing organization context',
+        details: 'User must be associated with an organization'
+      })
+    }
+
+    // Fetch custom fields with ALL visibility flags
+    const customFieldsResult = await CustomField.getFieldDefinitions(
+      organizationId,
+      'leads', // Default to leads, but this endpoint serves all entity types
+      true // activeOnly
+    )
+
+    // Fetch system fields from default_field_configurations with visibility flags
+    let systemFieldsResult = []
+    try {
+      const systemFieldsQuery = `
+        SELECT
+          id,
+          field_name,
+          field_label,
+          field_type,
+          field_options,
+          is_required,
+          is_enabled,
+          show_in_create_form,
+          show_in_edit_form,
+          show_in_detail_view,
+          show_in_list_view,
+          display_order
+        FROM default_field_configurations
+        WHERE organization_id = $1
+        ORDER BY display_order ASC, field_name ASC
+      `
+      const systemFieldsRes = await require('../database/connection').query(systemFieldsQuery, [organizationId])
+      systemFieldsResult = systemFieldsRes.rows
+    } catch (error) {
+      console.warn('⚠️ Could not fetch system fields from default_field_configurations:', error.message)
+      systemFieldsResult = []
+    }
+
+    console.log(`✅ Retrieved ${customFieldsResult.length} custom fields and ${systemFieldsResult.length} system fields`)
+
+    res.json({
+      success: true,
+      customFields: customFieldsResult,
+      systemFields: systemFieldsResult,
+      count: {
+        custom: customFieldsResult.length,
+        system: systemFieldsResult.length,
+        total: customFieldsResult.length + systemFieldsResult.length
+      }
+    })
+  } catch (error) {
+    console.error('❌ Error fetching form config:', error)
+    res.status(500).json({
+      error: 'Failed to fetch form configuration',
+      details: error.message
+    })
+  }
+})
+
 module.exports = router
