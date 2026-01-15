@@ -604,6 +604,10 @@ router.get('/', async (req, res) => {
     const hasIsEnabled = availableColumns.includes('is_enabled');
     const hasSortOrder = availableColumns.includes('sort_order');
     const hasEntityType = availableColumns.includes('entity_type');
+    const hasShowInCreateForm = availableColumns.includes('show_in_create_form');
+    const hasShowInEditForm = availableColumns.includes('show_in_edit_form');
+    const hasShowInDetailView = availableColumns.includes('show_in_detail_view');
+    const hasShowInListView = availableColumns.includes('show_in_list_view');
 
     console.log('📝 Available columns:', availableColumns);
 
@@ -612,11 +616,11 @@ router.get('/', async (req, res) => {
     if (hasIsEnabled) selectColumns += ', is_enabled';
     if (hasSortOrder) selectColumns += ', sort_order';
     if (hasEntityType) selectColumns += ', entity_type';
-    // Always try to include visibility flags if available
-    selectColumns += ', COALESCE(show_in_create_form, true) as show_in_create_form';
-    selectColumns += ', COALESCE(show_in_edit_form, true) as show_in_edit_form';
-    selectColumns += ', COALESCE(show_in_detail_view, true) as show_in_detail_view';
-    selectColumns += ', COALESCE(show_in_list_view, false) as show_in_list_view';
+    // Include visibility flags only if columns exist
+    if (hasShowInCreateForm) selectColumns += ', COALESCE(show_in_create_form, true) as show_in_create_form';
+    if (hasShowInEditForm) selectColumns += ', COALESCE(show_in_edit_form, true) as show_in_edit_form';
+    if (hasShowInDetailView) selectColumns += ', COALESCE(show_in_detail_view, true) as show_in_detail_view';
+    if (hasShowInListView) selectColumns += ', COALESCE(show_in_list_view, false) as show_in_list_view';
 
     const orderBy = hasSortOrder ? 'ORDER BY sort_order ASC, created_at ASC' : 'ORDER BY created_at ASC';
 
@@ -642,7 +646,11 @@ router.get('/', async (req, res) => {
     customFields.rows = customFields.rows.map(field => ({
       ...field,
       is_enabled: field.is_enabled !== undefined ? field.is_enabled : true,
-      sort_order: field.sort_order !== undefined ? field.sort_order : 0
+      sort_order: field.sort_order !== undefined ? field.sort_order : 0,
+      show_in_create_form: field.show_in_create_form !== undefined ? field.show_in_create_form : true,
+      show_in_edit_form: field.show_in_edit_form !== undefined ? field.show_in_edit_form : true,
+      show_in_detail_view: field.show_in_detail_view !== undefined ? field.show_in_detail_view : true,
+      show_in_list_view: field.show_in_list_view !== undefined ? field.show_in_list_view : false
     }));
 
     // Build system fields from defaults + stored configurations
