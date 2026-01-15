@@ -1333,4 +1333,119 @@ router.get('/form-config', async (req, res) => {
   }
 })
 
+/**
+ * PUT /api/custom-fields/default/:fieldName
+ * Update a system/default field configuration
+ */
+router.put('/default/:fieldName', async (req, res) => {
+  try {
+    const { fieldName } = req.params
+    const organizationId = req.user.organization_id
+    const updateData = req.body
+
+    console.log(`📥 PUT /api/custom-fields/default/${fieldName}`, updateData)
+
+    if (!organizationId) {
+      return res.status(400).json({
+        error: 'Missing organization context',
+        details: 'User must be associated with an organization'
+      })
+    }
+
+    // Validate field name is a known system field
+    if (!SYSTEM_FIELD_DEFAULTS[fieldName]) {
+      return res.status(400).json({
+        error: 'Invalid system field',
+        details: `Field '${fieldName}' is not a recognized system field`
+      })
+    }
+
+    // Build the update query dynamically based on provided fields
+    const allowedFields = [
+      'field_label',
+      'field_type',
+      'field_options',
+      'is_required',
+      'is_enabled',
+      'show_in_create_form',
+      'show_in_edit_form',
+      'show_in_detail_view',
+      'show_in_list_view',
+      'display_order'
+    ]
+
+    const updates = {}
+    allowedFields.forEach(field => {
+      if (updateData[field] !== undefined) {
+        updates[field] = updateData[field]
+      }
+    })
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({
+        error: 'No valid fields to update',
+        details: 'Request must include at least one valid field to update'
+      })
+    }
+
+    // Check if a configuration row exists for this field
+    const db = require('../database/connection')
+    const checkQuery = `
+      SELECT id FROM default_field_configurations
+      WHERE organization_id = $1 AND field_name = $2
+    `
+    const checkResult = await db.query(checkQuery, [organizationId, fieldName])
+
+    let result
+    if (checkResult.rows.length > 0) {
+      // Update existing configuration
+      const setClause = Object.keys(updates)
+        .map((key, idx) => `${key} = $${idx + 3}`)
+        .join(', ')
+
+      const updateQuery = `
+        UPDATE default_field_configurations
+        SET ${setClause}, updated_at = NOW()
+        WHERE organization_id = $1 AND field_name = $2
+        RETURNING *
+      `
+      const values = [organizationId, fieldName, ...Object.values(updates)]
+      result = await db.query(updateQuery, values)
+    } else {
+      // Insert new configuration
+      const defaultConfig = SYSTEM_FIELD_DEFAULTS[fieldName]
+      const insertData = {
+        ...defaultConfig,
+        ...updates,
+        organization_id: organizationId
+      }
+
+      const insertFields = Object.keys(insertData)
+      const placeholders = insertFields.map((_, idx) => `$${idx + 1}`).join(', ')
+
+      const insertQuery = `
+        INSERT INTO default_field_configurations (${insertFields.join(', ')})
+        VALUES (${placeholders})
+        RETURNING *
+      `
+      const values = Object.values(insertData)
+      result = await db.query(insertQuery, values)
+    }
+
+    console.log('✅ System field configuration updated successfully')
+
+    res.json({
+      success: true,
+      message: `Field '${fieldName}' configuration updated successfully`,
+      field: result.rows[0]
+    })
+  } catch (error) {
+    console.error('❌ Error updating system field configuration:', error)
+    res.status(500).json({
+      error: 'Failed to update system field configuration',
+      details: error.message
+    })
+  }
+})
+
 module.exports = router
