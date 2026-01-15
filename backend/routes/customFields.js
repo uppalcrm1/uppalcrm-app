@@ -1334,6 +1334,79 @@ router.get('/form-config', async (req, res) => {
 })
 
 /**
+ * GET /api/custom-fields/debug-config
+ * Debug endpoint to see raw field configurations
+ */
+router.get('/debug-config', async (req, res) => {
+  try {
+    const organizationId = req.user.organization_id;
+    const db = require('../database/connection');
+
+    console.log('🔍 DEBUG: Checking field configurations for org:', organizationId);
+
+    // Get raw data from database
+    let dbRows = [];
+    try {
+      const query = `
+        SELECT * FROM default_field_configurations
+        WHERE organization_id = $1
+        ORDER BY field_name ASC
+      `;
+      const result = await db.query(query, [organizationId]);
+      dbRows = result.rows;
+    } catch (error) {
+      console.error('Error fetching from DB:', error);
+    }
+
+    // Get what the API would return
+    const apiData = await require('../models/CustomField').getFieldDefinitions(organizationId, 'leads', true);
+
+    // Get system fields as they would be sent
+    let storedConfigs = {};
+    try {
+      const systemFieldsQuery = `
+        SELECT * FROM default_field_configurations
+        WHERE organization_id = $1
+      `;
+      const systemFieldsRes = await db.query(systemFieldsQuery, [organizationId]);
+      systemFieldsRes.rows.forEach(row => {
+        storedConfigs[row.field_name] = row;
+      });
+    } catch (error) {
+      console.error('Error:', error);
+    }
+
+    const mergedSystemFields = Object.values(SYSTEM_FIELD_DEFAULTS).map(defaultField => {
+      const stored = storedConfigs[defaultField.field_name] || {};
+      return {
+        field_name: defaultField.field_name,
+        default_is_enabled: defaultField.is_enabled,
+        default_show_in_create: defaultField.show_in_create_form,
+        stored_is_enabled: stored.is_enabled,
+        stored_show_in_create: stored.show_in_create_form,
+        final_is_enabled: stored.is_enabled !== undefined ? stored.is_enabled : defaultField.is_enabled,
+        final_show_in_create: stored.show_in_create_form !== undefined ? stored.show_in_create_form : defaultField.show_in_create_form,
+        will_pass_filter: (stored.is_enabled !== undefined ? stored.is_enabled : defaultField.is_enabled) !== false,
+        has_db_row: !!stored.id
+      };
+    });
+
+    res.json({
+      success: true,
+      organization_id: organizationId,
+      db_rows_count: dbRows.length,
+      db_rows: dbRows,
+      merged_system_fields: mergedSystemFields,
+      company_field: mergedSystemFields.find(f => f.field_name === 'company'),
+      priority_field: mergedSystemFields.find(f => f.field_name === 'priority')
+    });
+  } catch (error) {
+    console.error('Debug error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * PUT /api/custom-fields/default/:fieldName
  * Update a system/default field configuration
  */
