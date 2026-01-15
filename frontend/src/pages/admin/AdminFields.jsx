@@ -229,6 +229,11 @@ const AdminFields = () => {
         if (editingField.isSystemField) {
           // System fields use field_name as identifier and different endpoint
           updateData.entity_type = activeTab
+          // Include visibility flags for system fields
+          updateData.show_in_create_form = formData.show_in_create_form
+          updateData.show_in_edit_form = formData.show_in_edit_form
+          updateData.show_in_detail_view = formData.show_in_detail_view
+          updateData.show_in_list_view = formData.show_in_list_view
           console.log('📤 Updating system field:', editingField.field_name, updateData)
           const response = await api.put(`/custom-fields/default/${editingField.field_name}`, updateData)
           console.log('✅ System field updated:', response.data)

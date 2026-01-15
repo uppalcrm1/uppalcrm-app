@@ -612,6 +612,11 @@ router.get('/', async (req, res) => {
     if (hasIsEnabled) selectColumns += ', is_enabled';
     if (hasSortOrder) selectColumns += ', sort_order';
     if (hasEntityType) selectColumns += ', entity_type';
+    // Always try to include visibility flags if available
+    selectColumns += ', COALESCE(show_in_create_form, true) as show_in_create_form';
+    selectColumns += ', COALESCE(show_in_edit_form, true) as show_in_edit_form';
+    selectColumns += ', COALESCE(show_in_detail_view, true) as show_in_detail_view';
+    selectColumns += ', COALESCE(show_in_list_view, false) as show_in_list_view';
 
     const orderBy = hasSortOrder ? 'ORDER BY sort_order ASC, created_at ASC' : 'ORDER BY created_at ASC';
 
@@ -814,7 +819,7 @@ router.get('/', async (req, res) => {
     try {
       const configResult = await db.query(`
         SELECT field_name, field_options, is_enabled, is_required, sort_order,
-               show_in_create_form, show_in_edit_form, show_in_detail_view
+               show_in_create_form, show_in_edit_form, show_in_detail_view, show_in_list_view
         FROM default_field_configurations
         WHERE organization_id = $1 AND entity_type = $2
       `, [req.organizationId, entity_type]);
@@ -857,7 +862,8 @@ router.get('/', async (req, res) => {
         editable: fieldDef.editable,
         show_in_create_form: storedConfig.show_in_create_form !== undefined ? storedConfig.show_in_create_form : true,
         show_in_edit_form: storedConfig.show_in_edit_form !== undefined ? storedConfig.show_in_edit_form : true,
-        show_in_detail_view: storedConfig.show_in_detail_view !== undefined ? storedConfig.show_in_detail_view : true
+        show_in_detail_view: storedConfig.show_in_detail_view !== undefined ? storedConfig.show_in_detail_view : true,
+        show_in_list_view: storedConfig.show_in_list_view !== undefined ? storedConfig.show_in_list_view : false
       });
     });
 
@@ -1138,7 +1144,7 @@ router.put('/default/:fieldName', async (req, res) => {
 
     await ensureTablesExist();
 
-    const { is_enabled, is_required, is_deleted, field_options, field_label, field_type, entity_type } = req.body;
+    const { is_enabled, is_required, is_deleted, field_options, field_label, field_type, entity_type, show_in_create_form, show_in_edit_form, show_in_detail_view, show_in_list_view } = req.body;
     const { fieldName } = req.params;
 
     // entity_type is required for proper field isolation
@@ -1372,7 +1378,11 @@ router.put('/default/:fieldName', async (req, res) => {
       options: field_options || fieldDefault.options || null,
       is_enabled: is_enabled !== undefined ? is_enabled : true,
       is_required: is_required !== undefined ? is_required : fieldDefault.required,
-      is_deleted: is_deleted !== undefined ? is_deleted : false
+      is_deleted: is_deleted !== undefined ? is_deleted : false,
+      show_in_create_form: show_in_create_form !== undefined ? show_in_create_form : true,
+      show_in_edit_form: show_in_edit_form !== undefined ? show_in_edit_form : true,
+      show_in_detail_view: show_in_detail_view !== undefined ? show_in_detail_view : true,
+      show_in_list_view: show_in_list_view !== undefined ? show_in_list_view : false
     };
 
     console.log('🔧 Storing field config:', fieldConfig);
@@ -1394,15 +1404,23 @@ router.put('/default/:fieldName', async (req, res) => {
             is_required = $3,
             field_label = $4,
             field_type = $5,
+            show_in_create_form = $6,
+            show_in_edit_form = $7,
+            show_in_detail_view = $8,
+            show_in_list_view = $9,
             updated_at = NOW()
-        WHERE organization_id = $6 AND field_name = $7 AND entity_type IS NULL
-        RETURNING field_name, field_options, is_enabled, is_required
+        WHERE organization_id = $10 AND field_name = $11 AND entity_type IS NULL
+        RETURNING field_name, field_options, is_enabled, is_required, show_in_create_form, show_in_edit_form, show_in_detail_view, show_in_list_view
       `, [
         JSON.stringify(fieldConfig.options),
         fieldConfig.is_enabled,
         fieldConfig.is_required,
         fieldConfig.label,
         fieldConfig.type,
+        fieldConfig.show_in_create_form,
+        fieldConfig.show_in_edit_form,
+        fieldConfig.show_in_detail_view,
+        fieldConfig.show_in_list_view,
         req.organizationId,
         fieldName
       ]);
@@ -1415,21 +1433,29 @@ router.put('/default/:fieldName', async (req, res) => {
         entity_type,
         options: fieldConfig.options,
         is_enabled: fieldConfig.is_enabled,
-        is_required: fieldConfig.is_required
+        is_required: fieldConfig.is_required,
+        show_in_create_form: fieldConfig.show_in_create_form,
+        show_in_edit_form: fieldConfig.show_in_edit_form,
+        show_in_detail_view: fieldConfig.show_in_detail_view,
+        show_in_list_view: fieldConfig.show_in_list_view
       });
-      
+
       result = await db.query(`
         INSERT INTO default_field_configurations
-        (organization_id, field_name, entity_type, field_options, is_enabled, is_required, sort_order, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+        (organization_id, field_name, entity_type, field_options, is_enabled, is_required, sort_order, show_in_create_form, show_in_edit_form, show_in_detail_view, show_in_list_view, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
         ON CONFLICT (organization_id, field_name, entity_type)
         DO UPDATE SET
           field_options = EXCLUDED.field_options,
           is_enabled = EXCLUDED.is_enabled,
           is_required = EXCLUDED.is_required,
           sort_order = EXCLUDED.sort_order,
+          show_in_create_form = EXCLUDED.show_in_create_form,
+          show_in_edit_form = EXCLUDED.show_in_edit_form,
+          show_in_detail_view = EXCLUDED.show_in_detail_view,
+          show_in_list_view = EXCLUDED.show_in_list_view,
           updated_at = NOW()
-        RETURNING field_name, field_options, is_enabled, is_required, sort_order
+        RETURNING field_name, field_options, is_enabled, is_required, sort_order, show_in_create_form, show_in_edit_form, show_in_detail_view, show_in_list_view
       `, [
         req.organizationId,
         fieldName,
@@ -1437,9 +1463,13 @@ router.put('/default/:fieldName', async (req, res) => {
         JSON.stringify(fieldConfig.options),
         fieldConfig.is_enabled,
         fieldConfig.is_required,
-        0 // default sort order
+        0, // default sort order
+        fieldConfig.show_in_create_form,
+        fieldConfig.show_in_edit_form,
+        fieldConfig.show_in_detail_view,
+        fieldConfig.show_in_list_view
       ]);
-      
+
       console.log('🔧 Database result:', result.rows[0]);
     }
 
@@ -1453,7 +1483,11 @@ router.put('/default/:fieldName', async (req, res) => {
       is_enabled: fieldConfig.is_enabled,
       is_required: fieldConfig.is_required,
       is_deleted: fieldConfig.is_deleted,
-      sort_order: 0
+      sort_order: 0,
+      show_in_create_form: fieldConfig.show_in_create_form,
+      show_in_edit_form: fieldConfig.show_in_edit_form,
+      show_in_detail_view: fieldConfig.show_in_detail_view,
+      show_in_list_view: fieldConfig.show_in_list_view
     };
 
     res.json({
@@ -1763,7 +1797,8 @@ router.get('/form-config', async (req, res) => {
     try {
       // First, try to load from custom_field_definitions (new standardized approach)
       const systemFieldsQuery = await db.query(`
-        SELECT field_name, field_options, is_enabled, is_required, field_label, field_type
+        SELECT field_name, field_options, is_enabled, is_required, field_label, field_type,
+               show_in_create_form, show_in_edit_form, show_in_detail_view, show_in_list_view
         FROM custom_field_definitions
         WHERE organization_id = $1
           AND (entity_type = 'leads' OR entity_type IS NULL)
@@ -1782,7 +1817,7 @@ router.get('/form-config', async (req, res) => {
     try {
       const legacyConfigResult = await db.query(`
         SELECT field_name, field_options, is_enabled, is_required,
-               show_in_create_form, show_in_edit_form, show_in_detail_view
+               show_in_create_form, show_in_edit_form, show_in_detail_view, show_in_list_view
         FROM default_field_configurations
         WHERE organization_id = $1
       `, [req.organizationId]);
@@ -1822,7 +1857,8 @@ router.get('/form-config', async (req, res) => {
           is_enabled: true,
           show_in_create_form: storedConfig.show_in_create_form !== undefined ? storedConfig.show_in_create_form : true,
           show_in_edit_form: storedConfig.show_in_edit_form !== undefined ? storedConfig.show_in_edit_form : true,
-          show_in_detail_view: storedConfig.show_in_detail_view !== undefined ? storedConfig.show_in_detail_view : true
+          show_in_detail_view: storedConfig.show_in_detail_view !== undefined ? storedConfig.show_in_detail_view : true,
+          show_in_list_view: storedConfig.show_in_list_view !== undefined ? storedConfig.show_in_list_view : false
         });
       }
     });
