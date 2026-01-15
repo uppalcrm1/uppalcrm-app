@@ -492,7 +492,8 @@ router.get('/debug/payment-method', async (req, res) => {
     
     // Check default_field_configurations
     const defaultConfigResult = await db.query(`
-      SELECT field_name, entity_type, field_options, is_enabled, is_required
+      SELECT field_name, entity_type, field_options, is_enabled, is_required,
+             show_in_create_form, show_in_edit_form, show_in_detail_view
       FROM default_field_configurations
       WHERE organization_id = $1 AND field_name = 'payment_method'
       ORDER BY created_at DESC
@@ -812,7 +813,8 @@ router.get('/', async (req, res) => {
     let storedConfigs = {};
     try {
       const configResult = await db.query(`
-        SELECT field_name, field_options, is_enabled, is_required, sort_order
+        SELECT field_name, field_options, is_enabled, is_required, sort_order,
+               show_in_create_form, show_in_edit_form, show_in_detail_view
         FROM default_field_configurations
         WHERE organization_id = $1 AND entity_type = $2
       `, [req.organizationId, entity_type]);
@@ -852,7 +854,10 @@ router.get('/', async (req, res) => {
         is_required: storedConfig.is_required !== undefined ? storedConfig.is_required : fieldDef.required,
         is_deleted: false,
         sort_order: storedConfig.sort_order || 0,
-        editable: fieldDef.editable
+        editable: fieldDef.editable,
+        show_in_create_form: storedConfig.show_in_create_form !== undefined ? storedConfig.show_in_create_form : true,
+        show_in_edit_form: storedConfig.show_in_edit_form !== undefined ? storedConfig.show_in_edit_form : true,
+        show_in_detail_view: storedConfig.show_in_detail_view !== undefined ? storedConfig.show_in_detail_view : true
       });
     });
 
@@ -877,7 +882,8 @@ router.get('/', async (req, res) => {
     let defaultFields = { rows: [] };
     try {
       defaultFields = await db.query(`
-        SELECT field_name, is_enabled, is_required, sort_order
+        SELECT field_name, is_enabled, is_required, sort_order,
+               show_in_create_form, show_in_edit_form, show_in_detail_view
         FROM default_field_configurations
         WHERE organization_id = $1
       `, [req.organizationId]);
@@ -1775,7 +1781,8 @@ router.get('/form-config', async (req, res) => {
     // Fallback: check legacy default_field_configurations table for backward compatibility
     try {
       const legacyConfigResult = await db.query(`
-        SELECT field_name, field_options, is_enabled, is_required
+        SELECT field_name, field_options, is_enabled, is_required,
+               show_in_create_form, show_in_edit_form, show_in_detail_view
         FROM default_field_configurations
         WHERE organization_id = $1
       `, [req.organizationId]);
@@ -1812,7 +1819,10 @@ router.get('/form-config', async (req, res) => {
           field_type: fieldDef.type,
           field_options: fieldOptions,
           is_required: storedConfig.is_required !== undefined ? storedConfig.is_required : fieldDef.required,
-          is_enabled: true
+          is_enabled: true,
+          show_in_create_form: storedConfig.show_in_create_form !== undefined ? storedConfig.show_in_create_form : true,
+          show_in_edit_form: storedConfig.show_in_edit_form !== undefined ? storedConfig.show_in_edit_form : true,
+          show_in_detail_view: storedConfig.show_in_detail_view !== undefined ? storedConfig.show_in_detail_view : true
         });
       }
     });
