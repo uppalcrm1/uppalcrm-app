@@ -1813,10 +1813,17 @@ router.get('/form-config', async (req, res) => {
         ORDER BY created_at ASC
       `, [req.organizationId]);
 
+      console.log('🔍 Form config DB query result:', defaultConfigResult.rows.map(r => ({
+        field_name: r.field_name,
+        is_enabled: r.is_enabled,
+        show_in_create_form: r.show_in_create_form
+      })));
+
       defaultConfigResult.rows.forEach(config => {
         storedConfigs[config.field_name] = config;
       });
       console.log('Form config: loaded', Object.keys(storedConfigs).length, 'system field configs from default_field_configurations');
+      console.log('Form config: storedConfigs keys:', Object.keys(storedConfigs).join(', '));
     } catch (configError) {
       console.log('Could not fetch system fields from default_field_configurations:', configError.message);
     }
