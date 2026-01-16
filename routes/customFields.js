@@ -1856,6 +1856,16 @@ router.get('/form-config', async (req, res) => {
 
       const isEnabled = storedConfig.is_enabled !== undefined ? storedConfig.is_enabled : true;
 
+      // DEBUG: Log each field's enabled status
+      if (fieldName === 'company') {
+        console.log(`🔍 FORM CONFIG DEBUG - Company field:`, {
+          fieldName,
+          storedConfig,
+          isEnabled,
+          will_include: isEnabled ? 'YES' : 'NO'
+        });
+      }
+
       // Only include enabled fields in the form
       if (isEnabled) {
         systemFields.push({
@@ -1874,6 +1884,12 @@ router.get('/form-config', async (req, res) => {
     });
 
     console.log('Form config system fields count:', systemFields.length);
+    console.log('Form config system fields:', systemFields.map(f => `${f.field_name}(enabled=${f.is_enabled})`).join(', '));
+
+    // Prevent caching of form configuration to ensure live updates
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, public, max-age=0');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
 
     res.json({
       customFields: customFields.rows,
