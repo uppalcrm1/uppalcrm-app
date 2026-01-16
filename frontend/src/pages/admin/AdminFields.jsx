@@ -307,9 +307,26 @@ const AdminFields = () => {
       }
     }
 
+    // CRITICAL: Ensure all visibility flags are properly set from the field
+    // If field is missing visibility flags, use defaults that allow all views
     setFormData({
-      ...field,
-      field_options: normalizedOptions
+      field_name: field.field_name || '',
+      field_label: field.field_label || '',
+      field_description: field.field_description || '',
+      field_type: field.field_type || 'text',
+      entity_type: field.entity_type || activeTab,
+      is_required: field.is_required !== undefined ? field.is_required : false,
+      is_searchable: field.is_searchable !== undefined ? field.is_searchable : true,
+      is_filterable: field.is_filterable !== undefined ? field.is_filterable : true,
+      show_in_list_view: field.show_in_list_view !== undefined ? field.show_in_list_view : false,
+      show_in_detail_view: field.show_in_detail_view !== undefined ? field.show_in_detail_view : true,
+      show_in_create_form: field.show_in_create_form !== undefined ? field.show_in_create_form : true,
+      show_in_edit_form: field.show_in_edit_form !== undefined ? field.show_in_edit_form : true,
+      field_group: field.field_group || '',
+      placeholder: field.placeholder || '',
+      default_value: field.default_value || '',
+      field_options: normalizedOptions,
+      validation_rules: field.validation_rules || {}
     })
     setEditingField(field)
     setIsCreating(true)
