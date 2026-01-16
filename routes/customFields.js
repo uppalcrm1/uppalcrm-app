@@ -1800,10 +1800,29 @@ router.get('/form-config', async (req, res) => {
       notes: { label: 'Notes', type: 'textarea', required: false, editable: true }
     };
 
-    // Get any stored configurations for system fields from custom_field_definitions (new approach)
+    // CRITICAL: Load system field configurations from default_field_configurations
+    // This is the PRIMARY source for system field visibility settings
     let storedConfigs = {};
     try {
-      // First, try to load from custom_field_definitions (new standardized approach)
+      // Load from default_field_configurations for leads entity type
+      const defaultConfigResult = await db.query(`
+        SELECT field_name, field_options, is_enabled, is_required, field_label, field_type,
+               show_in_create_form, show_in_edit_form, show_in_detail_view, show_in_list_view
+        FROM default_field_configurations
+        WHERE organization_id = $1 AND entity_type = 'leads'
+        ORDER BY created_at ASC
+      `, [req.organizationId]);
+
+      defaultConfigResult.rows.forEach(config => {
+        storedConfigs[config.field_name] = config;
+      });
+      console.log('Form config: loaded', Object.keys(storedConfigs).length, 'system field configs from default_field_configurations');
+    } catch (configError) {
+      console.log('Could not fetch system fields from default_field_configurations:', configError.message);
+    }
+
+    // Fallback: check custom_field_definitions as secondary source
+    try {
       const systemFieldsQuery = await db.query(`
         SELECT field_name, field_options, is_enabled, is_required, field_label, field_type,
                show_in_create_form, show_in_edit_form, show_in_detail_view, show_in_list_view
@@ -1813,32 +1832,15 @@ router.get('/form-config', async (req, res) => {
         ORDER BY created_at ASC
       `, [req.organizationId]);
 
+      // Only use custom_field_definitions configs if no default_field_configurations found for that field
       systemFieldsQuery.rows.forEach(config => {
-        storedConfigs[config.field_name] = config;
-      });
-      console.log('Form config: loaded', Object.keys(storedConfigs).length, 'system field configs from custom_field_definitions');
-    } catch (configError) {
-      console.log('Could not fetch system fields from custom_field_definitions:', configError.message);
-    }
-
-    // Fallback: check legacy default_field_configurations table for backward compatibility
-    try {
-      const legacyConfigResult = await db.query(`
-        SELECT field_name, field_options, is_enabled, is_required,
-               show_in_create_form, show_in_edit_form, show_in_detail_view, show_in_list_view
-        FROM default_field_configurations
-        WHERE organization_id = $1
-      `, [req.organizationId]);
-
-      // Only use legacy configs if no new configs found for that field
-      legacyConfigResult.rows.forEach(config => {
         if (!storedConfigs[config.field_name]) {
           storedConfigs[config.field_name] = config;
         }
       });
-      console.log('Form config: total configs after legacy merge:', Object.keys(storedConfigs).length);
-    } catch (legacyError) {
-      console.log('No legacy system field configs found');
+      console.log('Form config: total configs after merging custom_field_definitions:', Object.keys(storedConfigs).length);
+    } catch (fallbackError) {
+      console.log('Could not fetch system fields from custom_field_definitions:', fallbackError.message);
     }
 
     // Build complete system fields list for form (only enabled fields)
