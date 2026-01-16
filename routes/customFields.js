@@ -1800,6 +1800,11 @@ router.get('/form-config', async (req, res) => {
       notes: { label: 'Notes', type: 'textarea', required: false, editable: true }
     };
 
+    // Helper function to convert snake_case field names to camelCase
+    const snakeToCamel = (str) => {
+      return str.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
+    };
+
     // CRITICAL: Load system field configurations from default_field_configurations
     // This is the PRIMARY source for system field visibility settings
     let storedConfigs = {};
@@ -1819,8 +1824,10 @@ router.get('/form-config', async (req, res) => {
         show_in_create_form: r.show_in_create_form
       })));
 
+      // Convert field names from snake_case to camelCase to match systemFieldDefaults keys
       defaultConfigResult.rows.forEach(config => {
-        storedConfigs[config.field_name] = config;
+        const camelCaseFieldName = snakeToCamel(config.field_name);
+        storedConfigs[camelCaseFieldName] = config;
       });
       console.log('Form config: loaded', Object.keys(storedConfigs).length, 'system field configs from default_field_configurations');
       console.log('Form config: storedConfigs keys:', Object.keys(storedConfigs).join(', '));
@@ -1841,8 +1848,9 @@ router.get('/form-config', async (req, res) => {
 
       // Only use custom_field_definitions configs if no default_field_configurations found for that field
       systemFieldsQuery.rows.forEach(config => {
-        if (!storedConfigs[config.field_name]) {
-          storedConfigs[config.field_name] = config;
+        const camelCaseFieldName = snakeToCamel(config.field_name);
+        if (!storedConfigs[camelCaseFieldName]) {
+          storedConfigs[camelCaseFieldName] = config;
         }
       });
       console.log('Form config: total configs after merging custom_field_definitions:', Object.keys(storedConfigs).length);
