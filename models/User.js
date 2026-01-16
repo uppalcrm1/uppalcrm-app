@@ -377,7 +377,8 @@ class User {
 
       return new User(userData);
     } catch (error) {
-      console.error('Token verification error:', error.message);
+      // Token verification errors are expected for expired tokens - don't log
+      // console.error('Token verification error:', error.message);
       return null;
     }
   }

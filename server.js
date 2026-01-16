@@ -107,11 +107,11 @@ app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 // Input sanitization
 app.use(sanitizeInput);
 
-// Debug: Log all incoming requests
-app.use((req, res, next) => {
-  console.log(`📝 ${req.method} ${req.url} (path: ${req.path})`);
-  next();
-});
+// Debug: Log all incoming requests (disabled - too verbose)
+// app.use((req, res, next) => {
+//   console.log(`📝 ${req.method} ${req.url} (path: ${req.path})`);
+//   next();
+// });
 
 // Serve static files only if frontend dist exists (for local dev)
 const frontendDistPath = path.join(__dirname, 'frontend/dist');
