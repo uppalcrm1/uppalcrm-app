@@ -492,8 +492,7 @@ router.get('/debug/payment-method', async (req, res) => {
     
     // Check default_field_configurations
     const defaultConfigResult = await db.query(`
-      SELECT field_name, entity_type, field_options, is_enabled, is_required,
-             show_in_create_form, show_in_edit_form, show_in_detail_view
+      SELECT field_name, entity_type, field_options, is_enabled, is_required
       FROM default_field_configurations
       WHERE organization_id = $1 AND field_name = 'payment_method'
       ORDER BY created_at DESC
@@ -604,10 +603,6 @@ router.get('/', async (req, res) => {
     const hasIsEnabled = availableColumns.includes('is_enabled');
     const hasSortOrder = availableColumns.includes('sort_order');
     const hasEntityType = availableColumns.includes('entity_type');
-    const hasShowInCreateForm = availableColumns.includes('show_in_create_form');
-    const hasShowInEditForm = availableColumns.includes('show_in_edit_form');
-    const hasShowInDetailView = availableColumns.includes('show_in_detail_view');
-    const hasShowInListView = availableColumns.includes('show_in_list_view');
 
     console.log('📝 Available columns:', availableColumns);
 
@@ -616,11 +611,6 @@ router.get('/', async (req, res) => {
     if (hasIsEnabled) selectColumns += ', is_enabled';
     if (hasSortOrder) selectColumns += ', sort_order';
     if (hasEntityType) selectColumns += ', entity_type';
-    // Include visibility flags only if columns exist
-    if (hasShowInCreateForm) selectColumns += ', COALESCE(show_in_create_form, true) as show_in_create_form';
-    if (hasShowInEditForm) selectColumns += ', COALESCE(show_in_edit_form, true) as show_in_edit_form';
-    if (hasShowInDetailView) selectColumns += ', COALESCE(show_in_detail_view, true) as show_in_detail_view';
-    if (hasShowInListView) selectColumns += ', COALESCE(show_in_list_view, false) as show_in_list_view';
 
     const orderBy = hasSortOrder ? 'ORDER BY sort_order ASC, created_at ASC' : 'ORDER BY created_at ASC';
 
@@ -646,11 +636,7 @@ router.get('/', async (req, res) => {
     customFields.rows = customFields.rows.map(field => ({
       ...field,
       is_enabled: field.is_enabled !== undefined ? field.is_enabled : true,
-      sort_order: field.sort_order !== undefined ? field.sort_order : 0,
-      show_in_create_form: field.show_in_create_form !== undefined ? field.show_in_create_form : true,
-      show_in_edit_form: field.show_in_edit_form !== undefined ? field.show_in_edit_form : true,
-      show_in_detail_view: field.show_in_detail_view !== undefined ? field.show_in_detail_view : true,
-      show_in_list_view: field.show_in_list_view !== undefined ? field.show_in_list_view : false
+      sort_order: field.sort_order !== undefined ? field.sort_order : 0
     }));
 
     // Build system fields from defaults + stored configurations
@@ -826,8 +812,7 @@ router.get('/', async (req, res) => {
     let storedConfigs = {};
     try {
       const configResult = await db.query(`
-        SELECT field_name, field_options, is_enabled, is_required, sort_order,
-               show_in_create_form, show_in_edit_form, show_in_detail_view, show_in_list_view
+        SELECT field_name, field_options, is_enabled, is_required, sort_order
         FROM default_field_configurations
         WHERE organization_id = $1 AND entity_type = $2
       `, [req.organizationId, entity_type]);
@@ -867,11 +852,7 @@ router.get('/', async (req, res) => {
         is_required: storedConfig.is_required !== undefined ? storedConfig.is_required : fieldDef.required,
         is_deleted: false,
         sort_order: storedConfig.sort_order || 0,
-        editable: fieldDef.editable,
-        show_in_create_form: storedConfig.show_in_create_form !== undefined ? storedConfig.show_in_create_form : true,
-        show_in_edit_form: storedConfig.show_in_edit_form !== undefined ? storedConfig.show_in_edit_form : true,
-        show_in_detail_view: storedConfig.show_in_detail_view !== undefined ? storedConfig.show_in_detail_view : true,
-        show_in_list_view: storedConfig.show_in_list_view !== undefined ? storedConfig.show_in_list_view : false
+        editable: fieldDef.editable
       });
     });
 
@@ -896,8 +877,7 @@ router.get('/', async (req, res) => {
     let defaultFields = { rows: [] };
     try {
       defaultFields = await db.query(`
-        SELECT field_name, is_enabled, is_required, sort_order,
-               show_in_create_form, show_in_edit_form, show_in_detail_view
+        SELECT field_name, is_enabled, is_required, sort_order
         FROM default_field_configurations
         WHERE organization_id = $1
       `, [req.organizationId]);
@@ -1152,7 +1132,7 @@ router.put('/default/:fieldName', async (req, res) => {
 
     await ensureTablesExist();
 
-    const { is_enabled, is_required, is_deleted, field_options, field_label, field_type, entity_type, show_in_create_form, show_in_edit_form, show_in_detail_view, show_in_list_view } = req.body;
+    const { is_enabled, is_required, is_deleted, field_options, field_label, field_type, entity_type } = req.body;
     const { fieldName } = req.params;
 
     // entity_type is required for proper field isolation
@@ -1386,11 +1366,7 @@ router.put('/default/:fieldName', async (req, res) => {
       options: field_options || fieldDefault.options || null,
       is_enabled: is_enabled !== undefined ? is_enabled : true,
       is_required: is_required !== undefined ? is_required : fieldDefault.required,
-      is_deleted: is_deleted !== undefined ? is_deleted : false,
-      show_in_create_form: show_in_create_form !== undefined ? show_in_create_form : true,
-      show_in_edit_form: show_in_edit_form !== undefined ? show_in_edit_form : true,
-      show_in_detail_view: show_in_detail_view !== undefined ? show_in_detail_view : true,
-      show_in_list_view: show_in_list_view !== undefined ? show_in_list_view : false
+      is_deleted: is_deleted !== undefined ? is_deleted : false
     };
 
     console.log('🔧 Storing field config:', fieldConfig);
@@ -1412,23 +1388,15 @@ router.put('/default/:fieldName', async (req, res) => {
             is_required = $3,
             field_label = $4,
             field_type = $5,
-            show_in_create_form = $6,
-            show_in_edit_form = $7,
-            show_in_detail_view = $8,
-            show_in_list_view = $9,
             updated_at = NOW()
-        WHERE organization_id = $10 AND field_name = $11 AND entity_type IS NULL
-        RETURNING field_name, field_options, is_enabled, is_required, show_in_create_form, show_in_edit_form, show_in_detail_view, show_in_list_view
+        WHERE organization_id = $6 AND field_name = $7 AND entity_type IS NULL
+        RETURNING field_name, field_options, is_enabled, is_required
       `, [
         JSON.stringify(fieldConfig.options),
         fieldConfig.is_enabled,
         fieldConfig.is_required,
         fieldConfig.label,
         fieldConfig.type,
-        fieldConfig.show_in_create_form,
-        fieldConfig.show_in_edit_form,
-        fieldConfig.show_in_detail_view,
-        fieldConfig.show_in_list_view,
         req.organizationId,
         fieldName
       ]);
@@ -1441,29 +1409,21 @@ router.put('/default/:fieldName', async (req, res) => {
         entity_type,
         options: fieldConfig.options,
         is_enabled: fieldConfig.is_enabled,
-        is_required: fieldConfig.is_required,
-        show_in_create_form: fieldConfig.show_in_create_form,
-        show_in_edit_form: fieldConfig.show_in_edit_form,
-        show_in_detail_view: fieldConfig.show_in_detail_view,
-        show_in_list_view: fieldConfig.show_in_list_view
+        is_required: fieldConfig.is_required
       });
-
+      
       result = await db.query(`
         INSERT INTO default_field_configurations
-        (organization_id, field_name, entity_type, field_options, is_enabled, is_required, sort_order, show_in_create_form, show_in_edit_form, show_in_detail_view, show_in_list_view, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
+        (organization_id, field_name, entity_type, field_options, is_enabled, is_required, sort_order, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
         ON CONFLICT (organization_id, field_name, entity_type)
         DO UPDATE SET
           field_options = EXCLUDED.field_options,
           is_enabled = EXCLUDED.is_enabled,
           is_required = EXCLUDED.is_required,
           sort_order = EXCLUDED.sort_order,
-          show_in_create_form = EXCLUDED.show_in_create_form,
-          show_in_edit_form = EXCLUDED.show_in_edit_form,
-          show_in_detail_view = EXCLUDED.show_in_detail_view,
-          show_in_list_view = EXCLUDED.show_in_list_view,
           updated_at = NOW()
-        RETURNING field_name, field_options, is_enabled, is_required, sort_order, show_in_create_form, show_in_edit_form, show_in_detail_view, show_in_list_view
+        RETURNING field_name, field_options, is_enabled, is_required, sort_order
       `, [
         req.organizationId,
         fieldName,
@@ -1471,13 +1431,9 @@ router.put('/default/:fieldName', async (req, res) => {
         JSON.stringify(fieldConfig.options),
         fieldConfig.is_enabled,
         fieldConfig.is_required,
-        0, // default sort order
-        fieldConfig.show_in_create_form,
-        fieldConfig.show_in_edit_form,
-        fieldConfig.show_in_detail_view,
-        fieldConfig.show_in_list_view
+        0 // default sort order
       ]);
-
+      
       console.log('🔧 Database result:', result.rows[0]);
     }
 
@@ -1491,11 +1447,7 @@ router.put('/default/:fieldName', async (req, res) => {
       is_enabled: fieldConfig.is_enabled,
       is_required: fieldConfig.is_required,
       is_deleted: fieldConfig.is_deleted,
-      sort_order: 0,
-      show_in_create_form: fieldConfig.show_in_create_form,
-      show_in_edit_form: fieldConfig.show_in_edit_form,
-      show_in_detail_view: fieldConfig.show_in_detail_view,
-      show_in_list_view: fieldConfig.show_in_list_view
+      sort_order: 0
     };
 
     res.json({
@@ -1800,54 +1752,43 @@ router.get('/form-config', async (req, res) => {
       notes: { label: 'Notes', type: 'textarea', required: false, editable: true }
     };
 
-    // CRITICAL: Load system field configurations from default_field_configurations
-    // This is the PRIMARY source for system field visibility settings
+    // Get any stored configurations for system fields from custom_field_definitions (new approach)
     let storedConfigs = {};
     try {
-      // Load from default_field_configurations for leads entity type
-      const defaultConfigResult = await db.query(`
-        SELECT field_name, field_options, is_enabled, is_required, field_label, field_type,
-               show_in_create_form, show_in_edit_form, show_in_detail_view, show_in_list_view
-        FROM default_field_configurations
-        WHERE organization_id = $1 AND entity_type = 'leads'
-        ORDER BY created_at ASC
-      `, [req.organizationId]);
-
-      console.log('🔍 Form config DB query result:', defaultConfigResult.rows.map(r => ({
-        field_name: r.field_name,
-        is_enabled: r.is_enabled,
-        show_in_create_form: r.show_in_create_form
-      })));
-
-      defaultConfigResult.rows.forEach(config => {
-        storedConfigs[config.field_name] = config;
-      });
-      console.log('Form config: loaded', Object.keys(storedConfigs).length, 'system field configs from default_field_configurations');
-      console.log('Form config: storedConfigs keys:', Object.keys(storedConfigs).join(', '));
-    } catch (configError) {
-      console.log('Could not fetch system fields from default_field_configurations:', configError.message);
-    }
-
-    // Fallback: check custom_field_definitions as secondary source
-    try {
+      // First, try to load from custom_field_definitions (new standardized approach)
       const systemFieldsQuery = await db.query(`
-        SELECT field_name, field_options, is_enabled, is_required, field_label, field_type,
-               show_in_create_form, show_in_edit_form, show_in_detail_view, show_in_list_view
+        SELECT field_name, field_options, is_enabled, is_required, field_label, field_type
         FROM custom_field_definitions
         WHERE organization_id = $1
           AND (entity_type = 'leads' OR entity_type IS NULL)
         ORDER BY created_at ASC
       `, [req.organizationId]);
 
-      // Only use custom_field_definitions configs if no default_field_configurations found for that field
       systemFieldsQuery.rows.forEach(config => {
+        storedConfigs[config.field_name] = config;
+      });
+      console.log('Form config: loaded', Object.keys(storedConfigs).length, 'system field configs from custom_field_definitions');
+    } catch (configError) {
+      console.log('Could not fetch system fields from custom_field_definitions:', configError.message);
+    }
+
+    // Fallback: check legacy default_field_configurations table for backward compatibility
+    try {
+      const legacyConfigResult = await db.query(`
+        SELECT field_name, field_options, is_enabled, is_required
+        FROM default_field_configurations
+        WHERE organization_id = $1
+      `, [req.organizationId]);
+
+      // Only use legacy configs if no new configs found for that field
+      legacyConfigResult.rows.forEach(config => {
         if (!storedConfigs[config.field_name]) {
           storedConfigs[config.field_name] = config;
         }
       });
-      console.log('Form config: total configs after merging custom_field_definitions:', Object.keys(storedConfigs).length);
-    } catch (fallbackError) {
-      console.log('Could not fetch system fields from custom_field_definitions:', fallbackError.message);
+      console.log('Form config: total configs after legacy merge:', Object.keys(storedConfigs).length);
+    } catch (legacyError) {
+      console.log('No legacy system field configs found');
     }
 
     // Build complete system fields list for form (only enabled fields)
@@ -1863,16 +1804,6 @@ router.get('/form-config', async (req, res) => {
 
       const isEnabled = storedConfig.is_enabled !== undefined ? storedConfig.is_enabled : true;
 
-      // DEBUG: Log each field's enabled status
-      if (fieldName === 'company') {
-        console.log(`🔍 FORM CONFIG DEBUG - Company field:`, {
-          fieldName,
-          storedConfig,
-          isEnabled,
-          will_include: isEnabled ? 'YES' : 'NO'
-        });
-      }
-
       // Only include enabled fields in the form
       if (isEnabled) {
         systemFields.push({
@@ -1881,22 +1812,12 @@ router.get('/form-config', async (req, res) => {
           field_type: fieldDef.type,
           field_options: fieldOptions,
           is_required: storedConfig.is_required !== undefined ? storedConfig.is_required : fieldDef.required,
-          is_enabled: true,
-          show_in_create_form: storedConfig.show_in_create_form !== undefined ? storedConfig.show_in_create_form : true,
-          show_in_edit_form: storedConfig.show_in_edit_form !== undefined ? storedConfig.show_in_edit_form : true,
-          show_in_detail_view: storedConfig.show_in_detail_view !== undefined ? storedConfig.show_in_detail_view : true,
-          show_in_list_view: storedConfig.show_in_list_view !== undefined ? storedConfig.show_in_list_view : false
+          is_enabled: true
         });
       }
     });
 
     console.log('Form config system fields count:', systemFields.length);
-    console.log('Form config system fields:', systemFields.map(f => `${f.field_name}(enabled=${f.is_enabled})`).join(', '));
-
-    // Prevent caching of form configuration to ensure live updates
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, public, max-age=0');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
 
     res.json({
       customFields: customFields.rows,
