@@ -619,14 +619,24 @@ router.post('/webhook/sms-status', async (req, res) => {
 });
 
 /**
- * Twilio Webhooks - Voice (TwiML for incoming calls)
+ * Twilio Webhooks - Voice (TwiML for incoming and outbound calls)
  */
 router.post('/webhook/voice', async (req, res) => {
   try {
     const { From, To, CallSid, Direction } = req.body;
 
-    console.log('Incoming voice call:', { From, To, CallSid, Direction });
+    console.log('Voice webhook call:', { From, To, CallSid, Direction });
 
+    // For OUTBOUND calls (when customer answers a call from our team),
+    // just return empty response to establish connection
+    if (Direction === 'outbound') {
+      console.log('Outbound call detected - allowing connection without voicemail');
+      res.type('text/xml');
+      res.send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+      return;
+    }
+
+    // INCOMING CALL HANDLING (customer calling the company number)
     // Find organization by Twilio phone number
     const orgQuery = `
       SELECT organization_id FROM twilio_config
@@ -693,21 +703,27 @@ router.post('/webhook/voice', async (req, res) => {
       }, 30000);
     }
 
-    // Return TwiML to handle the call - Voicemail recording system
-    const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+    // Return TwiML to handle incoming calls - Voicemail recording system
+    const forwardTo = process.env.FORWARD_CALLS_TO;
+    let twiml;
+
+    if (forwardTo) {
+      twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="alice">Thank you for calling. We are unable to take your call at the moment. Please leave a message after the beep, and we will get back to you as soon as possible.</Say>
-  <Record
-    maxLength="60"
-    transcribe="true"
-    transcribeCallback="https://uppalcrm-api.onrender.com/api/twilio/webhook/transcription"
-    recordingStatusCallback="https://uppalcrm-api.onrender.com/api/twilio/webhook/recording"
-    recordingStatusCallbackEvent="completed"
-    playBeep="true"
-  />
-  <Say voice="alice">Thank you for your message. Goodbye.</Say>
+  <Say voice="alice">Connecting your call. Please hold.</Say>
+  <Dial record="record-from-answer" timeout="30" action="/api/twilio/webhook/call-complete">
+    <Number>${forwardTo}</Number>
+  </Dial>
+  <Say voice="alice">We're sorry, but no one is available to take your call. Please leave a message after the beep.</Say>
+  <Record maxLength="120" transcribe="true" />
+</Response>`;
+    } else {
+      twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="alice">Thank you for calling. We have received your call and will get back to you shortly.</Say>
   <Hangup />
 </Response>`;
+    }
 
     res.type('text/xml');
     res.send(twiml);
