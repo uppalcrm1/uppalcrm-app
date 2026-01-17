@@ -644,16 +644,13 @@ router.post('/webhook/voice', async (req, res) => {
 
     console.log(`Call direction detected: ${isOutboundCall ? 'OUTBOUND' : 'INCOMING'} (isIncoming=${isIncomingCall})`);
 
-    // For OUTBOUND calls, keep connection alive with silence/hold
+    // For OUTBOUND calls, just return empty TwiML - let it be a normal call
     if (isOutboundCall) {
-      console.log('Outbound call detected - keeping connection alive with hold');
+      console.log('Outbound call detected - returning empty TwiML for normal call');
+      // For outbound calls, we want normal two-way audio, not a recorded message
+      // Return empty response to allow normal call flow
       const twiml = `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Say voice="alice">Thank you for calling. An agent will be with you shortly.</Say>
-  <Gather numDigits="0" timeout="3600" action="https://uppalcrm-api.onrender.com/api/twilio/webhook/gather-response">
-    <Pause length="3600"/>
-  </Gather>
-</Response>`;
+<Response></Response>`;
       res.type('text/xml');
       res.send(twiml);
       return;
