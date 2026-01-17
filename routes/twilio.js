@@ -730,11 +730,9 @@ router.post('/webhook/voice', async (req, res) => {
   <Say voice="alice">Thank you for calling. We are unable to take your call at the moment. Please leave a message after the beep, and we will get back to you as soon as possible.</Say>
   <Record
     maxLength="60"
-    transcribe="true"
-    transcribeCallback="https://uppalcrm-api.onrender.com/api/twilio/webhook/transcription"
+    playBeep="true"
     recordingStatusCallback="https://uppalcrm-api.onrender.com/api/twilio/webhook/recording"
     recordingStatusCallbackEvent="completed"
-    playBeep="true"
   />
   <Say voice="alice">Thank you for your message. Goodbye.</Say>
   <Hangup />
