@@ -5,6 +5,15 @@ const { authenticateToken } = require('../middleware/auth');
 const db = require('../database/connection');
 const Joi = require('joi');
 
+// Debug endpoint to verify code version
+router.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    version: 'twilio-fix-numChannels-2'
+  });
+});
+
 // Validation schemas
 const sendSMSSchema = Joi.object({
   to: Joi.string().required(),
