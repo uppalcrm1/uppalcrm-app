@@ -110,25 +110,19 @@ export const CallProvider = ({ children }) => {
     if (!incomingCall) return
 
     try {
-      // Clear the pending call from backend
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3004/api'
-      await fetch(`${API_URL}/twilio/incoming-calls/clear`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-          'X-Organization-Slug': localStorage.getItem('organizationSlug'),
-          'Content-Type': 'application/json'
-        }
-      })
-
-      // In a real implementation, this would connect the call
-      setActiveCall({
-        ...incomingCall,
-        status: 'connected',
-        startTime: new Date()
-      })
+      // Clear the incoming notification popup
       setIncomingCall(null)
-      toast.success('Call accepted')
+
+      // Dispatch event to open Dialpad with caller's number
+      window.dispatchEvent(new CustomEvent('openDialpadWithNumber', {
+        detail: {
+          phoneNumber: incomingCall.from,
+          callerName: incomingCall.callerName
+        }
+      }))
+
+      console.log('Incoming call accepted:', incomingCall)
+      toast.success(`Call from ${incomingCall.callerName || incomingCall.from} accepted. Dialpad opening...`)
     } catch (error) {
       console.error('Error accepting call:', error)
       toast.error('Failed to accept call')
