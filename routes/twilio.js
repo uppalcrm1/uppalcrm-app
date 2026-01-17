@@ -841,20 +841,16 @@ router.post('/webhook/voice', async (req, res) => {
       }
     }, 30000);
 
-    // Return TwiML to handle incoming calls - Voicemail system
-    // In the new Voice SDK architecture, agents receive notification in CRM UI
-    // They can accept/decline from the browser UI
-    // If no one answers, caller gets voicemail
+    // Return TwiML to handle incoming calls - Queue system
+    // Agent receives notification in CRM UI
+    // Caller is placed in queue with hold music while agent reviews
+    // If agent accepts, caller is moved to conference with agent
+    // If no agent accepts within 5 minutes, call ends
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="alice">Thank you for calling. We are unable to take your call at the moment. Please leave a message after the beep, and we will get back to you as soon as possible.</Say>
-  <Record
-    maxLength="60"
-    playBeep="true"
-    recordingStatusCallback="https://uppalcrm-api.onrender.com/api/twilio/webhook/recording"
-    recordingStatusCallbackEvent="completed"
-  />
-  <Say voice="alice">Thank you for your message. Goodbye.</Say>
+  <Say voice="alice">Thank you for calling. Please hold while we connect you to an agent.</Say>
+  <Enqueue waitUrl="http://twimlets.com/holdmusic?Bucket=com.twilio.music.ambient" maxQueueWait="300">support_queue</Enqueue>
+  <Say voice="alice">We're sorry, all agents are currently busy. Please try again later. Goodbye.</Say>
   <Hangup />
 </Response>`;
 
@@ -905,6 +901,63 @@ router.post('/incoming-calls/clear', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Error clearing pending call:', error);
     res.status(500).json({ error: 'Failed to clear pending call' });
+  }
+});
+
+/**
+ * Accept incoming call - Dequeue caller and move to conference
+ */
+router.post('/incoming-calls/accept', authenticateToken, async (req, res) => {
+  try {
+    const { callSid } = req.body;
+    const organizationId = req.organizationId;
+
+    console.log(`Accepting incoming call: ${callSid} for org: ${organizationId}`);
+
+    // Get Twilio client
+    const { client } = await twilioService.getClient(organizationId);
+
+    // Generate unique conference ID
+    const conferenceId = `conf-incoming-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    console.log(`Moving caller to conference: ${conferenceId}`);
+
+    // Update the call to redirect from queue to conference
+    await client.calls(callSid).update({
+      twiml: `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="alice">Connecting you now.</Say>
+  <Dial>
+    <Conference
+      startConferenceOnEnter="true"
+      endConferenceOnExit="true"
+      beep="false"
+      waitUrl="http://twimlets.com/holdmusic?Bucket=com.twilio.music.ambient"
+    >${conferenceId}</Conference>
+  </Dial>
+</Response>`
+    });
+
+    // Clear from incoming calls cache
+    const cacheKey = `incoming_call:${organizationId}`;
+    if (global.incomingCalls) {
+      delete global.incomingCalls[cacheKey];
+    }
+
+    console.log('Incoming call accepted and moved to conference:', conferenceId);
+
+    res.json({
+      success: true,
+      conferenceId,
+      message: 'Customer moved to conference. Agent should join now.'
+    });
+
+  } catch (error) {
+    console.error('Error accepting incoming call:', error);
+    res.status(500).json({
+      error: error.message || 'Failed to accept call',
+      details: error.toString()
+    });
   }
 });
 

@@ -44,6 +44,72 @@ const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
   }
 
   const handleCall = async () => {
+    // Check if this is joining an existing incoming call conference
+    const existingConferenceId = window.incomingConferenceId
+
+    if (existingConferenceId) {
+      console.log('Joining existing incoming call conference:', existingConferenceId)
+      setIsDialing(true)
+      setCallStatus('Joining call...')
+
+      try {
+        if (deviceStatus !== 'ready') {
+          throw new Error('Voice connection not ready')
+        }
+
+        if (!deviceRef.current) {
+          throw new Error('Device not initialized')
+        }
+
+        // Agent joins the conference where customer is already waiting
+        const call = await deviceRef.current.connect({
+          params: {
+            conference: existingConferenceId,
+            participant: 'agent'
+          }
+        })
+
+        activeCallRef.current = call
+        conferenceIdRef.current = existingConferenceId
+
+        setIsCallActive(true)
+        setCallStatus('Connected')
+
+        // Start call timer
+        timerRef.current = setInterval(() => {
+          setCallDuration(prev => prev + 1)
+        }, 1000)
+
+        // Clear the flag
+        delete window.incomingConferenceId
+
+        toast.success('Connected to caller!')
+
+        // Event listeners
+        call.on('disconnect', () => {
+          console.log('Call disconnected')
+          handleEndCall()
+        })
+
+        call.on('error', (error) => {
+          console.error('Call error:', error)
+          toast.error(`Call error: ${error.message}`)
+          setIsCallActive(false)
+          setCallStatus('')
+        })
+
+      } catch (error) {
+        console.error('Error joining conference:', error)
+        toast.error('Failed to join call')
+        setCallStatus('')
+        delete window.incomingConferenceId
+      } finally {
+        setIsDialing(false)
+      }
+      return
+    }
+
+    // ===== OUTBOUND CALL LOGIC =====
     const cleanNumber = phoneNumber.replace(/\D/g, '')
     if (cleanNumber.length < 10) {
       toast.error('Please enter a valid phone number')

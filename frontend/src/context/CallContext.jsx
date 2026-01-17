@@ -105,24 +105,48 @@ export const CallProvider = ({ children }) => {
     }
   }
 
-  // Accept incoming call
+  // Accept incoming call - Move customer from queue to conference
   const acceptCall = async () => {
     if (!incomingCall) return
 
     try {
-      // Clear the incoming notification popup
+      console.log('Accepting incoming call:', incomingCall)
+
+      // Call backend to dequeue customer into conference
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3004/api'
+      const response = await fetch(`${API_URL}/twilio/incoming-calls/accept`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+          'X-Organization-Slug': localStorage.getItem('organizationSlug'),
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          callSid: incomingCall.callSid
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to accept call')
+      }
+
+      const { conferenceId } = await response.json()
+
+      console.log('Customer moved to conference:', conferenceId)
+
+      // Clear the incoming notification
       setIncomingCall(null)
 
-      // Dispatch event to open Dialpad with caller's number
-      window.dispatchEvent(new CustomEvent('openDialpadWithNumber', {
+      // Dispatch event to connect agent to conference
+      window.dispatchEvent(new CustomEvent('joinIncomingCallConference', {
         detail: {
-          phoneNumber: incomingCall.from,
+          conferenceId,
+          callerPhone: incomingCall.from,
           callerName: incomingCall.callerName
         }
       }))
 
-      console.log('Incoming call accepted:', incomingCall)
-      toast.success(`Call from ${incomingCall.callerName || incomingCall.from} accepted. Dialpad opening...`)
+      toast.success('Connecting to caller...')
     } catch (error) {
       console.error('Error accepting call:', error)
       toast.error('Failed to accept call')

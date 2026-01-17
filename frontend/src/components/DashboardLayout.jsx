@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { Outlet, NavLink, useLocation } from 'react-router-dom'
+import toast from 'react-hot-toast'
 import { useAuth } from '../contexts/AuthContext'
 import { useNotifications } from '../context/NotificationContext'
 import { useCall } from '../context/CallContext'
@@ -70,8 +71,9 @@ const DashboardLayout = () => {
     }
   }, [browserPermission, requestBrowserPermission])
 
-  // Listen for incoming call dial back event
+  // Listen for incoming call events
   React.useEffect(() => {
+    // Handle dial back event (from accepting call in queue system)
     const handleOpenDialpad = (event) => {
       const { phoneNumber, callerName } = event.detail
       setIncomingCallNumber(phoneNumber)
@@ -80,8 +82,31 @@ const DashboardLayout = () => {
       console.log('Opening Dialpad for incoming call:', phoneNumber, callerName)
     }
 
+    // Handle joining existing conference (new queue system - agent joins customer's conference)
+    const handleJoinConference = (event) => {
+      const { conferenceId, callerPhone, callerName } = event.detail
+
+      console.log('Agent joining incoming call conference:', conferenceId)
+
+      // Pass conference ID to Dialpad via window variable
+      window.incomingConferenceId = conferenceId
+
+      // Show dialpad with caller info
+      setIncomingCallNumber(callerPhone)
+      setIncomingCallName(callerName)
+      setShowIncomingCallDialpad(true)
+
+      // Use react-hot-toast for notification
+      toast.success(`Joining call with ${callerName || callerPhone}...`)
+    }
+
     window.addEventListener('openDialpadWithNumber', handleOpenDialpad)
-    return () => window.removeEventListener('openDialpadWithNumber', handleOpenDialpad)
+    window.addEventListener('joinIncomingCallConference', handleJoinConference)
+
+    return () => {
+      window.removeEventListener('openDialpadWithNumber', handleOpenDialpad)
+      window.removeEventListener('joinIncomingCallConference', handleJoinConference)
+    }
   }, [])
 
   if (isLoading) {
