@@ -208,6 +208,7 @@ const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
         // Get token from backend
         const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3004/api'
         const response = await fetch(`${API_URL}/twilio/token`, {
+          method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
             'X-Organization-Slug': localStorage.getItem('organizationSlug')
@@ -242,6 +243,7 @@ const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
             const token = localStorage.getItem('authToken')
             const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3004/api'
             const response = await fetch(`${API_URL}/twilio/token`, {
+              method: 'POST',
               headers: {
                 'Authorization': `Bearer ${token}`,
                 'X-Organization-Slug': localStorage.getItem('organizationSlug')
