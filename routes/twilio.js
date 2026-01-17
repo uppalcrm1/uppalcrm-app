@@ -644,11 +644,18 @@ router.post('/webhook/voice', async (req, res) => {
 
     console.log(`Call direction detected: ${isOutboundCall ? 'OUTBOUND' : 'INCOMING'} (isIncoming=${isIncomingCall})`);
 
-    // For OUTBOUND calls, return empty response to allow call connection
+    // For OUTBOUND calls, put in conference so agents can connect
     if (isOutboundCall) {
-      console.log('Outbound call detected - returning empty TwiML for connection');
+      console.log('Outbound call detected - adding to conference');
+      // Extract organization from To/From - for outbound calls we need to find it differently
+      // For now, use a generic conference approach
+      const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="alice">Thank you for calling. Connecting you now.</Say>
+  <Conference endConferenceOnExit="true" statusCallback="https://uppalcrm-api.onrender.com/api/twilio/webhook/conference-status" statusCallbackEvent="join,leave,end">${CallSid}</Conference>
+</Response>`;
       res.type('text/xml');
-      res.send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+      res.send(twiml);
       return;
     }
 
@@ -826,8 +833,10 @@ router.post('/webhook/recording', async (req, res) => {
 
     res.status(200).send('OK');
   } catch (error) {
-    console.error('Error handling recording callback:', error);
-    res.status(500).send('Error');
+    // IMPORTANT: Always return 200 OK for webhooks, even on error
+    // Returning 5xx causes Twilio to retry infinitely
+    console.error('Error handling recording callback:', { error: error.message, stack: error.stack });
+    res.status(200).send('OK');
   }
 });
 
@@ -869,8 +878,10 @@ router.post('/webhook/transcription', async (req, res) => {
 
     res.status(200).send('OK');
   } catch (error) {
-    console.error('Error handling transcription callback:', error);
-    res.status(500).send('Error');
+    // IMPORTANT: Always return 200 OK for webhooks, even on error
+    // Returning 5xx causes Twilio to retry infinitely
+    console.error('Error handling transcription callback:', { error: error.message, stack: error.stack });
+    res.status(200).send('OK');
   }
 });
 
@@ -880,6 +891,8 @@ router.post('/webhook/transcription', async (req, res) => {
 router.post('/webhook/call-status', async (req, res) => {
   try {
     const { CallSid, CallStatus, CallDuration, RecordingUrl } = req.body;
+
+    console.log('Call status webhook received:', { CallSid, CallStatus, CallDuration });
 
     // Get organization context from cache
     if (!global.callOrganizations) {
@@ -901,10 +914,48 @@ router.post('/webhook/call-status', async (req, res) => {
       organizationId
     );
 
+    console.log('Call status updated successfully:', { CallSid, CallStatus });
     res.status(200).send('OK');
   } catch (error) {
-    console.error('Error updating call status:', error);
-    res.status(500).send('Error');
+    // IMPORTANT: Always return 200 OK for webhooks, even on error
+    // Returning 5xx causes Twilio to retry infinitely
+    console.error('Error updating call status:', { error: error.message, stack: error.stack });
+    res.status(200).send('OK');
+  }
+});
+
+/**
+ * Twilio Webhooks - Conference Status (for outbound calls)
+ */
+router.post('/webhook/conference-status', async (req, res) => {
+  try {
+    const { ConferenceSid, StatusCallbackEvent, FriendlyName } = req.body;
+
+    console.log('Conference status event:', { ConferenceSid, StatusCallbackEvent, FriendlyName });
+
+    // FriendlyName contains the CallSid in our setup
+    const CallSid = FriendlyName;
+
+    // Get organization context from cache
+    if (!global.callOrganizations) {
+      global.callOrganizations = {};
+    }
+    const organizationId = global.callOrganizations[CallSid];
+
+    if (!organizationId) {
+      console.warn(`Organization not found for conference ${CallSid}`);
+      res.status(200).send('OK');
+      return;
+    }
+
+    // Log conference events but don't need to store them separately
+    // The call status webhook will handle the final call status
+    console.log(`Conference event processed: ${StatusCallbackEvent}`);
+
+    res.status(200).send('OK');
+  } catch (error) {
+    console.error('Error handling conference status:', { error: error.message });
+    res.status(200).send('OK');
   }
 });
 
