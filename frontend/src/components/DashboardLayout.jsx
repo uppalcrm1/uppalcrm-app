@@ -29,6 +29,7 @@ import {
 } from 'lucide-react'
 import LoadingSpinner from './LoadingSpinner'
 import IncomingCallNotification from './IncomingCallNotification'
+import Dialpad from './Dialpad'
 
 // COMPLETE navigation with all your CRM sections
 const navigation = [
@@ -53,6 +54,9 @@ const DashboardLayout = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [adminMenuOpen, setAdminMenuOpen] = useState(false)
+  const [showIncomingCallDialpad, setShowIncomingCallDialpad] = useState(false)
+  const [incomingCallNumber, setIncomingCallNumber] = useState('')
+  const [incomingCallName, setIncomingCallName] = useState('')
   const location = useLocation()
 
   // Request browser notification permission on first visit
@@ -65,6 +69,20 @@ const DashboardLayout = () => {
       return () => clearTimeout(timer)
     }
   }, [browserPermission, requestBrowserPermission])
+
+  // Listen for incoming call dial back event
+  React.useEffect(() => {
+    const handleOpenDialpad = (event) => {
+      const { phoneNumber, callerName } = event.detail
+      setIncomingCallNumber(phoneNumber)
+      setIncomingCallName(callerName)
+      setShowIncomingCallDialpad(true)
+      console.log('Opening Dialpad for incoming call:', phoneNumber, callerName)
+    }
+
+    window.addEventListener('openDialpadWithNumber', handleOpenDialpad)
+    return () => window.removeEventListener('openDialpadWithNumber', handleOpenDialpad)
+  }, [])
 
   if (isLoading) {
     return <LoadingSpinner />
@@ -83,6 +101,19 @@ const DashboardLayout = () => {
           callerName={incomingCall.callerName}
           onAccept={acceptCall}
           onDecline={declineCall}
+        />
+      )}
+
+      {/* Dialpad for Incoming Call Dial Back */}
+      {showIncomingCallDialpad && (
+        <Dialpad
+          onClose={() => {
+            setShowIncomingCallDialpad(false)
+            setIncomingCallNumber('')
+            setIncomingCallName('')
+          }}
+          prefilledNumber={incomingCallNumber}
+          contactName={incomingCallName}
         />
       )}
 
