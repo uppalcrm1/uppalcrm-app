@@ -651,7 +651,7 @@ router.post('/webhook/voice', async (req, res) => {
 <Response>
   <Say voice="alice">Thank you for calling. An agent will be with you shortly.</Say>
   <Gather numDigits="0" timeout="3600" action="https://uppalcrm-api.onrender.com/api/twilio/webhook/gather-response">
-    <Play>https://demo.twilio.com/docs/voice.png</Play>
+    <Pause length="3600"/>
   </Gather>
 </Response>`;
       res.type('text/xml');
@@ -933,11 +933,11 @@ router.post('/webhook/gather-response', async (req, res) => {
 
     console.log('Gather response received:', { CallSid, Digits });
 
-    // If timeout (no digits pressed), loop back and continue hold music
+    // If timeout (no digits pressed), loop back and continue holding
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Gather numDigits="0" timeout="3600" action="https://uppalcrm-api.onrender.com/api/twilio/webhook/gather-response">
-    <Play>https://demo.twilio.com/docs/voice.png</Play>
+    <Pause length="3600"/>
   </Gather>
 </Response>`;
 
