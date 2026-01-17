@@ -644,13 +644,16 @@ router.post('/webhook/voice', async (req, res) => {
 
     console.log(`Call direction detected: ${isOutboundCall ? 'OUTBOUND' : 'INCOMING'} (isIncoming=${isIncomingCall})`);
 
-    // For OUTBOUND calls, just return empty TwiML - let it be a normal call
+    // For OUTBOUND calls, queue them and wait for agent to join
     if (isOutboundCall) {
-      console.log('Outbound call detected - returning empty TwiML for normal call');
-      // For outbound calls, we want normal two-way audio, not a recorded message
-      // Return empty response to allow normal call flow
+      console.log('Outbound call detected - queuing for agent connection');
+      // Put the caller in a queue with their CallSid as the queue name
+      // This keeps the call alive while waiting for an agent to dequeue
       const twiml = `<?xml version="1.0" encoding="UTF-8"?>
-<Response></Response>`;
+<Response>
+  <Say voice="alice">Thank you for calling. Please hold while we connect you to an agent.</Say>
+  <Enqueue>${CallSid}</Enqueue>
+</Response>`;
       res.type('text/xml');
       res.send(twiml);
       return;
