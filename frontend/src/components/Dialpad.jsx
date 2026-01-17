@@ -366,6 +366,70 @@ const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
     }
   }, [])
 
+  // Auto-join incoming call conference if it exists and device is ready
+  useEffect(() => {
+    const autoJoinConference = async () => {
+      const existingConferenceId = window.incomingConferenceId
+
+      if (existingConferenceId && deviceRef.current && deviceStatus === 'ready' && !isCallActive) {
+        console.log('Auto-joining incoming call conference:', existingConferenceId)
+
+        // Small delay to ensure device is fully ready
+        setTimeout(async () => {
+          try {
+            setIsDialing(true)
+            setCallStatus('Joining call...')
+
+            // Agent joins the conference where customer is already waiting
+            const call = await deviceRef.current.connect({
+              params: {
+                conference: existingConferenceId,
+                participant: 'agent'
+              }
+            })
+
+            activeCallRef.current = call
+            conferenceIdRef.current = existingConferenceId
+
+            setIsCallActive(true)
+            setCallStatus('Connected')
+
+            // Start call timer
+            timerRef.current = setInterval(() => {
+              setCallDuration(prev => prev + 1)
+            }, 1000)
+
+            // Clear the flag
+            delete window.incomingConferenceId
+
+            toast.success('Connected to caller!')
+
+            // Event listeners
+            call.on('disconnect', () => {
+              console.log('Call disconnected')
+              handleEndCall()
+            })
+
+            call.on('error', (error) => {
+              console.error('Call error:', error)
+              toast.error(`Call error: ${error.message}`)
+              handleEndCall()
+            })
+          } catch (error) {
+            console.error('Error auto-joining conference:', error)
+            toast.error('Failed to join call')
+            setCallStatus('')
+            delete window.incomingConferenceId
+          } finally {
+            setIsDialing(false)
+          }
+        }, 500)
+      }
+    }
+
+    autoJoinConference()
+  }, [deviceStatus, isCallActive])
+
   const dialpadButtons = [
     ['1', '2', '3'],
     ['4', '5', '6'],
@@ -434,6 +498,63 @@ const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
             </p>
           )}
         </div>
+
+        {/* Join Call Button - Backup for incoming calls */}
+        {window.incomingConferenceId && !isCallActive && (
+          <div className="p-4 bg-blue-50 border-t border-blue-200">
+            <p className="text-sm text-blue-800 mb-3 text-center font-semibold">
+              Caller is waiting in conference
+            </p>
+            <button
+              onClick={async () => {
+                const conferenceId = window.incomingConferenceId
+                try {
+                  setIsDialing(true)
+                  setCallStatus('Joining call...')
+
+                  const call = await deviceRef.current.connect({
+                    params: {
+                      conference: conferenceId,
+                      participant: 'agent'
+                    }
+                  })
+
+                  activeCallRef.current = call
+                  conferenceIdRef.current = conferenceId
+
+                  setIsCallActive(true)
+                  setCallStatus('Connected')
+
+                  timerRef.current = setInterval(() => {
+                    setCallDuration(prev => prev + 1)
+                  }, 1000)
+
+                  delete window.incomingConferenceId
+                  toast.success('Connected!')
+
+                  call.on('disconnect', () => handleEndCall())
+                  call.on('error', (error) => {
+                    console.error('Call error:', error)
+                    toast.error(`Call error: ${error.message}`)
+                    handleEndCall()
+                  })
+
+                } catch (error) {
+                  console.error('Error joining:', error)
+                  toast.error('Failed to join')
+                  setCallStatus('')
+                } finally {
+                  setIsDialing(false)
+                }
+              }}
+              disabled={isDialing || deviceStatus !== 'ready'}
+              className="w-full py-3 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg font-semibold text-lg transition-colors flex items-center justify-center space-x-2"
+            >
+              <Phone size={24} />
+              <span>{isDialing ? 'Joining...' : '📞 Join Call Now'}</span>
+            </button>
+          </div>
+        )}
 
         {/* Dialpad */}
         {!isCallActive && (
