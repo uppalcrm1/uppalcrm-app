@@ -14,6 +14,56 @@ router.get('/health', (req, res) => {
   });
 });
 
+/**
+ * Generate Twilio Voice SDK Token for agent
+ * Agent uses this to connect to Twilio from their browser
+ */
+router.post('/token', authenticateToken, async (req, res) => {
+  try {
+    const twilio = require('twilio');
+    const AccessToken = twilio.jwt.AccessToken;
+    const VoiceGrant = AccessToken.VoiceGrant;
+
+    const accountSid = process.env.TWILIO_ACCOUNT_SID;
+    const apiKey = process.env.TWILIO_API_KEY;
+    const apiSecret = process.env.TWILIO_API_SECRET;
+    const twimlAppSid = process.env.TWILIO_TWIML_APP_SID;
+
+    if (!accountSid || !apiKey || !apiSecret || !twimlAppSid) {
+      return res.status(500).json({
+        error: 'Twilio Voice SDK not configured. Missing TWILIO_API_KEY, TWILIO_API_SECRET, or TWILIO_TWIML_APP_SID'
+      });
+    }
+
+    // Create unique identity for this user/agent
+    const identity = `agent-${req.userId}`;
+
+    // Generate token (valid for 1 hour)
+    const token = new AccessToken(accountSid, apiKey, apiSecret, {
+      identity,
+      ttl: 3600
+    });
+
+    // Add Voice grant so agent can make/receive calls
+    const voiceGrant = new VoiceGrant({
+      outgoingApplicationSid: twimlAppSid,
+      incomingAllow: true
+    });
+
+    token.addGrant(voiceGrant);
+
+    console.log(`Generated Voice SDK token for agent: ${identity}`);
+
+    res.json({
+      token: token.toJwt(),
+      identity
+    });
+  } catch (error) {
+    console.error('Error generating token:', error);
+    res.status(500).json({ error: error.message || 'Failed to generate token' });
+  }
+});
+
 // Validation schemas
 const sendSMSSchema = Joi.object({
   to: Joi.string().required(),
@@ -26,7 +76,8 @@ const sendSMSSchema = Joi.object({
 const makeCallSchema = Joi.object({
   to: Joi.string().required(),
   leadId: Joi.string().uuid().optional().allow(null, ''),
-  contactId: Joi.string().uuid().optional().allow(null, '')
+  contactId: Joi.string().uuid().optional().allow(null, ''),
+  conferenceId: Joi.string().optional().allow(null, '')
 });
 
 const twilioConfigSchema = Joi.object({
@@ -375,6 +426,7 @@ router.get('/sms/conversation/:phoneNumber', authenticateToken, async (req, res)
 
 /**
  * Make phone call
+ * If conferenceId is provided, customer will be dialed into that conference
  */
 router.post('/call/make', authenticateToken, async (req, res) => {
   try {
@@ -383,7 +435,7 @@ router.post('/call/make', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: error.details[0].message });
     }
 
-    const { to, leadId, contactId } = req.body;
+    const { to, leadId, contactId, conferenceId } = req.body;
     const organizationId = req.organizationId;
     const userId = req.userId;
 
@@ -392,7 +444,8 @@ router.post('/call/make', authenticateToken, async (req, res) => {
       to,
       leadId,
       contactId,
-      userId
+      userId,
+      conferenceId
     });
 
     res.json({
@@ -653,11 +706,62 @@ router.post('/webhook/voice', async (req, res) => {
 
     console.log(`Call direction detected: ${isOutboundCall ? 'OUTBOUND' : 'INCOMING'} (isIncoming=${isIncomingCall})`);
 
-    // For OUTBOUND calls (agent calling customer), record both channels for two-way audio
+    // For OUTBOUND calls (agent calling customer via Voice SDK conference)
     if (isOutboundCall) {
-      console.log('Outbound call detected - recording two-way audio');
-      // numChannels="2" records both caller and callee, keeps connection open for conversation
-      // maxLength="3600" allows up to 1 hour conversation
+      const { conference, participant } = req.query;
+
+      // AGENT joining conference via Voice SDK
+      if (conference && participant === 'agent') {
+        console.log(`Agent joining conference: ${conference}`);
+
+        // TwiML to add agent to conference (starts the conference since agent joins first)
+        const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Dial>
+    <Conference
+      startConferenceOnEnter="true"
+      endConferenceOnExit="true"
+      waitUrl="http://twimlets.com/holdmusic?Bucket=com.twilio.music.ambient"
+      record="record-from-start"
+      recordingStatusCallback="https://uppalcrm-api.onrender.com/api/twilio/webhook/recording"
+      recordingStatusCallbackEvent="completed"
+      statusCallback="https://uppalcrm-api.onrender.com/api/twilio/webhook/conference-status"
+      statusCallbackEvent="start end join leave"
+    >${conference}</Conference>
+  </Dial>
+</Response>`;
+        res.type('text/xml');
+        res.send(twiml);
+        return;
+      }
+
+      // CUSTOMER joining conference (phone call from REST API)
+      if (conference && participant === 'customer') {
+        console.log(`Customer joining conference: ${conference}`);
+
+        // TwiML to add customer to conference where agent is already waiting
+        const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Dial>
+    <Conference
+      startConferenceOnEnter="false"
+      endConferenceOnExit="true"
+      waitUrl="http://twimlets.com/holdmusic?Bucket=com.twilio.music.ambient"
+      record="record-from-start"
+      recordingStatusCallback="https://uppalcrm-api.onrender.com/api/twilio/webhook/recording"
+      recordingStatusCallbackEvent="completed"
+      statusCallback="https://uppalcrm-api.onrender.com/api/twilio/webhook/conference-status"
+      statusCallbackEvent="start end join leave"
+    >${conference}</Conference>
+  </Dial>
+</Response>`;
+        res.type('text/xml');
+        res.send(twiml);
+        return;
+      }
+
+      // Legacy mode: No conference specified, just record two-way audio
+      console.log('Outbound call detected - recording two-way audio (legacy mode)');
       const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Record numChannels="2" maxLength="3600" recordingStatusCallback="https://uppalcrm-api.onrender.com/api/twilio/webhook/recording"/>

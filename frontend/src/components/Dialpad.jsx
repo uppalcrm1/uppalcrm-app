@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Phone, PhoneOff, Mic, MicOff, Volume2, VolumeX, Delete, X, User } from 'lucide-react'
+import { Device } from '@twilio/voice-sdk'
 import { twilioAPI } from '../services/api'
 import toast from 'react-hot-toast'
 
@@ -11,7 +12,11 @@ const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
   const [isMuted, setIsMuted] = useState(false)
   const [isSpeakerOn, setIsSpeakerOn] = useState(true)
   const [isDialing, setIsDialing] = useState(false)
+  const [deviceStatus, setDeviceStatus] = useState('initializing') // 'initializing', 'ready', 'error'
   const timerRef = useRef(null)
+  const deviceRef = useRef(null)
+  const activeCallRef = useRef(null)
+  const conferenceIdRef = useRef(null)
 
   // Format phone number as user types
   const formatPhoneNumber = (value) => {
@@ -45,31 +50,92 @@ const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
       return
     }
 
+    if (deviceStatus !== 'ready') {
+      if (deviceStatus === 'error') {
+        toast.error('Voice connection error. Please refresh the page and check your microphone permissions.')
+      } else {
+        toast.error('Voice connection is initializing. Please wait...')
+      }
+      return
+    }
+
+    if (!deviceRef.current) {
+      toast.error('Voice connection not ready. Please refresh the page.')
+      return
+    }
+
     setIsDialing(true)
-    setCallStatus('Dialing...')
+    setCallStatus('Connecting...')
 
     try {
-      // Format number with country code if not present
-      const formattedNumber = cleanNumber.startsWith('1')
-        ? `+${cleanNumber}`
-        : `+1${cleanNumber}`
+      // Generate unique conference ID for this call
+      const conferenceId = `conf-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      conferenceIdRef.current = conferenceId
 
-      const result = await twilioAPI.makeCall({
-        to: formattedNumber
+      // Step 1: Agent connects to conference via Voice SDK
+      console.log(`Agent joining conference: ${conferenceId}`)
+      setCallStatus('Joining conference...')
+
+      const call = await deviceRef.current.connect({
+        params: {
+          conference: conferenceId,
+          participant: 'agent'
+        }
       })
 
-      setIsCallActive(true)
-      setCallStatus('Calling...')
+      activeCallRef.current = call
 
-      // Start call timer
-      timerRef.current = setInterval(() => {
-        setCallDuration(prev => prev + 1)
-      }, 1000)
+      // Step 2: Listen for call acceptance
+      call.on('accept', async () => {
+        console.log('Agent accepted call, now dialing customer')
+        setCallStatus('Calling customer...')
 
-      toast.success('Call initiated')
+        // Format number with country code if not present
+        const formattedNumber = cleanNumber.startsWith('1')
+          ? `+${cleanNumber}`
+          : `+1${cleanNumber}`
+
+        try {
+          // Step 3: Dial customer into the same conference
+          const result = await twilioAPI.makeCall({
+            to: formattedNumber,
+            conferenceId: conferenceId
+          })
+
+          setIsCallActive(true)
+          setCallStatus('Connected')
+
+          // Start call timer
+          timerRef.current = setInterval(() => {
+            setCallDuration(prev => prev + 1)
+          }, 1000)
+
+          toast.success('Customer call initiated')
+        } catch (error) {
+          console.error('Error dialing customer:', error)
+          toast.error('Failed to dial customer')
+          call.disconnect()
+          setIsCallActive(false)
+          setCallStatus('')
+        }
+      })
+
+      call.on('disconnect', () => {
+        console.log('Call disconnected')
+        handleEndCall()
+      })
+
+      call.on('error', (error) => {
+        console.error('Call error:', error)
+        toast.error(`Call error: ${error.message}`)
+        setIsCallActive(false)
+        setCallStatus('')
+      })
+
+      toast.success('Connecting to conference...')
     } catch (error) {
       console.error('Error making call:', error)
-      toast.error(error.response?.data?.error || 'Failed to make call')
+      toast.error(error.message || 'Failed to make call')
       setCallStatus('')
     } finally {
       setIsDialing(false)
@@ -80,9 +146,14 @@ const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
     if (timerRef.current) {
       clearInterval(timerRef.current)
     }
+    if (activeCallRef.current) {
+      activeCallRef.current.disconnect()
+      activeCallRef.current = null
+    }
     setIsCallActive(false)
     setCallStatus('Call ended')
     setCallDuration(0)
+    conferenceIdRef.current = null
 
     setTimeout(() => {
       setCallStatus('')
@@ -90,12 +161,16 @@ const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
   }
 
   const toggleMute = () => {
+    if (activeCallRef.current && isCallActive) {
+      activeCallRef.current.mute(!isMuted)
+    }
     setIsMuted(!isMuted)
     toast.success(isMuted ? 'Microphone unmuted' : 'Microphone muted')
   }
 
   const toggleSpeaker = () => {
     setIsSpeakerOn(!isSpeakerOn)
+    toast.success(isSpeakerOn ? 'Speaker off' : 'Speaker on')
   }
 
   const formatDuration = (seconds) => {
@@ -104,11 +179,122 @@ const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
   }
 
+  // Initialize Twilio Device on mount
+  useEffect(() => {
+    const initDevice = async () => {
+      try {
+        setDeviceStatus('initializing')
+
+        // Check microphone permission
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+          stream.getTracks().forEach(track => track.stop())
+          console.log('Microphone permission granted')
+        } catch (error) {
+          console.error('Microphone permission denied:', error)
+          toast.error('Please allow microphone access to use calling')
+          setDeviceStatus('error')
+          return
+        }
+
+        const token = localStorage.getItem('authToken')
+        if (!token) {
+          console.error('No auth token found')
+          setDeviceStatus('error')
+          toast.error('Not authenticated. Please log in again.')
+          return
+        }
+
+        // Get token from backend
+        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3004/api'
+        const response = await fetch(`${API_URL}/twilio/token`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'X-Organization-Slug': localStorage.getItem('organizationSlug')
+          }
+        })
+
+        if (!response.ok) {
+          throw new Error(`Failed to get Twilio token: ${response.statusText}`)
+        }
+
+        const { token: twilioToken } = await response.json()
+
+        // Create and register device
+        const device = new Device(twilioToken, {
+          debug: true,
+          sounds: {
+            incoming: true,
+            outgoing: true,
+            disconnect: true
+          }
+        })
+
+        device.on('registered', () => {
+          console.log('Twilio Device registered and ready')
+          setDeviceStatus('ready')
+          toast.success('Voice connection ready')
+        })
+
+        device.on('tokenWillExpire', async () => {
+          console.warn('Token expiring soon - refreshing...')
+          try {
+            const token = localStorage.getItem('authToken')
+            const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3004/api'
+            const response = await fetch(`${API_URL}/twilio/token`, {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'X-Organization-Slug': localStorage.getItem('organizationSlug')
+              }
+            })
+
+            if (!response.ok) {
+              throw new Error('Failed to refresh token')
+            }
+
+            const { token: newToken } = await response.json()
+            device.updateToken(newToken)
+            console.log('Token refreshed successfully')
+            toast.success('Voice connection refreshed')
+          } catch (error) {
+            console.error('Error refreshing token:', error)
+            toast.error('Failed to refresh connection')
+            setDeviceStatus('error')
+          }
+        })
+
+        device.on('error', (error) => {
+          console.error('Twilio Device error:', error)
+          setDeviceStatus('error')
+          toast.error(`Connection error: ${error.message}`)
+        })
+
+        await device.register()
+        deviceRef.current = device
+      } catch (error) {
+        console.error('Error initializing Twilio device:', error)
+        setDeviceStatus('error')
+        toast.error(error.message || 'Failed to initialize voice connection')
+      }
+    }
+
+    initDevice()
+
+    return () => {
+      if (deviceRef.current) {
+        deviceRef.current.destroy()
+      }
+    }
+  }, [])
+
   // Cleanup timer on unmount
   useEffect(() => {
     return () => {
       if (timerRef.current) {
         clearInterval(timerRef.current)
+      }
+      if (activeCallRef.current) {
+        activeCallRef.current.disconnect()
       }
     }
   }, [])
@@ -137,7 +323,14 @@ const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
         {/* Header */}
         <div className="bg-gradient-to-r from-primary-600 to-primary-700 text-white p-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold">Phone</h3>
+            <div className="flex items-center space-x-2">
+              <h3 className="text-lg font-semibold">Phone</h3>
+              <div className={`w-2 h-2 rounded-full ${
+                deviceStatus === 'ready' ? 'bg-green-400' :
+                deviceStatus === 'error' ? 'bg-red-400' :
+                'bg-yellow-400'
+              }`}></div>
+            </div>
             <button
               onClick={onClose}
               className="p-1 hover:bg-white/20 rounded-full transition-colors"
@@ -145,6 +338,11 @@ const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
               <X size={20} />
             </button>
           </div>
+          {deviceStatus !== 'ready' && (
+            <p className="text-xs mt-2 text-white/80">
+              {deviceStatus === 'initializing' ? 'Connecting...' : 'Connection error - refresh to retry'}
+            </p>
+          )}
         </div>
 
         {/* Contact/Number Display */}
@@ -245,16 +443,16 @@ const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
           {!isCallActive ? (
             <button
               onClick={handleCall}
-              disabled={isDialing || !phoneNumber}
+              disabled={isDialing || !phoneNumber || deviceStatus !== 'ready'}
               className={`w-full py-4 rounded-full flex items-center justify-center space-x-2 transition-colors ${
-                isDialing || !phoneNumber
+                isDialing || !phoneNumber || deviceStatus !== 'ready'
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   : 'bg-green-500 hover:bg-green-600 text-white'
               }`}
             >
               <Phone size={24} />
               <span className="font-semibold">
-                {isDialing ? 'Dialing...' : 'Call'}
+                {isDialing ? 'Dialing...' : deviceStatus !== 'ready' ? 'Connecting...' : 'Call'}
               </span>
             </button>
           ) : (

@@ -86,12 +86,18 @@ class TwilioService {
   /**
    * Make phone call
    */
-  async makeCall({ organizationId, to, leadId = null, contactId = null, userId }) {
+  async makeCall({ organizationId, to, leadId = null, contactId = null, userId, conferenceId = null }) {
     try {
       const { client, phoneNumber } = await this.getClient(organizationId);
 
+      // Build webhook URL - include conferenceId if provided (for Voice SDK conference calls)
+      let webhookUrl = `${API_BASE_URL}/api/twilio/webhook/voice`;
+      if (conferenceId) {
+        webhookUrl += `?conference=${encodeURIComponent(conferenceId)}&participant=customer`;
+      }
+
       const call = await client.calls.create({
-        url: `${API_BASE_URL}/api/twilio/webhook/voice`,
+        url: webhookUrl,
         to,
         from: phoneNumber,
         record: true,
