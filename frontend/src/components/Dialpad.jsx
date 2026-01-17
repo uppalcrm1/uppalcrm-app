@@ -85,40 +85,39 @@ const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
 
       activeCallRef.current = call
 
-      // Step 2: Listen for call acceptance
-      call.on('accept', async () => {
-        console.log('Agent accepted call, now dialing customer')
-        setCallStatus('Calling customer...')
+      // Step 2: Agent is now in conference via Voice SDK
+      // Immediately dial customer into the same conference (no need to wait for "accept")
+      setCallStatus('Calling customer...')
 
-        // Format number with country code if not present
-        const formattedNumber = cleanNumber.startsWith('1')
-          ? `+${cleanNumber}`
-          : `+1${cleanNumber}`
+      const formattedNumber = cleanNumber.startsWith('1')
+        ? `+${cleanNumber}`
+        : `+1${cleanNumber}`
 
-        try {
-          // Step 3: Dial customer into the same conference
-          const result = await twilioAPI.makeCall({
-            to: formattedNumber,
-            conferenceId: conferenceId
-          })
+      try {
+        // Step 3: Dial customer into the same conference
+        const result = await twilioAPI.makeCall({
+          to: formattedNumber,
+          conferenceId: conferenceId
+        })
 
-          setIsCallActive(true)
-          setCallStatus('Connected')
+        setIsCallActive(true)
+        setCallStatus('Connected')
 
-          // Start call timer
-          timerRef.current = setInterval(() => {
-            setCallDuration(prev => prev + 1)
-          }, 1000)
+        // Start call timer
+        timerRef.current = setInterval(() => {
+          setCallDuration(prev => prev + 1)
+        }, 1000)
 
-          toast.success('Customer call initiated')
-        } catch (error) {
-          console.error('Error dialing customer:', error)
-          toast.error('Failed to dial customer')
-          call.disconnect()
-          setIsCallActive(false)
-          setCallStatus('')
+        toast.success('Customer call initiated - both parties will be connected')
+      } catch (error) {
+        console.error('Error dialing customer:', error)
+        toast.error('Failed to dial customer')
+        if (activeCallRef.current) {
+          activeCallRef.current.disconnect()
         }
-      })
+        setIsCallActive(false)
+        setCallStatus('')
+      }
 
       call.on('disconnect', () => {
         console.log('Call disconnected')

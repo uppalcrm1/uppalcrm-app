@@ -709,7 +709,10 @@ router.post('/webhook/voice', async (req, res) => {
     // For OUTBOUND calls (agent calling customer via Voice SDK conference)
     // This is the correct hybrid approach: Voice SDK for agent + REST API for customer + Conference bridge
     if (isOutboundCall) {
-      const { conference, participant } = req.query;
+      // Voice SDK sends params in req.body, REST API sends in query string
+      // Check both to support both flows
+      const conference = req.query.conference || req.body.conference;
+      const participant = req.query.participant || req.body.participant;
 
       // AGENT joining conference via Voice SDK
       if (conference && participant === 'agent') {
@@ -831,38 +834,20 @@ router.post('/webhook/voice', async (req, res) => {
       timestamp: new Date().toISOString()
     };
 
-    // Clear after 30 seconds if not answered
+    // Clear after 30 seconds if not answered (frontend should clear when answered)
     setTimeout(() => {
       if (global.incomingCalls && global.incomingCalls[cacheKey]?.callSid === CallSid) {
         delete global.incomingCalls[cacheKey];
       }
     }, 30000);
 
-    // Return TwiML to handle the call - Ring agent phone with voicemail fallback
-    const forwardTo = process.env.FORWARD_CALLS_TO;
-    let twiml;
-
-    if (forwardTo) {
-      // Dial agent's phone, if no answer go to voicemail
-      twiml = `<?xml version="1.0" encoding="UTF-8"?>
+    // Return TwiML to handle incoming calls - Voicemail system
+    // In the new Voice SDK architecture, agents receive notification in CRM UI
+    // They can accept/decline from the browser UI
+    // If no one answers, caller gets voicemail
+    const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Dial record="record-from-answer" timeout="30">
-    <Number>${forwardTo}</Number>
-  </Dial>
-  <Say voice="alice">We are unable to take your call at the moment. Please leave a message after the beep.</Say>
-  <Record
-    maxLength="60"
-    playBeep="true"
-    recordingStatusCallback="https://uppalcrm-api.onrender.com/api/twilio/webhook/recording"
-    recordingStatusCallbackEvent="completed"
-  />
-  <Say voice="alice">Thank you for your message. Goodbye.</Say>
-</Response>`;
-    } else {
-      // No forward number, go straight to voicemail
-      twiml = `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Say voice="alice">Thank you for calling. Please leave a message after the beep.</Say>
+  <Say voice="alice">Thank you for calling. We are unable to take your call at the moment. Please leave a message after the beep, and we will get back to you as soon as possible.</Say>
   <Record
     maxLength="60"
     playBeep="true"
@@ -872,7 +857,6 @@ router.post('/webhook/voice', async (req, res) => {
   <Say voice="alice">Thank you for your message. Goodbye.</Say>
   <Hangup />
 </Response>`;
-    }
 
     res.type('text/xml');
     res.send(twiml);
