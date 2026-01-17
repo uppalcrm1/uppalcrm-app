@@ -644,15 +644,15 @@ router.post('/webhook/voice', async (req, res) => {
 
     console.log(`Call direction detected: ${isOutboundCall ? 'OUTBOUND' : 'INCOMING'} (isIncoming=${isIncomingCall})`);
 
-    // For OUTBOUND calls, put in conference so agents can connect
+    // For OUTBOUND calls, keep connection alive with hold
     if (isOutboundCall) {
-      console.log('Outbound call detected - adding to conference');
-      // Extract organization from To/From - for outbound calls we need to find it differently
-      // For now, use a generic conference approach
+      console.log('Outbound call detected - keeping connection alive');
       const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="alice">Thank you for calling. Connecting you now.</Say>
-  <Conference endConferenceOnExit="true" statusCallback="https://uppalcrm-api.onrender.com/api/twilio/webhook/conference-status" statusCallbackEvent="join,leave,end">${CallSid}</Conference>
+  <Say voice="alice">Thank you for calling. An agent will be with you shortly.</Say>
+  <Gather numDigits="0" timeout="3600" action="https://uppalcrm-api.onrender.com/api/twilio/webhook/gather-response">
+    <Play>https://demo.twilio.com/docs/voice.png</Play>
+  </Gather>
 </Response>`;
       res.type('text/xml');
       res.send(twiml);
@@ -920,6 +920,31 @@ router.post('/webhook/call-status', async (req, res) => {
     // IMPORTANT: Always return 200 OK for webhooks, even on error
     // Returning 5xx causes Twilio to retry infinitely
     console.error('Error updating call status:', { error: error.message, stack: error.stack });
+    res.status(200).send('OK');
+  }
+});
+
+/**
+ * Twilio Webhooks - Gather Response (when caller presses a key or timeout)
+ */
+router.post('/webhook/gather-response', async (req, res) => {
+  try {
+    const { CallSid, Digits } = req.body;
+
+    console.log('Gather response received:', { CallSid, Digits });
+
+    // If timeout (no digits pressed), loop back and continue hold music
+    const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Gather numDigits="0" timeout="3600" action="https://uppalcrm-api.onrender.com/api/twilio/webhook/gather-response">
+    <Play>https://demo.twilio.com/docs/voice.png</Play>
+  </Gather>
+</Response>`;
+
+    res.type('text/xml');
+    res.send(twiml);
+  } catch (error) {
+    console.error('Error handling gather response:', { error: error.message });
     res.status(200).send('OK');
   }
 });
