@@ -653,13 +653,30 @@ router.post('/webhook/voice', async (req, res) => {
 
     console.log(`Call direction detected: ${isOutboundCall ? 'OUTBOUND' : 'INCOMING'} (isIncoming=${isIncomingCall})`);
 
-    // For OUTBOUND calls (agent calling customer), return empty response for normal audio
+    // For OUTBOUND calls (agent calling customer), dial the agent's phone to connect
     if (isOutboundCall) {
-      console.log('Outbound call detected - allowing two-way audio');
-      // Empty Response allows normal two-way audio flow
-      // Recording is handled by record:true parameter in makeCall
+      console.log('Outbound call detected - connecting to agent phone');
+      const forwardTo = process.env.FORWARD_CALLS_TO;
+
+      if (!forwardTo) {
+        console.error('FORWARD_CALLS_TO not configured for outbound call');
+        const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="alice">Configuration error. Unable to connect your call.</Say>
+  <Hangup />
+</Response>`;
+        res.type('text/xml');
+        res.send(twiml);
+        return;
+      }
+
+      // Dial the agent's phone to create the connection
       const twiml = `<?xml version="1.0" encoding="UTF-8"?>
-<Response></Response>`;
+<Response>
+  <Dial timeout="30" record="record-from-answer" recordingStatusCallback="https://uppalcrm-api.onrender.com/api/twilio/webhook/recording">
+    <Number>${forwardTo}</Number>
+  </Dial>
+</Response>`;
       res.type('text/xml');
       res.send(twiml);
       return;
@@ -739,7 +756,6 @@ router.post('/webhook/voice', async (req, res) => {
       // Dial agent's phone, if no answer go to voicemail
       twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="alice">Connecting your call. Please hold.</Say>
   <Dial record="record-from-answer" timeout="30">
     <Number>${forwardTo}</Number>
   </Dial>
@@ -751,7 +767,6 @@ router.post('/webhook/voice', async (req, res) => {
     recordingStatusCallbackEvent="completed"
   />
   <Say voice="alice">Thank you for your message. Goodbye.</Say>
-  <Hangup />
 </Response>`;
     } else {
       // No forward number, go straight to voicemail
