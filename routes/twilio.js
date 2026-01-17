@@ -707,6 +707,7 @@ router.post('/webhook/voice', async (req, res) => {
     console.log(`Call direction detected: ${isOutboundCall ? 'OUTBOUND' : 'INCOMING'} (isIncoming=${isIncomingCall})`);
 
     // For OUTBOUND calls (agent calling customer via Voice SDK conference)
+    // This is the correct hybrid approach: Voice SDK for agent + REST API for customer + Conference bridge
     if (isOutboundCall) {
       const { conference, participant } = req.query;
 
@@ -837,10 +838,31 @@ router.post('/webhook/voice', async (req, res) => {
       }
     }, 30000);
 
-    // Return TwiML to handle the call - Voicemail recording system
-    const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+    // Return TwiML to handle the call - Ring agent phone with voicemail fallback
+    const forwardTo = process.env.FORWARD_CALLS_TO;
+    let twiml;
+
+    if (forwardTo) {
+      // Dial agent's phone, if no answer go to voicemail
+      twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="alice">Thank you for calling. We are unable to take your call at the moment. Please leave a message after the beep, and we will get back to you as soon as possible.</Say>
+  <Dial record="record-from-answer" timeout="30">
+    <Number>${forwardTo}</Number>
+  </Dial>
+  <Say voice="alice">We are unable to take your call at the moment. Please leave a message after the beep.</Say>
+  <Record
+    maxLength="60"
+    playBeep="true"
+    recordingStatusCallback="https://uppalcrm-api.onrender.com/api/twilio/webhook/recording"
+    recordingStatusCallbackEvent="completed"
+  />
+  <Say voice="alice">Thank you for your message. Goodbye.</Say>
+</Response>`;
+    } else {
+      // No forward number, go straight to voicemail
+      twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="alice">Thank you for calling. Please leave a message after the beep.</Say>
   <Record
     maxLength="60"
     playBeep="true"
@@ -850,6 +872,7 @@ router.post('/webhook/voice', async (req, res) => {
   <Say voice="alice">Thank you for your message. Goodbye.</Say>
   <Hangup />
 </Response>`;
+    }
 
     res.type('text/xml');
     res.send(twiml);
