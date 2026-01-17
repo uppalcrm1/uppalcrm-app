@@ -644,9 +644,9 @@ router.post('/webhook/voice', async (req, res) => {
 
     console.log(`Call direction detected: ${isOutboundCall ? 'OUTBOUND' : 'INCOMING'} (isIncoming=${isIncomingCall})`);
 
-    // For OUTBOUND calls, keep connection alive with hold
+    // For OUTBOUND calls, keep connection alive with silence/hold
     if (isOutboundCall) {
-      console.log('Outbound call detected - keeping connection alive');
+      console.log('Outbound call detected - keeping connection alive with hold');
       const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="alice">Thank you for calling. An agent will be with you shortly.</Say>
