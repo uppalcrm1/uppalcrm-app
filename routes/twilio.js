@@ -625,8 +625,18 @@ router.post('/webhook/voice', async (req, res) => {
   try {
     const { From, To, CallSid, Direction } = req.body;
 
-    console.log('Incoming voice call:', { From, To, CallSid, Direction });
+    console.log('Voice webhook call:', { From, To, CallSid, Direction });
 
+    // For OUTBOUND calls (when customer answers a call from our team),
+    // return empty response to establish connection without voicemail
+    if (Direction === 'outbound') {
+      console.log('Outbound call detected - allowing connection without voicemail');
+      res.type('text/xml');
+      res.send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+      return;
+    }
+
+    // INCOMING CALL HANDLING (customer calling the company number)
     // Find organization by Twilio phone number
     const orgQuery = `
       SELECT organization_id FROM twilio_config
