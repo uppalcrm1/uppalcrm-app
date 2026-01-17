@@ -623,21 +623,12 @@ router.post('/webhook/sms-status', async (req, res) => {
  */
 router.post('/webhook/voice', async (req, res) => {
   try {
-    const { From, To, CallSid, Direction } = req.body;
+    const { From, To, CallSid, Direction, CallStatus } = req.body;
 
-    console.log('Voice webhook call:', { From, To, CallSid, Direction });
+    console.log('Voice webhook call - Full request body:', req.body);
+    console.log('Voice webhook call:', { From, To, CallSid, Direction, CallStatus });
 
-    // For OUTBOUND calls (when customer answers a call from our team),
-    // return empty response to establish connection without voicemail
-    if (Direction === 'outbound') {
-      console.log('Outbound call detected - allowing connection without voicemail');
-      res.type('text/xml');
-      res.send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
-      return;
-    }
-
-    // INCOMING CALL HANDLING (customer calling the company number)
-    // Find organization by Twilio phone number
+    // Find organization by Twilio phone number to check if this is an incoming call
     const orgQuery = `
       SELECT organization_id FROM twilio_config
       WHERE phone_number = $1
@@ -647,61 +638,74 @@ router.post('/webhook/voice', async (req, res) => {
     const normalizedTo = To.replace(/[^\d+]/g, '');
     const orgResult = await db.query(orgQuery, [To, normalizedTo, normalizedTo]);
 
-    if (orgResult.rows.length > 0) {
-      const organizationId = orgResult.rows[0].organization_id;
+    // If To number is NOT our Twilio number, this is an OUTBOUND call
+    const isIncomingCall = orgResult.rows.length > 0;
+    const isOutboundCall = !isIncomingCall;
 
-      // Check if caller is a known lead or contact
-      const contactQuery = `
-        SELECT 'lead' as type, id, first_name, last_name FROM leads
-        WHERE organization_id = $1 AND phone = $2
-        UNION ALL
-        SELECT 'contact' as type, id, first_name, last_name FROM contacts
-        WHERE organization_id = $1 AND phone = $2
-        LIMIT 1
-      `;
-      const contactResult = await db.query(contactQuery, [organizationId, From]);
-      const contactInfo = contactResult.rows[0] || null;
+    console.log(`Call direction detected: ${isOutboundCall ? 'OUTBOUND' : 'INCOMING'} (isIncoming=${isIncomingCall})`);
 
-      // Save incoming call to database
-      const insertQuery = `
-        INSERT INTO phone_calls (
-          organization_id, lead_id, contact_id,
-          direction, from_number, to_number,
-          twilio_call_sid, twilio_status, started_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'ringing', NOW())
-        RETURNING *
-      `;
-
-      await db.query(insertQuery, [
-        organizationId,
-        contactInfo?.type === 'lead' ? contactInfo.id : null,
-        contactInfo?.type === 'contact' ? contactInfo.id : null,
-        'inbound',
-        From,
-        To,
-        CallSid
-      ]);
-
-      // Store pending incoming call for frontend notification
-      const cacheKey = `incoming_call:${organizationId}`;
-      if (!global.incomingCalls) {
-        global.incomingCalls = {};
-      }
-      global.incomingCalls[cacheKey] = {
-        callSid: CallSid,
-        from: From,
-        to: To,
-        callerName: contactInfo ? `${contactInfo.first_name || ''} ${contactInfo.last_name || ''}`.trim() : null,
-        timestamp: new Date().toISOString()
-      };
-
-      // Clear after 30 seconds if not answered
-      setTimeout(() => {
-        if (global.incomingCalls && global.incomingCalls[cacheKey]?.callSid === CallSid) {
-          delete global.incomingCalls[cacheKey];
-        }
-      }, 30000);
+    // For OUTBOUND calls, return empty response to allow call connection
+    if (isOutboundCall) {
+      console.log('Outbound call detected - returning empty TwiML for connection');
+      res.type('text/xml');
+      res.send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+      return;
     }
+
+    // INCOMING CALL HANDLING (customer calling the company number)
+    const organizationId = orgResult.rows[0].organization_id;
+
+    // Check if caller is a known lead or contact
+    const contactQuery = `
+      SELECT 'lead' as type, id, first_name, last_name FROM leads
+      WHERE organization_id = $1 AND phone = $2
+      UNION ALL
+      SELECT 'contact' as type, id, first_name, last_name FROM contacts
+      WHERE organization_id = $1 AND phone = $2
+      LIMIT 1
+    `;
+    const contactResult = await db.query(contactQuery, [organizationId, From]);
+    const contactInfo = contactResult.rows[0] || null;
+
+    // Save incoming call to database
+    const insertQuery = `
+      INSERT INTO phone_calls (
+        organization_id, lead_id, contact_id,
+        direction, from_number, to_number,
+        twilio_call_sid, twilio_status, started_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'ringing', NOW())
+      RETURNING *
+    `;
+
+    await db.query(insertQuery, [
+      organizationId,
+      contactInfo?.type === 'lead' ? contactInfo.id : null,
+      contactInfo?.type === 'contact' ? contactInfo.id : null,
+      'inbound',
+      From,
+      To,
+      CallSid
+    ]);
+
+    // Store pending incoming call for frontend notification
+    const cacheKey = `incoming_call:${organizationId}`;
+    if (!global.incomingCalls) {
+      global.incomingCalls = {};
+    }
+    global.incomingCalls[cacheKey] = {
+      callSid: CallSid,
+      from: From,
+      to: To,
+      callerName: contactInfo ? `${contactInfo.first_name || ''} ${contactInfo.last_name || ''}`.trim() : null,
+      timestamp: new Date().toISOString()
+    };
+
+    // Clear after 30 seconds if not answered
+    setTimeout(() => {
+      if (global.incomingCalls && global.incomingCalls[cacheKey]?.callSid === CallSid) {
+        delete global.incomingCalls[cacheKey];
+      }
+    }, 30000);
 
     // Return TwiML to handle the call - Voicemail recording system
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
