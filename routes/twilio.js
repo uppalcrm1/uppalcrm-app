@@ -644,13 +644,14 @@ router.post('/webhook/voice', async (req, res) => {
 
     console.log(`Call direction detected: ${isOutboundCall ? 'OUTBOUND' : 'INCOMING'} (isIncoming=${isIncomingCall})`);
 
-    // For OUTBOUND calls (agent calling customer), just record and keep connection alive
+    // For OUTBOUND calls (agent calling customer), record both channels for two-way audio
     if (isOutboundCall) {
-      console.log('Outbound call detected - recording call and allowing two-way audio');
-      // Record the call and keep connection open for agent-customer conversation
+      console.log('Outbound call detected - recording two-way audio');
+      // numChannels="2" records both caller and callee, keeps connection open for conversation
+      // maxLength="3600" allows up to 1 hour conversation
       const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Record maxLength="3600" recordingStatusCallback="https://uppalcrm-api.onrender.com/api/twilio/webhook/recording"/>
+  <Record numChannels="2" maxLength="3600" recordingStatusCallback="https://uppalcrm-api.onrender.com/api/twilio/webhook/recording"/>
 </Response>`;
       res.type('text/xml');
       res.send(twiml);
