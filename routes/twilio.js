@@ -687,6 +687,17 @@ router.post('/webhook/voice', async (req, res) => {
       CallSid
     ]);
 
+    // Cache organization for this call (for webhook callbacks)
+    if (!global.callOrganizations) {
+      global.callOrganizations = {};
+    }
+    global.callOrganizations[CallSid] = organizationId;
+
+    // Auto-expire cache after 4 hours
+    setTimeout(() => {
+      delete global.callOrganizations[CallSid];
+    }, 4 * 60 * 60 * 1000);
+
     // Store pending incoming call for frontend notification
     const cacheKey = `incoming_call:${organizationId}`;
     if (!global.incomingCalls) {
@@ -782,6 +793,18 @@ router.post('/webhook/recording', async (req, res) => {
 
     console.log('Recording completed:', { CallSid, RecordingSid, RecordingDuration });
 
+    // Get organization context from cache
+    if (!global.callOrganizations) {
+      global.callOrganizations = {};
+    }
+    const organizationId = global.callOrganizations[CallSid];
+
+    if (!organizationId) {
+      console.warn(`Organization not found for call ${CallSid} - cache may have expired`);
+      res.status(200).send('OK'); // Still return OK to prevent Twilio from retrying
+      return;
+    }
+
     // Update the phone call record with recording information
     const updateQuery = `
       UPDATE phone_calls
@@ -797,7 +820,7 @@ router.post('/webhook/recording', async (req, res) => {
       RecordingUrl,
       RecordingDuration ? parseInt(RecordingDuration) : null,
       CallSid
-    ]);
+    ], organizationId);
 
     console.log('Recording saved to database for CallSid:', CallSid);
 
@@ -818,6 +841,18 @@ router.post('/webhook/transcription', async (req, res) => {
     console.log('Transcription completed:', { CallSid, TranscriptionStatus });
 
     if (TranscriptionStatus === 'completed' && TranscriptionText) {
+      // Get organization context from cache
+      if (!global.callOrganizations) {
+        global.callOrganizations = {};
+      }
+      const organizationId = global.callOrganizations[CallSid];
+
+      if (!organizationId) {
+        console.warn(`Organization not found for call ${CallSid} - cache may have expired`);
+        res.status(200).send('OK'); // Still return OK to prevent Twilio from retrying
+        return;
+      }
+
       // Update the phone call record with transcription
       const updateQuery = `
         UPDATE phone_calls
@@ -827,7 +862,7 @@ router.post('/webhook/transcription', async (req, res) => {
         WHERE twilio_call_sid = $2
       `;
 
-      await db.query(updateQuery, [TranscriptionText, CallSid]);
+      await db.query(updateQuery, [TranscriptionText, CallSid], organizationId);
 
       console.log('Transcription saved to database for CallSid:', CallSid);
     }
@@ -846,11 +881,24 @@ router.post('/webhook/call-status', async (req, res) => {
   try {
     const { CallSid, CallStatus, CallDuration, RecordingUrl } = req.body;
 
+    // Get organization context from cache
+    if (!global.callOrganizations) {
+      global.callOrganizations = {};
+    }
+    const organizationId = global.callOrganizations[CallSid];
+
+    if (!organizationId) {
+      console.warn(`Organization not found for call ${CallSid} - cache may have expired`);
+      res.status(200).send('OK'); // Still return OK to prevent Twilio from retrying
+      return;
+    }
+
     await twilioService.updateCallStatus(
       CallSid,
       CallStatus,
       CallDuration ? parseInt(CallDuration) : null,
-      RecordingUrl
+      RecordingUrl,
+      organizationId
     );
 
     res.status(200).send('OK');

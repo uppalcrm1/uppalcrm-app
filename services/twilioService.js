@@ -115,6 +115,17 @@ class TwilioService {
         call.sid, call.status
       ]);
 
+      // Cache organization for this call (for webhook callbacks)
+      if (!global.callOrganizations) {
+        global.callOrganizations = {};
+      }
+      global.callOrganizations[call.sid] = organizationId;
+
+      // Auto-expire cache after 4 hours
+      setTimeout(() => {
+        delete global.callOrganizations[call.sid];
+      }, 4 * 60 * 60 * 1000);
+
       return result.rows[0];
     } catch (error) {
       console.error('Error making call:', error);
@@ -308,7 +319,22 @@ class TwilioService {
   /**
    * Update call status from webhook
    */
-  async updateCallStatus(callSid, status, duration = null, recordingUrl = null) {
+  async updateCallStatus(callSid, status, duration = null, recordingUrl = null, organizationId = null) {
+    // If organizationId not provided, look for it in our cache
+    if (!organizationId) {
+      if (!global.callOrganizations) {
+        global.callOrganizations = {};
+      }
+
+      organizationId = global.callOrganizations[callSid];
+
+      if (!organizationId) {
+        console.error(`Organization not found for call ${callSid} - cache may have expired`);
+        throw new Error(`Organization context not available for call: ${callSid}`);
+      }
+    }
+
+    // Now update with organization context for RLS
     const query = `
       UPDATE phone_calls
       SET twilio_status = $1,
@@ -327,7 +353,7 @@ class TwilioService {
       recordingUrl,
       recordingUrl ? true : false,
       callSid
-    ]);
+    ], organizationId);
 
     return result.rows[0];
   }
