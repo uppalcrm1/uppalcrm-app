@@ -188,38 +188,6 @@ export const CallProvider = ({ children }) => {
     }
   }
 
-  // Make outgoing call
-  // DEPRECATED: Use Dialpad component instead for Voice SDK conference calls
-  // This legacy function uses simple REST API calls without conference support
-  // Kept for backward compatibility only
-  const makeCall = async (phoneNumber, contactInfo = {}) => {
-    console.warn('⚠️ CallContext.makeCall is deprecated. Use Dialpad component for Voice SDK calls.')
-    try {
-      const result = await twilioAPI.makeCall({
-        to: phoneNumber,
-        leadId: contactInfo.leadId,
-        contactId: contactInfo.contactId
-        // Note: conferenceId NOT passed - falls back to legacy <Record> mode
-      })
-
-      setActiveCall({
-        id: result.id,
-        phoneNumber,
-        direction: 'outbound',
-        status: 'calling',
-        startTime: new Date(),
-        ...contactInfo
-      })
-
-      toast.success('Calling...')
-      return result
-    } catch (error) {
-      console.error('Error making call:', error)
-      toast.error(error.response?.data?.error || 'Failed to make call')
-      throw error
-    }
-  }
-
   // Clear missed call count
   const clearMissedCalls = () => {
     setMissedCallCount(0)
@@ -240,7 +208,6 @@ export const CallProvider = ({ children }) => {
     acceptCall,
     declineCall,
     endCall,
-    makeCall,
     clearMissedCalls,
     fetchCallHistory
   }
