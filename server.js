@@ -1,3 +1,19 @@
+// ============================================
+// LOG FILTER - Removes noisy polling logs
+// ============================================
+const originalConsoleLog = console.log;
+console.log = function(...args) {
+  const message = String(args[0] || '');
+  const shouldSkip =
+    message.includes('GET /api/twilio/incoming-calls/pending') ||
+    message.includes('[verifyToken] Decoded token:') ||
+    message.includes('[verifyToken] Session query result rows:');
+  if (!shouldSkip) {
+    originalConsoleLog.apply(console, args);
+  }
+};
+// ============================================
+
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
