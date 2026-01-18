@@ -834,12 +834,50 @@ router.post('/webhook/voice', async (req, res) => {
       timestamp: new Date().toISOString()
     };
 
-    // Clear from cache after 60 seconds so agents no longer see the popup
-    // Note: The <Dial> timeout="60" below will handle transitioning to voicemail
-    setTimeout(() => {
+    // After 60 seconds, remove customer from waiting conference to trigger voicemail
+    setTimeout(async () => {
       if (global.incomingCalls && global.incomingCalls[cacheKey]?.callSid === CallSid) {
-        console.log(`Timeout: Clearing unanswered call ${CallSid} from cache after 60s`);
+        console.log(`========================================`);
+        console.log(`TIMEOUT: Unanswered call ${CallSid} after 60s`);
+        console.log(`Clearing from cache and ejecting from conference`);
+        console.log(`========================================`);
         delete global.incomingCalls[cacheKey];
+
+        // Remove the customer from the waiting conference
+        // This will cause the <Dial> to exit and continue to voicemail TwiML
+        try {
+          const { client } = await twilioService.getClient(organizationId);
+          const waitingRoomId = `waiting-${CallSid}`;
+
+          // Get all participants in the conference
+          const participants = await client
+            .conferences(waitingRoomId)
+            .participants
+            .list({ limit: 20 })
+            .catch(err => {
+              console.log(`Could not list participants: ${err.message}`);
+              return { participants: [] };
+            });
+
+          // Find and remove the calling participant (the one that matches our CallSid)
+          if (participants.length > 0) {
+            for (const participant of participants) {
+              // Check if this participant's call matches our incoming CallSid
+              if (participant.callSid === CallSid) {
+                console.log(`Found matching participant, removing from conference`);
+                await client
+                  .conferences(waitingRoomId)
+                  .participants(participant.callSid)
+                  .update({ status: 'complete' })
+                  .then(() => console.log(`Successfully removed participant from conference`))
+                  .catch(err => console.log(`Could not remove participant: ${err.message}`));
+                break;
+              }
+            }
+          }
+        } catch (err) {
+          console.log(`Error during timeout: ${err.message}`);
+        }
       }
     }, 60000);
 
