@@ -847,14 +847,13 @@ router.post('/webhook/voice', async (req, res) => {
     // Caller is placed in queue with hold music while agent reviews
     // If agent accepts, caller is moved to conference with agent
     // If no agent accepts within 60 seconds (popup timeout), call goes to voicemail
-    const apiBaseUrl = process.env.API_BASE_URL || 'https://uppalcrm-api.onrender.com';
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="alice">Thank you for calling. Please hold while we connect you to an agent.</Say>
   <Enqueue
     waitUrl="http://twimlets.com/holdmusic?Bucket=com.twilio.music.ambient"
     maxQueueWait="60"
-    action="${apiBaseUrl}/api/twilio/webhook/queue-timeout"
+    action="https://uppalcrm-api.onrender.com/api/twilio/webhook/queue-timeout"
     method="POST"
   >support_queue</Enqueue>
 </Response>`;
@@ -876,61 +875,36 @@ router.post('/webhook/voice', async (req, res) => {
 /**
  * Queue timeout handler - Called when customer waits maxQueueWait seconds without agent answer
  */
-router.post('/webhook/queue-timeout', async (req, res) => {
+router.post('/webhook/queue-timeout', (req, res) => {
   try {
-    const { CallSid, From, QueueResult } = req.body;
+    console.log('========================================');
+    console.log('QUEUE TIMEOUT WEBHOOK TRIGGERED');
+    console.log('Full Request Body:', JSON.stringify(req.body, null, 2));
+    console.log('========================================');
 
-    console.log('Queue timeout webhook:', { CallSid, From, QueueResult });
+    const { CallSid, From, QueueResult, QueueTime } = req.body;
 
-    // Get organization ID from cache
-    const organizationId = global.callOrganizations?.[CallSid];
-    if (!organizationId) {
-      console.log('Could not find organization for call:', CallSid);
-      // Still send voicemail response
-      const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+    console.log('Extracted values:', {
+      CallSid,
+      From,
+      QueueResult,
+      QueueTime
+    });
+
+    // Send to voicemail
+    console.log(`Sending call ${CallSid} from ${From} to voicemail after ${QueueTime || 60}s in queue (QueueResult: ${QueueResult})`);
+
+    const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="alice">We apologize, all agents are currently busy. Please leave a detailed message after the beep.</Say>
-  <Record maxLength="120" playBeep="true" />
-  <Say voice="alice">Thank you for your message. Goodbye.</Say>
-  <Hangup />
-</Response>`;
-      res.type('text/xml');
-      res.send(twiml);
-      return;
-    }
-
-    // QueueResult can be: 'bridged', 'redirected', 'hangup', 'error', 'queue-full', 'system-error', 'leave'
-    // 'leave' means customer waited the full maxQueueWait time and left the queue
-
-    if (QueueResult === 'leave') {
-      console.log(`Call ${CallSid} from ${From} timed out after 60s - sending to voicemail`);
-
-      // Customer waited the full timeout - send to voicemail
-      const twiml = `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Say voice="alice">We apologize, all agents are currently busy. Please leave a detailed message after the beep, and we will return your call as soon as possible.</Say>
+  <Say voice="alice">We apologize. All of our agents are currently assisting other customers. Please leave a detailed message after the beep, and we will return your call as soon as possible.</Say>
   <Record
     maxLength="120"
     playBeep="true"
-    recordingStatusCallback="${process.env.API_BASE_URL || 'https://uppalcrm-api.onrender.com'}/api/twilio/webhook/recording"
+    recordingStatusCallback="https://uppalcrm-api.onrender.com/api/twilio/webhook/recording"
     recordingStatusCallbackEvent="completed"
-    transcribe="true"
-    transcribeCallback="${process.env.API_BASE_URL || 'https://uppalcrm-api.onrender.com'}/api/twilio/webhook/transcription"
+    transcribe="false"
   />
-  <Say voice="alice">Thank you for your message. We will get back to you shortly. Goodbye.</Say>
-  <Hangup />
-</Response>`;
-
-      res.type('text/xml');
-      res.send(twiml);
-      return;
-    }
-
-    // For other results (error, queue-full, system-error, etc.), just hang up
-    console.log(`Queue result: ${QueueResult} - ending call`);
-    const twiml = `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Say voice="alice">Thank you for calling. Goodbye.</Say>
+  <Say voice="alice">Thank you for your message. Goodbye.</Say>
   <Hangup />
 </Response>`;
 
@@ -938,7 +912,7 @@ router.post('/webhook/queue-timeout', async (req, res) => {
     res.send(twiml);
 
   } catch (error) {
-    console.error('Error handling queue timeout:', error);
+    console.error('Error handling queue timeout webhook:', error);
     // Send voicemail as fallback
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
