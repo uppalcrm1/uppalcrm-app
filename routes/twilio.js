@@ -834,11 +834,39 @@ router.post('/webhook/voice', async (req, res) => {
       timestamp: new Date().toISOString()
     };
 
-    // Clear from cache after 60 seconds
-    setTimeout(() => {
+    // Server-side force dequeue after 60 seconds (Twilio maxQueueWait is unreliable)
+    setTimeout(async () => {
       if (global.incomingCalls && global.incomingCalls[cacheKey]?.callSid === CallSid) {
-        console.log(`Clearing unanswered call ${CallSid} from cache after 60s`);
+        console.log('========================================');
+        console.log(`⏰ TIMEOUT: Force dequeueing ${CallSid} after 60 seconds`);
+        console.log('========================================');
+
         delete global.incomingCalls[cacheKey];
+
+        try {
+          const { client } = await twilioService.getClient(organizationId);
+
+          // Fetch the support_queue
+          const queue = await client.queues('support_queue').fetch();
+
+          // Update the queued member to redirect to voicemail
+          await client
+            .queues(queue.sid)
+            .members(CallSid)
+            .update({
+              url: `${process.env.API_BASE_URL || 'https://uppalcrm-api.onrender.com'}/api/twilio/webhook/voicemail-redirect`,
+              method: 'POST'
+            })
+            .then(() => {
+              console.log(`✅ Successfully dequeued ${CallSid} and redirected to voicemail`);
+            })
+            .catch(err => {
+              console.log(`❌ Could not dequeue (call may have ended): ${err.message}`);
+            });
+
+        } catch (err) {
+          console.error(`Error during force dequeue: ${err.message}`);
+        }
       }
     }, 60000);
 
@@ -930,6 +958,35 @@ router.post('/webhook/queue-result', (req, res) => {
     res.type('text/xml');
     res.send(twiml);
   }
+});
+
+/**
+ * Voicemail redirect - Called when we forcefully dequeue after 60 second timeout
+ */
+router.post('/webhook/voicemail-redirect', (req, res) => {
+  const { CallSid } = req.body;
+
+  console.log('========================================');
+  console.log('📞 VOICEMAIL REDIRECT');
+  console.log('CallSid:', CallSid);
+  console.log('Customer being sent to voicemail after 60s timeout');
+  console.log('========================================');
+
+  const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="alice">We apologize, all of our agents are currently assisting other customers. Please leave a detailed message after the beep, and we will return your call as soon as possible.</Say>
+  <Record
+    maxLength="120"
+    playBeep="true"
+    recordingStatusCallback="https://uppalcrm-api.onrender.com/api/twilio/webhook/recording"
+    recordingStatusCallbackEvent="completed"
+  />
+  <Say voice="alice">Thank you for your message. We will get back to you shortly. Goodbye.</Say>
+  <Hangup />
+</Response>`;
+
+  res.type('text/xml');
+  res.send(twiml);
 });
 
 /**
