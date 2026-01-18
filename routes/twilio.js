@@ -14,6 +14,71 @@ router.get('/health', (req, res) => {
   });
 });
 
+// ========================================
+// GLOBAL POLLING TASK: Check for old incoming calls every 30 seconds
+// This is more reliable than per-call setTimeout in containerized environments
+// ========================================
+const startIncomingCallCleanup = () => {
+  // Run every 30 seconds
+  setInterval(async () => {
+    try {
+      if (!global.incomingCalls || Object.keys(global.incomingCalls).length === 0) {
+        return; // No calls to check
+      }
+
+      const now = Date.now();
+      const TIMEOUT_MS = 60000; // 60 seconds
+
+      for (const cacheKey in global.incomingCalls) {
+        const call = global.incomingCalls[cacheKey];
+        const callAge = now - new Date(call.timestamp).getTime();
+
+        if (callAge >= TIMEOUT_MS) {
+          console.log('========================================');
+          console.log('🔄 GLOBAL CLEANUP: Found old call');
+          console.log('CallSid:', call.callSid);
+          console.log('Age:', Math.round(callAge / 1000), 'seconds');
+          console.log('========================================');
+
+          // Remove from cache
+          delete global.incomingCalls[cacheKey];
+
+          // Force dequeue via Twilio API
+          try {
+            // Extract organizationId from cache key (format: "incoming_call:organizationId")
+            const orgId = cacheKey.split(':')[1];
+            if (!orgId) {
+              console.log('Could not extract organization ID from cache key');
+              continue;
+            }
+
+            const { client } = await twilioService.getClient(orgId);
+            const queue = await client.queues('support_queue').fetch();
+
+            console.log('Attempting to dequeue:', call.callSid);
+            await client
+              .queues(queue.sid)
+              .members(call.callSid)
+              .update({
+                url: `${process.env.API_BASE_URL || 'https://uppalcrm-api.onrender.com'}/api/twilio/webhook/voicemail-redirect`,
+                method: 'POST'
+              });
+
+            console.log('✅ Successfully dequeued and redirected to voicemail');
+          } catch (dequeueErr) {
+            console.log('❌ Dequeue failed (call may have already ended):', dequeueErr.message);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error in incoming call cleanup task:', err.message);
+    }
+  }, 30000); // Run every 30 seconds
+};
+
+// Start the cleanup task when this module loads
+startIncomingCallCleanup();
+
 /**
  * Generate Twilio Voice SDK Token for agent
  * Agent uses this to connect to Twilio from their browser
@@ -834,52 +899,8 @@ router.post('/webhook/voice', async (req, res) => {
       timestamp: new Date().toISOString()
     };
 
-    // Server-side force dequeue after 60 seconds (Twilio maxQueueWait is unreliable)
-    setTimeout(async () => {
-      console.log('========================================');
-      console.log('⏰ TIMEOUT CALLBACK FIRED');
-      console.log('Checking if call still pending:', CallSid);
-      console.log('Cache key:', cacheKey);
-      console.log('Cache exists?', global.incomingCalls?.[cacheKey] ? 'YES' : 'NO');
-      console.log('========================================');
-
-      if (global.incomingCalls && global.incomingCalls[cacheKey]?.callSid === CallSid) {
-        console.log(`✅ Call ${CallSid} still pending after 60s - attempting dequeue`);
-
-        delete global.incomingCalls[cacheKey];
-
-        try {
-          console.log('Step 1: Getting Twilio client for org:', organizationId);
-          const { client } = await twilioService.getClient(organizationId);
-          console.log('✅ Client obtained');
-
-          console.log('Step 2: Fetching support_queue');
-          const queue = await client.queues('support_queue').fetch();
-          console.log('✅ Queue fetched, SID:', queue.sid);
-
-          console.log('Step 3: Updating queue member:', CallSid);
-          await client
-            .queues(queue.sid)
-            .members(CallSid)
-            .update({
-              url: `${process.env.API_BASE_URL || 'https://uppalcrm-api.onrender.com'}/api/twilio/webhook/voicemail-redirect`,
-              method: 'POST'
-            });
-
-          console.log(`✅ Successfully dequeued ${CallSid} and redirected to voicemail`);
-
-        } catch (err) {
-          console.error('========================================');
-          console.error('❌ ERROR DURING DEQUEUE');
-          console.error('Error message:', err.message);
-          console.error('Error code:', err.code);
-          console.error('Full error:', JSON.stringify(err, null, 2));
-          console.error('========================================');
-        }
-      } else {
-        console.log(`ℹ️ Call ${CallSid} no longer in cache (may have been answered or hung up)`);
-      }
-    }, 60000);
+    // Note: Per-call setTimeout is unreliable in containerized environments
+    // The global cleanup task (runs every 30 seconds) will handle forcing dequeue after 60 seconds
 
     // Use Enqueue with action URL for proper queue timeout handling
     // When customer waits 60s without agent answer, Twilio calls the action URL
