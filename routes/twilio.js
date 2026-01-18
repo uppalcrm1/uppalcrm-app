@@ -834,28 +834,63 @@ router.post('/webhook/voice', async (req, res) => {
       timestamp: new Date().toISOString()
     };
 
-    // Clear after 60 seconds if not answered (matches queue timeout)
-    setTimeout(() => {
+    // Hang up waiting room conference and send to voicemail after 60 seconds if no agent joined
+    setTimeout(async () => {
       if (global.incomingCalls && global.incomingCalls[cacheKey]?.callSid === CallSid) {
-        console.log(`Clearing unanswered call ${CallSid} from cache after 60s`);
+        console.log(`Timeout: Clearing unanswered call ${CallSid} from cache after 60s and hanging up conference`);
         delete global.incomingCalls[cacheKey];
+
+        // Hang up the waiting conference to force customer to voicemail
+        try {
+          const { client } = await twilioService.getClient(organizationId);
+          const waitingRoomId = `waiting-${CallSid}`;
+
+          // Get the conference and hang up all participants
+          const conference = await client.conferences(waitingRoomId).fetch().catch(() => null);
+          if (conference) {
+            console.log(`Hanging up waiting room conference ${waitingRoomId}`);
+            // Update the call to hangup (this will cause the <Dial> to exit and continue to voicemail TwiML)
+            await client.calls(CallSid).update({
+              status: 'completed'
+            }).catch(err => console.log('Could not complete call, it may already be ended:', err.message));
+          }
+        } catch (err) {
+          console.log(`Could not hang up conference for ${CallSid}:`, err.message);
+        }
       }
     }, 60000);
 
-    // Return TwiML to handle incoming calls - Queue system
+    // Return TwiML to handle incoming calls - Waiting room approach
+    // Instead of using Enqueue (which has maxQueueWait issues), use a waiting conference
     // Agent receives notification in CRM UI
-    // Caller is placed in queue with hold music while agent reviews
-    // If agent accepts, caller is moved to conference with agent
-    // If no agent accepts within 60 seconds (popup timeout), call goes to voicemail
+    // Caller is placed in waiting conference with hold music
+    // If agent accepts within 60s, caller is moved to conference with agent
+    // If no agent accepts within 60s, call goes to voicemail (handled by server-side timeout below)
+    const waitingRoomId = `waiting-${CallSid}`;
+
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="alice">Thank you for calling. Please hold while we connect you to an agent.</Say>
-  <Enqueue
-    waitUrl="http://twimlets.com/holdmusic?Bucket=com.twilio.music.ambient"
-    maxQueueWait="60"
-    action="https://uppalcrm-api.onrender.com/api/twilio/webhook/queue-timeout"
-    method="POST"
-  >support_queue</Enqueue>
+  <Dial>
+    <Conference
+      startConferenceOnEnter="false"
+      endConferenceOnExit="true"
+      waitUrl="http://twimlets.com/holdmusic?Bucket=com.twilio.music.ambient"
+      beep="false"
+      statusCallback="https://uppalcrm-api.onrender.com/api/twilio/webhook/conference-status"
+      statusCallbackEvent="start end join leave"
+    >${waitingRoomId}</Conference>
+  </Dial>
+  <Say voice="alice">We apologize. All of our agents are currently assisting other customers. Please leave a detailed message after the beep.</Say>
+  <Record
+    maxLength="120"
+    playBeep="true"
+    recordingStatusCallback="https://uppalcrm-api.onrender.com/api/twilio/webhook/recording"
+    recordingStatusCallbackEvent="completed"
+    transcribe="false"
+  />
+  <Say voice="alice">Thank you for your message. Goodbye.</Say>
+  <Hangup />
 </Response>`;
 
     res.type('text/xml');
