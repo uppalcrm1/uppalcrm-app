@@ -1,13 +1,23 @@
 // ============================================
-// LOG FILTER - Removes noisy polling logs
+// LOG FILTER - Add at the very top of your server file
 // ============================================
 const originalConsoleLog = console.log;
+
 console.log = function(...args) {
   const message = String(args[0] || '');
+
+  // Skip logging for these noisy polling endpoints
   const shouldSkip =
-    message.includes('GET /api/twilio/incoming-calls/pending') ||
+    message.includes('/api/twilio/incoming-calls/pending') ||
+    message.includes('/incoming-calls/pending') ||
+    message.includes('📍 TWILIO ROUTE RECEIVED: GET /incoming-calls/pending') ||
+    message.includes('Full path: /api/twilio/incoming-calls/pending') ||
+    message.includes('========================================') ||
+    message.includes('Query: {}') ||
+    message.includes('Body: {}') ||
     message.includes('[verifyToken] Decoded token:') ||
     message.includes('[verifyToken] Session query result rows:');
+
   if (!shouldSkip) {
     originalConsoleLog.apply(console, args);
   }
