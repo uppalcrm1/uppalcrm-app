@@ -849,6 +849,7 @@ router.post('/webhook/voice', async (req, res) => {
   <Say voice="alice">Thank you for calling. Please hold while we connect you to an agent.</Say>
   <Enqueue
     waitUrl="http://twimlets.com/holdmusic?Bucket=com.twilio.music.ambient"
+    maxQueueWait="60"
     action="https://uppalcrm-api.onrender.com/api/twilio/webhook/queue-result"
     method="POST"
   >support_queue</Enqueue>
