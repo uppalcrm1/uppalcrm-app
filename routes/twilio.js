@@ -5,6 +5,17 @@ const { authenticateToken } = require('../middleware/auth');
 const db = require('../database/connection');
 const Joi = require('joi');
 
+// Catch-all logger for ALL requests to Twilio routes
+router.use((req, res, next) => {
+  console.log('========================================');
+  console.log(`📍 TWILIO ROUTE RECEIVED: ${req.method} ${req.path}`);
+  console.log('Full path:', req.originalUrl);
+  console.log('Query:', JSON.stringify(req.query));
+  console.log('Body:', JSON.stringify(req.body));
+  console.log('========================================');
+  next();
+});
+
 // Debug endpoint to verify code version
 router.get('/health', (req, res) => {
   res.json({
@@ -749,8 +760,26 @@ router.post('/webhook/sms-status', async (req, res) => {
  * Twilio Webhooks - Voice (TwiML for incoming calls)
  */
 router.post('/webhook/voice', async (req, res) => {
+  console.log('========================================');
+  console.log('🎯 VOICE WEBHOOK RECEIVED');
+  console.log('Headers:', JSON.stringify(req.headers, null, 2));
+  console.log('Body:', JSON.stringify(req.body, null, 2));
+  console.log('========================================');
+
   try {
     const { From, To, CallSid, Direction, CallStatus } = req.body;
+
+    if (!CallSid) {
+      console.error('❌ ERROR: Missing CallSid in request body');
+      const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="alice">System error. Please try again.</Say>
+  <Hangup />
+</Response>`;
+      res.type('text/xml');
+      res.send(twiml);
+      return;
+    }
 
     console.log('Voice webhook call - Full request body:', req.body);
     console.log('Voice webhook call:', { From, To, CallSid, Direction, CallStatus });
@@ -918,7 +947,14 @@ router.post('/webhook/voice', async (req, res) => {
     res.type('text/xml');
     res.send(twiml);
   } catch (error) {
-    console.error('Error handling voice webhook:', error);
+    console.error('========================================');
+    console.error('❌ VOICE WEBHOOK ERROR');
+    console.error('Error message:', error.message);
+    console.error('Stack trace:', error.stack);
+    console.error('Request body was:', JSON.stringify(req.body));
+    console.error('Request headers were:', JSON.stringify(req.headers));
+    console.error('========================================');
+
     // Return a basic TwiML response even on error
     res.type('text/xml');
     res.send(`<?xml version="1.0" encoding="UTF-8"?>
