@@ -834,29 +834,12 @@ router.post('/webhook/voice', async (req, res) => {
       timestamp: new Date().toISOString()
     };
 
-    // Hang up waiting room conference and send to voicemail after 60 seconds if no agent joined
-    setTimeout(async () => {
+    // Clear from cache after 60 seconds so agents no longer see the popup
+    // Note: The <Dial> timeout="60" below will handle transitioning to voicemail
+    setTimeout(() => {
       if (global.incomingCalls && global.incomingCalls[cacheKey]?.callSid === CallSid) {
-        console.log(`Timeout: Clearing unanswered call ${CallSid} from cache after 60s and hanging up conference`);
+        console.log(`Timeout: Clearing unanswered call ${CallSid} from cache after 60s`);
         delete global.incomingCalls[cacheKey];
-
-        // Hang up the waiting conference to force customer to voicemail
-        try {
-          const { client } = await twilioService.getClient(organizationId);
-          const waitingRoomId = `waiting-${CallSid}`;
-
-          // Get the conference and hang up all participants
-          const conference = await client.conferences(waitingRoomId).fetch().catch(() => null);
-          if (conference) {
-            console.log(`Hanging up waiting room conference ${waitingRoomId}`);
-            // Update the call to hangup (this will cause the <Dial> to exit and continue to voicemail TwiML)
-            await client.calls(CallSid).update({
-              status: 'completed'
-            }).catch(err => console.log('Could not complete call, it may already be ended:', err.message));
-          }
-        } catch (err) {
-          console.log(`Could not hang up conference for ${CallSid}:`, err.message);
-        }
       }
     }, 60000);
 
@@ -881,7 +864,7 @@ router.post('/webhook/voice', async (req, res) => {
       statusCallbackEvent="start end join leave"
     >${waitingRoomId}</Conference>
   </Dial>
-  <Say voice="alice">We apologize. All of our agents are currently assisting other customers. Please leave a detailed message after the beep.</Say>
+  <Say voice="alice">We apologize. All of our agents are currently assisting other customers. Please leave a detailed message after the beep and we will get back to you shortly.</Say>
   <Record
     maxLength="120"
     playBeep="true"
