@@ -836,37 +836,48 @@ router.post('/webhook/voice', async (req, res) => {
 
     // Server-side force dequeue after 60 seconds (Twilio maxQueueWait is unreliable)
     setTimeout(async () => {
+      console.log('========================================');
+      console.log('⏰ TIMEOUT CALLBACK FIRED');
+      console.log('Checking if call still pending:', CallSid);
+      console.log('Cache key:', cacheKey);
+      console.log('Cache exists?', global.incomingCalls?.[cacheKey] ? 'YES' : 'NO');
+      console.log('========================================');
+
       if (global.incomingCalls && global.incomingCalls[cacheKey]?.callSid === CallSid) {
-        console.log('========================================');
-        console.log(`⏰ TIMEOUT: Force dequeueing ${CallSid} after 60 seconds`);
-        console.log('========================================');
+        console.log(`✅ Call ${CallSid} still pending after 60s - attempting dequeue`);
 
         delete global.incomingCalls[cacheKey];
 
         try {
+          console.log('Step 1: Getting Twilio client for org:', organizationId);
           const { client } = await twilioService.getClient(organizationId);
+          console.log('✅ Client obtained');
 
-          // Fetch the support_queue
+          console.log('Step 2: Fetching support_queue');
           const queue = await client.queues('support_queue').fetch();
+          console.log('✅ Queue fetched, SID:', queue.sid);
 
-          // Update the queued member to redirect to voicemail
+          console.log('Step 3: Updating queue member:', CallSid);
           await client
             .queues(queue.sid)
             .members(CallSid)
             .update({
               url: `${process.env.API_BASE_URL || 'https://uppalcrm-api.onrender.com'}/api/twilio/webhook/voicemail-redirect`,
               method: 'POST'
-            })
-            .then(() => {
-              console.log(`✅ Successfully dequeued ${CallSid} and redirected to voicemail`);
-            })
-            .catch(err => {
-              console.log(`❌ Could not dequeue (call may have ended): ${err.message}`);
             });
 
+          console.log(`✅ Successfully dequeued ${CallSid} and redirected to voicemail`);
+
         } catch (err) {
-          console.error(`Error during force dequeue: ${err.message}`);
+          console.error('========================================');
+          console.error('❌ ERROR DURING DEQUEUE');
+          console.error('Error message:', err.message);
+          console.error('Error code:', err.code);
+          console.error('Full error:', JSON.stringify(err, null, 2));
+          console.error('========================================');
         }
+      } else {
+        console.log(`ℹ️ Call ${CallSid} no longer in cache (may have been answered or hung up)`);
       }
     }, 60000);
 
