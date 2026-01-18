@@ -905,6 +905,45 @@ router.post('/incoming-calls/clear', authenticateToken, async (req, res) => {
 });
 
 /**
+ * Decline incoming call - Hang up and clear from queue
+ */
+router.post('/incoming-calls/decline', authenticateToken, async (req, res) => {
+  try {
+    const { callSid } = req.body;
+    const organizationId = req.organizationId;
+
+    console.log(`Declining incoming call: ${callSid}`);
+
+    // Clear from global cache immediately
+    const cacheKey = `incoming_call:${organizationId}`;
+    if (global.incomingCalls) {
+      delete global.incomingCalls[cacheKey];
+      console.log(`Cleared declined call from cache for org: ${organizationId}`);
+    }
+
+    // Get Twilio client and hang up the call
+    const { client } = await twilioService.getClient(organizationId);
+
+    await client.calls(callSid).update({
+      status: 'completed'
+    });
+
+    console.log(`Call ${callSid} ended`);
+
+    res.json({
+      success: true,
+      message: 'Call declined and ended'
+    });
+
+  } catch (error) {
+    console.error('Error declining call:', error);
+    res.status(500).json({
+      error: error.message || 'Failed to decline call'
+    });
+  }
+});
+
+/**
  * Accept incoming call - Dequeue caller and move to conference
  */
 router.post('/incoming-calls/accept', authenticateToken, async (req, res) => {
@@ -913,6 +952,13 @@ router.post('/incoming-calls/accept', authenticateToken, async (req, res) => {
     const organizationId = req.organizationId;
 
     console.log(`Accepting incoming call: ${callSid} for org: ${organizationId}`);
+
+    // Clear from incoming calls cache IMMEDIATELY so all other clients stop seeing this call
+    const cacheKey = `incoming_call:${organizationId}`;
+    if (global.incomingCalls) {
+      delete global.incomingCalls[cacheKey];
+      console.log(`Cleared incoming call from cache for org: ${organizationId}`);
+    }
 
     // Get Twilio client
     const { client } = await twilioService.getClient(organizationId);
@@ -937,12 +983,6 @@ router.post('/incoming-calls/accept', authenticateToken, async (req, res) => {
   </Dial>
 </Response>`
     });
-
-    // Clear from incoming calls cache
-    const cacheKey = `incoming_call:${organizationId}`;
-    if (global.incomingCalls) {
-      delete global.incomingCalls[cacheKey];
-    }
 
     console.log('Incoming call accepted and moved to conference:', conferenceId);
 

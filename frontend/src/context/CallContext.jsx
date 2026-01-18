@@ -65,6 +65,10 @@ export const CallProvider = ({ children }) => {
                 icon: '/phone-icon.png'
               })
             }
+          } else if (!data.incomingCall && incomingCall) {
+            // Call was accepted by another agent - clear the popup
+            console.log('Incoming call no longer available (accepted by another agent)')
+            setIncomingCall(null)
           }
         }
       } catch (error) {
@@ -75,8 +79,8 @@ export const CallProvider = ({ children }) => {
     // Only start polling if authenticated
     if (!isAuthenticated) return;
 
-    // Poll every 3 seconds
-    const interval = setInterval(checkForIncomingCalls, 3000)
+    // Poll every 2 seconds
+    const interval = setInterval(checkForIncomingCalls, 2000)
 
     return () => clearInterval(interval)
   }, [incomingCall, isAuthenticated])
@@ -158,15 +162,18 @@ export const CallProvider = ({ children }) => {
     if (!incomingCall) return
 
     try {
-      // Clear the pending call from backend
+      // Call backend to decline and hang up the call
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3004/api'
-      await fetch(`${API_URL}/twilio/incoming-calls/clear`, {
+      await fetch(`${API_URL}/twilio/incoming-calls/decline`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
           'X-Organization-Slug': localStorage.getItem('organizationSlug'),
           'Content-Type': 'application/json'
-        }
+        },
+        body: JSON.stringify({
+          callSid: incomingCall.callSid
+        })
       })
 
       setMissedCallCount(prev => prev + 1)
@@ -176,6 +183,7 @@ export const CallProvider = ({ children }) => {
       console.error('Error declining call:', error)
       // Still clear the call locally even if backend fails
       setIncomingCall(null)
+      toast.error('Failed to decline call')
     }
   }
 
