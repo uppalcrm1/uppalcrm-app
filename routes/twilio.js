@@ -1487,4 +1487,43 @@ router.get('/stats', authenticateToken, async (req, res) => {
   }
 });
 
+/**
+ * TEMPORARY: Create support_queue
+ * Run once, then delete this endpoint
+ */
+router.post('/create-queue', authenticateToken, async (req, res) => {
+  try {
+    const organizationId = req.organizationId;
+    const { client } = await twilioService.getClient(organizationId);
+
+    console.log('Creating support_queue...');
+
+    const queue = await client.queues.create({
+      friendlyName: 'support_queue',
+      maxSize: 100
+    });
+
+    console.log('✅ Queue created successfully!');
+    console.log('Queue SID:', queue.sid);
+    console.log('Friendly Name:', queue.friendlyName);
+
+    res.json({
+      success: true,
+      message: 'Queue created successfully!',
+      queue: {
+        sid: queue.sid,
+        friendlyName: queue.friendlyName,
+        maxSize: queue.maxSize
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error creating queue:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;
