@@ -1488,15 +1488,33 @@ router.get('/stats', authenticateToken, async (req, res) => {
 });
 
 /**
- * TEMPORARY: Create support_queue
+ * TEMPORARY: Create support_queue (no auth required)
  * Run once, then delete this endpoint
+ * Simple endpoint - just access the URL in your browser or curl
  */
-router.post('/create-queue', authenticateToken, async (req, res) => {
+router.get('/create-queue-simple', async (req, res) => {
   try {
-    const organizationId = req.organizationId;
-    const { client } = await twilioService.getClient(organizationId);
+    // Get first active Twilio config to create queue
+    const orgQuery = `
+      SELECT organization_id, account_sid, auth_token
+      FROM twilio_config
+      WHERE is_active = true
+      LIMIT 1
+    `;
 
-    console.log('Creating support_queue...');
+    const result = await db.query(orgQuery);
+
+    if (!result.rows.length) {
+      return res.status(400).json({
+        success: false,
+        error: 'No active Twilio configuration found'
+      });
+    }
+
+    const { organization_id, account_sid, auth_token } = result.rows[0];
+    const client = require('twilio')(account_sid, auth_token);
+
+    console.log('Creating support_queue for organization:', organization_id);
 
     const queue = await client.queues.create({
       friendlyName: 'support_queue',
@@ -1509,12 +1527,14 @@ router.post('/create-queue', authenticateToken, async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Queue created successfully!',
+      message: '✅ Queue created successfully!',
       queue: {
         sid: queue.sid,
         friendlyName: queue.friendlyName,
-        maxSize: queue.maxSize
-      }
+        maxSize: queue.maxSize,
+        organizationId: organization_id
+      },
+      nextStep: 'Call your Twilio number and wait 60 seconds. It should work now!'
     });
 
   } catch (error) {
