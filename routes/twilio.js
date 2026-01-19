@@ -64,7 +64,15 @@ const startIncomingCallCleanup = () => {
             }
 
             const { client } = await twilioService.getClient(orgId);
-            const queue = await client.queues('support_queue').fetch();
+
+            // Find the support_queue by friendly name (not by SID)
+            const queues = await client.queues.list();
+            const queue = queues.find(q => q.friendlyName === 'support_queue');
+
+            if (!queue) {
+              console.log('support_queue not found - skipping dequeue');
+              continue;
+            }
 
             console.log('Attempting to dequeue:', call.callSid);
             await client
@@ -1162,8 +1170,15 @@ router.post('/incoming-calls/accept', authenticateToken, async (req, res) => {
     const apiBaseUrl = process.env.API_BASE_URL || 'https://uppalcrm-api.onrender.com';
 
     try {
-      // Get the support_queue
-      const queue = await client.queues('support_queue').fetch();
+      // Get the support_queue by listing all queues and finding by friendly name
+      // (client.queues() requires SID, not friendly name)
+      const queues = await client.queues.list();
+      const queue = queues.find(q => q.friendlyName === 'support_queue');
+
+      if (!queue) {
+        throw new Error('support_queue not found - please create it first');
+      }
+
       const queueSid = queue.sid;
 
       // Update the queued member to redirect them
