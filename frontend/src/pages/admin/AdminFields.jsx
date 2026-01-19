@@ -146,7 +146,10 @@ const AdminFields = () => {
     placeholder: '',
     default_value: '',
     field_options: [],
-    validation_rules: {}
+    validation_rules: {},
+    // Phase 1: Master visibility toggle
+    overall_visibility: 'visible',
+    visibility_logic: 'master_override'
   })
 
   // Load fields from API
@@ -215,7 +218,10 @@ const AdminFields = () => {
           field_label: formData.field_label,
           field_type: formData.field_type,
           field_options: formData.field_options,
-          is_required: formData.is_required
+          is_required: formData.is_required,
+          // Phase 1: Include visibility fields
+          overall_visibility: formData.overall_visibility,
+          visibility_logic: formData.visibility_logic
         }
 
         // Check if trying to make Product Name field optional
@@ -262,7 +268,10 @@ const AdminFields = () => {
           field_label: formData.field_label,
           field_type: formData.field_type,
           field_options: formData.field_options,
-          is_required: formData.is_required
+          is_required: formData.is_required,
+          // Phase 1: Include visibility fields
+          overall_visibility: formData.overall_visibility,
+          visibility_logic: formData.visibility_logic
         }
         console.log('📤 Sending field data:', fieldData)
         const response = await api.post('/custom-fields', fieldData)
@@ -326,7 +335,10 @@ const AdminFields = () => {
       placeholder: field.placeholder || '',
       default_value: field.default_value || '',
       field_options: normalizedOptions,
-      validation_rules: field.validation_rules || {}
+      validation_rules: field.validation_rules || {},
+      // Phase 1: Master visibility toggle
+      overall_visibility: field.overall_visibility || 'visible',
+      visibility_logic: field.visibility_logic || 'master_override'
     })
     setEditingField(field)
     setIsCreating(true)
@@ -451,7 +463,10 @@ const AdminFields = () => {
       placeholder: '',
       default_value: '',
       field_options: [],
-      validation_rules: {}
+      validation_rules: {},
+      // Phase 1: Master visibility toggle
+      overall_visibility: 'visible',
+      visibility_logic: 'master_override'
     })
   }
 
@@ -861,6 +876,60 @@ const AdminFields = () => {
               <p className="text-xs text-gray-500 mt-1">Group related fields together</p>
             </div>
 
+            {/* Phase 1: Master Visibility Control */}
+            <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-900">
+                    Master Visibility Control (Phase 1)
+                  </label>
+                  <p className="text-xs text-gray-600 mt-1">
+                    Controls overall field visibility. When hidden, the field is invisible everywhere.
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center cursor-pointer flex-1">
+                    <input
+                      type="radio"
+                      name="overall_visibility"
+                      value="visible"
+                      checked={formData.overall_visibility === 'visible'}
+                      onChange={(e) => handleInputChange('overall_visibility', e.target.value)}
+                      className="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"
+                    />
+                    <span className="ml-3">
+                      <span className="text-sm font-medium text-gray-900">Visible</span>
+                      <p className="text-xs text-gray-600">Field is visible where configured in context settings</p>
+                    </span>
+                  </label>
+                </div>
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center cursor-pointer flex-1">
+                    <input
+                      type="radio"
+                      name="overall_visibility"
+                      value="hidden"
+                      checked={formData.overall_visibility === 'hidden'}
+                      onChange={(e) => handleInputChange('overall_visibility', e.target.value)}
+                      className="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"
+                    />
+                    <span className="ml-3">
+                      <span className="text-sm font-medium text-gray-900">Hidden</span>
+                      <p className="text-xs text-gray-600">Field is hidden everywhere, regardless of context settings</p>
+                    </span>
+                  </label>
+                </div>
+              </div>
+              {formData.overall_visibility === 'hidden' && (
+                <div className="mt-3 p-2 bg-orange-50 border border-orange-200 rounded text-xs text-orange-700 flex items-start gap-2">
+                  <span>⚠️</span>
+                  <span>All context visibility settings below will be disabled when you save</span>
+                </div>
+              )}
+            </div>
+
             {/* Field Settings Checkboxes */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-3">
@@ -1084,7 +1153,16 @@ const AdminFields = () => {
                             <span className={`font-medium ${getFieldVisibility(field) ? 'text-gray-900' : 'text-gray-500'}`}>
                               {field.field_label}
                             </span>
-                            {!getFieldVisibility(field) && (
+                            {/* Phase 1: Master visibility indicator */}
+                            {field.overall_visibility === 'hidden' && (
+                              <span
+                                className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium flex items-center gap-1"
+                                title="Phase 1: Hidden by master visibility control"
+                              >
+                                👁️ Master Hidden
+                              </span>
+                            )}
+                            {!getFieldVisibility(field) && field.overall_visibility !== 'hidden' && (
                               <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Hidden</span>
                             )}
                             {field.entity_type === null && activeTab !== 'universal' && (

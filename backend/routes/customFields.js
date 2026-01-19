@@ -2,6 +2,7 @@ const express = require('express')
 const router = express.Router()
 const CustomField = require('../models/CustomField')
 const { authenticateToken } = require('../middleware/auth')
+const fieldVisibilityService = require('../services/fieldVisibilityService')
 
 // Apply authentication middleware to all routes
 router.use(authenticateToken)
@@ -173,6 +174,7 @@ const SYSTEM_FIELD_DEFAULTS = {
 /**
  * GET /api/custom-fields
  * Get all custom field definitions (optionally filtered by entityType query param)
+ * Phase 1: Applies visibility logic to all fields
  */
 router.get('/', async (req, res) => {
   try {
@@ -180,7 +182,7 @@ router.get('/', async (req, res) => {
     console.log('Query params:', req.query)
     console.log('User:', req.user?.id, 'Org:', req.user?.organization_id)
 
-    const { entityType, activeOnly = 'true' } = req.query
+    const { entityType, activeOnly = 'true', context } = req.query
     const organizationId = req.user.organization_id
 
     if (!organizationId) {
@@ -203,11 +205,20 @@ router.get('/', async (req, res) => {
       }
 
       console.log(`🔍 Fetching fields for entityType: ${entityType}`)
-      const fields = await CustomField.getFieldDefinitions(
+      let fields = await CustomField.getFieldDefinitions(
         organizationId,
         entityType,
         activeOnly === 'true'
       )
+
+      // Phase 1: Apply visibility logic to all fields
+      fields = fields.map(field => fieldVisibilityService.applyVisibilityLogic(field))
+
+      // Filter by context if requested
+      if (context) {
+        fields = fields.filter(field => fieldVisibilityService.isVisibleInContext(field, context))
+        console.log(`🔍 Filtered to ${fields.length} fields visible in context: ${context}`)
+      }
 
       console.log(`✅ Found ${fields.length} fields for ${entityType}`)
       return res.json({
@@ -224,11 +235,20 @@ router.get('/', async (req, res) => {
     const entityTypes = ['leads', 'contacts', 'accounts', 'transactions', 'product']
 
     for (const type of entityTypes) {
-      const fields = await CustomField.getFieldDefinitions(
+      let fields = await CustomField.getFieldDefinitions(
         organizationId,
         type,
         activeOnly === 'true'
       )
+
+      // Phase 1: Apply visibility logic to all fields
+      fields = fields.map(field => fieldVisibilityService.applyVisibilityLogic(field))
+
+      // Filter by context if requested
+      if (context) {
+        fields = fields.filter(field => fieldVisibilityService.isVisibleInContext(field, context))
+      }
+
       allFields[type] = fields
     }
 
@@ -307,7 +327,10 @@ router.post('/', async (req, res) => {
       fieldOptions, field_options,
       defaultValue, default_value,
       placeholder,
-      fieldGroup, field_group
+      fieldGroup, field_group,
+      // Phase 1: Visibility fields
+      overall_visibility,
+      visibility_logic
     } = req.body
 
     // Normalize to camelCase (prefer camelCase, fallback to snake_case)
@@ -329,7 +352,10 @@ router.post('/', async (req, res) => {
       fieldOptions: fieldOptions || field_options,
       defaultValue: defaultValue !== undefined ? defaultValue : default_value,
       placeholder: placeholder,
-      fieldGroup: fieldGroup || field_group
+      fieldGroup: fieldGroup || field_group,
+      // Phase 1: Visibility fields
+      overall_visibility: overall_visibility || 'visible',
+      visibility_logic: visibility_logic || 'master_override'
     }
 
     console.log('🔍 STEP 2: AFTER NORMALIZATION')
@@ -431,6 +457,9 @@ router.post('/', async (req, res) => {
       defaultValue: normalizedData.defaultValue,
       placeholder: normalizedData.placeholder,
       fieldGroup: normalizedData.fieldGroup,
+      // Phase 1: Visibility fields
+      overall_visibility: normalizedData.overall_visibility,
+      visibility_logic: normalizedData.visibility_logic,
       createdBy: userId
     }
 
@@ -613,7 +642,10 @@ router.post('/definitions', async (req, res) => {
       fieldOptions, field_options,
       defaultValue, default_value,
       placeholder,
-      fieldGroup, field_group
+      fieldGroup, field_group,
+      // Phase 1: Visibility fields
+      overall_visibility,
+      visibility_logic
     } = req.body
 
     // Normalize to camelCase (prefer camelCase, fallback to snake_case)
@@ -635,7 +667,10 @@ router.post('/definitions', async (req, res) => {
       fieldOptions: fieldOptions || field_options,
       defaultValue: defaultValue !== undefined ? defaultValue : default_value,
       placeholder: placeholder,
-      fieldGroup: fieldGroup || field_group
+      fieldGroup: fieldGroup || field_group,
+      // Phase 1: Visibility fields
+      overall_visibility: overall_visibility || 'visible',
+      visibility_logic: visibility_logic || 'master_override'
     }
 
     console.log('📋 Extracted field data:', {
@@ -728,6 +763,9 @@ router.post('/definitions', async (req, res) => {
       defaultValue: normalizedData.defaultValue,
       placeholder: normalizedData.placeholder,
       fieldGroup: normalizedData.fieldGroup,
+      // Phase 1: Visibility fields
+      overall_visibility: normalizedData.overall_visibility,
+      visibility_logic: normalizedData.visibility_logic,
       createdBy: userId
     }
 
@@ -797,15 +835,18 @@ router.post('/definitions', async (req, res) => {
 /**
  * PUT /api/custom-fields/definitions/:fieldId
  * Update a custom field definition
+ * Phase 1: Validates updates using fieldVisibilityService
  */
 router.put('/definitions/:fieldId', async (req, res) => {
   try {
     const { fieldId } = req.params
     const organizationId = req.user.organization_id
     const userId = req.user.id
-    const updateData = req.body
 
     console.log(`📥 PUT /api/custom-fields/definitions/${fieldId}`)
+
+    // Phase 1: Validate and adjust updates
+    let updateData = fieldVisibilityService.validateUpdate(req.body)
 
     const field = await CustomField.updateFieldDefinition(
       fieldId,
@@ -814,13 +855,24 @@ router.put('/definitions/:fieldId', async (req, res) => {
       userId
     )
 
+    // Phase 1: Apply visibility logic to response
+    const processedField = fieldVisibilityService.applyVisibilityLogic(field)
+
     console.log('✅ Field updated successfully')
 
-    res.json({
+    // Phase 1: Include adjustment info if auto-adjusted
+    const response = {
       success: true,
       message: 'Field definition updated successfully',
-      field
-    })
+      field: processedField
+    }
+
+    if (updateData._auto_adjusted) {
+      response.adjusted = true
+      response.adjustment_reason = updateData._adjustment_reason
+    }
+
+    res.json(response)
   } catch (error) {
     console.error('❌ Error updating field definition:', error)
 
@@ -838,6 +890,45 @@ router.put('/definitions/:fieldId', async (req, res) => {
 
     res.status(500).json({
       error: 'Failed to update field definition',
+      details: error.message
+    })
+  }
+})
+
+/**
+ * GET /api/custom-fields/definitions/:fieldId/visibility-status
+ * Get visibility status for a field (Phase 1)
+ * Returns effective visibility configuration for UI display
+ */
+router.get('/definitions/:fieldId/visibility-status', async (req, res) => {
+  try {
+    const { fieldId } = req.params
+    const organizationId = req.user.organization_id
+
+    console.log(`📥 GET /api/custom-fields/definitions/${fieldId}/visibility-status`)
+
+    const field = await CustomField.getFieldDefinitionById(fieldId, organizationId)
+
+    if (!field) {
+      return res.status(404).json({
+        success: false,
+        message: 'Field not found'
+      })
+    }
+
+    const status = fieldVisibilityService.getVisibilityStatus(field)
+
+    console.log('✅ Retrieved visibility status')
+
+    res.json({
+      success: true,
+      data: status
+    })
+  } catch (error) {
+    console.error('❌ Error fetching visibility status:', error)
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch visibility status',
       details: error.message
     })
   }
