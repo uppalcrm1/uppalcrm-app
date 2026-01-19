@@ -437,6 +437,32 @@ router.post('/', async (req, res) => {
       console.log('✅ Field options valid:', normalizedData.fieldOptions.length, 'options')
     }
 
+    // Validate Phase 1 visibility fields
+    const validVisibilityStates = ['visible', 'hidden']
+    const validVisibilityLogics = ['master_override', 'context_based']
+
+    if (normalizedData.overall_visibility && !validVisibilityStates.includes(normalizedData.overall_visibility)) {
+      console.error('❌ Invalid overall_visibility:', normalizedData.overall_visibility)
+      return res.status(400).json({
+        error: 'Invalid overall_visibility value',
+        validValues: validVisibilityStates,
+        received: normalizedData.overall_visibility
+      })
+    }
+
+    if (normalizedData.visibility_logic && !validVisibilityLogics.includes(normalizedData.visibility_logic)) {
+      console.error('❌ Invalid visibility_logic:', normalizedData.visibility_logic)
+      return res.status(400).json({
+        error: 'Invalid visibility_logic value',
+        validValues: validVisibilityLogics,
+        received: normalizedData.visibility_logic
+      })
+    }
+
+    console.log('✅ Phase 1 visibility fields valid')
+    console.log('   overall_visibility:', normalizedData.overall_visibility)
+    console.log('   visibility_logic:', normalizedData.visibility_logic)
+
     const fieldData = {
       organizationId,
       fieldName: normalizedData.fieldName,
@@ -742,6 +768,32 @@ router.post('/definitions', async (req, res) => {
       }
       console.log('✅ Field options valid:', normalizedData.fieldOptions.length, 'options')
     }
+
+    // Validate Phase 1 visibility fields
+    const validVisibilityStates = ['visible', 'hidden']
+    const validVisibilityLogics = ['master_override', 'context_based']
+
+    if (normalizedData.overall_visibility && !validVisibilityStates.includes(normalizedData.overall_visibility)) {
+      console.error('❌ Invalid overall_visibility:', normalizedData.overall_visibility)
+      return res.status(400).json({
+        error: 'Invalid overall_visibility value',
+        validValues: validVisibilityStates,
+        received: normalizedData.overall_visibility
+      })
+    }
+
+    if (normalizedData.visibility_logic && !validVisibilityLogics.includes(normalizedData.visibility_logic)) {
+      console.error('❌ Invalid visibility_logic:', normalizedData.visibility_logic)
+      return res.status(400).json({
+        error: 'Invalid visibility_logic value',
+        validValues: validVisibilityLogics,
+        received: normalizedData.visibility_logic
+      })
+    }
+
+    console.log('✅ Phase 1 visibility fields valid')
+    console.log('   overall_visibility:', normalizedData.overall_visibility)
+    console.log('   visibility_logic:', normalizedData.visibility_logic)
 
     const fieldData = {
       organizationId,
