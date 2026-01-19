@@ -40,7 +40,9 @@ class CustomField {
           field_group,
           is_active,
           created_at,
-          updated_at
+          updated_at,
+          overall_visibility,
+          visibility_logic
         FROM custom_field_definitions
         WHERE organization_id = $1 AND entity_type = $2
       `
@@ -98,6 +100,8 @@ class CustomField {
           validation_rules,
           field_options,
           default_value,
+          overall_visibility,
+          visibility_logic,
           placeholder,
           field_group,
           is_active,
@@ -158,7 +162,10 @@ class CustomField {
         defaultValue = null,
         placeholder = null,
         fieldGroup = null,
-        createdBy
+        createdBy,
+        // Phase 1: Visibility fields
+        overall_visibility = 'visible',
+        visibility_logic = 'master_override'
       } = fieldData
 
       const query = `
@@ -182,8 +189,10 @@ class CustomField {
           default_value,
           placeholder,
           field_group,
-          created_by
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15::jsonb, $16::jsonb, $17, $18, $19, $20)
+          created_by,
+          overall_visibility,
+          visibility_logic
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15::jsonb, $16::jsonb, $17, $18, $19, $20, $21, $22)
         RETURNING *
       `
 
@@ -241,7 +250,10 @@ class CustomField {
         defaultValue,
         placeholder,
         fieldGroup,
-        createdBy
+        createdBy,
+        // Phase 1: Visibility fields
+        overall_visibility,
+        visibility_logic
       ]
 
       console.log('================================================================================')
@@ -305,7 +317,10 @@ class CustomField {
         'default_value',
         'placeholder',
         'field_group',
-        'is_active'
+        'is_active',
+        // Phase 1: Visibility fields
+        'overall_visibility',
+        'visibility_logic'
       ]
 
       const updates = []
