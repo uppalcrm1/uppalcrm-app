@@ -490,6 +490,17 @@ const startServer = async () => {
     // Test database connection
     await testConnection();
 
+    // Run pending database migrations
+    try {
+      const migrationRunner = require('./database/migrationRunner');
+      console.log('🔧 Checking for pending database migrations...');
+      const results = await migrationRunner.runPending();
+      console.log(`✅ Database migrations complete (${results.length} executed)`);
+    } catch (migrationError) {
+      console.error('⚠️  Database migration error:', migrationError.message);
+      // Don't stop server if migrations fail - log but continue
+    }
+
     // Fix lead creation trigger (run once on startup)
     try {
       const { fixLeadCreationTrigger } = require('./scripts/fix-lead-creation-trigger');
