@@ -47,7 +47,13 @@ const ContactDetailPage = () => {
       const response = await contactsAPI.getContactDetail(id);
       setContact(response.contact);
       setAccounts(response.accounts || []);
-      setCustomFields(response.customFields || []);
+
+      // Filter custom fields by show_in_detail_view
+      const visibleCustomFields = (response.customFields || []).filter(f => {
+        return f.is_enabled && f.show_in_detail_view !== false;
+      });
+
+      setCustomFields(visibleCustomFields);
       setTaskStats(response.taskStats || { total: 0, completed: 0, inProgress: 0 });
     } catch (err) {
       setError('Failed to load contact details');
