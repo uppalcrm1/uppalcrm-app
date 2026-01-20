@@ -1685,6 +1685,32 @@ router.post('/', validateLeadDynamic(false), async (req, res) => {
 
     const createdLead = result.rows[0];
 
+    // ========================================
+    // PHASE 1: Save custom fields to JSONB column
+    // ========================================
+    if (customFields && Object.keys(customFields).length > 0) {
+      console.log('💾 Saving custom fields to lead:', customFields);
+
+      try {
+        await db.query(
+          `UPDATE leads
+           SET custom_fields = $1
+           WHERE id = $2 AND organization_id = $3`,
+          [JSON.stringify(customFields), createdLead.id, req.organizationId]
+        );
+
+        console.log('✅ Custom fields saved successfully');
+
+        // Add custom_fields to the response object
+        createdLead.custom_fields = customFields;
+
+      } catch (error) {
+        console.error('❌ Error saving custom fields:', error);
+        // Don't fail the entire lead creation, just log the error
+      }
+    }
+    // ========================================
+
     // Auto-create follow-up task if next_follow_up is set
     if (followUpDate) {
       try {
@@ -1870,6 +1896,37 @@ router.put('/:id',
           console.log('ℹ️ Next follow-up date unchanged, skipping task creation');
         }
       }
+
+      // ========================================
+      // PHASE 1: Update custom fields if provided
+      // ========================================
+      const { customFields = {}, custom_fields = {} } = req.body;
+      const fieldsToUpdate = Object.keys(customFields).length > 0 ? customFields : custom_fields;
+
+      if (fieldsToUpdate && Object.keys(fieldsToUpdate).length > 0) {
+        console.log('💾 Updating custom fields:', fieldsToUpdate);
+
+        try {
+          await db.query(
+            `UPDATE leads
+             SET custom_fields = $1
+             WHERE id = $2 AND organization_id = $3`,
+            [JSON.stringify(fieldsToUpdate), req.params.id, req.organizationId]
+          );
+
+          console.log('✅ Custom fields updated successfully');
+
+          // Add to lead object if it has toJSON method, otherwise add directly
+          if (lead.custom_fields !== undefined) {
+            lead.custom_fields = fieldsToUpdate;
+          }
+
+        } catch (error) {
+          console.error('❌ Error updating custom fields:', error);
+          // Don't fail the entire update, just log the error
+        }
+      }
+      // ========================================
 
       console.log('✅ Lead updated successfully:', lead.id);
       res.json({
