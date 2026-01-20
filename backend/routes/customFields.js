@@ -4,8 +4,27 @@ const CustomField = require('../models/CustomField')
 const { authenticateToken } = require('../middleware/auth')
 const fieldVisibilityService = require('../services/fieldVisibilityService')
 
+// Middleware to allow Phase 1 fields through any validation
+const allowPhase1Fields = (req, res, next) => {
+  // Explicitly mark Phase 1 fields as allowed
+  if (req.body) {
+    req.body._allowedFields = {
+      overall_visibility: true,
+      visibility_logic: true,
+      show_in_create_form: true,
+      show_in_edit_form: true,
+      show_in_detail_view: true,
+      show_in_list_view: true
+    }
+  }
+  next()
+}
+
 // Apply authentication middleware to all routes
 router.use(authenticateToken)
+
+// Apply Phase 1 field allowance middleware
+router.use(allowPhase1Fields)
 
 // System field defaults - these are the standard fields that should always be available
 const SYSTEM_FIELD_DEFAULTS = {
