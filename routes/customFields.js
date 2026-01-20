@@ -444,8 +444,20 @@ const createFieldSchema = Joi.object({
     ).min(1).max(20).required(),
     otherwise: Joi.array().optional()
   }),
-  is_required: Joi.boolean().default(false)
-});
+  is_required: Joi.boolean().default(false),
+  // Phase 1 visibility fields
+  overall_visibility: Joi.string()
+    .valid('visible', 'hidden')
+    .default('visible'),
+  visibility_logic: Joi.string()
+    .valid('master_override', 'context_based')
+    .default('master_override'),
+  // Visibility context fields
+  show_in_create_form: Joi.boolean().default(true),
+  show_in_edit_form: Joi.boolean().default(true),
+  show_in_detail_view: Joi.boolean().default(true),
+  show_in_list_view: Joi.boolean().default(false)
+}).unknown(true);
 
 const updateFieldSchema = Joi.object({
   field_label: Joi.string().max(100),
@@ -462,8 +474,18 @@ const updateFieldSchema = Joi.object({
   }),
   is_required: Joi.boolean(),
   is_enabled: Joi.boolean(),
-  sort_order: Joi.number().integer().min(0)
-});
+  sort_order: Joi.number().integer().min(0),
+  // Phase 1 visibility fields
+  overall_visibility: Joi.string()
+    .valid('visible', 'hidden'),
+  visibility_logic: Joi.string()
+    .valid('master_override', 'context_based'),
+  // Visibility context fields
+  show_in_create_form: Joi.boolean(),
+  show_in_edit_form: Joi.boolean(),
+  show_in_detail_view: Joi.boolean(),
+  show_in_list_view: Joi.boolean()
+}).unknown(true);
 
 // Debug endpoint to check authentication
 // Debug endpoint to check database contents
@@ -603,6 +625,12 @@ router.get('/', async (req, res) => {
     const hasIsEnabled = availableColumns.includes('is_enabled');
     const hasSortOrder = availableColumns.includes('sort_order');
     const hasEntityType = availableColumns.includes('entity_type');
+    const hasOverallVisibility = availableColumns.includes('overall_visibility');
+    const hasVisibilityLogic = availableColumns.includes('visibility_logic');
+    const hasShowInCreateForm = availableColumns.includes('show_in_create_form');
+    const hasShowInEditForm = availableColumns.includes('show_in_edit_form');
+    const hasShowInDetailView = availableColumns.includes('show_in_detail_view');
+    const hasShowInListView = availableColumns.includes('show_in_list_view');
 
     console.log('📝 Available columns:', availableColumns);
 
@@ -611,6 +639,12 @@ router.get('/', async (req, res) => {
     if (hasIsEnabled) selectColumns += ', is_enabled';
     if (hasSortOrder) selectColumns += ', sort_order';
     if (hasEntityType) selectColumns += ', entity_type';
+    if (hasOverallVisibility) selectColumns += ', overall_visibility';
+    if (hasVisibilityLogic) selectColumns += ', visibility_logic';
+    if (hasShowInCreateForm) selectColumns += ', show_in_create_form';
+    if (hasShowInEditForm) selectColumns += ', show_in_edit_form';
+    if (hasShowInDetailView) selectColumns += ', show_in_detail_view';
+    if (hasShowInListView) selectColumns += ', show_in_list_view';
 
     const orderBy = hasSortOrder ? 'ORDER BY sort_order ASC, created_at ASC' : 'ORDER BY created_at ASC';
 
@@ -636,7 +670,13 @@ router.get('/', async (req, res) => {
     customFields.rows = customFields.rows.map(field => ({
       ...field,
       is_enabled: field.is_enabled !== undefined ? field.is_enabled : true,
-      sort_order: field.sort_order !== undefined ? field.sort_order : 0
+      sort_order: field.sort_order !== undefined ? field.sort_order : 0,
+      overall_visibility: field.overall_visibility !== undefined ? field.overall_visibility : 'visible',
+      visibility_logic: field.visibility_logic !== undefined ? field.visibility_logic : 'master_override',
+      show_in_create_form: field.show_in_create_form !== undefined ? field.show_in_create_form : true,
+      show_in_edit_form: field.show_in_edit_form !== undefined ? field.show_in_edit_form : true,
+      show_in_detail_view: field.show_in_detail_view !== undefined ? field.show_in_detail_view : true,
+      show_in_list_view: field.show_in_list_view !== undefined ? field.show_in_list_view : false
     }));
 
     // Build system fields from defaults + stored configurations
@@ -974,7 +1014,29 @@ router.post('/', fieldCreationLimit, async (req, res) => {
     console.log('  value.field_options is array?:', Array.isArray(value.field_options))
     console.log('  value.field_options:', value.field_options)
 
-    const { field_name, field_label, field_type, field_options, is_required, entity_type = 'leads' } = value;
+    const {
+      field_name,
+      field_label,
+      field_type,
+      field_options,
+      is_required,
+      entity_type = 'leads',
+      overall_visibility = 'visible',
+      visibility_logic = 'master_override',
+      show_in_create_form = true,
+      show_in_edit_form = true,
+      show_in_detail_view = true,
+      show_in_list_view = false
+    } = value;
+
+    // DEBUG: Log Phase 1 visibility fields
+    console.log('✅ Phase 1 visibility fields validated:')
+    console.log('  - overall_visibility:', overall_visibility)
+    console.log('  - visibility_logic:', visibility_logic)
+    console.log('  - show_in_create_form:', show_in_create_form)
+    console.log('  - show_in_edit_form:', show_in_edit_form)
+    console.log('  - show_in_detail_view:', show_in_detail_view)
+    console.log('  - show_in_list_view:', show_in_list_view)
 
     // Validate entity_type (allow null for universal fields)
     const validEntityTypes = ['leads', 'contacts', 'accounts', 'transactions', 'product', null];
@@ -1027,10 +1089,13 @@ router.post('/', fieldCreationLimit, async (req, res) => {
 
     const result = await db.query(`
       INSERT INTO custom_field_definitions
-      (organization_id, entity_type, field_name, field_label, field_type, field_options, is_required, created_by)
-      VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8)
-      RETURNING id, entity_type, field_name, field_label, field_type, field_options, is_required, is_enabled, created_at
-    `, [req.organizationId, entity_type, field_name, field_label, field_type, fieldOptionsJson, is_required, req.userId]);
+      (organization_id, entity_type, field_name, field_label, field_type, field_options, is_required, created_by,
+       overall_visibility, visibility_logic, show_in_create_form, show_in_edit_form, show_in_detail_view, show_in_list_view)
+      VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10, $11, $12, $13, $14)
+      RETURNING id, entity_type, field_name, field_label, field_type, field_options, is_required, is_enabled, created_at,
+                overall_visibility, visibility_logic, show_in_create_form, show_in_edit_form, show_in_detail_view, show_in_list_view
+    `, [req.organizationId, entity_type, field_name, field_label, field_type, fieldOptionsJson, is_required, req.userId,
+        overall_visibility, visibility_logic, show_in_create_form, show_in_edit_form, show_in_detail_view, show_in_list_view]);
 
     res.status(201).json({
       message: 'Custom field created successfully',
@@ -1086,7 +1151,8 @@ router.put('/:fieldId', async (req, res) => {
       UPDATE custom_field_definitions
       SET ${updates.join(', ')}
       WHERE id = $${paramCount++} AND organization_id = $${paramCount++}
-      RETURNING id, field_name, field_label, field_type, field_options, is_required, is_enabled, sort_order
+      RETURNING id, field_name, field_label, field_type, field_options, is_required, is_enabled, sort_order,
+                overall_visibility, visibility_logic, show_in_create_form, show_in_edit_form, show_in_detail_view, show_in_list_view
     `, values);
 
     if (result.rows.length === 0) {
