@@ -1602,6 +1602,7 @@ router.put('/default/:fieldName', async (req, res) => {
       'field_options',
       'is_required',
       'is_enabled',
+      'overall_visibility',
       'show_in_create_form',
       'show_in_edit_form',
       'show_in_detail_view',
