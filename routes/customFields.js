@@ -1198,7 +1198,11 @@ router.put('/default/:fieldName', async (req, res) => {
 
     await ensureTablesExist();
 
-    const { is_enabled, is_required, is_deleted, field_options, field_label, field_type, entity_type } = req.body;
+    const {
+      is_enabled, is_required, is_deleted, field_options, field_label, field_type, entity_type,
+      overall_visibility, visibility_logic,
+      show_in_create_form, show_in_edit_form, show_in_detail_view, show_in_list_view
+    } = req.body;
     const { fieldName } = req.params;
 
     // entity_type is required for proper field isolation
@@ -1432,10 +1436,17 @@ router.put('/default/:fieldName', async (req, res) => {
       options: field_options || fieldDefault.options || null,
       is_enabled: is_enabled !== undefined ? is_enabled : true,
       is_required: is_required !== undefined ? is_required : fieldDefault.required,
-      is_deleted: is_deleted !== undefined ? is_deleted : false
+      is_deleted: is_deleted !== undefined ? is_deleted : false,
+      overall_visibility: overall_visibility || 'visible',
+      visibility_logic: visibility_logic || 'master_override',
+      show_in_create_form: show_in_create_form !== undefined ? show_in_create_form : true,
+      show_in_edit_form: show_in_edit_form !== undefined ? show_in_edit_form : true,
+      show_in_detail_view: show_in_detail_view !== undefined ? show_in_detail_view : true,
+      show_in_list_view: show_in_list_view !== undefined ? show_in_list_view : false
     };
 
-    console.log('🔧 Storing field config:', fieldConfig);
+    console.log('📝 Updating system field:', fieldName);
+    console.log('📝 Updates:', fieldConfig);
 
     // First, check if this field exists as a universal field (entity_type = NULL) in custom_field_definitions
     const universalFieldCheck = await db.query(`
@@ -1454,9 +1465,16 @@ router.put('/default/:fieldName', async (req, res) => {
             is_required = $3,
             field_label = $4,
             field_type = $5,
+            overall_visibility = $8,
+            visibility_logic = $9,
+            show_in_create_form = $10,
+            show_in_edit_form = $11,
+            show_in_detail_view = $12,
+            show_in_list_view = $13,
             updated_at = NOW()
         WHERE organization_id = $6 AND field_name = $7 AND entity_type IS NULL
-        RETURNING field_name, field_options, is_enabled, is_required
+        RETURNING field_name, field_options, is_enabled, is_required, overall_visibility, visibility_logic,
+                  show_in_create_form, show_in_edit_form, show_in_detail_view, show_in_list_view
       `, [
         JSON.stringify(fieldConfig.options),
         fieldConfig.is_enabled,
@@ -1464,7 +1482,13 @@ router.put('/default/:fieldName', async (req, res) => {
         fieldConfig.label,
         fieldConfig.type,
         req.organizationId,
-        fieldName
+        fieldName,
+        fieldConfig.overall_visibility,
+        fieldConfig.visibility_logic,
+        fieldConfig.show_in_create_form,
+        fieldConfig.show_in_edit_form,
+        fieldConfig.show_in_detail_view,
+        fieldConfig.show_in_list_view
       ]);
     } else {
       // Fall back to default_field_configurations for entity-specific fields
@@ -1475,21 +1499,32 @@ router.put('/default/:fieldName', async (req, res) => {
         entity_type,
         options: fieldConfig.options,
         is_enabled: fieldConfig.is_enabled,
-        is_required: fieldConfig.is_required
+        is_required: fieldConfig.is_required,
+        overall_visibility: fieldConfig.overall_visibility,
+        visibility_logic: fieldConfig.visibility_logic
       });
-      
+
       result = await db.query(`
         INSERT INTO default_field_configurations
-        (organization_id, field_name, entity_type, field_options, is_enabled, is_required, sort_order, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+        (organization_id, field_name, entity_type, field_options, is_enabled, is_required, sort_order,
+         overall_visibility, visibility_logic, show_in_create_form, show_in_edit_form, show_in_detail_view, show_in_list_view, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW())
         ON CONFLICT (organization_id, field_name, entity_type)
         DO UPDATE SET
           field_options = EXCLUDED.field_options,
           is_enabled = EXCLUDED.is_enabled,
           is_required = EXCLUDED.is_required,
           sort_order = EXCLUDED.sort_order,
+          overall_visibility = EXCLUDED.overall_visibility,
+          visibility_logic = EXCLUDED.visibility_logic,
+          show_in_create_form = EXCLUDED.show_in_create_form,
+          show_in_edit_form = EXCLUDED.show_in_edit_form,
+          show_in_detail_view = EXCLUDED.show_in_detail_view,
+          show_in_list_view = EXCLUDED.show_in_list_view,
           updated_at = NOW()
-        RETURNING field_name, field_options, is_enabled, is_required, sort_order
+        RETURNING field_name, field_options, is_enabled, is_required, sort_order,
+                  overall_visibility, visibility_logic, show_in_create_form, show_in_edit_form,
+                  show_in_detail_view, show_in_list_view
       `, [
         req.organizationId,
         fieldName,
@@ -1497,14 +1532,21 @@ router.put('/default/:fieldName', async (req, res) => {
         JSON.stringify(fieldConfig.options),
         fieldConfig.is_enabled,
         fieldConfig.is_required,
-        0 // default sort order
+        0, // default sort order
+        fieldConfig.overall_visibility,
+        fieldConfig.visibility_logic,
+        fieldConfig.show_in_create_form,
+        fieldConfig.show_in_edit_form,
+        fieldConfig.show_in_detail_view,
+        fieldConfig.show_in_list_view
       ]);
-      
+
       console.log('🔧 Database result:', result.rows[0]);
     }
 
     // Store the complete field configuration (including options) in a separate way
     // For now, we'll return the basic config and handle options in memory
+    const updatedField = result.rows[0];
     const responseField = {
       field_name: fieldName,
       field_label: fieldConfig.label,
@@ -1513,12 +1555,21 @@ router.put('/default/:fieldName', async (req, res) => {
       is_enabled: fieldConfig.is_enabled,
       is_required: fieldConfig.is_required,
       is_deleted: fieldConfig.is_deleted,
-      sort_order: 0
+      sort_order: updatedField?.sort_order || 0,
+      overall_visibility: updatedField?.overall_visibility || fieldConfig.overall_visibility,
+      visibility_logic: updatedField?.visibility_logic || fieldConfig.visibility_logic,
+      show_in_create_form: updatedField?.show_in_create_form !== undefined ? updatedField.show_in_create_form : fieldConfig.show_in_create_form,
+      show_in_edit_form: updatedField?.show_in_edit_form !== undefined ? updatedField.show_in_edit_form : fieldConfig.show_in_edit_form,
+      show_in_detail_view: updatedField?.show_in_detail_view !== undefined ? updatedField.show_in_detail_view : fieldConfig.show_in_detail_view,
+      show_in_list_view: updatedField?.show_in_list_view !== undefined ? updatedField.show_in_list_view : fieldConfig.show_in_list_view
     };
 
+    console.log('✅ System field updated:', responseField);
+
     res.json({
+      success: true,
       message: 'System field configuration updated',
-      field: responseField
+      data: responseField
     });
   } catch (error) {
     console.error('Error updating system field:', error);
