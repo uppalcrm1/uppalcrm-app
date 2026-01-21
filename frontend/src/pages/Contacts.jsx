@@ -103,14 +103,15 @@ const Contacts = () => {
   const [showFilters, setShowFilters] = useState(false)
   const [viewMode, setViewMode] = useState('list') // 'list' or 'detail'
   const [fieldLabels, setFieldLabels] = useState({})
+  const [fieldConfig, setFieldConfig] = useState([])
 
-  // Load column visibility from localStorage or use defaults
+  // Load column visibility from localStorage or use defaults based on field config
   const [visibleColumns, setVisibleColumns] = useState(() => {
     const saved = localStorage.getItem('contacts_visible_columns')
     return saved ? JSON.parse(saved) : DEFAULT_VISIBLE_COLUMNS
   })
 
-  // Fetch field configuration to get dynamic column labels
+  // Fetch field configuration to get dynamic column labels and visibility
   useEffect(() => {
     const loadFieldConfiguration = async () => {
       try {
@@ -119,12 +120,37 @@ const Contacts = () => {
           ...(response.data.systemFields || []),
           ...(response.data.customFields || [])
         ]
+        setFieldConfig(allFields)
+
         const labelMap = {}
+        const defaultVisibility = { ...DEFAULT_VISIBLE_COLUMNS }
+
         allFields.forEach(field => {
           labelMap[field.field_name] = field.field_label
+
+          // Check if field should be hidden by default based on field config
+          const fieldKey = field.field_name === 'assigned_to' ? 'assigned' :
+                          field.field_name === 'created_at' ? 'created' :
+                          field.field_name
+
+          // If field is hidden or not visible in list view, hide it by default
+          if (field.overall_visibility === 'hidden' || field.show_in_list_view === false) {
+            defaultVisibility[fieldKey] = false
+          }
         })
+
         setFieldLabels(labelMap)
-        console.log('📋 Field labels loaded for contacts:', labelMap)
+
+        // Check if user has saved preferences
+        const saved = localStorage.getItem('contacts_visible_columns')
+        if (!saved) {
+          // Use default visibility from field config
+          setVisibleColumns(defaultVisibility)
+          localStorage.setItem('contacts_visible_columns', JSON.stringify(defaultVisibility))
+        }
+
+        console.log('📋 Field configuration loaded for contacts:', allFields)
+        console.log('📋 Default visible columns based on config:', defaultVisibility)
       } catch (error) {
         console.error('❌ Error loading field configuration:', error)
         setFieldLabels({})

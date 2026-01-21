@@ -21,6 +21,7 @@ const ContactDetailPage = () => {
   const [transactions, setTransactions] = useState([]);
   const [interactions, setInteractions] = useState([]);
   const [customFields, setCustomFields] = useState([]);
+  const [fieldConfig, setFieldConfig] = useState([]);
   const [taskStats, setTaskStats] = useState({ total: 0, completed: 0, inProgress: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -37,9 +38,31 @@ const ContactDetailPage = () => {
   // Fetch contact details
   useEffect(() => {
     fetchContactDetail();
+    fetchFieldConfiguration();
     fetchInteractions();
     fetchTransactions();
   }, [id]);
+
+  const fetchFieldConfiguration = async () => {
+    try {
+      const response = await fetch('/api/custom-fields?entity_type=contacts', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        // Combine system and custom fields
+        const allFields = [
+          ...(data.data?.systemFields || []),
+          ...(data.data?.customFields || [])
+        ];
+        setFieldConfig(allFields);
+        console.log('✅ Field configuration loaded for detail view:', allFields);
+      }
+    } catch (error) {
+      console.error('❌ Error fetching field configuration:', error);
+    }
+  };
 
   const fetchContactDetail = async () => {
     try {
@@ -139,6 +162,20 @@ const ContactDetailPage = () => {
       note: { icon: MessageSquare, color: 'bg-gray-100 text-gray-600' }
     };
     return styles[type] || styles.note;
+  };
+
+  // Check if a field should be shown in detail view
+  const shouldShowField = (fieldName) => {
+    const field = fieldConfig.find(f => f.field_name === fieldName);
+    if (!field) return true; // Show by default if no config found
+
+    // Check overall visibility first
+    if (field.overall_visibility === 'hidden') return false;
+
+    // Check detail view visibility
+    if (field.show_in_detail_view === false) return false;
+
+    return true;
   };
 
   // Format time ago
@@ -252,7 +289,7 @@ const ContactDetailPage = () => {
             {/* Email and Phone Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Email Card */}
-              {contact.email && (
+              {contact.email && shouldShowField('email') && (
                 <div className="bg-blue-50 rounded-lg p-4 flex items-center justify-between border border-blue-100">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -273,7 +310,7 @@ const ContactDetailPage = () => {
               )}
 
               {/* Phone Card */}
-              {contact.phone && (
+              {contact.phone && shouldShowField('phone') && (
                 <div className="bg-green-50 rounded-lg p-4 flex items-center justify-between border border-green-100">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
@@ -307,20 +344,25 @@ const ContactDetailPage = () => {
               {sectionsOpen.contactDetails && (
                 <div className="px-6 pb-6 border-t border-gray-100">
                   <div className="grid grid-cols-2 gap-6 mt-4">
-                    <div>
-                      <p className="text-sm text-gray-600">Owner</p>
-                      <p className="text-sm font-medium text-gray-900 mt-1">
-                        {contact.assigned_to_name || contact.assigned_user?.full_name || 'Not assigned'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Created Date</p>
-                      <p className="text-sm font-medium text-gray-900 mt-1 flex items-center gap-1">
-                        <Calendar size={14} />
-                        {contact.created_at ? format(new Date(contact.created_at), 'MMM d, yyyy') : 'N/A'}
-                      </p>
-                    </div>
-                    {contact.company && (
+                    {/* Dynamic System Fields - only show if visible in config */}
+                    {shouldShowField('assigned_to') && (
+                      <div>
+                        <p className="text-sm text-gray-600">Owner</p>
+                        <p className="text-sm font-medium text-gray-900 mt-1">
+                          {contact.assigned_to_name || contact.assigned_user?.full_name || 'Not assigned'}
+                        </p>
+                      </div>
+                    )}
+                    {shouldShowField('created_at') && (
+                      <div>
+                        <p className="text-sm text-gray-600">Created Date</p>
+                        <p className="text-sm font-medium text-gray-900 mt-1 flex items-center gap-1">
+                          <Calendar size={14} />
+                          {contact.created_at ? format(new Date(contact.created_at), 'MMM d, yyyy') : 'N/A'}
+                        </p>
+                      </div>
+                    )}
+                    {shouldShowField('company') && contact.company && (
                       <div>
                         <p className="text-sm text-gray-600">Company</p>
                         <p className="text-sm font-medium text-gray-900 mt-1">
@@ -328,7 +370,7 @@ const ContactDetailPage = () => {
                         </p>
                       </div>
                     )}
-                    {contact.title && (
+                    {shouldShowField('title') && contact.title && (
                       <div>
                         <p className="text-sm text-gray-600">Title</p>
                         <p className="text-sm font-medium text-gray-900 mt-1">
@@ -336,7 +378,7 @@ const ContactDetailPage = () => {
                         </p>
                       </div>
                     )}
-                    {contact.source && (
+                    {shouldShowField('source') && contact.source && (
                       <div>
                         <p className="text-sm text-gray-600">Source</p>
                         <p className="text-sm font-medium text-gray-900 mt-1">
@@ -344,7 +386,7 @@ const ContactDetailPage = () => {
                         </p>
                       </div>
                     )}
-                    {contact.converted_from_lead && (
+                    {shouldShowField('converted_from_lead_id') && contact.converted_from_lead && (
                       <div>
                         <p className="text-sm text-gray-600">Converted From Lead</p>
                         <p className="text-sm font-medium text-blue-600 mt-1">

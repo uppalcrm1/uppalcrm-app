@@ -235,6 +235,14 @@ const LeadDetail = () => {
     return colors[status] || 'bg-gray-100 text-gray-800'
   }
 
+  // Check if a field should be shown (for header/sidebar fields)
+  const shouldShowField = (fieldName) => {
+    if (loadingFieldConfig || !fieldConfig.systemFields) return true // Show while loading
+    const field = fieldConfig.systemFields.find(f => f.field_name === fieldName)
+    if (!field) return false
+    return field.overall_visibility !== 'hidden' && field.show_in_detail_view !== false
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -257,7 +265,7 @@ const LeadDetail = () => {
                   <span className={`px-3 py-1.5 rounded-full text-sm font-semibold ${getStatusColor(lead.status)}`}>
                     {lead.status_name || lead.status}
                   </span>
-                  {lead.company && (
+                  {lead.company && shouldShowField('company') && (
                     <div className="flex items-center gap-1.5 text-sm text-gray-600">
                       <Building2 size={14} className="text-gray-400" />
                       <span className="font-medium">{lead.company}</span>
@@ -411,19 +419,21 @@ const LeadDetail = () => {
                 <h3 className="text-base font-semibold text-gray-900">Quick Info</h3>
               </div>
               <div className="p-5 space-y-4">
-                <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
-                  <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                    <Mail size={16} className="text-blue-600" />
+                {lead.email && shouldShowField('email') && (
+                  <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                    <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                      <Mail size={16} className="text-blue-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs text-gray-500 mb-0.5">Email</div>
+                      <a href={`mailto:${lead.email}`} className="text-sm font-medium text-blue-600 hover:text-blue-700 truncate block">
+                        {lead.email}
+                      </a>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xs text-gray-500 mb-0.5">Email</div>
-                    <a href={`mailto:${lead.email}`} className="text-sm font-medium text-blue-600 hover:text-blue-700 truncate block">
-                      {lead.email}
-                    </a>
-                  </div>
-                </div>
+                )}
 
-                {lead.phone && (
+                {lead.phone && shouldShowField('phone') && (
                   <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg border border-green-100">
                     <div className="flex-shrink-0 w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
                       <Phone size={16} className="text-green-600" />
@@ -437,7 +447,7 @@ const LeadDetail = () => {
                   </div>
                 )}
 
-                {lead.company && (
+                {lead.company && shouldShowField('company') && (
                   <div className="flex items-center gap-3 p-3 bg-purple-50 rounded-lg border border-purple-100">
                     <div className="flex-shrink-0 w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
                       <Building2 size={16} className="text-purple-600" />
@@ -449,7 +459,7 @@ const LeadDetail = () => {
                   </div>
                 )}
 
-                {lead.lead_value && (
+                {lead.lead_value && shouldShowField('lead_value') && (
                   <div className="flex items-center gap-3 p-3 bg-amber-50 rounded-lg border border-amber-100">
                     <div className="flex-shrink-0 w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center">
                       <DollarSign size={16} className="text-amber-600" />
@@ -461,21 +471,23 @@ const LeadDetail = () => {
                   </div>
                 )}
 
-                <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                  <div className="flex-shrink-0 w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
-                    <Calendar size={16} className="text-gray-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xs text-gray-500 mb-0.5">Created</div>
-                    <div className="text-sm font-medium text-gray-900">
-                      {new Date(lead.created_at).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric'
-                      })}
+                {shouldShowField('created_at') && (
+                  <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="flex-shrink-0 w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
+                      <Calendar size={16} className="text-gray-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs text-gray-500 mb-0.5">Created</div>
+                      <div className="text-sm font-medium text-gray-900">
+                        {new Date(lead.created_at).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric'
+                        })}
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
 

@@ -29,6 +29,7 @@ import TaskManager from '../components/TaskManager'
 import toast from 'react-hot-toast'
 import { useForm } from 'react-hook-form'
 import { format } from 'date-fns'
+import api from '../services/api'
 
 const LEAD_STATUSES = [
   { value: 'new', label: 'New', color: 'blue' },
@@ -68,6 +69,8 @@ const LeadsPage = () => {
   const [selectedLead, setSelectedLead] = useState(null)
   const [showFilters, setShowFilters] = useState(false)
   const [activeActivityTab, setActiveActivityTab] = useState('tasks') // tasks, interactions, all
+  const [fieldConfig, setFieldConfig] = useState([])
+  const [fieldLabels, setFieldLabels] = useState({})
 
   // Get current filters from URL - memoized to prevent unnecessary re-renders
   const currentFilters = React.useMemo(() => ({
@@ -81,6 +84,51 @@ const LeadsPage = () => {
   }), [searchParams])
 
   console.log('🔵 currentFilters memoized:', currentFilters)
+
+  // Load field configuration to get dynamic column labels and visibility
+  React.useEffect(() => {
+    const loadFieldConfiguration = async () => {
+      try {
+        const response = await api.get('/custom-fields?entity_type=leads')
+        const allFields = [
+          ...(response.data.systemFields || []),
+          ...(response.data.customFields || [])
+        ]
+        setFieldConfig(allFields)
+
+        const labelMap = {}
+        allFields.forEach(field => {
+          labelMap[field.field_name] = field.field_label
+        })
+        setFieldLabels(labelMap)
+        console.log('📋 Field labels loaded for leads:', labelMap)
+        console.log('✅ Field configuration loaded for leads:', allFields)
+      } catch (error) {
+        console.error('❌ Error loading field configuration:', error)
+        setFieldLabels({})
+      }
+    }
+    loadFieldConfiguration()
+  }, [])
+
+  // Helper function to check if a field should be shown
+  const shouldShowField = (fieldName) => {
+    const field = fieldConfig.find(f => f.field_name === fieldName)
+    if (!field) return true // Show by default if no config found
+
+    // Check overall visibility first
+    if (field.overall_visibility === 'hidden') return false
+
+    // Check list view visibility
+    if (field.show_in_list_view === false) return false
+
+    return true
+  }
+
+  // Helper function to get field label with fallback
+  const getFieldLabel = (fieldName, defaultLabel) => {
+    return fieldLabels[fieldName] || defaultLabel
+  }
 
   // Update URL with new filters
   const updateFilters = (newFilters) => {
@@ -343,15 +391,15 @@ const LeadsPage = () => {
               <table className="w-full table-auto">
                 <thead className="bg-gray-50">
                   <tr className="border-b-2 border-gray-200">
-                    <th className="text-left py-3 px-4 font-medium text-gray-900">Name</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-900">Email</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-900">Phone</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-900">Company</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-900">Status</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-900">Priority</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-900">Value</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-900">Assigned</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-900">Created</th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('first_name', 'Name')}</th>
+                    {shouldShowField('email') && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('email', 'Email')}</th>}
+                    {shouldShowField('phone') && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('phone', 'Phone')}</th>}
+                    {shouldShowField('company') && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('company', 'Company')}</th>}
+                    <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('status', 'Status')}</th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('priority', 'Priority')}</th>
+                    {shouldShowField('lead_value') && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('lead_value', 'Value')}</th>}
+                    {shouldShowField('assigned_to') && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('assigned_to', 'Assigned')}</th>}
+                    {shouldShowField('created_at') && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('created_at', 'Created')}</th>}
                     <th className="text-left py-3 px-4 font-medium text-gray-900">Actions</th>
                   </tr>
                 </thead>
@@ -364,45 +412,51 @@ const LeadsPage = () => {
                       </td>
 
                       {/* Email Column */}
-                      <td className="py-4 px-4">
-                        {lead.email ? (
-                          <div className="flex items-center text-sm text-gray-900">
-                            <Mail size={14} className="mr-2 text-gray-400" />
-                            <a href={`mailto:${lead.email}`} className="hover:text-primary-600">
-                              {lead.email}
-                            </a>
-                          </div>
-                        ) : (
-                          <span className="text-gray-400 text-sm">—</span>
-                        )}
-                      </td>
+                      {shouldShowField('email') && (
+                        <td className="py-4 px-4">
+                          {lead.email ? (
+                            <div className="flex items-center text-sm text-gray-900">
+                              <Mail size={14} className="mr-2 text-gray-400" />
+                              <a href={`mailto:${lead.email}`} className="hover:text-primary-600">
+                                {lead.email}
+                              </a>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 text-sm">—</span>
+                          )}
+                        </td>
+                      )}
 
                       {/* Phone Column */}
-                      <td className="py-4 px-4">
-                        {lead.phone ? (
-                          <div className="flex items-center text-sm text-gray-900">
-                            <Phone size={14} className="mr-2 text-gray-400" />
-                            <a href={`tel:${lead.phone}`} className="hover:text-primary-600">
-                              {lead.phone}
-                            </a>
-                          </div>
-                        ) : (
-                          <span className="text-gray-400 text-sm">—</span>
-                        )}
-                      </td>
+                      {shouldShowField('phone') && (
+                        <td className="py-4 px-4">
+                          {lead.phone ? (
+                            <div className="flex items-center text-sm text-gray-900">
+                              <Phone size={14} className="mr-2 text-gray-400" />
+                              <a href={`tel:${lead.phone}`} className="hover:text-primary-600">
+                                {lead.phone}
+                              </a>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 text-sm">—</span>
+                          )}
+                        </td>
+                      )}
 
                       {/* Company Column */}
-                      <td className="py-4 px-4">
-                        <div className="flex items-center text-gray-900">
-                          {lead.company && (
-                            <>
-                              <Building size={14} className="mr-2 text-gray-400" />
-                              {lead.company}
-                            </>
-                          )}
-                          {!lead.company && <span className="text-gray-500">—</span>}
-                        </div>
-                      </td>
+                      {shouldShowField('company') && (
+                        <td className="py-4 px-4">
+                          <div className="flex items-center text-gray-900">
+                            {lead.company && (
+                              <>
+                                <Building size={14} className="mr-2 text-gray-400" />
+                                {lead.company}
+                              </>
+                            )}
+                            {!lead.company && <span className="text-gray-500">—</span>}
+                          </div>
+                        </td>
+                      )}
                       <td className="py-4 px-4">
                         <span className={`badge badge-${getStatusBadgeColor(lead.status)}`}>
                           {LEAD_STATUSES.find(s => s.value === lead.status)?.label || lead.status}
@@ -413,39 +467,45 @@ const LeadsPage = () => {
                           {LEAD_PRIORITIES.find(p => p.value === lead.priority)?.label || lead.priority}
                         </span>
                       </td>
-                      <td className="py-4 px-4">
-                        <div className="flex items-center text-gray-900">
-                          <DollarSign size={14} className="mr-1" />
-                          {lead.value?.toLocaleString() || 0}
-                        </div>
-                      </td>
-                      <td className="py-4 px-4">
-                        {lead.assigned_user ? (
-                          <div className="flex items-center">
-                            <div className="w-6 h-6 bg-primary-600 rounded-full flex items-center justify-center mr-2">
-                              <span className="text-white text-xs font-medium">
-                                {lead.assigned_user.first_name[0]}{lead.assigned_user.last_name[0]}
-                              </span>
-                            </div>
-                            <span className="text-sm text-gray-900">{lead.assigned_user.full_name}</span>
+                      {shouldShowField('lead_value') && (
+                        <td className="py-4 px-4">
+                          <div className="flex items-center text-gray-900">
+                            <DollarSign size={14} className="mr-1" />
+                            {lead.lead_value?.toLocaleString() || 0}
                           </div>
-                        ) : (
-                          <button
-                            onClick={() => {
-                              setSelectedLead(lead)
-                              setShowAssignModal(true)
-                            }}
-                            className="text-sm text-gray-500 hover:text-primary-600"
-                          >
-                            Assign
-                          </button>
-                        )}
-                      </td>
-                      <td className="py-4 px-4">
-                        <div className="text-sm text-gray-600">
-                          {format(new Date(lead.created_at), 'MMM d, yyyy')}
-                        </div>
-                      </td>
+                        </td>
+                      )}
+                      {shouldShowField('assigned_to') && (
+                        <td className="py-4 px-4">
+                          {lead.assigned_user ? (
+                            <div className="flex items-center">
+                              <div className="w-6 h-6 bg-primary-600 rounded-full flex items-center justify-center mr-2">
+                                <span className="text-white text-xs font-medium">
+                                  {lead.assigned_user.first_name[0]}{lead.assigned_user.last_name[0]}
+                                </span>
+                              </div>
+                              <span className="text-sm text-gray-900">{lead.assigned_user.full_name}</span>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setSelectedLead(lead)
+                                setShowAssignModal(true)
+                              }}
+                              className="text-sm text-gray-500 hover:text-primary-600"
+                            >
+                              Assign
+                            </button>
+                          )}
+                        </td>
+                      )}
+                      {shouldShowField('created_at') && (
+                        <td className="py-4 px-4">
+                          <div className="text-sm text-gray-600">
+                            {format(new Date(lead.created_at), 'MMM d, yyyy')}
+                          </div>
+                        </td>
+                      )}
                       <td className="py-4 px-4">
                         <div className="flex items-center space-x-2">
                           <button
