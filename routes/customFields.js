@@ -852,7 +852,9 @@ router.get('/', async (req, res) => {
     let storedConfigs = {};
     try {
       const configResult = await db.query(`
-        SELECT field_name, field_options, is_enabled, is_required, sort_order
+        SELECT field_name, field_options, is_enabled, is_required, sort_order,
+               overall_visibility, visibility_logic,
+               show_in_create_form, show_in_edit_form, show_in_detail_view, show_in_list_view
         FROM default_field_configurations
         WHERE organization_id = $1 AND entity_type = $2
       `, [req.organizationId, entity_type]);
@@ -892,7 +894,14 @@ router.get('/', async (req, res) => {
         is_required: storedConfig.is_required !== undefined ? storedConfig.is_required : fieldDef.required,
         is_deleted: false,
         sort_order: storedConfig.sort_order || 0,
-        editable: fieldDef.editable
+        editable: fieldDef.editable,
+        // Phase 1 visibility fields
+        overall_visibility: storedConfig.overall_visibility || 'visible',
+        visibility_logic: storedConfig.visibility_logic || 'master_override',
+        show_in_create_form: storedConfig.show_in_create_form !== undefined ? storedConfig.show_in_create_form : true,
+        show_in_edit_form: storedConfig.show_in_edit_form !== undefined ? storedConfig.show_in_edit_form : true,
+        show_in_detail_view: storedConfig.show_in_detail_view !== undefined ? storedConfig.show_in_detail_view : true,
+        show_in_list_view: storedConfig.show_in_list_view !== undefined ? storedConfig.show_in_list_view : false
       });
     });
 
@@ -917,7 +926,9 @@ router.get('/', async (req, res) => {
     let defaultFields = { rows: [] };
     try {
       defaultFields = await db.query(`
-        SELECT field_name, is_enabled, is_required, sort_order
+        SELECT field_name, is_enabled, is_required, sort_order,
+               overall_visibility, visibility_logic,
+               show_in_create_form, show_in_edit_form, show_in_detail_view, show_in_list_view
         FROM default_field_configurations
         WHERE organization_id = $1
       `, [req.organizationId]);
@@ -1874,7 +1885,9 @@ router.get('/form-config', async (req, res) => {
     try {
       // First, try to load from custom_field_definitions (new standardized approach)
       const systemFieldsQuery = await db.query(`
-        SELECT field_name, field_options, is_enabled, is_required, field_label, field_type
+        SELECT field_name, field_options, is_enabled, is_required, field_label, field_type,
+               overall_visibility, visibility_logic,
+               show_in_create_form, show_in_edit_form, show_in_detail_view, show_in_list_view
         FROM custom_field_definitions
         WHERE organization_id = $1
           AND (entity_type = 'leads' OR entity_type IS NULL)
@@ -1892,7 +1905,9 @@ router.get('/form-config', async (req, res) => {
     // Fallback: check legacy default_field_configurations table for backward compatibility
     try {
       const legacyConfigResult = await db.query(`
-        SELECT field_name, field_options, is_enabled, is_required
+        SELECT field_name, field_options, is_enabled, is_required,
+               overall_visibility, visibility_logic,
+               show_in_create_form, show_in_edit_form, show_in_detail_view, show_in_list_view
         FROM default_field_configurations
         WHERE organization_id = $1
       `, [req.organizationId]);
@@ -1929,7 +1944,14 @@ router.get('/form-config', async (req, res) => {
           field_type: fieldDef.type,
           field_options: fieldOptions,
           is_required: storedConfig.is_required !== undefined ? storedConfig.is_required : fieldDef.required,
-          is_enabled: true
+          is_enabled: true,
+          // Phase 1 visibility fields
+          overall_visibility: storedConfig.overall_visibility || 'visible',
+          visibility_logic: storedConfig.visibility_logic || 'master_override',
+          show_in_create_form: storedConfig.show_in_create_form !== undefined ? storedConfig.show_in_create_form : true,
+          show_in_edit_form: storedConfig.show_in_edit_form !== undefined ? storedConfig.show_in_edit_form : true,
+          show_in_detail_view: storedConfig.show_in_detail_view !== undefined ? storedConfig.show_in_detail_view : true,
+          show_in_list_view: storedConfig.show_in_list_view !== undefined ? storedConfig.show_in_list_view : false
         });
       }
     });
