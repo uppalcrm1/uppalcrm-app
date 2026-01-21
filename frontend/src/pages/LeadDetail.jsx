@@ -240,7 +240,13 @@ const LeadDetail = () => {
     if (loadingFieldConfig || !fieldConfig.systemFields) return true // Show while loading
     const field = fieldConfig.systemFields.find(f => f.field_name === fieldName)
     if (!field) return false
-    return field.overall_visibility !== 'hidden' && field.show_in_detail_view !== false
+
+    // Check all visibility constraints
+    if (field.overall_visibility === 'hidden') return false
+    if (field.is_enabled === false) return false
+    if (field.show_in_detail_view === false) return false
+
+    return true
   }
 
   return (

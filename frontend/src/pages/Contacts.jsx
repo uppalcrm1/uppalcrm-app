@@ -256,11 +256,14 @@ const Contacts = () => {
       // Check if field should be shown based on config
       const field = fieldConfig.find(f => f.field_name === fieldName)
 
-      // If no config found, allow it (should show by default)
-      if (!field) return true
+      // If no config found, hide it (field might be disabled/hidden)
+      if (!field) return false
 
       // Hide if overall visibility is hidden
       if (field.overall_visibility === 'hidden') return false
+
+      // Hide if field is disabled
+      if (field.is_enabled === false) return false
 
       // Hide if not enabled to show in list view
       if (field.show_in_list_view === false) return false
