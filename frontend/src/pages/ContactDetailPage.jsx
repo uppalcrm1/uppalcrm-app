@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useFieldVisibility } from '../hooks/useFieldVisibility';
 import {
   ArrowLeft, Mail, Phone, Copy, ChevronDown, ChevronUp,
   MessageSquare, Edit, MoreVertical, Calendar, CheckCircle2,
@@ -21,11 +22,13 @@ const ContactDetailPage = () => {
   const [transactions, setTransactions] = useState([]);
   const [interactions, setInteractions] = useState([]);
   const [customFields, setCustomFields] = useState([]);
-  const [fieldConfig, setFieldConfig] = useState([]);
   const [taskStats, setTaskStats] = useState({ total: 0, completed: 0, inProgress: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showEditModal, setShowEditModal] = useState(false);
+
+  // Use field visibility hook for all field configuration
+  const { isFieldVisible, getVisibleFields } = useFieldVisibility('contacts');
 
   // Collapsible sections state
   const [sectionsOpen, setSectionsOpen] = useState({
@@ -38,31 +41,9 @@ const ContactDetailPage = () => {
   // Fetch contact details
   useEffect(() => {
     fetchContactDetail();
-    fetchFieldConfiguration();
     fetchInteractions();
     fetchTransactions();
   }, [id]);
-
-  const fetchFieldConfiguration = async () => {
-    try {
-      const response = await fetch('/api/custom-fields?entity_type=contacts', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-      });
-      const data = await response.json();
-
-      if (data.success) {
-        // Combine system and custom fields
-        const allFields = [
-          ...(data.data?.systemFields || []),
-          ...(data.data?.customFields || [])
-        ];
-        setFieldConfig(allFields);
-        console.log('✅ Field configuration loaded for detail view:', allFields);
-      }
-    } catch (error) {
-      console.error('❌ Error fetching field configuration:', error);
-    }
-  };
 
   const fetchContactDetail = async () => {
     try {
@@ -164,24 +145,6 @@ const ContactDetailPage = () => {
     return styles[type] || styles.note;
   };
 
-  // Check if a field should be shown in detail view
-  const shouldShowField = (fieldName) => {
-    // If config hasn't loaded yet, show by default
-    if (!fieldConfig || fieldConfig.length === 0) return true;
-
-    // Config is loaded, look for the field
-    const field = fieldConfig.find(f => f.field_name === fieldName);
-
-    // If field not in loaded config, it's disabled/hidden
-    if (!field) return false;
-
-    // Field exists in config, check visibility flags
-    if (field.overall_visibility === 'hidden') return false;
-    if (field.is_enabled === false) return false;
-    if (field.show_in_detail_view === false) return false;
-
-    return true;
-  };
 
   // Format time ago
   const timeAgo = (date) => {
@@ -294,7 +257,7 @@ const ContactDetailPage = () => {
             {/* Email and Phone Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Email Card */}
-              {contact.email && shouldShowField('email') && (
+              {contact.email && isFieldVisible('email', 'detail') && (
                 <div className="bg-blue-50 rounded-lg p-4 flex items-center justify-between border border-blue-100">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -315,7 +278,7 @@ const ContactDetailPage = () => {
               )}
 
               {/* Phone Card */}
-              {contact.phone && shouldShowField('phone') && (
+              {contact.phone && isFieldVisible('phone', 'detail') && (
                 <div className="bg-green-50 rounded-lg p-4 flex items-center justify-between border border-green-100">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
@@ -349,56 +312,22 @@ const ContactDetailPage = () => {
               {sectionsOpen.contactDetails && (
                 <div className="px-6 pb-6 border-t border-gray-100">
                   <div className="grid grid-cols-2 gap-6 mt-4">
-                    {/* Dynamic System Fields - only show if visible in config */}
-                    {shouldShowField('assigned_to') && (
-                      <div>
-                        <p className="text-sm text-gray-600">Owner</p>
-                        <p className="text-sm font-medium text-gray-900 mt-1">
-                          {contact.assigned_to_name || contact.assigned_user?.full_name || 'Not assigned'}
-                        </p>
-                      </div>
-                    )}
-                    {shouldShowField('created_at') && (
-                      <div>
-                        <p className="text-sm text-gray-600">Created Date</p>
-                        <p className="text-sm font-medium text-gray-900 mt-1 flex items-center gap-1">
-                          <Calendar size={14} />
-                          {contact.created_at ? format(new Date(contact.created_at), 'MMM d, yyyy') : 'N/A'}
-                        </p>
-                      </div>
-                    )}
-                    {shouldShowField('company') && contact.company && (
-                      <div>
-                        <p className="text-sm text-gray-600">Company</p>
-                        <p className="text-sm font-medium text-gray-900 mt-1">
-                          {contact.company}
-                        </p>
-                      </div>
-                    )}
-                    {shouldShowField('title') && contact.title && (
-                      <div>
-                        <p className="text-sm text-gray-600">Title</p>
-                        <p className="text-sm font-medium text-gray-900 mt-1">
-                          {contact.title}
-                        </p>
-                      </div>
-                    )}
-                    {shouldShowField('source') && contact.source && (
-                      <div>
-                        <p className="text-sm text-gray-600">Source</p>
-                        <p className="text-sm font-medium text-gray-900 mt-1">
-                          {contact.source}
-                        </p>
-                      </div>
-                    )}
-                    {shouldShowField('converted_from_lead_id') && contact.converted_from_lead && (
-                      <div>
-                        <p className="text-sm text-gray-600">Converted From Lead</p>
-                        <p className="text-sm font-medium text-blue-600 mt-1">
-                          {contact.converted_from_lead.full_name}
-                        </p>
-                      </div>
-                    )}
+                    {/* Dynamic System Fields - render all visible fields */}
+                    {getVisibleFields('detail').map(field => {
+                      const value = contact?.[field.field_name];
+
+                      // Skip empty values
+                      if (!value) return null;
+
+                      return (
+                        <div key={field.field_name}>
+                          <p className="text-sm text-gray-600">{field.field_label}</p>
+                          <p className="text-sm font-medium text-gray-900 mt-1">
+                            {typeof value === 'object' ? (value.full_name || JSON.stringify(value)) : value}
+                          </p>
+                        </div>
+                      );
+                    })}
                     {/* Custom Fields */}
                     {customFields.map((field, index) => (
                       <div key={index}>

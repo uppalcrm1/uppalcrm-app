@@ -30,6 +30,7 @@ import toast from 'react-hot-toast'
 import { useForm } from 'react-hook-form'
 import { format } from 'date-fns'
 import api from '../services/api'
+import { useFieldVisibility } from '../hooks/useFieldVisibility'
 
 const LEAD_STATUSES = [
   { value: 'new', label: 'New', color: 'blue' },
@@ -60,6 +61,9 @@ const LeadsPage = () => {
   const [searchParams, setSearchParams] = useSearchParams()
   const queryClient = useQueryClient()
 
+  // Use field visibility hook for all field configuration
+  const { isFieldVisible, getFieldLabel } = useFieldVisibility('leads')
+
   // State
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
@@ -69,8 +73,6 @@ const LeadsPage = () => {
   const [selectedLead, setSelectedLead] = useState(null)
   const [showFilters, setShowFilters] = useState(false)
   const [activeActivityTab, setActiveActivityTab] = useState('tasks') // tasks, interactions, all
-  const [fieldConfig, setFieldConfig] = useState([])
-  const [fieldLabels, setFieldLabels] = useState({})
 
   // Get current filters from URL - memoized to prevent unnecessary re-renders
   const currentFilters = React.useMemo(() => ({
@@ -85,55 +87,6 @@ const LeadsPage = () => {
 
   console.log('🔵 currentFilters memoized:', currentFilters)
 
-  // Load field configuration to get dynamic column labels and visibility
-  React.useEffect(() => {
-    const loadFieldConfiguration = async () => {
-      try {
-        const response = await api.get('/custom-fields?entity_type=leads')
-        const allFields = [
-          ...(response.data.systemFields || []),
-          ...(response.data.customFields || [])
-        ]
-        setFieldConfig(allFields)
-
-        const labelMap = {}
-        allFields.forEach(field => {
-          labelMap[field.field_name] = field.field_label
-        })
-        setFieldLabels(labelMap)
-        console.log('📋 Field labels loaded for leads:', labelMap)
-        console.log('✅ Field configuration loaded for leads:', allFields)
-      } catch (error) {
-        console.error('❌ Error loading field configuration:', error)
-        setFieldLabels({})
-      }
-    }
-    loadFieldConfiguration()
-  }, [])
-
-  // Helper function to check if a field should be shown
-  const shouldShowField = (fieldName) => {
-    // If config hasn't loaded yet, show by default
-    if (!fieldConfig || fieldConfig.length === 0) return true
-
-    // Config is loaded, look for the field
-    const field = fieldConfig.find(f => f.field_name === fieldName)
-
-    // If field not in loaded config, it's disabled/hidden
-    if (!field) return false
-
-    // Field exists in config, check visibility flags
-    if (field.overall_visibility === 'hidden') return false
-    if (field.is_enabled === false) return false
-    if (field.show_in_list_view === false) return false
-
-    return true
-  }
-
-  // Helper function to get field label with fallback
-  const getFieldLabel = (fieldName, defaultLabel) => {
-    return fieldLabels[fieldName] || defaultLabel
-  }
 
   // Update URL with new filters
   const updateFilters = (newFilters) => {
@@ -397,14 +350,14 @@ const LeadsPage = () => {
                 <thead className="bg-gray-50">
                   <tr className="border-b-2 border-gray-200">
                     <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('first_name', 'Name')}</th>
-                    {shouldShowField('email') && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('email', 'Email')}</th>}
-                    {shouldShowField('phone') && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('phone', 'Phone')}</th>}
-                    {shouldShowField('company') && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('company', 'Company')}</th>}
+                    {isFieldVisible('email', 'list') && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('email', 'Email')}</th>}
+                    {isFieldVisible('phone', 'list') && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('phone', 'Phone')}</th>}
+                    {isFieldVisible('company', 'list') && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('company', 'Company')}</th>}
                     <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('status', 'Status')}</th>
                     <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('priority', 'Priority')}</th>
-                    {shouldShowField('lead_value') && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('lead_value', 'Value')}</th>}
-                    {shouldShowField('assigned_to') && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('assigned_to', 'Assigned')}</th>}
-                    {shouldShowField('created_at') && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('created_at', 'Created')}</th>}
+                    {isFieldVisible('lead_value', 'list') && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('lead_value', 'Value')}</th>}
+                    {isFieldVisible('assigned_to', 'list') && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('assigned_to', 'Assigned')}</th>}
+                    {isFieldVisible('created_at', 'list') && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('created_at', 'Created')}</th>}
                     <th className="text-left py-3 px-4 font-medium text-gray-900">Actions</th>
                   </tr>
                 </thead>
@@ -417,7 +370,7 @@ const LeadsPage = () => {
                       </td>
 
                       {/* Email Column */}
-                      {shouldShowField('email') && (
+                      {isFieldVisible('email', 'list') && (
                         <td className="py-4 px-4">
                           {lead.email ? (
                             <div className="flex items-center text-sm text-gray-900">
@@ -433,7 +386,7 @@ const LeadsPage = () => {
                       )}
 
                       {/* Phone Column */}
-                      {shouldShowField('phone') && (
+                      {isFieldVisible('phone', 'list') && (
                         <td className="py-4 px-4">
                           {lead.phone ? (
                             <div className="flex items-center text-sm text-gray-900">
@@ -449,7 +402,7 @@ const LeadsPage = () => {
                       )}
 
                       {/* Company Column */}
-                      {shouldShowField('company') && (
+                      {isFieldVisible('company', 'list') && (
                         <td className="py-4 px-4">
                           <div className="flex items-center text-gray-900">
                             {lead.company && (
@@ -472,7 +425,7 @@ const LeadsPage = () => {
                           {LEAD_PRIORITIES.find(p => p.value === lead.priority)?.label || lead.priority}
                         </span>
                       </td>
-                      {shouldShowField('lead_value') && (
+                      {isFieldVisible('lead_value', 'list') && (
                         <td className="py-4 px-4">
                           <div className="flex items-center text-gray-900">
                             <DollarSign size={14} className="mr-1" />
@@ -480,7 +433,7 @@ const LeadsPage = () => {
                           </div>
                         </td>
                       )}
-                      {shouldShowField('assigned_to') && (
+                      {isFieldVisible('assigned_to', 'list') && (
                         <td className="py-4 px-4">
                           {lead.assigned_user ? (
                             <div className="flex items-center">
@@ -504,7 +457,7 @@ const LeadsPage = () => {
                           )}
                         </td>
                       )}
-                      {shouldShowField('created_at') && (
+                      {isFieldVisible('created_at', 'list') && (
                         <td className="py-4 px-4">
                           <div className="text-sm text-gray-600">
                             {format(new Date(lead.created_at), 'MMM d, yyyy')}

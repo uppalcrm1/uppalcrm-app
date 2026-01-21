@@ -35,6 +35,7 @@ import ContactDetail from '../components/ContactDetail'
 import ContactForm from '../components/ContactForm'
 import ConvertLeadModal from '../components/ConvertLeadModal'
 import api from '../services/api'
+import { useFieldVisibility } from '../hooks/useFieldVisibility'
 
 // Define available columns with metadata
 const COLUMN_DEFINITIONS = [
@@ -94,7 +95,10 @@ const Contacts = () => {
   const [searchParams, setSearchParams] = useSearchParams()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
-  
+
+  // Use field visibility hook for all field configuration
+  const { isFieldVisible, getVisibleFields, getFieldLabel } = useFieldVisibility('contacts')
+
   // State
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
@@ -102,83 +106,12 @@ const Contacts = () => {
   const [selectedContact, setSelectedContact] = useState(null)
   const [showFilters, setShowFilters] = useState(false)
   const [viewMode, setViewMode] = useState('list') // 'list' or 'detail'
-  const [fieldLabels, setFieldLabels] = useState({})
-  const [fieldConfig, setFieldConfig] = useState([])
 
-  // Load column visibility from localStorage or use defaults based on field config
+  // Load column visibility from localStorage or use defaults
   const [visibleColumns, setVisibleColumns] = useState(() => {
     const saved = localStorage.getItem('contacts_visible_columns')
     return saved ? JSON.parse(saved) : DEFAULT_VISIBLE_COLUMNS
   })
-
-  // Fetch field configuration to get dynamic column labels and visibility
-  useEffect(() => {
-    const loadFieldConfiguration = async () => {
-      try {
-        const response = await api.get('/custom-fields?entity_type=contacts')
-        const allFields = [
-          ...(response.data.systemFields || []),
-          ...(response.data.customFields || [])
-        ]
-        setFieldConfig(allFields)
-
-        const labelMap = {}
-        const defaultVisibility = { ...DEFAULT_VISIBLE_COLUMNS }
-        const hiddenFieldKeys = []
-
-        allFields.forEach(field => {
-          labelMap[field.field_name] = field.field_label
-
-          // Check if field should be hidden by default based on field config
-          const fieldKey = field.field_name === 'assigned_to' ? 'assigned' :
-                          field.field_name === 'created_at' ? 'created' :
-                          field.field_name
-
-          // If field is hidden or not visible in list view, hide it by default
-          if (field.overall_visibility === 'hidden' || field.show_in_list_view === false) {
-            defaultVisibility[fieldKey] = false
-            hiddenFieldKeys.push(fieldKey)
-          }
-        })
-
-        setFieldLabels(labelMap)
-
-        // Check if user has saved preferences
-        const saved = localStorage.getItem('contacts_visible_columns')
-        if (!saved) {
-          // Use default visibility from field config
-          setVisibleColumns(defaultVisibility)
-          localStorage.setItem('contacts_visible_columns', JSON.stringify(defaultVisibility))
-        } else {
-          // Clean up any saved preferences for fields that are now hidden by config
-          const savedVisibility = JSON.parse(saved)
-          const cleanedVisibility = { ...savedVisibility }
-          let hasChanges = false
-
-          hiddenFieldKeys.forEach(fieldKey => {
-            if (cleanedVisibility[fieldKey] === true) {
-              cleanedVisibility[fieldKey] = false
-              hasChanges = true
-              console.log(`📋 Hiding column '${fieldKey}' - hidden by field configuration`)
-            }
-          })
-
-          if (hasChanges) {
-            setVisibleColumns(cleanedVisibility)
-            localStorage.setItem('contacts_visible_columns', JSON.stringify(cleanedVisibility))
-            console.log('📋 Updated column visibility to respect field configuration')
-          }
-        }
-
-        console.log('📋 Field configuration loaded for contacts:', allFields)
-        console.log('📋 Default visible columns based on config:', defaultVisibility)
-      } catch (error) {
-        console.error('❌ Error loading field configuration:', error)
-        setFieldLabels({})
-      }
-    }
-    loadFieldConfiguration()
-  }, [])
 
   // Get current filters from URL - memoized to prevent unnecessary re-renders
   const currentFilters = React.useMemo(() => ({
@@ -218,64 +151,12 @@ const Contacts = () => {
   }
 
   const handleResetColumns = () => {
-    // Reset to defaults but respect field configuration visibility
-    const resetVisibility = { ...DEFAULT_VISIBLE_COLUMNS }
-
-    // Apply field config constraints
-    fieldConfig.forEach(field => {
-      const fieldKey = field.field_name === 'assigned_to' ? 'assigned' :
-                      field.field_name === 'created_at' ? 'created' :
-                      field.field_name
-
-      // Hide if configuration says to hide
-      if (field.overall_visibility === 'hidden' || field.show_in_list_view === false) {
-        resetVisibility[fieldKey] = false
-      }
-    })
-
-    setVisibleColumns(resetVisibility)
-    localStorage.setItem('contacts_visible_columns', JSON.stringify(resetVisibility))
+    // Reset to defaults
+    setVisibleColumns({ ...DEFAULT_VISIBLE_COLUMNS })
+    localStorage.setItem('contacts_visible_columns', JSON.stringify(DEFAULT_VISIBLE_COLUMNS))
     console.log('📋 Columns reset to defaults (respecting field configuration)')
   }
 
-  // Helper function to get field label with fallback
-  const getFieldLabel = (fieldName, defaultLabel) => {
-    return fieldLabels[fieldName] || defaultLabel
-  }
-
-  // Filter column definitions based on field configuration
-  // Only show columns for fields that are not hidden in configuration
-  const filteredColumnDefinitions = React.useMemo(() => {
-    // If config hasn't loaded yet, show all columns
-    if (!fieldConfig || fieldConfig.length === 0) {
-      return COLUMN_DEFINITIONS
-    }
-
-    return COLUMN_DEFINITIONS.filter(column => {
-      // Map column key to field name
-      const fieldName = column.key === 'assigned' ? 'assigned_to' :
-                       column.key === 'created' ? 'created_at' :
-                       column.key === 'name' ? 'first_name' :
-                       column.key
-
-      // Check if field should be shown based on config
-      const field = fieldConfig.find(f => f.field_name === fieldName)
-
-      // If config is loaded but field not found, it's disabled/hidden
-      if (!field) return false
-
-      // Hide if overall visibility is hidden
-      if (field.overall_visibility === 'hidden') return false
-
-      // Hide if field is disabled
-      if (field.is_enabled === false) return false
-
-      // Hide if not enabled to show in list view
-      if (field.show_in_list_view === false) return false
-
-      return true
-    })
-  }, [fieldConfig])
 
   // Fetch contacts
   const { data: contactsData, isLoading: contactsLoading, isFetching: contactsFetching } = useQuery({
@@ -533,7 +414,7 @@ const Contacts = () => {
           </div>
           <div className="flex items-center gap-2">
             <ColumnSelector
-              columns={filteredColumnDefinitions}
+              columns={COLUMN_DEFINITIONS}
               visibleColumns={visibleColumns}
               onColumnToggle={handleColumnToggle}
               onReset={handleResetColumns}
@@ -575,17 +456,17 @@ const Contacts = () => {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-200">
-                    {visibleColumns.name && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('name', 'Name')}</th>}
-                    {visibleColumns.email && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('email', 'Email')}</th>}
-                    {visibleColumns.phone && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('phone', 'Phone')}</th>}
-                    {visibleColumns.company && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('company', 'Company')}</th>}
-                    {visibleColumns.status && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('status', 'Status')}</th>}
-                    {visibleColumns.type && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('type', 'Type')}</th>}
+                    {visibleColumns.name && isFieldVisible('first_name', 'list') && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('first_name', 'Name')}</th>}
+                    {visibleColumns.email && isFieldVisible('email', 'list') && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('email', 'Email')}</th>}
+                    {visibleColumns.phone && isFieldVisible('phone', 'list') && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('phone', 'Phone')}</th>}
+                    {visibleColumns.company && isFieldVisible('company', 'list') && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('company', 'Company')}</th>}
+                    {visibleColumns.status && isFieldVisible('status', 'list') && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('status', 'Status')}</th>}
+                    {visibleColumns.type && isFieldVisible('type', 'list') && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('type', 'Type')}</th>}
                     {visibleColumns.accounts && <th className="text-center py-3 px-4 font-medium text-gray-900">Accounts</th>}
                     {visibleColumns.transactions && <th className="text-center py-3 px-4 font-medium text-gray-900">Transactions</th>}
-                    {visibleColumns.value && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('value', 'Value')}</th>}
-                    {visibleColumns.assigned && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('assigned_to', 'Assigned')}</th>}
-                    {visibleColumns.created && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('created_at', 'Created')}</th>}
+                    {visibleColumns.value && isFieldVisible('value', 'list') && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('value', 'Value')}</th>}
+                    {visibleColumns.assigned && isFieldVisible('assigned_to', 'list') && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('assigned_to', 'Assigned')}</th>}
+                    {visibleColumns.created && isFieldVisible('created_at', 'list') && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('created_at', 'Created')}</th>}
                     <th className="text-left py-3 px-4 font-medium text-gray-900">Actions</th>
                   </tr>
                 </thead>
@@ -595,7 +476,7 @@ const Contacts = () => {
                       key={contact.id}
                       className="border-b border-gray-100 hover:bg-gray-50"
                     >
-                      {visibleColumns.name && (
+                      {visibleColumns.name && isFieldVisible('first_name', 'list') && (
                         <td className="py-4 px-4">
                           <button
                             onClick={(e) => {
@@ -608,7 +489,7 @@ const Contacts = () => {
                           </button>
                         </td>
                       )}
-                      {visibleColumns.email && (
+                      {visibleColumns.email && isFieldVisible('email', 'list') && (
                         <td className="py-4 px-4">
                           {contact.email ? (
                             <div className="flex items-center text-gray-900">
@@ -620,7 +501,7 @@ const Contacts = () => {
                           )}
                         </td>
                       )}
-                      {visibleColumns.phone && (
+                      {visibleColumns.phone && isFieldVisible('phone', 'list') && (
                         <td className="py-4 px-4">
                           {contact.phone ? (
                             <div className="flex items-center text-gray-900">
@@ -632,7 +513,7 @@ const Contacts = () => {
                           )}
                         </td>
                       )}
-                      {visibleColumns.company && (
+                      {visibleColumns.company && isFieldVisible('company', 'list') && (
                         <td className="py-4 px-4">
                           <div className="flex items-center text-gray-900">
                             {contact.company && (
@@ -645,14 +526,14 @@ const Contacts = () => {
                           </div>
                         </td>
                       )}
-                      {visibleColumns.status && (
+                      {visibleColumns.status && isFieldVisible('status', 'list') && (
                         <td className="py-4 px-4">
                           <span className={`badge badge-${getStatusBadgeColor(contact.status)}`}>
                             {CONTACT_STATUSES.find(s => s.value === contact.status)?.label || contact.status}
                           </span>
                         </td>
                       )}
-                      {visibleColumns.type && (
+                      {visibleColumns.type && isFieldVisible('type', 'list') && (
                         <td className="py-4 px-4">
                           <span className={`badge badge-${getTypeBadgeColor(contact.type)}`}>
                             {CONTACT_TYPES.find(t => t.value === contact.type)?.label || contact.type}
@@ -673,7 +554,7 @@ const Contacts = () => {
                           </span>
                         </td>
                       )}
-                      {visibleColumns.value && (
+                      {visibleColumns.value && isFieldVisible('value', 'list') && (
                         <td className="py-4 px-4">
                           <div className="flex items-center text-gray-900">
                             <DollarSign size={14} className="mr-1" />
@@ -681,7 +562,7 @@ const Contacts = () => {
                           </div>
                         </td>
                       )}
-                      {visibleColumns.assigned && (
+                      {visibleColumns.assigned && isFieldVisible('assigned_to', 'list') && (
                         <td className="py-4 px-4">
                           {contact.assigned_user ? (
                             <div className="flex items-center">
@@ -697,7 +578,7 @@ const Contacts = () => {
                           )}
                         </td>
                       )}
-                      {visibleColumns.created && (
+                      {visibleColumns.created && isFieldVisible('created_at', 'list') && (
                         <td className="py-4 px-4">
                           <div className="text-sm text-gray-600">
                             {format(new Date(contact.created_at), 'MMM d, yyyy')}
