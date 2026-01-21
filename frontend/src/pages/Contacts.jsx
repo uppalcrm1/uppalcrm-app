@@ -124,6 +124,7 @@ const Contacts = () => {
 
         const labelMap = {}
         const defaultVisibility = { ...DEFAULT_VISIBLE_COLUMNS }
+        const hiddenFieldKeys = []
 
         allFields.forEach(field => {
           labelMap[field.field_name] = field.field_label
@@ -136,6 +137,7 @@ const Contacts = () => {
           // If field is hidden or not visible in list view, hide it by default
           if (field.overall_visibility === 'hidden' || field.show_in_list_view === false) {
             defaultVisibility[fieldKey] = false
+            hiddenFieldKeys.push(fieldKey)
           }
         })
 
@@ -147,6 +149,25 @@ const Contacts = () => {
           // Use default visibility from field config
           setVisibleColumns(defaultVisibility)
           localStorage.setItem('contacts_visible_columns', JSON.stringify(defaultVisibility))
+        } else {
+          // Clean up any saved preferences for fields that are now hidden by config
+          const savedVisibility = JSON.parse(saved)
+          const cleanedVisibility = { ...savedVisibility }
+          let hasChanges = false
+
+          hiddenFieldKeys.forEach(fieldKey => {
+            if (cleanedVisibility[fieldKey] === true) {
+              cleanedVisibility[fieldKey] = false
+              hasChanges = true
+              console.log(`📋 Hiding column '${fieldKey}' - hidden by field configuration`)
+            }
+          })
+
+          if (hasChanges) {
+            setVisibleColumns(cleanedVisibility)
+            localStorage.setItem('contacts_visible_columns', JSON.stringify(cleanedVisibility))
+            console.log('📋 Updated column visibility to respect field configuration')
+          }
         }
 
         console.log('📋 Field configuration loaded for contacts:', allFields)
@@ -197,15 +218,56 @@ const Contacts = () => {
   }
 
   const handleResetColumns = () => {
-    setVisibleColumns(DEFAULT_VISIBLE_COLUMNS)
-    localStorage.setItem('contacts_visible_columns', JSON.stringify(DEFAULT_VISIBLE_COLUMNS))
-    console.log('📋 Columns reset to defaults')
+    // Reset to defaults but respect field configuration visibility
+    const resetVisibility = { ...DEFAULT_VISIBLE_COLUMNS }
+
+    // Apply field config constraints
+    fieldConfig.forEach(field => {
+      const fieldKey = field.field_name === 'assigned_to' ? 'assigned' :
+                      field.field_name === 'created_at' ? 'created' :
+                      field.field_name
+
+      // Hide if configuration says to hide
+      if (field.overall_visibility === 'hidden' || field.show_in_list_view === false) {
+        resetVisibility[fieldKey] = false
+      }
+    })
+
+    setVisibleColumns(resetVisibility)
+    localStorage.setItem('contacts_visible_columns', JSON.stringify(resetVisibility))
+    console.log('📋 Columns reset to defaults (respecting field configuration)')
   }
 
   // Helper function to get field label with fallback
   const getFieldLabel = (fieldName, defaultLabel) => {
     return fieldLabels[fieldName] || defaultLabel
   }
+
+  // Filter column definitions based on field configuration
+  // Only show columns for fields that are not hidden in configuration
+  const filteredColumnDefinitions = React.useMemo(() => {
+    return COLUMN_DEFINITIONS.filter(column => {
+      // Map column key to field name
+      const fieldName = column.key === 'assigned' ? 'assigned_to' :
+                       column.key === 'created' ? 'created_at' :
+                       column.key === 'name' ? 'first_name' :
+                       column.key
+
+      // Check if field should be shown based on config
+      const field = fieldConfig.find(f => f.field_name === fieldName)
+
+      // If no config found, allow it (should show by default)
+      if (!field) return true
+
+      // Hide if overall visibility is hidden
+      if (field.overall_visibility === 'hidden') return false
+
+      // Hide if not enabled to show in list view
+      if (field.show_in_list_view === false) return false
+
+      return true
+    })
+  }, [fieldConfig])
 
   // Fetch contacts
   const { data: contactsData, isLoading: contactsLoading, isFetching: contactsFetching } = useQuery({
@@ -463,7 +525,7 @@ const Contacts = () => {
           </div>
           <div className="flex items-center gap-2">
             <ColumnSelector
-              columns={COLUMN_DEFINITIONS}
+              columns={filteredColumnDefinitions}
               visibleColumns={visibleColumns}
               onColumnToggle={handleColumnToggle}
               onReset={handleResetColumns}
