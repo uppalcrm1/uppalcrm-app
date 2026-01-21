@@ -246,6 +246,11 @@ const Contacts = () => {
   // Filter column definitions based on field configuration
   // Only show columns for fields that are not hidden in configuration
   const filteredColumnDefinitions = React.useMemo(() => {
+    // If config hasn't loaded yet, show all columns
+    if (!fieldConfig || fieldConfig.length === 0) {
+      return COLUMN_DEFINITIONS
+    }
+
     return COLUMN_DEFINITIONS.filter(column => {
       // Map column key to field name
       const fieldName = column.key === 'assigned' ? 'assigned_to' :
@@ -256,7 +261,7 @@ const Contacts = () => {
       // Check if field should be shown based on config
       const field = fieldConfig.find(f => f.field_name === fieldName)
 
-      // If no config found, hide it (field might be disabled/hidden)
+      // If config is loaded but field not found, it's disabled/hidden
       if (!field) return false
 
       // Hide if overall visibility is hidden

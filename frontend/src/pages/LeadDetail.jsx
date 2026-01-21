@@ -237,8 +237,15 @@ const LeadDetail = () => {
 
   // Check if a field should be shown (for header/sidebar fields)
   const shouldShowField = (fieldName) => {
-    if (loadingFieldConfig || !fieldConfig.systemFields) return true // Show while loading
+    // Show while loading or if config is empty
+    if (loadingFieldConfig || !fieldConfig.systemFields || fieldConfig.systemFields.length === 0) {
+      return true
+    }
+
+    // Config is loaded, look for the field
     const field = fieldConfig.systemFields.find(f => f.field_name === fieldName)
+
+    // If field not in loaded config, it's disabled/hidden
     if (!field) return false
 
     // Check all visibility constraints

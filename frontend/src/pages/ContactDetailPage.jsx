@@ -166,16 +166,18 @@ const ContactDetailPage = () => {
 
   // Check if a field should be shown in detail view
   const shouldShowField = (fieldName) => {
+    // If config hasn't loaded yet, show by default
+    if (!fieldConfig || fieldConfig.length === 0) return true;
+
+    // Config is loaded, look for the field
     const field = fieldConfig.find(f => f.field_name === fieldName);
-    if (!field) return false; // Hide if no config found (field might be disabled/hidden)
 
-    // Check overall visibility first
+    // If field not in loaded config, it's disabled/hidden
+    if (!field) return false;
+
+    // Field exists in config, check visibility flags
     if (field.overall_visibility === 'hidden') return false;
-
-    // Check if field is enabled
     if (field.is_enabled === false) return false;
-
-    // Check detail view visibility
     if (field.show_in_detail_view === false) return false;
 
     return true;
