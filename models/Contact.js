@@ -415,7 +415,7 @@ class Contact {
     const allowedFields = [
       'title', 'company', 'first_name', 'last_name', 'email', 'phone',
       'type', 'status', 'source', 'priority', 'notes', 'assigned_to',
-      'last_contact_date', 'next_follow_up'
+      'last_contact_date', 'next_follow_up', 'department', 'linkedin', 'customer_value'
     ];
     
     const updateFields = Object.keys(updates).filter(key => allowedFields.includes(key));
