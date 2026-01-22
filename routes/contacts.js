@@ -49,16 +49,16 @@ const contactSchemas = {
       email: Joi.string().email().allow('', null).optional(),
       phone: Joi.string().max(50).allow('', null).optional(),
       status: Joi.string().max(50).allow('', null).optional(),
-      type: Joi.string().max(50).allow('', null).optional(),
+      contact_type: Joi.string().max(50).allow('', null).optional(),
       source: Joi.string().max(100).allow('', null).optional(),
-      priority: Joi.string().valid('low', 'medium', 'high').allow('', null).optional(),
-      value: Joi.number().min(0).allow(null).optional(),
       notes: Joi.string().allow('', null).optional(),
-      assigned_to: Joi.string().guid({ version: 'uuidv4' }).allow('', null).optional(),
       last_contact_date: Joi.date().iso().allow('', null).optional(),
-      next_follow_up: Joi.date().iso().allow('', null).optional(),
-      department: Joi.string().max(100).allow('', null).optional(),
-      linkedin: Joi.string().max(500).allow('', null).optional()
+      address_line1: Joi.string().max(255).allow('', null).optional(),
+      address_line2: Joi.string().max(255).allow('', null).optional(),
+      city: Joi.string().max(100).allow('', null).optional(),
+      state: Joi.string().max(100).allow('', null).optional(),
+      postal_code: Joi.string().max(20).allow('', null).optional(),
+      country: Joi.string().max(100).allow('', null).optional()
     }).unknown(true),
     params: Joi.object({
       id: Joi.string().guid({ version: 'uuidv4' }).required()
