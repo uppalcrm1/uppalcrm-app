@@ -332,8 +332,15 @@ const ContactDetailPage = () => {
                       return detailFields.map(field => {
                         const value = contact?.[field.field_name];
 
-                        // Skip empty values
-                        if (!value) return null;
+                        // Show empty fields with placeholder
+                        if (value === null || value === undefined) {
+                          return (
+                            <div key={field.field_name}>
+                              <p className="text-sm text-gray-600">{field.field_label}</p>
+                              <p className="text-sm text-gray-400 mt-1 italic">Not provided</p>
+                            </div>
+                          );
+                        }
 
                         return (
                           <div key={field.field_name}>
