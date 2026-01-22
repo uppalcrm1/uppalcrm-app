@@ -23,11 +23,11 @@ export const useFieldVisibility = (entityType) => {
         // This ensures we use the configured base URL and auth headers
         const data = await customFieldsAPI.getFields(entityType);
 
-        if (data.success || data.data) {
+        if (data.success || (data.systemFields && data.customFields)) {
           // Combine system and custom fields into a single array
           const allFields = [
-            ...(data.data?.systemFields || []),
-            ...(data.data?.customFields || [])
+            ...(data.systemFields || []),
+            ...(data.customFields || [])
           ];
           setFieldConfig(allFields);
           console.log(`📋 Field configuration loaded for ${entityType}:`, allFields);
