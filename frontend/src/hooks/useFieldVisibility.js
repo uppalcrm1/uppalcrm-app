@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { customFieldsAPI } from '../services/api';
 
 /**
  * Hook to manage field visibility based on configuration
@@ -18,18 +19,11 @@ export const useFieldVisibility = (entityType) => {
         setLoading(true);
         setError(null);
 
-        const response = await fetch(
-          `/api/custom-fields?entity_type=${entityType}`,
-          {
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('token')}`
-            }
-          }
-        );
+        // Use the same API service as all other endpoints (contacts, leads, etc.)
+        // This ensures we use the configured base URL and auth headers
+        const data = await customFieldsAPI.getFields(entityType);
 
-        const data = await response.json();
-
-        if (data.success) {
+        if (data.success || data.data) {
           // Combine system and custom fields into a single array
           const allFields = [
             ...(data.data?.systemFields || []),

@@ -313,21 +313,38 @@ const ContactDetailPage = () => {
                 <div className="px-6 pb-6 border-t border-gray-100">
                   <div className="grid grid-cols-2 gap-6 mt-4">
                     {/* Dynamic System Fields - render all visible fields */}
-                    {getVisibleFields('detail').map(field => {
-                      const value = contact?.[field.field_name];
+                    {(() => {
+                      const detailFields = getVisibleFields('detail');
 
-                      // Skip empty values
-                      if (!value) return null;
+                      // ADD DEBUG LOGGING:
+                      console.log('=== FIELD VISIBILITY DEBUG ===');
+                      console.log('Detail fields:', detailFields.length, 'fields');
+                      console.log('Detail field names:', detailFields.map(f => f.field_name));
+                      console.log('Contact data:', contact);
+                      console.log('Contact keys:', Object.keys(contact || {}));
+                      console.log('Field value check:');
+                      detailFields.forEach(field => {
+                        const value = contact?.[field.field_name];
+                        console.log(`  ${field.field_name}: ${value || '(empty)'}`);
+                      });
+                      console.log('=============================');
 
-                      return (
-                        <div key={field.field_name}>
-                          <p className="text-sm text-gray-600">{field.field_label}</p>
-                          <p className="text-sm font-medium text-gray-900 mt-1">
-                            {typeof value === 'object' ? (value.full_name || JSON.stringify(value)) : value}
-                          </p>
-                        </div>
-                      );
-                    })}
+                      return detailFields.map(field => {
+                        const value = contact?.[field.field_name];
+
+                        // Skip empty values
+                        if (!value) return null;
+
+                        return (
+                          <div key={field.field_name}>
+                            <p className="text-sm text-gray-600">{field.field_label}</p>
+                            <p className="text-sm font-medium text-gray-900 mt-1">
+                              {typeof value === 'object' ? (value.full_name || JSON.stringify(value)) : value}
+                            </p>
+                          </div>
+                        );
+                      });
+                    })()}
                     {/* Custom Fields */}
                     {customFields.map((field, index) => (
                       <div key={index}>
