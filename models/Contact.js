@@ -414,9 +414,8 @@ class Contact {
   static async update(id, updates, organizationId) {
     const allowedFields = [
       'title', 'company', 'first_name', 'last_name', 'email', 'phone',
-      'status', 'source', 'notes',
-      'address_line1', 'address_line2', 'city', 'state', 'postal_code', 'country',
-      'last_contact_date', 'contact_type'
+      'type', 'status', 'source', 'priority', 'notes', 'assigned_to',
+      'last_contact_date', 'next_follow_up'
     ];
     
     const updateFields = Object.keys(updates).filter(key => allowedFields.includes(key));
