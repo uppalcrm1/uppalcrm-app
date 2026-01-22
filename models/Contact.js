@@ -414,7 +414,8 @@ class Contact {
   static async update(id, updates, organizationId) {
     const allowedFields = [
       'title', 'company', 'first_name', 'last_name', 'email', 'phone',
-      'type', 'priority', 'notes', 'assigned_to',
+      'status', 'type', 'source', 'priority', 'value', 'notes',
+      'assigned_to', 'department', 'linkedin',
       'last_contact_date', 'next_follow_up'
     ];
     
