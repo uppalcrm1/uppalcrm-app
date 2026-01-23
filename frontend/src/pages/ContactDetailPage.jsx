@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useFieldVisibility } from '../hooks/useFieldVisibility';
 import {
   ArrowLeft, Mail, Phone, Copy, ChevronDown, ChevronUp,
   MessageSquare, Edit, MoreVertical, Calendar, CheckCircle2,
@@ -26,6 +27,9 @@ const ContactDetailPage = () => {
   const [error, setError] = useState('');
   const [showEditModal, setShowEditModal] = useState(false);
 
+  // Use field visibility hook for all field configuration
+  const { isFieldVisible, getVisibleFields } = useFieldVisibility('contacts');
+
   // Collapsible sections state
   const [sectionsOpen, setSectionsOpen] = useState({
     contactDetails: true,
@@ -47,7 +51,13 @@ const ContactDetailPage = () => {
       const response = await contactsAPI.getContactDetail(id);
       setContact(response.contact);
       setAccounts(response.accounts || []);
-      setCustomFields(response.customFields || []);
+
+      // Filter custom fields by show_in_detail_view
+      const visibleCustomFields = (response.customFields || []).filter(f => {
+        return f.is_enabled && f.show_in_detail_view !== false;
+      });
+
+      setCustomFields(visibleCustomFields);
       setTaskStats(response.taskStats || { total: 0, completed: 0, inProgress: 0 });
     } catch (err) {
       setError('Failed to load contact details');
@@ -134,6 +144,7 @@ const ContactDetailPage = () => {
     };
     return styles[type] || styles.note;
   };
+
 
   // Format time ago
   const timeAgo = (date) => {
@@ -246,7 +257,7 @@ const ContactDetailPage = () => {
             {/* Email and Phone Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Email Card */}
-              {contact.email && (
+              {contact.email && isFieldVisible('email', 'detail') && (
                 <div className="bg-blue-50 rounded-lg p-4 flex items-center justify-between border border-blue-100">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -267,7 +278,7 @@ const ContactDetailPage = () => {
               )}
 
               {/* Phone Card */}
-              {contact.phone && (
+              {contact.phone && isFieldVisible('phone', 'detail') && (
                 <div className="bg-green-50 rounded-lg p-4 flex items-center justify-between border border-green-100">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
@@ -301,51 +312,46 @@ const ContactDetailPage = () => {
               {sectionsOpen.contactDetails && (
                 <div className="px-6 pb-6 border-t border-gray-100">
                   <div className="grid grid-cols-2 gap-6 mt-4">
-                    <div>
-                      <p className="text-sm text-gray-600">Owner</p>
-                      <p className="text-sm font-medium text-gray-900 mt-1">
-                        {contact.assigned_to_name || contact.assigned_user?.full_name || 'Not assigned'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Created Date</p>
-                      <p className="text-sm font-medium text-gray-900 mt-1 flex items-center gap-1">
-                        <Calendar size={14} />
-                        {contact.created_at ? format(new Date(contact.created_at), 'MMM d, yyyy') : 'N/A'}
-                      </p>
-                    </div>
-                    {contact.company && (
-                      <div>
-                        <p className="text-sm text-gray-600">Company</p>
-                        <p className="text-sm font-medium text-gray-900 mt-1">
-                          {contact.company}
-                        </p>
-                      </div>
-                    )}
-                    {contact.title && (
-                      <div>
-                        <p className="text-sm text-gray-600">Title</p>
-                        <p className="text-sm font-medium text-gray-900 mt-1">
-                          {contact.title}
-                        </p>
-                      </div>
-                    )}
-                    {contact.source && (
-                      <div>
-                        <p className="text-sm text-gray-600">Source</p>
-                        <p className="text-sm font-medium text-gray-900 mt-1">
-                          {contact.source}
-                        </p>
-                      </div>
-                    )}
-                    {contact.converted_from_lead && (
-                      <div>
-                        <p className="text-sm text-gray-600">Converted From Lead</p>
-                        <p className="text-sm font-medium text-blue-600 mt-1">
-                          {contact.converted_from_lead.full_name}
-                        </p>
-                      </div>
-                    )}
+                    {/* Dynamic System Fields - render all visible fields */}
+                    {(() => {
+                      const detailFields = getVisibleFields('detail');
+
+                      // ADD DEBUG LOGGING:
+                      console.log('=== FIELD VISIBILITY DEBUG ===');
+                      console.log('Detail fields:', detailFields.length, 'fields');
+                      console.log('Detail field names:', detailFields.map(f => f.field_name));
+                      console.log('Contact data:', contact);
+                      console.log('Contact keys:', Object.keys(contact || {}));
+                      console.log('Field value check:');
+                      detailFields.forEach(field => {
+                        const value = contact?.[field.field_name];
+                        console.log(`  ${field.field_name}: ${value || '(empty)'}`);
+                      });
+                      console.log('=============================');
+
+                      return detailFields.map(field => {
+                        const value = contact?.[field.field_name];
+
+                        // Show empty fields with placeholder
+                        if (value === null || value === undefined) {
+                          return (
+                            <div key={field.field_name}>
+                              <p className="text-sm text-gray-600">{field.field_label}</p>
+                              <p className="text-sm text-gray-400 mt-1 italic">Not provided</p>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div key={field.field_name}>
+                            <p className="text-sm text-gray-600">{field.field_label}</p>
+                            <p className="text-sm font-medium text-gray-900 mt-1">
+                              {typeof value === 'object' ? (value.full_name || JSON.stringify(value)) : value}
+                            </p>
+                          </div>
+                        );
+                      });
+                    })()}
                     {/* Custom Fields */}
                     {customFields.map((field, index) => (
                       <div key={index}>

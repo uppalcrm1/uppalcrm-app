@@ -133,11 +133,11 @@ app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 // Input sanitization
 app.use(sanitizeInput);
 
-// Debug: Log all incoming requests
-app.use((req, res, next) => {
-  console.log(`📝 ${req.method} ${req.url} (path: ${req.path})`);
-  next();
-});
+// Debug: Log all incoming requests (disabled - too verbose)
+// app.use((req, res, next) => {
+//   console.log(`📝 ${req.method} ${req.url} (path: ${req.path})`);
+//   next();
+// });
 
 // Serve static files only if frontend dist exists (for local dev)
 const frontendDistPath = path.join(__dirname, 'frontend/dist');
@@ -489,6 +489,17 @@ const startServer = async () => {
   try {
     // Test database connection
     await testConnection();
+
+    // Run pending database migrations
+    try {
+      const migrationRunner = require('./database/migrationRunner');
+      console.log('🔧 Checking for pending database migrations...');
+      const results = await migrationRunner.runPending();
+      console.log(`✅ Database migrations complete (${results.length} executed)`);
+    } catch (migrationError) {
+      console.error('⚠️  Database migration error:', migrationError.message);
+      // Don't stop server if migrations fail - log but continue
+    }
 
     // Fix lead creation trigger (run once on startup)
     try {

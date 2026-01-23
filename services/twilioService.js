@@ -91,7 +91,6 @@ class TwilioService {
       const { client, phoneNumber } = await this.getClient(organizationId);
 
       const call = await client.calls.create({
-        url: `${API_BASE_URL}/api/twilio/webhook/voice`,
         to,
         from: phoneNumber,
         record: true,

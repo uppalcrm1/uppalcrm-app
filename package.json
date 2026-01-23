@@ -27,8 +27,16 @@
     "fix:lead-trigger": "node scripts/fix-lead-trigger.js",
     "fix:lead-history-tables": "node scripts/apply-lead-history-tables.js",
     "migrate:field-mappings": "node scripts/apply-024-devtest.js",
+    "migrate:status": "node database/runMigrations.js status",
+    "migrate:run": "node database/runMigrations.js run",
     "test:subscription-api": "node test/super-admin-subscription-api.test.js",
-    "test:super-admin-auth": "node test/super-admin-middleware.test.js"
+    "test:super-admin-auth": "node test/super-admin-middleware.test.js",
+    "test:phase1": "node run-phase-1-tests.js",
+    "test:phase1:api": "node phase-1-tests.js",
+    "test:phase1:frontend": "node phase-1-frontend-tests.js",
+    "test:phase1:verbose": "VERBOSE=true node run-phase-1-tests.js",
+    "test:phase1:staging": "node run-phase-1-tests.js --env staging",
+    "test:phase1:production": "node run-phase-1-tests.js --env production"
   },
   "dependencies": {
     "axios": "^1.11.0",

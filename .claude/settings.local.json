@@ -57,7 +57,8 @@
       "Bash(elif [ -f .env.local ])",
       "Bash(then cat .env.local)",
       "Bash(git cherry-pick:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(npm run test:phase1:api:*)"
     ],
     "deny": [],
     "ask": []

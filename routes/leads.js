@@ -152,31 +152,109 @@ View in CRM Dashboard: https://uppalcrm-frontend.onrender.com/dashboard
 }
 
 // Add this helper function to get field configurations
+// System field defaults - sync with backend/routes/customFields.js SYSTEM_FIELD_DEFAULTS
+const SYSTEM_FIELD_DEFAULTS = {
+  first_name: { field_name: 'first_name', field_label: 'First Name', field_type: 'text', is_required: true, is_enabled: true, show_in_create_form: true, show_in_edit_form: true, show_in_detail_view: true, show_in_list_view: true, field_options: null, display_order: 1 },
+  last_name: { field_name: 'last_name', field_label: 'Last Name', field_type: 'text', is_required: true, is_enabled: true, show_in_create_form: true, show_in_edit_form: true, show_in_detail_view: true, show_in_list_view: true, field_options: null, display_order: 2 },
+  email: { field_name: 'email', field_label: 'Email', field_type: 'email', is_required: true, is_enabled: true, show_in_create_form: true, show_in_edit_form: true, show_in_detail_view: true, show_in_list_view: true, field_options: null, display_order: 3 },
+  phone: { field_name: 'phone', field_label: 'Phone', field_type: 'text', is_required: false, is_enabled: true, show_in_create_form: true, show_in_edit_form: true, show_in_detail_view: true, show_in_list_view: false, field_options: null, display_order: 4 },
+  company: { field_name: 'company', field_label: 'Company', field_type: 'text', is_required: false, is_enabled: true, show_in_create_form: true, show_in_edit_form: true, show_in_detail_view: true, show_in_list_view: false, field_options: null, display_order: 5 },
+  source: { field_name: 'source', field_label: 'Source', field_type: 'select', is_required: false, is_enabled: true, show_in_create_form: true, show_in_edit_form: true, show_in_detail_view: true, show_in_list_view: true, field_options: ['website', 'referral', 'phone', 'email', 'social_media', 'event', 'manual'], display_order: 6 },
+  status: { field_name: 'status', field_label: 'Status', field_type: 'select', is_required: false, is_enabled: true, show_in_create_form: true, show_in_edit_form: true, show_in_detail_view: true, show_in_list_view: true, field_options: ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'won', 'lost'], display_order: 7 },
+  priority: { field_name: 'priority', field_label: 'Priority', field_type: 'select', is_required: false, is_enabled: true, show_in_create_form: true, show_in_edit_form: true, show_in_detail_view: true, show_in_list_view: true, field_options: ['low', 'medium', 'high'], display_order: 8 },
+  value: { field_name: 'value', field_label: 'Potential Value ($)', field_type: 'number', is_required: false, is_enabled: true, show_in_create_form: true, show_in_edit_form: true, show_in_detail_view: true, show_in_list_view: false, field_options: null, display_order: 9 },
+  assigned_to: { field_name: 'assigned_to', field_label: 'Assign To', field_type: 'user_select', is_required: false, is_enabled: true, show_in_create_form: true, show_in_edit_form: true, show_in_detail_view: true, show_in_list_view: false, field_options: null, display_order: 10 },
+  next_follow_up: { field_name: 'next_follow_up', field_label: 'Next Follow Up', field_type: 'date', is_required: false, is_enabled: true, show_in_create_form: true, show_in_edit_form: true, show_in_detail_view: true, show_in_list_view: false, field_options: null, display_order: 11 },
+  notes: { field_name: 'notes', field_label: 'Notes', field_type: 'textarea', is_required: false, is_enabled: true, show_in_create_form: true, show_in_edit_form: true, show_in_detail_view: true, show_in_list_view: false, field_options: null, display_order: 12 }
+};
+
 const getFieldConfigurations = async (organizationId) => {
   try {
-    const customFields = await db.query(`
-      SELECT field_name, field_label, field_type, field_options, is_required, created_at
+    // Fetch custom fields with ALL visibility flags
+    const customFieldsResult = await db.query(`
+      SELECT
+        id,
+        field_name,
+        field_label,
+        field_type,
+        field_options,
+        is_required,
+        is_active,
+        is_enabled,
+        show_in_create_form,
+        show_in_edit_form,
+        show_in_detail_view,
+        show_in_list_view,
+        display_order,
+        created_at
       FROM custom_field_definitions
-      WHERE organization_id = $1
-      ORDER BY created_at ASC
+      WHERE organization_id = $1 AND is_active = true
+      ORDER BY display_order ASC, created_at ASC
     `, [organizationId]);
 
-    const defaultFields = await db.query(`
-      SELECT field_name, is_required
-      FROM default_field_configurations
-      WHERE organization_id = $1
-    `, [organizationId]);
+    // Fetch system fields with ALL visibility flags from default_field_configurations
+    let storedSystemFields = [];
+    try {
+      const systemFieldsResult = await db.query(`
+        SELECT
+          id,
+          field_name,
+          field_label,
+          field_type,
+          field_options,
+          is_required,
+          is_enabled,
+          COALESCE(show_in_create_form, true) as show_in_create_form,
+          COALESCE(show_in_edit_form, true) as show_in_edit_form,
+          COALESCE(show_in_detail_view, true) as show_in_detail_view,
+          COALESCE(show_in_list_view, false) as show_in_list_view,
+          display_order
+        FROM default_field_configurations
+        WHERE organization_id = $1
+        ORDER BY display_order ASC
+      `, [organizationId]);
+      storedSystemFields = systemFieldsResult.rows;
+    } catch (error) {
+      console.warn('⚠️ Error fetching system fields from database:', error.message);
+      // Continue with defaults if table or columns don't exist
+    }
+
+    // Build final system fields by merging defaults with stored configs
+    const storedConfigMap = {};
+    storedSystemFields.forEach(field => {
+      storedConfigMap[field.field_name] = field;
+    });
+
+    const systemFields = Object.values(SYSTEM_FIELD_DEFAULTS).map(defaultField => {
+      const stored = storedConfigMap[defaultField.field_name] || {};
+      return {
+        ...defaultField,
+        ...(stored.id && { id: stored.id }),
+        ...(stored.field_label && { field_label: stored.field_label }),
+        ...(stored.is_required !== undefined && { is_required: stored.is_required }),
+        ...(stored.is_enabled !== undefined && { is_enabled: stored.is_enabled }),
+        ...(stored.show_in_create_form !== undefined && { show_in_create_form: stored.show_in_create_form }),
+        ...(stored.show_in_edit_form !== undefined && { show_in_edit_form: stored.show_in_edit_form }),
+        ...(stored.show_in_detail_view !== undefined && { show_in_detail_view: stored.show_in_detail_view }),
+        ...(stored.show_in_list_view !== undefined && { show_in_list_view: stored.show_in_list_view }),
+        ...(stored.display_order !== undefined && { display_order: stored.display_order })
+      };
+    }).filter(field => field.is_enabled !== false);
 
     return {
-      customFields: customFields.rows,
-      defaultFields: defaultFields.rows
+      customFields: customFieldsResult.rows,
+      systemFields: systemFields,
+      defaultFields: systemFields // Maintain backward compatibility
     };
   } catch (error) {
-    console.log('⚠️ Error fetching field configurations, returning empty config:', error.message);
-    // Return empty configuration if tables don't exist or have schema issues
+    console.log('⚠️ Error fetching field configurations, returning defaults:', error.message);
+    console.error('Error details:', error);
+    // Return system field defaults if there's an error
+    const defaultSystemFields = Object.values(SYSTEM_FIELD_DEFAULTS).filter(field => field.is_enabled !== false);
     return {
       customFields: [],
-      defaultFields: []
+      systemFields: defaultSystemFields,
+      defaultFields: defaultSystemFields
     };
   }
 };
@@ -1607,6 +1685,32 @@ router.post('/', validateLeadDynamic(false), async (req, res) => {
 
     const createdLead = result.rows[0];
 
+    // ========================================
+    // PHASE 1: Save custom fields to JSONB column
+    // ========================================
+    if (customFields && Object.keys(customFields).length > 0) {
+      console.log('💾 Saving custom fields to lead:', customFields);
+
+      try {
+        await db.query(
+          `UPDATE leads
+           SET custom_fields = $1
+           WHERE id = $2 AND organization_id = $3`,
+          [JSON.stringify(customFields), createdLead.id, req.organizationId]
+        );
+
+        console.log('✅ Custom fields saved successfully');
+
+        // Add custom_fields to the response object
+        createdLead.custom_fields = customFields;
+
+      } catch (error) {
+        console.error('❌ Error saving custom fields:', error);
+        // Don't fail the entire lead creation, just log the error
+      }
+    }
+    // ========================================
+
     // Auto-create follow-up task if next_follow_up is set
     if (followUpDate) {
       try {
@@ -1792,6 +1896,37 @@ router.put('/:id',
           console.log('ℹ️ Next follow-up date unchanged, skipping task creation');
         }
       }
+
+      // ========================================
+      // PHASE 1: Update custom fields if provided
+      // ========================================
+      const { customFields = {}, custom_fields = {} } = req.body;
+      const fieldsToUpdate = Object.keys(customFields).length > 0 ? customFields : custom_fields;
+
+      if (fieldsToUpdate && Object.keys(fieldsToUpdate).length > 0) {
+        console.log('💾 Updating custom fields:', fieldsToUpdate);
+
+        try {
+          await db.query(
+            `UPDATE leads
+             SET custom_fields = $1
+             WHERE id = $2 AND organization_id = $3`,
+            [JSON.stringify(fieldsToUpdate), req.params.id, req.organizationId]
+          );
+
+          console.log('✅ Custom fields updated successfully');
+
+          // Add to lead object if it has toJSON method, otherwise add directly
+          if (lead.custom_fields !== undefined) {
+            lead.custom_fields = fieldsToUpdate;
+          }
+
+        } catch (error) {
+          console.error('❌ Error updating custom fields:', error);
+          // Don't fail the entire update, just log the error
+        }
+      }
+      // ========================================
 
       console.log('✅ Lead updated successfully:', lead.id);
       res.json({

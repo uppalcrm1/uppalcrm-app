@@ -14,10 +14,32 @@ const ContactForm = ({ contact = null, onClose, onSubmit, users = [], isLoading 
     const loadFieldConfig = async () => {
       try {
         const response = await customFieldsAPI.getFields('contacts')
-        // Combine system and custom fields, filter enabled ones
-        const systemFields = (response.systemFields || []).filter(f => f.is_enabled !== false)
-        const customFields = (response.customFields || []).filter(f => f.is_enabled !== false)
-        
+
+        // Detect mode: create vs edit
+        const mode = isEditing ? 'edit' : 'create'
+
+        // Filter system fields by mode
+        const systemFields = (response.systemFields || []).filter(f => {
+          if (f.is_enabled === false) return false
+
+          if (mode === 'create') {
+            return f.show_in_create_form !== false
+          } else {
+            return f.show_in_edit_form !== false
+          }
+        })
+
+        // Filter custom fields by mode
+        const customFields = (response.customFields || []).filter(f => {
+          if (!f.is_enabled) return false
+
+          if (mode === 'create') {
+            return f.show_in_create_form !== false
+          } else {
+            return f.show_in_edit_form !== false
+          }
+        })
+
         setFieldConfig({
           systemFields,
           customFields
@@ -29,7 +51,7 @@ const ContactForm = ({ contact = null, onClose, onSubmit, users = [], isLoading 
       }
     }
     loadFieldConfig()
-  }, [])
+  }, [isEditing])
 
   const { register, handleSubmit, formState: { errors }, watch } = useForm({
     defaultValues: contact ? {
