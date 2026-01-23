@@ -86,6 +86,7 @@ const Contacts = () => {
   const [selectedContact, setSelectedContact] = useState(null)
   const [showFilters, setShowFilters] = useState(false)
   const [viewMode, setViewMode] = useState('list') // 'list' or 'detail'
+  const [loadingEditContact, setLoadingEditContact] = useState(false)
 
   // Build dynamic column definitions from field configuration
   const { COLUMN_DEFINITIONS, DEFAULT_VISIBLE_COLUMNS } = React.useMemo(() => {
@@ -251,6 +252,21 @@ const Contacts = () => {
       toast.error(error.response?.data?.message || 'Failed to delete contact')
     }
   })
+
+  // Handler to fetch full contact before opening edit modal
+  const handleEditContact = async (contactFromList) => {
+    try {
+      setLoadingEditContact(true)
+      const response = await contactsAPI.getContact(contactFromList.id)
+      setSelectedContact(response.contact)
+      setShowEditModal(true)
+    } catch (error) {
+      console.error('Failed to load contact for editing:', error)
+      toast.error('Failed to load contact details')
+    } finally {
+      setLoadingEditContact(false)
+    }
+  }
 
   const getStatusBadgeColor = (status) => {
     const statusConfig = CONTACT_STATUSES.find(s => s.value === status)
@@ -441,13 +457,10 @@ const Contacts = () => {
   // Show contact detail view
   if (viewMode === 'detail' && selectedContact) {
     return (
-      <ContactDetail 
+      <ContactDetail
         contact={selectedContact}
         onBack={handleBackToList}
-        onEdit={(contact) => {
-          setSelectedContact(contact)
-          setShowEditModal(true)
-        }}
+        onEdit={(contact) => handleEditContact(contact)}
         onDelete={(id) => {
           if (window.confirm('Are you sure you want to delete this contact?')) {
             deleteMutation.mutate(id)
@@ -700,11 +713,9 @@ const Contacts = () => {
                       <td className="py-4 px-4">
                         <div className="flex items-center space-x-2" onClick={(e) => e.stopPropagation()}>
                           <button
-                            onClick={() => {
-                              setSelectedContact(contact)
-                              setShowEditModal(true)
-                            }}
-                            className="p-1 text-gray-600 hover:text-primary-600"
+                            onClick={() => handleEditContact(contact)}
+                            disabled={loadingEditContact}
+                            className="p-1 text-gray-600 hover:text-primary-600 disabled:opacity-50 disabled:cursor-not-allowed"
                             title="Edit Contact"
                           >
                             <Edit size={16} />
