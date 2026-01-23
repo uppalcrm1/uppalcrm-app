@@ -93,6 +93,7 @@ async function findByOrganizationComplex(organizationId, options = {}) {
       c.department,
       c.linkedin,
       COALESCE(c.contact_status, c.status, 'active') as status,
+      c.type,
       c.source,
       c.priority,
       c.notes,
@@ -118,7 +119,7 @@ async function findByOrganizationComplex(organizationId, options = {}) {
     WHERE ${whereClause}
 
     GROUP BY c.id, c.first_name, c.last_name, c.name, c.email, c.phone, c.company,
-             c.title, c.department, c.linkedin, c.contact_status, c.status, c.source, c.priority,
+             c.title, c.department, c.linkedin, c.contact_status, c.status, c.type, c.source, c.priority,
              c.notes, c.custom_fields, c.created_at, c.updated_at, c.last_contact_date, c.next_follow_up
 
     ORDER BY c.${sort} ${order}
@@ -229,6 +230,7 @@ async function findByOrganizationSimple(organizationId, options = {}) {
       c.department,
       c.linkedin,
       COALESCE(c.contact_status, c.status, 'active') as status,
+      c.type,
       c.source,
       c.priority,
       c.notes,
