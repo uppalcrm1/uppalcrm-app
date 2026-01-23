@@ -25,6 +25,19 @@ class Contact {
     this.next_follow_up = data.next_follow_up;
     this.converted_from_lead_id = data.converted_from_lead_id;
 
+    // Additional contact fields
+    this.department = data.department;
+    this.linkedin = data.linkedin;
+    this.customer_value = data.customer_value;
+
+    // Address fields
+    this.address_line1 = data.address_line1;
+    this.address_line2 = data.address_line2;
+    this.city = data.city;
+    this.state = data.state;
+    this.postal_code = data.postal_code;
+    this.country = data.country;
+
     // Store custom fields from JSONB column
     this.custom_fields = data.custom_fields || {};
   }
@@ -1548,6 +1561,16 @@ class Contact {
       next_follow_up: this.next_follow_up,
       converted_from_lead_id: this.converted_from_lead_id,
       converted_from_lead: this.converted_from_lead,
+      department: this.department,
+      linkedin: this.linkedin,
+      customer_value: this.customer_value,
+      address_line1: this.address_line1,
+      address_line2: this.address_line2,
+      city: this.city,
+      state: this.state,
+      postal_code: this.postal_code,
+      country: this.country,
+      custom_fields: this.custom_fields,
       // Merge custom fields at the top level
       ...this.custom_fields
     };
