@@ -761,7 +761,7 @@ const LeadDetailsPanel = ({ lead, isFieldVisible }) => {
       )}
 
       {/* Custom Fields Card */}
-      {customFields.length > 0 && (
+      {lead.custom_fields && Object.keys(lead.custom_fields).length > 0 && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
           <div className="bg-gradient-to-r from-cyan-50 to-blue-50 px-6 py-4 border-b border-gray-200">
             <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
@@ -771,33 +771,18 @@ const LeadDetailsPanel = ({ lead, isFieldVisible }) => {
           </div>
           <div className="p-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              {customFields.map(field => {
-                const fieldValue = lead.custom_fields?.[field.field_name]
-                if (!fieldValue && fieldValue !== 0) return null
-
-                return (
-                  <div key={field.field_name}>
+              {Object.entries(lead.custom_fields).map(([fieldName, fieldValue]) => (
+                fieldValue && (
+                  <div key={fieldName}>
                     <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
-                      {field.field_label}
+                      {fieldName}
                     </div>
                     <div className="text-base font-semibold text-gray-900">
-                      {field.field_type === 'select' && field.field_options ? (
-                        // For select fields, show the label if it's an object option
-                        (() => {
-                          const option = field.field_options.find(
-                            opt => (typeof opt === 'string' ? opt : opt.value) === fieldValue
-                          )
-                          return option
-                            ? (typeof option === 'string' ? option : option.label)
-                            : fieldValue
-                        })()
-                      ) : (
-                        fieldValue || <span className="text-gray-400 italic font-normal">Not provided</span>
-                      )}
+                      {fieldValue || <span className="text-gray-400 italic font-normal">Not provided</span>}
                     </div>
                   </div>
                 )
-              })}
+              ))}
             </div>
           </div>
         </div>
