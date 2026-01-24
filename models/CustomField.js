@@ -40,7 +40,9 @@ class CustomField {
           field_group,
           is_active,
           created_at,
-          updated_at
+          updated_at,
+          overall_visibility,
+          visibility_logic
         FROM custom_field_definitions
         WHERE organization_id = $1 AND entity_type = $2
       `
@@ -98,6 +100,8 @@ class CustomField {
           validation_rules,
           field_options,
           default_value,
+          overall_visibility,
+          visibility_logic,
           placeholder,
           field_group,
           is_active,
@@ -138,28 +142,53 @@ class CustomField {
       }
       console.log('================================================================================')
 
+      // Accept both camelCase and snake_case naming conventions
       const {
-        organizationId,
-        fieldName,
-        fieldLabel,
-        fieldDescription,
-        entityType,
-        fieldType,
-        isRequired = false,
-        isSearchable = true,
-        isFilterable = true,
-        displayOrder = 0,
-        showInListView = false,
-        showInDetailView = true,
-        showInCreateForm = true,
-        showInEditForm = true,
-        validationRules = {},
-        fieldOptions = [],
-        defaultValue = null,
-        placeholder = null,
-        fieldGroup = null,
-        createdBy
+        organizationId, organization_id,
+        fieldName, field_name,
+        fieldLabel, field_label,
+        fieldDescription, field_description,
+        entityType, entity_type,
+        fieldType, field_type,
+        isRequired, is_required = false,
+        isSearchable, is_searchable = true,
+        isFilterable, is_filterable = true,
+        displayOrder, display_order = 0,
+        showInListView, show_in_list_view = false,
+        showInDetailView, show_in_detail_view = true,
+        showInCreateForm, show_in_create_form = true,
+        showInEditForm, show_in_edit_form = true,
+        validationRules, validation_rules = {},
+        fieldOptions, field_options = [],
+        defaultValue, default_value = null,
+        placeholder,
+        fieldGroup, field_group = null,
+        createdBy, created_by,
+        // Phase 1: Visibility fields
+        overall_visibility = 'visible',
+        visibility_logic = 'master_override'
       } = fieldData
+
+      // Normalize to camelCase (prefer camelCase, fallback to snake_case)
+      const normalizedOrgId = organizationId || organization_id
+      const normalizedFieldName = fieldName || field_name
+      const normalizedFieldLabel = fieldLabel || field_label
+      const normalizedFieldDesc = fieldDescription || field_description
+      const normalizedEntityType = entityType || entity_type
+      const normalizedFieldType = fieldType || field_type
+      const normalizedIsRequired = isRequired !== undefined ? isRequired : is_required
+      const normalizedIsSearchable = isSearchable !== undefined ? isSearchable : is_searchable
+      const normalizedIsFilterable = isFilterable !== undefined ? isFilterable : is_filterable
+      const normalizedDisplayOrder = displayOrder !== undefined ? displayOrder : display_order
+      const normalizedShowListView = showInListView !== undefined ? showInListView : show_in_list_view
+      const normalizedShowDetailView = showInDetailView !== undefined ? showInDetailView : show_in_detail_view
+      const normalizedShowCreateForm = showInCreateForm !== undefined ? showInCreateForm : show_in_create_form
+      const normalizedShowEditForm = showInEditForm !== undefined ? showInEditForm : show_in_edit_form
+      const normalizedValidationRules = validationRules || validation_rules
+      const normalizedFieldOptions = fieldOptions || field_options
+      const normalizedDefaultValue = defaultValue !== undefined ? defaultValue : default_value
+      const normalizedFieldGroup = fieldGroup || field_group
+      const normalizedCreatedBy = createdBy || created_by
 
       const query = `
         INSERT INTO custom_field_definitions (
@@ -182,66 +211,71 @@ class CustomField {
           default_value,
           placeholder,
           field_group,
-          created_by
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15::jsonb, $16::jsonb, $17, $18, $19, $20)
+          created_by,
+          overall_visibility,
+          visibility_logic
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15::jsonb, $16::jsonb, $17, $18, $19, $20, $21, $22)
         RETURNING *
       `
 
       // CRITICAL: Log types and values before passing to database
       console.log('🔍 DETAILED INSPECTION BEFORE DB INSERT:')
-      console.log('  fieldOptions type:', typeof fieldOptions)
-      console.log('  fieldOptions isArray:', Array.isArray(fieldOptions))
-      console.log('  fieldOptions value:', JSON.stringify(fieldOptions, null, 2))
-      console.log('  fieldOptions raw:', fieldOptions)
-      console.log('  validationRules type:', typeof validationRules)
-      console.log('  validationRules value:', JSON.stringify(validationRules, null, 2))
+      console.log('  fieldOptions type:', typeof normalizedFieldOptions)
+      console.log('  fieldOptions isArray:', Array.isArray(normalizedFieldOptions))
+      console.log('  fieldOptions value:', JSON.stringify(normalizedFieldOptions, null, 2))
+      console.log('  fieldOptions raw:', normalizedFieldOptions)
+      console.log('  validationRules type:', typeof normalizedValidationRules)
+      console.log('  validationRules value:', JSON.stringify(normalizedValidationRules, null, 2))
 
       console.log('================================================================================')
       console.log('📊 PREPARING DATABASE QUERY')
       console.log('================================================================================')
       console.log('📊 QUERY PARAMETER fieldOptions (raw - no stringify):')
-      console.log('  Type:', typeof fieldOptions)
-      console.log('  Is Array:', Array.isArray(fieldOptions))
-      console.log('  Value:', fieldOptions)
+      console.log('  Type:', typeof normalizedFieldOptions)
+      console.log('  Is Array:', Array.isArray(normalizedFieldOptions))
+      console.log('  Value:', normalizedFieldOptions)
       console.log('')
       console.log('📊 QUERY PARAMETER validationRules (raw - no stringify):')
-      console.log('  Type:', typeof validationRules)
-      console.log('  Value:', validationRules)
+      console.log('  Type:', typeof normalizedValidationRules)
+      console.log('  Value:', normalizedValidationRules)
       console.log('================================================================================')
 
       // Clean and ensure proper format - handle edge cases where data might already be stringified
-      const cleanFieldOptions = Array.isArray(fieldOptions)
-        ? fieldOptions
-        : (typeof fieldOptions === 'string' ? JSON.parse(fieldOptions) : (fieldOptions || []))
+      const cleanFieldOptions = Array.isArray(normalizedFieldOptions)
+        ? normalizedFieldOptions
+        : (typeof normalizedFieldOptions === 'string' ? JSON.parse(normalizedFieldOptions) : (normalizedFieldOptions || []))
 
-      const cleanValidationRules = (validationRules && typeof validationRules === 'object' && !Array.isArray(validationRules))
-        ? validationRules
-        : (typeof validationRules === 'string' ? JSON.parse(validationRules) : {})
+      const cleanValidationRules = (normalizedValidationRules && typeof normalizedValidationRules === 'object' && !Array.isArray(normalizedValidationRules))
+        ? normalizedValidationRules
+        : (typeof normalizedValidationRules === 'string' ? JSON.parse(normalizedValidationRules) : {})
 
       const values = [
-        organizationId,
-        fieldName,
-        fieldLabel,
-        fieldDescription,
-        entityType,
-        fieldType,
-        isRequired,
-        isSearchable,
-        isFilterable,
-        displayOrder,
-        showInListView,
-        showInDetailView,
-        showInCreateForm,
-        showInEditForm,
+        normalizedOrgId,
+        normalizedFieldName,
+        normalizedFieldLabel,
+        normalizedFieldDesc,
+        normalizedEntityType,
+        normalizedFieldType,
+        normalizedIsRequired,
+        normalizedIsSearchable,
+        normalizedIsFilterable,
+        normalizedDisplayOrder,
+        normalizedShowListView,
+        normalizedShowDetailView,
+        normalizedShowCreateForm,
+        normalizedShowEditForm,
         // CRITICAL FIX: Pass raw JavaScript objects/arrays to pg driver
         // The ::jsonb cast in SQL will handle the conversion automatically
         // DO NOT use JSON.stringify - that causes double-stringification!
         cleanValidationRules,  // Raw object
         cleanFieldOptions,     // Raw array
-        defaultValue,
+        normalizedDefaultValue,
         placeholder,
-        fieldGroup,
-        createdBy
+        normalizedFieldGroup,
+        normalizedCreatedBy,
+        // Phase 1: Visibility fields
+        overall_visibility,
+        visibility_logic
       ]
 
       console.log('================================================================================')
@@ -305,7 +339,10 @@ class CustomField {
         'default_value',
         'placeholder',
         'field_group',
-        'is_active'
+        'is_active',
+        // Phase 1: Visibility fields
+        'overall_visibility',
+        'visibility_logic'
       ]
 
       const updates = []

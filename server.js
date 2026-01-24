@@ -1,3 +1,29 @@
+// ============================================
+// LOG FILTER - Add at the very top of your server file
+// ============================================
+const originalConsoleLog = console.log;
+
+console.log = function(...args) {
+  const message = String(args[0] || '');
+
+  // Skip logging for these noisy polling endpoints
+  const shouldSkip =
+    message.includes('/api/twilio/incoming-calls/pending') ||
+    message.includes('/incoming-calls/pending') ||
+    message.includes('📍 TWILIO ROUTE RECEIVED: GET /incoming-calls/pending') ||
+    message.includes('Full path: /api/twilio/incoming-calls/pending') ||
+    message.includes('========================================') ||
+    message.includes('Query: {}') ||
+    message.includes('Body: {}') ||
+    message.includes('[verifyToken] Decoded token:') ||
+    message.includes('[verifyToken] Session query result rows:');
+
+  if (!shouldSkip) {
+    originalConsoleLog.apply(console, args);
+  }
+};
+// ============================================
+
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -107,11 +133,11 @@ app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 // Input sanitization
 app.use(sanitizeInput);
 
-// Debug: Log all incoming requests
-app.use((req, res, next) => {
-  console.log(`📝 ${req.method} ${req.url} (path: ${req.path})`);
-  next();
-});
+// Debug: Log all incoming requests (disabled - too verbose)
+// app.use((req, res, next) => {
+//   console.log(`📝 ${req.method} ${req.url} (path: ${req.path})`);
+//   next();
+// });
 
 // Serve static files only if frontend dist exists (for local dev)
 const frontendDistPath = path.join(__dirname, 'frontend/dist');
@@ -463,6 +489,17 @@ const startServer = async () => {
   try {
     // Test database connection
     await testConnection();
+
+    // Run pending database migrations
+    try {
+      const migrationRunner = require('./database/migrationRunner');
+      console.log('🔧 Checking for pending database migrations...');
+      const results = await migrationRunner.runPending();
+      console.log(`✅ Database migrations complete (${results.length} executed)`);
+    } catch (migrationError) {
+      console.error('⚠️  Database migration error:', migrationError.message);
+      // Don't stop server if migrations fail - log but continue
+    }
 
     // Fix lead creation trigger (run once on startup)
     try {

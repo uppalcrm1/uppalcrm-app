@@ -34,6 +34,24 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import api from '../../services/api'
 
+// Phase 1b: CSS Animations
+const animationStyles = `
+  @keyframes slide-in-right {
+    from {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+
+  .animate-slide-in-right {
+    animation: slide-in-right 0.3s ease-out;
+  }
+`
+
 const ENTITY_TYPES = [
   { id: 'universal', label: 'Universal Fields', icon: '🌐' },  // Universal fields tab
   { id: 'leads', label: 'Leads', icon: '👤' },
@@ -129,6 +147,8 @@ const AdminFields = () => {
   const [successMessage, setSuccessMessage] = useState(null)
   const [isReorderMode, setIsReorderMode] = useState(false)
   const [pendingChanges, setPendingChanges] = useState({}) // Track unsaved visibility changes
+  const [updatingFieldId, setUpdatingFieldId] = useState(null) // Phase 1b: Track which field is updating
+  const [notifications, setNotifications] = useState([])
   const [formData, setFormData] = useState({
     field_name: '',
     field_label: '',
@@ -146,8 +166,22 @@ const AdminFields = () => {
     placeholder: '',
     default_value: '',
     field_options: [],
-    validation_rules: {}
+    validation_rules: {},
+    // Phase 1: Master visibility toggle
+    overall_visibility: 'visible',
+    visibility_logic: 'master_override'
   })
+
+  // Phase 1b: Notification helper
+  const showNotification = (message, type = 'success') => {
+    const id = Date.now()
+    setNotifications(prev => [...prev, { id, message, type }])
+
+    // Auto-remove after 3 seconds
+    setTimeout(() => {
+      setNotifications(prev => prev.filter(n => n.id !== id))
+    }, 3000)
+  }
 
   // Load fields from API
   const loadFields = async (entityType) => {
@@ -215,7 +249,10 @@ const AdminFields = () => {
           field_label: formData.field_label,
           field_type: formData.field_type,
           field_options: formData.field_options,
-          is_required: formData.is_required
+          is_required: formData.is_required,
+          // Phase 1: Include visibility fields
+          overall_visibility: formData.overall_visibility,
+          visibility_logic: formData.visibility_logic
         }
 
         // Check if trying to make Product Name field optional
@@ -229,6 +266,11 @@ const AdminFields = () => {
         if (editingField.isSystemField) {
           // System fields use field_name as identifier and different endpoint
           updateData.entity_type = activeTab
+          // Include visibility flags for system fields
+          updateData.show_in_create_form = formData.show_in_create_form
+          updateData.show_in_edit_form = formData.show_in_edit_form
+          updateData.show_in_detail_view = formData.show_in_detail_view
+          updateData.show_in_list_view = formData.show_in_list_view
           console.log('📤 Updating system field:', editingField.field_name, updateData)
           const response = await api.put(`/custom-fields/default/${editingField.field_name}`, updateData)
           console.log('✅ System field updated:', response.data)
@@ -257,7 +299,10 @@ const AdminFields = () => {
           field_label: formData.field_label,
           field_type: formData.field_type,
           field_options: formData.field_options,
-          is_required: formData.is_required
+          is_required: formData.is_required,
+          // Phase 1: Include visibility fields
+          overall_visibility: formData.overall_visibility,
+          visibility_logic: formData.visibility_logic
         }
         console.log('📤 Sending field data:', fieldData)
         const response = await api.post('/custom-fields', fieldData)
@@ -302,9 +347,29 @@ const AdminFields = () => {
       }
     }
 
+    // CRITICAL: Ensure all visibility flags are properly set from the field
+    // If field is missing visibility flags, use defaults that allow all views
     setFormData({
-      ...field,
-      field_options: normalizedOptions
+      field_name: field.field_name || '',
+      field_label: field.field_label || '',
+      field_description: field.field_description || '',
+      field_type: field.field_type || 'text',
+      entity_type: field.entity_type || activeTab,
+      is_required: field.is_required !== undefined ? field.is_required : false,
+      is_searchable: field.is_searchable !== undefined ? field.is_searchable : true,
+      is_filterable: field.is_filterable !== undefined ? field.is_filterable : true,
+      show_in_list_view: field.show_in_list_view !== undefined ? field.show_in_list_view : false,
+      show_in_detail_view: field.show_in_detail_view !== undefined ? field.show_in_detail_view : true,
+      show_in_create_form: field.show_in_create_form !== undefined ? field.show_in_create_form : true,
+      show_in_edit_form: field.show_in_edit_form !== undefined ? field.show_in_edit_form : true,
+      field_group: field.field_group || '',
+      placeholder: field.placeholder || '',
+      default_value: field.default_value || '',
+      field_options: normalizedOptions,
+      validation_rules: field.validation_rules || {},
+      // Phase 1: Master visibility toggle
+      overall_visibility: field.overall_visibility || 'visible',
+      visibility_logic: field.visibility_logic || 'master_override'
     })
     setEditingField(field)
     setIsCreating(true)
@@ -429,7 +494,10 @@ const AdminFields = () => {
       placeholder: '',
       default_value: '',
       field_options: [],
-      validation_rules: {}
+      validation_rules: {},
+      // Phase 1: Master visibility toggle
+      overall_visibility: 'visible',
+      visibility_logic: 'master_override'
     })
   }
 
@@ -525,8 +593,218 @@ const AdminFields = () => {
 
   const needsOptions = ['select', 'multiselect', 'radio'].includes(formData.field_type)
 
+  // Phase 1b: VisibilityStatusBadge Component
+  const VisibilityStatusBadge = ({ field }) => {
+    const isHidden = field.overall_visibility === 'hidden'
+    const isUpdating = updatingFieldId === field.id || updatingFieldId === field.field_name
+
+    const handleMasterToggle = async (newVisibility) => {
+      setUpdatingFieldId(field.id || field.field_name)
+
+      try {
+        const endpoint = field.isSystemField
+          ? `/custom-fields/default/${field.field_name}`
+          : `/custom-fields/${field.id}`
+
+        const response = await api.put(endpoint, {
+          overall_visibility: newVisibility,
+          entity_type: activeTab,
+          // Phase 1: When hiding, auto-uncheck all contexts
+          ...(newVisibility === 'hidden' && {
+            show_in_create_form: false,
+            show_in_edit_form: false,
+            show_in_detail_view: false,
+            show_in_list_view: false
+          })
+        })
+
+        if (response.data) {
+          showNotification(
+            newVisibility === 'hidden'
+              ? `${field.field_label} is now hidden everywhere`
+              : `${field.field_label} is now visible`,
+            'success'
+          )
+          // Reload fields to get updated data
+          await loadFields(activeTab)
+        }
+      } catch (error) {
+        console.error('Error updating visibility:', error)
+        showNotification('Error updating field visibility', 'error')
+      } finally {
+        setUpdatingFieldId(null)
+      }
+    }
+
+    return (
+      <div className="flex items-center gap-2">
+        <select
+          value={field.overall_visibility || 'visible'}
+          onChange={(e) => handleMasterToggle(e.target.value)}
+          disabled={isUpdating}
+          className={`
+            text-sm border rounded px-3 py-1.5 min-w-[110px]
+            transition-colors duration-200 font-medium
+            ${isUpdating ? 'opacity-50 cursor-wait' : 'cursor-pointer'}
+            ${isHidden
+              ? 'border-red-300 text-red-700 bg-red-50 hover:bg-red-100'
+              : 'border-green-300 text-green-700 bg-green-50 hover:bg-green-100'
+            }
+          `}
+        >
+          <option value="visible">👁️ Visible</option>
+          <option value="hidden">🚫 Hidden</option>
+        </select>
+
+        {isUpdating && (
+          <div className="animate-spin h-4 w-4 border-2 border-gray-300 border-t-blue-600 rounded-full"></div>
+        )}
+      </div>
+    )
+  }
+
+  // Phase 1b: ContextCheckboxes Component
+  const ContextCheckboxes = ({ field }) => {
+    const isHidden = field.overall_visibility === 'hidden'
+    const isUpdating = updatingFieldId === field.id || updatingFieldId === field.field_name
+
+    const handleContextToggle = async (contextField, value) => {
+      if (isHidden) {
+        showNotification('Cannot modify context when field is hidden. Change to "Visible" first.', 'warning')
+        return
+      }
+
+      setUpdatingFieldId(field.id || field.field_name)
+
+      try {
+        const endpoint = field.isSystemField
+          ? `/custom-fields/default/${field.field_name}`
+          : `/custom-fields/${field.id}`
+
+        const response = await api.put(endpoint, {
+          [contextField]: value,
+          entity_type: activeTab
+        })
+
+        if (response.data) {
+          showNotification('Context visibility updated', 'success')
+          await loadFields(activeTab)
+        }
+      } catch (error) {
+        console.error('Error updating context:', error)
+        showNotification('Error updating context visibility', 'error')
+      } finally {
+        setUpdatingFieldId(null)
+      }
+    }
+
+    const contexts = [
+      { key: 'show_in_create_form', label: 'Create', icon: '➕' },
+      { key: 'show_in_edit_form', label: 'Edit', icon: '✏️' },
+      { key: 'show_in_detail_view', label: 'Detail', icon: '👁️' },
+      { key: 'show_in_list_view', label: 'List', icon: '📋' }
+    ]
+
+    return (
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-3 flex-wrap">
+          {contexts.map(({ key, label, icon }) => (
+            <label
+              key={key}
+              className={`
+                flex items-center gap-1.5 text-xs font-medium
+                transition-all duration-200 px-2 py-1 rounded
+                ${isHidden
+                  ? 'opacity-40 cursor-not-allowed bg-gray-50'
+                  : 'cursor-pointer hover:bg-blue-50 hover:text-blue-600'
+                }
+                ${isUpdating ? 'opacity-50' : ''}
+              `}
+            >
+              <input
+                type="checkbox"
+                checked={field[key] !== false}
+                onChange={(e) => handleContextToggle(key, e.target.checked)}
+                disabled={isHidden || isUpdating}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span>{icon}</span>
+              <span>{label}</span>
+            </label>
+          ))}
+        </div>
+
+        {/* Explanation text */}
+        <div className="text-xs text-gray-500 italic">
+          {isHidden ? (
+            <span className="text-red-600">
+              ⚠️ Context settings disabled - field is hidden everywhere
+            </span>
+          ) : (
+            <span>
+              Select where this field should appear
+            </span>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // Phase 1b: HiddenFieldWarning Component
+  const HiddenFieldWarning = ({ field }) => {
+    if (field.overall_visibility !== 'hidden') return null
+
+    return (
+      <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
+        <span className="text-red-600 text-lg flex-shrink-0">⚠️</span>
+        <div className="text-sm text-red-700">
+          <p className="font-medium mb-1">This field is hidden everywhere</p>
+          <p className="text-xs">
+            This field will not appear in any forms, lists, or views.
+            Change the master visibility to "Visible" to configure where it should appear.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  // Phase 1b: NotificationToast Component
+  const NotificationToast = () => {
+    return (
+      <div className="fixed top-4 right-4 z-50 space-y-2 pointer-events-none">
+        {notifications.map(({ id, message, type }) => (
+          <div
+            key={id}
+            className={`
+              px-4 py-3 rounded-lg shadow-lg border
+              animate-slide-in-right pointer-events-auto
+              ${type === 'success' ? 'bg-green-50 border-green-200 text-green-800' : ''}
+              ${type === 'error' ? 'bg-red-50 border-red-200 text-red-800' : ''}
+              ${type === 'warning' ? 'bg-yellow-50 border-yellow-200 text-yellow-800' : ''}
+            `}
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-lg">
+                {type === 'success' && '✅'}
+                {type === 'error' && '❌'}
+                {type === 'warning' && '⚠️'}
+              </span>
+              <span className="text-sm font-medium">{message}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
+      {/* Phase 1b: Animation Styles */}
+      <style>{animationStyles}</style>
+
+      {/* Phase 1b: Notification Toast */}
+      <NotificationToast />
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -839,6 +1117,60 @@ const AdminFields = () => {
               <p className="text-xs text-gray-500 mt-1">Group related fields together</p>
             </div>
 
+            {/* Phase 1: Master Visibility Control */}
+            <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-900">
+                    Master Visibility Control (Phase 1)
+                  </label>
+                  <p className="text-xs text-gray-600 mt-1">
+                    Controls overall field visibility. When hidden, the field is invisible everywhere.
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center cursor-pointer flex-1">
+                    <input
+                      type="radio"
+                      name="overall_visibility"
+                      value="visible"
+                      checked={formData.overall_visibility === 'visible'}
+                      onChange={(e) => handleInputChange('overall_visibility', e.target.value)}
+                      className="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"
+                    />
+                    <span className="ml-3">
+                      <span className="text-sm font-medium text-gray-900">Visible</span>
+                      <p className="text-xs text-gray-600">Field is visible where configured in context settings</p>
+                    </span>
+                  </label>
+                </div>
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center cursor-pointer flex-1">
+                    <input
+                      type="radio"
+                      name="overall_visibility"
+                      value="hidden"
+                      checked={formData.overall_visibility === 'hidden'}
+                      onChange={(e) => handleInputChange('overall_visibility', e.target.value)}
+                      className="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"
+                    />
+                    <span className="ml-3">
+                      <span className="text-sm font-medium text-gray-900">Hidden</span>
+                      <p className="text-xs text-gray-600">Field is hidden everywhere, regardless of context settings</p>
+                    </span>
+                  </label>
+                </div>
+              </div>
+              {formData.overall_visibility === 'hidden' && (
+                <div className="mt-3 p-2 bg-orange-50 border border-orange-200 rounded text-xs text-orange-700 flex items-start gap-2">
+                  <span>⚠️</span>
+                  <span>All context visibility settings below will be disabled when you save</span>
+                </div>
+              )}
+            </div>
+
             {/* Field Settings Checkboxes */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-3">
@@ -941,11 +1273,11 @@ const AdminFields = () => {
         </div>
       )}
 
-      {/* Fields List */}
+      {/* Phase 1b: Fields List with New Grid Layout */}
       {!isCreating && (
         <div className="card">
-          {/* Header with Reorder Button */}
-          <div className="flex items-center justify-between mb-6">
+          {/* Header with Search and Controls */}
+          <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-200">
             <div className="flex-1">
               <div className="relative">
                 <Search size={16} className="absolute left-3 top-3 text-gray-400" />
@@ -959,25 +1291,6 @@ const AdminFields = () => {
               </div>
             </div>
             <div className="flex items-center gap-3 ml-4">
-              {Object.keys(pendingChanges).length > 0 && (
-                <>
-                  <button
-                    onClick={handleCancelChanges}
-                    className="btn btn-outline flex items-center gap-2"
-                  >
-                    <X size={16} />
-                    Cancel Changes
-                  </button>
-                  <button
-                    onClick={handleSaveVisibilityChanges}
-                    disabled={loading}
-                    className="btn btn-primary flex items-center gap-2"
-                  >
-                    <Save size={16} />
-                    Save {Object.keys(pendingChanges).length} Change{Object.keys(pendingChanges).length > 1 ? 's' : ''}
-                  </button>
-                </>
-              )}
               <button
                 onClick={() => setIsReorderMode(!isReorderMode)}
                 className={`btn ${isReorderMode ? 'btn-primary' : 'btn-outline'} flex items-center gap-2`}
@@ -988,23 +1301,23 @@ const AdminFields = () => {
             </div>
           </div>
 
-          {/* Fields Table */}
+          {/* Phase 1b: Fields Grid */}
           {filteredFields.length === 0 ? (
             <div className="text-center py-12">
               <Sliders className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">
-                {searchQuery ? 'No fields found' : 'No custom fields yet'}
+                {searchQuery ? 'No fields found' : 'No fields yet'}
               </h3>
               <p className="text-gray-600 mb-6">
                 {searchQuery
                   ? 'Try adjusting your search query'
-                  : `Create custom fields to capture additional information for ${ENTITY_TYPES.find(e => e.id === activeTab)?.label.toLowerCase()}`
+                  : `Manage field visibility for ${ENTITY_TYPES.find(e => e.id === activeTab)?.label.toLowerCase()}`
                 }
               </p>
               {!searchQuery && (
                 <button onClick={() => setIsCreating(true)} className="btn btn-primary">
                   <Plus size={16} className="mr-2" />
-                  Add First Field
+                  Add Custom Field
                 </button>
               )}
             </div>
@@ -1014,7 +1327,7 @@ const AdminFields = () => {
               collisionDetection={closestCenter}
               onDragEnd={handleDragEnd}
             >
-              <div className="overflow-x-auto">
+              <div className="space-y-1">
                 {isReorderMode && (
                   <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                     <div className="flex items-center gap-2 text-blue-800">
@@ -1023,148 +1336,103 @@ const AdminFields = () => {
                     </div>
                   </div>
                 )}
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-gray-200 bg-gray-50">
-                      {isReorderMode && (
-                        <th className="text-left py-3 px-4 font-medium text-gray-900 w-12"></th>
-                      )}
-                      <th className="text-left py-3 px-4 font-medium text-gray-900">Field Label</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-900">Field Name</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-900">Type</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-900">Scope</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-900">Required</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-900">
-                        <div className="flex items-center gap-2">
-                          <Eye size={16} className="text-gray-600" />
-                          <span>Show in Forms</span>
-                        </div>
-                      </th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-900">Actions</th>
-                    </tr>
-                  </thead>
-                  <SortableContext
-                    items={filteredFields.map(f => f.id)}
-                    strategy={verticalListSortingStrategy}
-                  >
-                    <tbody>
-                      {filteredFields.map((field) => {
-                        const isProtectedField = isProductNameField(field, activeTab)
-                        return (
-                          <SortableRow
-                            key={field.id}
-                            field={field}
-                            entityType={activeTab}
-                            isReorderMode={isReorderMode}
-                          >
-                        <td className="py-4 px-4">
-                          <div className="flex items-center gap-2">
-                            <span className={`font-medium ${getFieldVisibility(field) ? 'text-gray-900' : 'text-gray-500'}`}>
-                              {field.field_label}
-                            </span>
-                            {!getFieldVisibility(field) && (
-                              <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Hidden</span>
-                            )}
-                            {field.entity_type === null && activeTab !== 'universal' && (
-                              <span
-                                className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full flex items-center gap-1"
-                                title="This field is available in all modules (Leads, Contacts, Accounts, Transactions)"
-                              >
-                                🌐 Universal
-                              </span>
-                            )}
-                            {isProtectedField && (
-                              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full flex items-center gap-1">
-                                <ShieldAlert size={12} />
-                                Protected
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="py-4 px-4">
-                          <code className={`text-sm px-2 py-1 rounded ${
-                            field.is_enabled ? 'text-gray-600 bg-gray-100' : 'text-gray-400 bg-gray-50'
-                          }`}>
-                            {field.field_name}
-                          </code>
-                        </td>
-                        <td className="py-4 px-4">
-                          <span className={`badge ${field.is_enabled ? 'badge-gray' : 'badge-gray opacity-60'}`}>
-                            {FIELD_TYPES.find(t => t.value === field.field_type)?.label || field.field_type}
-                          </span>
-                        </td>
-                        <td className="py-4 px-4">
-                          {field.entity_type === null ? (
-                            <span className="text-xs bg-gradient-to-r from-blue-100 to-purple-100 text-blue-700 px-2 py-1 rounded-full font-medium">
-                              All Modules
-                            </span>
-                          ) : (
-                            <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">
-                              {field.entity_type ? field.entity_type.charAt(0).toUpperCase() + field.entity_type.slice(1) : activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
-                            </span>
+
+                {/* Phase 1b: Grid Header */}
+                <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-700 uppercase">
+                  <div className="col-span-3">Field</div>
+                  <div className="col-span-2">Master Visibility</div>
+                  <div className="col-span-5">Show In</div>
+                  <div className="col-span-2 text-right">Actions</div>
+                </div>
+
+                {/* Phase 1b: Field Rows */}
+                <SortableContext
+                  items={filteredFields.map(f => f.id || f.field_name)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  {filteredFields.map((field) => (
+                    <React.Fragment key={field.id || field.field_name}>
+                      <SortableRow
+                        field={field}
+                        entityType={activeTab}
+                        isReorderMode={isReorderMode}
+                      >
+                        <div className="grid grid-cols-12 gap-4 px-6 py-4 hover:bg-gray-50 transition-colors">
+                          {/* Drag Handle Column */}
+                          {isReorderMode && (
+                            <div className="col-span-0 flex items-center -ml-4">
+                              <GripVertical size={20} className="text-gray-400" />
+                            </div>
                           )}
-                        </td>
-                        <td className="py-4 px-4">
-                          {field.is_required ? (
-                            <CheckCircle size={16} className={field.is_enabled ? 'text-green-600' : 'text-gray-400'} />
-                          ) : (
-                            <span className="text-gray-400">—</span>
-                          )}
-                        </td>
-                        <td className="py-4 px-4">
-                          <div className="flex items-center gap-2">
-                            <select
-                              value={getFieldVisibility(field) ? 'visible' : 'hidden'}
-                              onChange={(e) => handleToggleVisibility(field, e.target.value === 'visible')}
-                              className={`input py-1.5 text-sm min-w-[120px] ${
-                                hasPendingChange(field) ? 'border-orange-500 border-2' : ''
-                              }`}
-                            >
-                              <option value="visible">👁️ Visible</option>
-                              <option value="hidden">🚫 Hidden</option>
-                            </select>
-                            {hasPendingChange(field) && (
-                              <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-full font-medium">
-                                Unsaved
+
+                          {/* Field Info */}
+                          <div className={`${isReorderMode ? 'col-span-3' : 'col-span-3'}`}>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-lg">
+                                {field.isSystemField ? '🔧' : '⭐'}
                               </span>
-                            )}
+                              <div>
+                                <div className="font-medium text-gray-900">
+                                  {field.field_label}
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  {field.field_name}
+                                </div>
+                                <div className="text-xs text-gray-400">
+                                  {field.isSystemField ? 'System Field' : 'Custom Field'}
+                                </div>
+                              </div>
+                            </div>
                           </div>
-                        </td>
-                        <td className="py-4 px-4">
-                          <div className="flex items-center gap-2">
+
+                          {/* Master Visibility */}
+                          <div className="col-span-2 flex items-center">
+                            <VisibilityStatusBadge field={field} />
+                          </div>
+
+                          {/* Context Checkboxes */}
+                          <div className="col-span-5 flex items-center">
+                            <ContextCheckboxes field={field} />
+                          </div>
+
+                          {/* Actions */}
+                          <div className="col-span-2 flex items-center justify-end gap-2">
+                            {!field.isSystemField && (
+                              <>
+                                <button
+                                  onClick={() => handleEditField(field)}
+                                  className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                  title="Edit field"
+                                >
+                                  ✏️
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteField(field)}
+                                  className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                  title="Delete field"
+                                >
+                                  🗑️
+                                </button>
+                              </>
+                            )}
                             <button
                               onClick={() => handleEditField(field)}
-                              className="btn btn-sm btn-outline"
-                              title="Edit field"
+                              className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                              title="Field settings"
                             >
-                              <Edit2 size={14} />
+                              ⚙️
                             </button>
-                            {!field.isSystemField && !isProtectedField && (
-                              <button
-                                onClick={() => handleDeleteField(field)}
-                                className="btn btn-sm btn-outline text-red-600 hover:bg-red-50"
-                                title="Delete field"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            )}
-                            {field.isSystemField && (
-                              <span className="text-xs text-gray-400 px-2">System Field</span>
-                            )}
-                            {isProtectedField && !field.isSystemField && (
-                              <span className="text-xs text-blue-400 px-2 flex items-center gap-1">
-                                <ShieldAlert size={12} />
-                                Protected
-                              </span>
-                            )}
                           </div>
-                        </td>
-                          </SortableRow>
-                        )
-                      })}
-                    </tbody>
-                  </SortableContext>
-                </table>
+                        </div>
+                      </SortableRow>
+
+                      {/* Phase 1b: Hidden Field Warning (spans full width) */}
+                      <div className="px-6">
+                        <HiddenFieldWarning field={field} />
+                      </div>
+                    </React.Fragment>
+                  ))}
+                </SortableContext>
               </div>
             </DndContext>
           )}

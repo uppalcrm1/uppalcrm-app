@@ -63,14 +63,29 @@ CREATE INDEX IF NOT EXISTS idx_organizations_payment_status ON organizations(pay
 ALTER TABLE organization_trial_history ENABLE ROW LEVEL SECURITY;
 ALTER TABLE organization_subscriptions ENABLE ROW LEVEL SECURITY;
 
--- RLS Policies
-CREATE POLICY organization_trial_history_isolation ON organization_trial_history
-    FOR ALL TO PUBLIC
-    USING (organization_id = current_setting('app.current_organization_id')::uuid);
+-- RLS Policies (create only if they don't exist)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE tablename = 'organization_trial_history'
+    AND policyname = 'organization_trial_history_isolation'
+  ) THEN
+    CREATE POLICY organization_trial_history_isolation ON organization_trial_history
+        FOR ALL TO PUBLIC
+        USING (organization_id = current_setting('app.current_organization_id')::uuid);
+  END IF;
 
-CREATE POLICY organization_subscriptions_isolation ON organization_subscriptions
-    FOR ALL TO PUBLIC
-    USING (organization_id = current_setting('app.current_organization_id')::uuid);
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE tablename = 'organization_subscriptions'
+    AND policyname = 'organization_subscriptions_isolation'
+  ) THEN
+    CREATE POLICY organization_subscriptions_isolation ON organization_subscriptions
+        FOR ALL TO PUBLIC
+        USING (organization_id = current_setting('app.current_organization_id')::uuid);
+  END IF;
+END $$;
 
 -- Function to start a 30-day trial (no waiting period)
 CREATE OR REPLACE FUNCTION start_organization_trial(
@@ -80,15 +95,15 @@ CREATE OR REPLACE FUNCTION start_organization_trial(
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
-AS $
+AS $$
 DECLARE
     trial_end TIMESTAMP WITH TIME ZONE;
 BEGIN
     trial_end := NOW() + (trial_days || ' days')::interval;
-    
+
     -- Update organization
-    UPDATE organizations 
-    SET 
+    UPDATE organizations
+    SET
         trial_started_at = NOW(),
         trial_ends_at = trial_end,
         trial_status = 'active',
@@ -99,7 +114,7 @@ BEGIN
         is_active = true,
         updated_at = NOW()
     WHERE id = org_id;
-    
+
     -- Create trial history record
     INSERT INTO organization_trial_history (
         organization_id,
@@ -114,7 +129,7 @@ BEGIN
         trial_days,
         'active'
     );
-    
+
     -- Create subscription record
     INSERT INTO organization_subscriptions (
         organization_id,
@@ -133,10 +148,10 @@ BEGIN
         NOW(),
         trial_end
     );
-    
+
     RETURN TRUE;
 END;
-$;
+$$;
 
 -- Function to check eligibility (no waiting period required)
 CREATE OR REPLACE FUNCTION can_start_new_trial(org_id UUID)
@@ -144,27 +159,27 @@ RETURNS BOOLEAN
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
-AS $
+AS $$
 DECLARE
     current_status VARCHAR(50);
 BEGIN
     SELECT trial_status
     INTO current_status
-    FROM organizations 
+    FROM organizations
     WHERE id = org_id;
-    
+
     -- Business rules:
     -- 1. Must not have active trial
     -- 2. No waiting period required
     -- 3. No maximum trial limit
-    
+
     IF current_status = 'active' THEN
         RETURN FALSE; -- Already in trial
     END IF;
-    
+
     RETURN TRUE; -- Can always start new trial when not active
 END;
-$;
+$$;
 
 -- Function to expire trials
 CREATE OR REPLACE FUNCTION expire_trials()
@@ -172,20 +187,20 @@ RETURNS INTEGER
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
-AS $
+AS $$
 DECLARE
     expired_count INTEGER := 0;
     org_record RECORD;
 BEGIN
-    FOR org_record IN 
-        SELECT id, name 
-        FROM organizations 
-        WHERE trial_status = 'active' 
+    FOR org_record IN
+        SELECT id, name
+        FROM organizations
+        WHERE trial_status = 'active'
         AND trial_ends_at <= NOW()
     LOOP
         -- Update organization status
-        UPDATE organizations 
-        SET 
+        UPDATE organizations
+        SET
             trial_status = 'expired',
             payment_status = 'trial_expired',
             subscription_ends_at = NOW() + interval '7 days',
@@ -193,23 +208,23 @@ BEGIN
             is_active = false,
             updated_at = NOW()
         WHERE id = org_record.id;
-        
+
         -- Update subscription status
-        UPDATE organization_subscriptions 
-        SET 
+        UPDATE organization_subscriptions
+        SET
             status = 'expired',
             grace_period_ends_at = NOW() + interval '7 days',
             updated_at = NOW()
         WHERE organization_id = org_record.id AND status = 'trial';
-        
+
         -- Update trial history
-        UPDATE organization_trial_history 
+        UPDATE organization_trial_history
         SET trial_outcome = 'expired'
         WHERE organization_id = org_record.id AND trial_outcome = 'active';
-        
+
         expired_count := expired_count + 1;
     END LOOP;
-    
+
     RETURN expired_count;
 END;
-$;
+$$;

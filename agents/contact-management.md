@@ -126,6 +126,67 @@ As the Contact Management Agent, you help users with:
 - `POST /api/contacts/downloads/record` - Record software download
 - `POST /api/contacts/activations/record` - Record software activation
 
+### ⚠️ Important Endpoint Behavior Notes (Jan 23, 2026)
+
+**List vs Detail Endpoint Differences:**
+
+| Aspect | GET /api/contacts | GET /api/contacts/:id | GET /api/contacts/:id/detail |
+|--------|---|---|---|
+| **Purpose** | List view (optimized) | Single contact detail | Detail page with aggregates |
+| **Data Source** | `Contact-Safe.js` (findByOrganizationComplex/Simple) | `Contact.js` (findById) | `Contact.js` (findById) + accounts/stats |
+| **custom_fields** | ✅ Included in response | ✅ Included & spread at top | ✅ Included & spread at top |
+| **all_fields** | ⚠️ Selected in SQL but must be mapped in result object | ✅ All fields included | ✅ All fields included |
+| **Use Case** | Table display, dropdowns, searches | Component refreshes | Full page load |
+
+**Critical Mapping Issue in Contact-Safe.js:**
+- **Problem**: SQL query selected fields but result mapping didn't include them
+- **Example**: `SELECT c.type` was in SQL but `type: row.type` was missing in result mapping
+- **Solution**: Always ensure fields selected in SELECT are mapped in the result object
+- **Files affected**: `models/Contact-Safe.js` (both findByOrganizationComplex and findByOrganizationSimple)
+- **Fix commits**: 7d76c21, b33df1e
+
+**Universal Contact Edit Experience (Jan 23, 2026):**
+
+When implementing edit modals that should work consistently across list and detail views:
+
+1. **List View Edit** → Fetch full contact first:
+```javascript
+const handleEditContact = async (contactFromList) => {
+  const response = await contactsAPI.getContact(contactFromList.id)  // Use single endpoint
+  setSelectedContact(response.contact)  // Has all fields
+  setShowEditModal(true)
+}
+```
+
+2. **Detail View Edit** → Already has full data:
+```javascript
+onEdit={(contact) => {
+  setSelectedContact(contact)  // Already complete
+  setShowEditModal(true)
+}
+```
+
+3. **Why this works**:
+   - List endpoint optimized for performance (used for pagination/filtering)
+   - Single endpoint used for editing (one extra API call acceptable)
+   - Ensures edit form always has complete data (custom_fields, all standard fields)
+   - No data duplication in UI layer
+
+**Changes Made (Jan 23, 2026):**
+
+1. **Frontend** (`frontend/src/pages/Contacts.jsx`):
+   - Added `handleEditContact()` async handler
+   - Fetches full contact before opening edit modal
+   - Applies to both list and detail edit flows
+   - Commit: 334df80
+
+2. **Backend** (`models/Contact-Safe.js`):
+   - Added `c.type` to SELECT clause (findByOrganizationComplex)
+   - Added `c.type` to SELECT clause (findByOrganizationSimple)
+   - Added `c.type` to GROUP BY clause (findByOrganizationComplex)
+   - Added `type: row.type` to result mapping (both queries)
+   - Commits: 7d76c21, b33df1e
+
 ### Model: `models/Contact.js`
 
 The Contact model provides methods for:
@@ -474,6 +535,9 @@ All contact operations are automatically scoped to the authenticated user's orga
 8. **Preserve lead history** when converting to contact
 9. **Update last_contact_date** when logging interactions
 10. **Validate email uniqueness** within organization (optional)
+11. **⚠️ SQL Select ≠ Result Mapping** - Always verify that fields selected in SQL are also mapped in the result object. Query can return a field but if it's not in the result mapping, it won't reach the frontend
+12. **Consistent Edit Flows** - For UI consistency, fetch complete data (single endpoint) before opening edit forms, even from list views. One extra API call is worth the UX consistency
+13. **Test field visibility across endpoints** - When adding new fields to list endpoint, test both the SQL select AND the result mapping in Contact-Safe.js
 
 ---
 
@@ -503,6 +567,21 @@ All contact operations are automatically scoped to the authenticated user's orga
    - Verify contact_id
    - Check user_id is valid
    - Ensure required fields present
+
+6. **Field appears empty in list view after saving (Jan 23, 2026):**
+   - **Cause**: Contact-Safe.js query selects field but result mapping doesn't include it
+   - **Debug**: Check both SQL SELECT AND result mapping object in Contact-Safe.js
+   - **Example**: `SELECT c.type` in query but missing `type: row.type` in result mapping
+   - **Files**: `models/Contact-Safe.js` (findByOrganizationComplex & findByOrganizationSimple)
+   - **Fix**: Add field to both SELECT clause AND result object mapping
+   - **Verification**: Value should appear correctly in detail page (uses different endpoint)
+
+7. **Edit form not prefilled with current values:**
+   - **Cause**: List endpoint returns sparse data (optimized), edit form needs complete data
+   - **Solution**: Fetch full contact from GET `/api/contacts/:id` before opening edit modal
+   - **Pattern**: Use `handleEditContact()` to fetch before `setShowEditModal(true)`
+   - **Why**: List endpoint optimized for performance, detail endpoint has all fields
+   - **Trade-off**: One extra API call on edit is worth UX consistency
 
 ---
 

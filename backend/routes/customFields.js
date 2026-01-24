@@ -2,9 +2,189 @@ const express = require('express')
 const router = express.Router()
 const CustomField = require('../models/CustomField')
 const { authenticateToken } = require('../middleware/auth')
+const fieldVisibilityService = require('../services/fieldVisibilityService')
+
+// Middleware to allow Phase 1 fields through any validation
+const allowPhase1Fields = (req, res, next) => {
+  // Explicitly mark Phase 1 fields as allowed
+  if (req.body) {
+    req.body._allowedFields = {
+      overall_visibility: true,
+      visibility_logic: true,
+      show_in_create_form: true,
+      show_in_edit_form: true,
+      show_in_detail_view: true,
+      show_in_list_view: true
+    }
+  }
+  next()
+}
 
 // Apply authentication middleware to all routes
 router.use(authenticateToken)
+
+// Apply Phase 1 field allowance middleware
+router.use(allowPhase1Fields)
+
+// System field defaults - these are the standard fields that should always be available
+const SYSTEM_FIELD_DEFAULTS = {
+  first_name: {
+    field_name: 'first_name',
+    field_label: 'First Name',
+    field_type: 'text',
+    is_required: true,
+    is_enabled: true,
+    show_in_create_form: true,
+    show_in_edit_form: true,
+    show_in_detail_view: true,
+    show_in_list_view: true,
+    field_options: null,
+    display_order: 1
+  },
+  last_name: {
+    field_name: 'last_name',
+    field_label: 'Last Name',
+    field_type: 'text',
+    is_required: true,
+    is_enabled: true,
+    show_in_create_form: true,
+    show_in_edit_form: true,
+    show_in_detail_view: true,
+    show_in_list_view: true,
+    field_options: null,
+    display_order: 2
+  },
+  email: {
+    field_name: 'email',
+    field_label: 'Email',
+    field_type: 'email',
+    is_required: true,
+    is_enabled: true,
+    show_in_create_form: true,
+    show_in_edit_form: true,
+    show_in_detail_view: true,
+    show_in_list_view: true,
+    field_options: null,
+    display_order: 3
+  },
+  phone: {
+    field_name: 'phone',
+    field_label: 'Phone',
+    field_type: 'text',
+    is_required: false,
+    is_enabled: true,
+    show_in_create_form: true,
+    show_in_edit_form: true,
+    show_in_detail_view: true,
+    show_in_list_view: false,
+    field_options: null,
+    display_order: 4
+  },
+  company: {
+    field_name: 'company',
+    field_label: 'Company',
+    field_type: 'text',
+    is_required: false,
+    is_enabled: true,
+    show_in_create_form: true,
+    show_in_edit_form: true,
+    show_in_detail_view: true,
+    show_in_list_view: false,
+    field_options: null,
+    display_order: 5
+  },
+  source: {
+    field_name: 'source',
+    field_label: 'Source',
+    field_type: 'select',
+    is_required: false,
+    is_enabled: true,
+    show_in_create_form: true,
+    show_in_edit_form: true,
+    show_in_detail_view: true,
+    show_in_list_view: true,
+    field_options: ['website', 'referral', 'phone', 'email', 'social_media', 'event', 'manual'],
+    display_order: 6
+  },
+  status: {
+    field_name: 'status',
+    field_label: 'Status',
+    field_type: 'select',
+    is_required: false,
+    is_enabled: true,
+    show_in_create_form: true,
+    show_in_edit_form: true,
+    show_in_detail_view: true,
+    show_in_list_view: true,
+    field_options: ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'won', 'lost'],
+    display_order: 7
+  },
+  priority: {
+    field_name: 'priority',
+    field_label: 'Priority',
+    field_type: 'select',
+    is_required: false,
+    is_enabled: true,
+    show_in_create_form: true,
+    show_in_edit_form: true,
+    show_in_detail_view: true,
+    show_in_list_view: true,
+    field_options: ['low', 'medium', 'high'],
+    display_order: 8
+  },
+  value: {
+    field_name: 'value',
+    field_label: 'Potential Value ($)',
+    field_type: 'number',
+    is_required: false,
+    is_enabled: true,
+    show_in_create_form: true,
+    show_in_edit_form: true,
+    show_in_detail_view: true,
+    show_in_list_view: false,
+    field_options: null,
+    display_order: 9
+  },
+  assigned_to: {
+    field_name: 'assigned_to',
+    field_label: 'Assign To',
+    field_type: 'user_select',
+    is_required: false,
+    is_enabled: true,
+    show_in_create_form: true,
+    show_in_edit_form: true,
+    show_in_detail_view: true,
+    show_in_list_view: false,
+    field_options: null,
+    display_order: 10
+  },
+  next_follow_up: {
+    field_name: 'next_follow_up',
+    field_label: 'Next Follow Up',
+    field_type: 'date',
+    is_required: false,
+    is_enabled: true,
+    show_in_create_form: true,
+    show_in_edit_form: true,
+    show_in_detail_view: true,
+    show_in_list_view: false,
+    field_options: null,
+    display_order: 11
+  },
+  notes: {
+    field_name: 'notes',
+    field_label: 'Notes',
+    field_type: 'textarea',
+    is_required: false,
+    is_enabled: true,
+    show_in_create_form: true,
+    show_in_edit_form: true,
+    show_in_detail_view: true,
+    show_in_list_view: false,
+    field_options: null,
+    display_order: 12
+  }
+}
 
 // ========================================
 // FIELD DEFINITIONS ROUTES
@@ -13,6 +193,7 @@ router.use(authenticateToken)
 /**
  * GET /api/custom-fields
  * Get all custom field definitions (optionally filtered by entityType query param)
+ * Phase 1: Applies visibility logic to all fields
  */
 router.get('/', async (req, res) => {
   try {
@@ -20,7 +201,7 @@ router.get('/', async (req, res) => {
     console.log('Query params:', req.query)
     console.log('User:', req.user?.id, 'Org:', req.user?.organization_id)
 
-    const { entityType, activeOnly = 'true' } = req.query
+    const { entityType, activeOnly = 'true', context } = req.query
     const organizationId = req.user.organization_id
 
     if (!organizationId) {
@@ -43,11 +224,20 @@ router.get('/', async (req, res) => {
       }
 
       console.log(`🔍 Fetching fields for entityType: ${entityType}`)
-      const fields = await CustomField.getFieldDefinitions(
+      let fields = await CustomField.getFieldDefinitions(
         organizationId,
         entityType,
         activeOnly === 'true'
       )
+
+      // Phase 1: Apply visibility logic to all fields
+      fields = fields.map(field => fieldVisibilityService.applyVisibilityLogic(field))
+
+      // Filter by context if requested
+      if (context) {
+        fields = fields.filter(field => fieldVisibilityService.isVisibleInContext(field, context))
+        console.log(`🔍 Filtered to ${fields.length} fields visible in context: ${context}`)
+      }
 
       console.log(`✅ Found ${fields.length} fields for ${entityType}`)
       return res.json({
@@ -64,11 +254,20 @@ router.get('/', async (req, res) => {
     const entityTypes = ['leads', 'contacts', 'accounts', 'transactions', 'product']
 
     for (const type of entityTypes) {
-      const fields = await CustomField.getFieldDefinitions(
+      let fields = await CustomField.getFieldDefinitions(
         organizationId,
         type,
         activeOnly === 'true'
       )
+
+      // Phase 1: Apply visibility logic to all fields
+      fields = fields.map(field => fieldVisibilityService.applyVisibilityLogic(field))
+
+      // Filter by context if requested
+      if (context) {
+        fields = fields.filter(field => fieldVisibilityService.isVisibleInContext(field, context))
+      }
+
       allFields[type] = fields
     }
 
@@ -147,7 +346,10 @@ router.post('/', async (req, res) => {
       fieldOptions, field_options,
       defaultValue, default_value,
       placeholder,
-      fieldGroup, field_group
+      fieldGroup, field_group,
+      // Phase 1: Visibility fields
+      overall_visibility,
+      visibility_logic
     } = req.body
 
     // Normalize to camelCase (prefer camelCase, fallback to snake_case)
@@ -169,7 +371,10 @@ router.post('/', async (req, res) => {
       fieldOptions: fieldOptions || field_options,
       defaultValue: defaultValue !== undefined ? defaultValue : default_value,
       placeholder: placeholder,
-      fieldGroup: fieldGroup || field_group
+      fieldGroup: fieldGroup || field_group,
+      // Phase 1: Visibility fields
+      overall_visibility: overall_visibility || 'visible',
+      visibility_logic: visibility_logic || 'master_override'
     }
 
     console.log('🔍 STEP 2: AFTER NORMALIZATION')
@@ -251,6 +456,32 @@ router.post('/', async (req, res) => {
       console.log('✅ Field options valid:', normalizedData.fieldOptions.length, 'options')
     }
 
+    // Validate Phase 1 visibility fields
+    const validVisibilityStates = ['visible', 'hidden']
+    const validVisibilityLogics = ['master_override', 'context_based']
+
+    if (normalizedData.overall_visibility && !validVisibilityStates.includes(normalizedData.overall_visibility)) {
+      console.error('❌ Invalid overall_visibility:', normalizedData.overall_visibility)
+      return res.status(400).json({
+        error: 'Invalid overall_visibility value',
+        validValues: validVisibilityStates,
+        received: normalizedData.overall_visibility
+      })
+    }
+
+    if (normalizedData.visibility_logic && !validVisibilityLogics.includes(normalizedData.visibility_logic)) {
+      console.error('❌ Invalid visibility_logic:', normalizedData.visibility_logic)
+      return res.status(400).json({
+        error: 'Invalid visibility_logic value',
+        validValues: validVisibilityLogics,
+        received: normalizedData.visibility_logic
+      })
+    }
+
+    console.log('✅ Phase 1 visibility fields valid')
+    console.log('   overall_visibility:', normalizedData.overall_visibility)
+    console.log('   visibility_logic:', normalizedData.visibility_logic)
+
     const fieldData = {
       organizationId,
       fieldName: normalizedData.fieldName,
@@ -271,6 +502,9 @@ router.post('/', async (req, res) => {
       defaultValue: normalizedData.defaultValue,
       placeholder: normalizedData.placeholder,
       fieldGroup: normalizedData.fieldGroup,
+      // Phase 1: Visibility fields
+      overall_visibility: normalizedData.overall_visibility,
+      visibility_logic: normalizedData.visibility_logic,
       createdBy: userId
     }
 
@@ -453,7 +687,10 @@ router.post('/definitions', async (req, res) => {
       fieldOptions, field_options,
       defaultValue, default_value,
       placeholder,
-      fieldGroup, field_group
+      fieldGroup, field_group,
+      // Phase 1: Visibility fields
+      overall_visibility,
+      visibility_logic
     } = req.body
 
     // Normalize to camelCase (prefer camelCase, fallback to snake_case)
@@ -475,7 +712,10 @@ router.post('/definitions', async (req, res) => {
       fieldOptions: fieldOptions || field_options,
       defaultValue: defaultValue !== undefined ? defaultValue : default_value,
       placeholder: placeholder,
-      fieldGroup: fieldGroup || field_group
+      fieldGroup: fieldGroup || field_group,
+      // Phase 1: Visibility fields
+      overall_visibility: overall_visibility || 'visible',
+      visibility_logic: visibility_logic || 'master_override'
     }
 
     console.log('📋 Extracted field data:', {
@@ -548,6 +788,32 @@ router.post('/definitions', async (req, res) => {
       console.log('✅ Field options valid:', normalizedData.fieldOptions.length, 'options')
     }
 
+    // Validate Phase 1 visibility fields
+    const validVisibilityStates = ['visible', 'hidden']
+    const validVisibilityLogics = ['master_override', 'context_based']
+
+    if (normalizedData.overall_visibility && !validVisibilityStates.includes(normalizedData.overall_visibility)) {
+      console.error('❌ Invalid overall_visibility:', normalizedData.overall_visibility)
+      return res.status(400).json({
+        error: 'Invalid overall_visibility value',
+        validValues: validVisibilityStates,
+        received: normalizedData.overall_visibility
+      })
+    }
+
+    if (normalizedData.visibility_logic && !validVisibilityLogics.includes(normalizedData.visibility_logic)) {
+      console.error('❌ Invalid visibility_logic:', normalizedData.visibility_logic)
+      return res.status(400).json({
+        error: 'Invalid visibility_logic value',
+        validValues: validVisibilityLogics,
+        received: normalizedData.visibility_logic
+      })
+    }
+
+    console.log('✅ Phase 1 visibility fields valid')
+    console.log('   overall_visibility:', normalizedData.overall_visibility)
+    console.log('   visibility_logic:', normalizedData.visibility_logic)
+
     const fieldData = {
       organizationId,
       fieldName: normalizedData.fieldName,
@@ -568,6 +834,9 @@ router.post('/definitions', async (req, res) => {
       defaultValue: normalizedData.defaultValue,
       placeholder: normalizedData.placeholder,
       fieldGroup: normalizedData.fieldGroup,
+      // Phase 1: Visibility fields
+      overall_visibility: normalizedData.overall_visibility,
+      visibility_logic: normalizedData.visibility_logic,
       createdBy: userId
     }
 
@@ -637,15 +906,18 @@ router.post('/definitions', async (req, res) => {
 /**
  * PUT /api/custom-fields/definitions/:fieldId
  * Update a custom field definition
+ * Phase 1: Validates updates using fieldVisibilityService
  */
 router.put('/definitions/:fieldId', async (req, res) => {
   try {
     const { fieldId } = req.params
     const organizationId = req.user.organization_id
     const userId = req.user.id
-    const updateData = req.body
 
     console.log(`📥 PUT /api/custom-fields/definitions/${fieldId}`)
+
+    // Phase 1: Validate and adjust updates
+    let updateData = fieldVisibilityService.validateUpdate(req.body)
 
     const field = await CustomField.updateFieldDefinition(
       fieldId,
@@ -654,13 +926,24 @@ router.put('/definitions/:fieldId', async (req, res) => {
       userId
     )
 
+    // Phase 1: Apply visibility logic to response
+    const processedField = fieldVisibilityService.applyVisibilityLogic(field)
+
     console.log('✅ Field updated successfully')
 
-    res.json({
+    // Phase 1: Include adjustment info if auto-adjusted
+    const response = {
       success: true,
       message: 'Field definition updated successfully',
-      field
-    })
+      field: processedField
+    }
+
+    if (updateData._auto_adjusted) {
+      response.adjusted = true
+      response.adjustment_reason = updateData._adjustment_reason
+    }
+
+    res.json(response)
   } catch (error) {
     console.error('❌ Error updating field definition:', error)
 
@@ -678,6 +961,45 @@ router.put('/definitions/:fieldId', async (req, res) => {
 
     res.status(500).json({
       error: 'Failed to update field definition',
+      details: error.message
+    })
+  }
+})
+
+/**
+ * GET /api/custom-fields/definitions/:fieldId/visibility-status
+ * Get visibility status for a field (Phase 1)
+ * Returns effective visibility configuration for UI display
+ */
+router.get('/definitions/:fieldId/visibility-status', async (req, res) => {
+  try {
+    const { fieldId } = req.params
+    const organizationId = req.user.organization_id
+
+    console.log(`📥 GET /api/custom-fields/definitions/${fieldId}/visibility-status`)
+
+    const field = await CustomField.getFieldDefinitionById(fieldId, organizationId)
+
+    if (!field) {
+      return res.status(404).json({
+        success: false,
+        message: 'Field not found'
+      })
+    }
+
+    const status = fieldVisibilityService.getVisibilityStatus(field)
+
+    console.log('✅ Retrieved visibility status')
+
+    res.json({
+      success: true,
+      data: status
+    })
+  } catch (error) {
+    console.error('❌ Error fetching visibility status:', error)
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch visibility status',
       details: error.message
     })
   }
@@ -1034,6 +1356,329 @@ router.post('/values/batch', async (req, res) => {
     console.error('❌ Error fetching batch field values:', error)
     res.status(500).json({
       error: 'Failed to fetch field values',
+      details: error.message
+    })
+  }
+})
+
+/**
+ * GET /api/custom-fields/form-config
+ * Get complete form configuration including system fields and custom fields
+ * with all visibility flags needed for dynamic form rendering
+ */
+router.get('/form-config', async (req, res) => {
+  try {
+    console.log('📥 GET /api/custom-fields/form-config')
+
+    const organizationId = req.user.organization_id
+
+    if (!organizationId) {
+      return res.status(400).json({
+        error: 'Missing organization context',
+        details: 'User must be associated with an organization'
+      })
+    }
+
+    // Fetch custom fields with ALL visibility flags
+    const customFieldsResult = await CustomField.getFieldDefinitions(
+      organizationId,
+      'leads', // Default to leads, but this endpoint serves all entity types
+      true // activeOnly
+    )
+
+    // Fetch system fields from default_field_configurations with visibility flags
+    let systemFieldsResult = []
+    let storedConfigs = {}
+
+    try {
+      // Try to fetch with visibility flags first (if columns exist)
+      try {
+        const systemFieldsQuery = `
+          SELECT
+            id,
+            field_name,
+            field_label,
+            field_type,
+            field_options,
+            is_required,
+            is_enabled,
+            COALESCE(show_in_create_form, true) as show_in_create_form,
+            COALESCE(show_in_edit_form, true) as show_in_edit_form,
+            COALESCE(show_in_detail_view, true) as show_in_detail_view,
+            COALESCE(show_in_list_view, false) as show_in_list_view,
+            display_order
+          FROM default_field_configurations
+          WHERE organization_id = $1
+          ORDER BY display_order ASC, field_name ASC
+        `
+        const systemFieldsRes = await require('../database/connection').query(systemFieldsQuery, [organizationId])
+
+        // Store configs by field_name for merging with defaults
+        systemFieldsRes.rows.forEach(row => {
+          storedConfigs[row.field_name] = row
+        })
+      } catch (innerError) {
+        // If visibility columns don't exist, fetch without them and add defaults
+        console.warn('⚠️ Could not fetch with visibility flags, trying without:', innerError.message)
+        try {
+          const fallbackQuery = `
+            SELECT
+              id,
+              field_name,
+              field_label,
+              field_type,
+              field_options,
+              is_required,
+              is_enabled,
+              display_order
+            FROM default_field_configurations
+            WHERE organization_id = $1
+            ORDER BY display_order ASC, field_name ASC
+          `
+          const fallbackRes = await require('../database/connection').query(fallbackQuery, [organizationId])
+          fallbackRes.rows.forEach(row => {
+            storedConfigs[row.field_name] = {
+              ...row,
+              show_in_create_form: true,
+              show_in_edit_form: true,
+              show_in_detail_view: true,
+              show_in_list_view: false
+            }
+          })
+        } catch (fallbackError) {
+          console.warn('⚠️ Could not fetch from default_field_configurations table:', fallbackError.message)
+        }
+      }
+
+      // Build final system fields by merging defaults with stored configs
+      systemFieldsResult = Object.values(SYSTEM_FIELD_DEFAULTS).map(defaultField => {
+        const stored = storedConfigs[defaultField.field_name] || {}
+        return {
+          ...defaultField,
+          // Override defaults with stored values if they exist
+          ...(stored.id && { id: stored.id }),
+          ...(stored.field_label && { field_label: stored.field_label }),
+          ...(stored.is_required !== undefined && { is_required: stored.is_required }),
+          ...(stored.is_enabled !== undefined && { is_enabled: stored.is_enabled }),
+          ...(stored.show_in_create_form !== undefined && { show_in_create_form: stored.show_in_create_form }),
+          ...(stored.show_in_edit_form !== undefined && { show_in_edit_form: stored.show_in_edit_form }),
+          ...(stored.show_in_detail_view !== undefined && { show_in_detail_view: stored.show_in_detail_view }),
+          ...(stored.show_in_list_view !== undefined && { show_in_list_view: stored.show_in_list_view }),
+          ...(stored.display_order !== undefined && { display_order: stored.display_order })
+        }
+      }).filter(field => field.is_enabled !== false)
+
+    } catch (error) {
+      console.warn('⚠️ Could not fetch system fields from default_field_configurations:', error.message)
+      // Even if there's an error, provide the defaults
+      systemFieldsResult = Object.values(SYSTEM_FIELD_DEFAULTS).filter(field => field.is_enabled !== false)
+    }
+
+    console.log(`✅ Retrieved ${customFieldsResult.length} custom fields and ${systemFieldsResult.length} system fields`)
+
+    res.json({
+      success: true,
+      customFields: customFieldsResult,
+      systemFields: systemFieldsResult,
+      count: {
+        custom: customFieldsResult.length,
+        system: systemFieldsResult.length,
+        total: customFieldsResult.length + systemFieldsResult.length
+      }
+    })
+  } catch (error) {
+    console.error('❌ Error fetching form config:', error)
+    res.status(500).json({
+      error: 'Failed to fetch form configuration',
+      details: error.message
+    })
+  }
+})
+
+/**
+ * GET /api/custom-fields/debug-config
+ * Debug endpoint to see raw field configurations
+ */
+router.get('/debug-config', async (req, res) => {
+  try {
+    const organizationId = req.user.organization_id;
+    const db = require('../database/connection');
+
+    console.log('🔍 DEBUG: Checking field configurations for org:', organizationId);
+
+    // Get raw data from database
+    let dbRows = [];
+    try {
+      const query = `
+        SELECT * FROM default_field_configurations
+        WHERE organization_id = $1
+        ORDER BY field_name ASC
+      `;
+      const result = await db.query(query, [organizationId]);
+      dbRows = result.rows;
+    } catch (error) {
+      console.error('Error fetching from DB:', error);
+    }
+
+    // Get what the API would return
+    const apiData = await require('../models/CustomField').getFieldDefinitions(organizationId, 'leads', true);
+
+    // Get system fields as they would be sent
+    let storedConfigs = {};
+    try {
+      const systemFieldsQuery = `
+        SELECT * FROM default_field_configurations
+        WHERE organization_id = $1
+      `;
+      const systemFieldsRes = await db.query(systemFieldsQuery, [organizationId]);
+      systemFieldsRes.rows.forEach(row => {
+        storedConfigs[row.field_name] = row;
+      });
+    } catch (error) {
+      console.error('Error:', error);
+    }
+
+    const mergedSystemFields = Object.values(SYSTEM_FIELD_DEFAULTS).map(defaultField => {
+      const stored = storedConfigs[defaultField.field_name] || {};
+      return {
+        field_name: defaultField.field_name,
+        default_is_enabled: defaultField.is_enabled,
+        default_show_in_create: defaultField.show_in_create_form,
+        stored_is_enabled: stored.is_enabled,
+        stored_show_in_create: stored.show_in_create_form,
+        final_is_enabled: stored.is_enabled !== undefined ? stored.is_enabled : defaultField.is_enabled,
+        final_show_in_create: stored.show_in_create_form !== undefined ? stored.show_in_create_form : defaultField.show_in_create_form,
+        will_pass_filter: (stored.is_enabled !== undefined ? stored.is_enabled : defaultField.is_enabled) !== false,
+        has_db_row: !!stored.id
+      };
+    });
+
+    res.json({
+      success: true,
+      organization_id: organizationId,
+      db_rows_count: dbRows.length,
+      db_rows: dbRows,
+      merged_system_fields: mergedSystemFields,
+      company_field: mergedSystemFields.find(f => f.field_name === 'company'),
+      priority_field: mergedSystemFields.find(f => f.field_name === 'priority')
+    });
+  } catch (error) {
+    console.error('Debug error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * PUT /api/custom-fields/default/:fieldName
+ * Update a system/default field configuration
+ */
+router.put('/default/:fieldName', async (req, res) => {
+  try {
+    const { fieldName } = req.params
+    const organizationId = req.user.organization_id
+    const updateData = req.body
+
+    console.log(`📥 PUT /api/custom-fields/default/${fieldName}`, updateData)
+
+    if (!organizationId) {
+      return res.status(400).json({
+        error: 'Missing organization context',
+        details: 'User must be associated with an organization'
+      })
+    }
+
+    // Validate field name is a known system field
+    if (!SYSTEM_FIELD_DEFAULTS[fieldName]) {
+      return res.status(400).json({
+        error: 'Invalid system field',
+        details: `Field '${fieldName}' is not a recognized system field`
+      })
+    }
+
+    // Build the update query dynamically based on provided fields
+    const allowedFields = [
+      'field_label',
+      'field_type',
+      'field_options',
+      'is_required',
+      'is_enabled',
+      'overall_visibility',
+      'show_in_create_form',
+      'show_in_edit_form',
+      'show_in_detail_view',
+      'show_in_list_view',
+      'display_order'
+    ]
+
+    const updates = {}
+    allowedFields.forEach(field => {
+      if (updateData[field] !== undefined) {
+        updates[field] = updateData[field]
+      }
+    })
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({
+        error: 'No valid fields to update',
+        details: 'Request must include at least one valid field to update'
+      })
+    }
+
+    // Check if a configuration row exists for this field
+    const db = require('../database/connection')
+    const checkQuery = `
+      SELECT id FROM default_field_configurations
+      WHERE organization_id = $1 AND field_name = $2
+    `
+    const checkResult = await db.query(checkQuery, [organizationId, fieldName])
+
+    let result
+    if (checkResult.rows.length > 0) {
+      // Update existing configuration
+      const setClause = Object.keys(updates)
+        .map((key, idx) => `${key} = $${idx + 3}`)
+        .join(', ')
+
+      const updateQuery = `
+        UPDATE default_field_configurations
+        SET ${setClause}, updated_at = NOW()
+        WHERE organization_id = $1 AND field_name = $2
+        RETURNING *
+      `
+      const values = [organizationId, fieldName, ...Object.values(updates)]
+      result = await db.query(updateQuery, values)
+    } else {
+      // Insert new configuration
+      const defaultConfig = SYSTEM_FIELD_DEFAULTS[fieldName]
+      const insertData = {
+        ...defaultConfig,
+        ...updates,
+        organization_id: organizationId
+      }
+
+      const insertFields = Object.keys(insertData)
+      const placeholders = insertFields.map((_, idx) => `$${idx + 1}`).join(', ')
+
+      const insertQuery = `
+        INSERT INTO default_field_configurations (${insertFields.join(', ')})
+        VALUES (${placeholders})
+        RETURNING *
+      `
+      const values = Object.values(insertData)
+      result = await db.query(insertQuery, values)
+    }
+
+    console.log('✅ System field configuration updated successfully')
+
+    res.json({
+      success: true,
+      message: `Field '${fieldName}' configuration updated successfully`,
+      field: result.rows[0]
+    })
+  } catch (error) {
+    console.error('❌ Error updating system field configuration:', error)
+    res.status(500).json({
+      error: 'Failed to update system field configuration',
       details: error.message
     })
   }
