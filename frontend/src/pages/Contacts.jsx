@@ -90,14 +90,16 @@ const Contacts = () => {
 
   // Build dynamic column definitions from field configuration
   const { COLUMN_DEFINITIONS, DEFAULT_VISIBLE_COLUMNS } = React.useMemo(() => {
-    // Start with system fields that have show_in_list_view = true
+    // Collect ALL available fields for the column picker
+    // Note: We include all fields here (not just show_in_list_view=true)
+    // so users can toggle any field as a column option
     const columns = []
     const addedFields = new Set()
 
-    // Add system fields
+    // Add system fields - include ALL fields so they're available in column picker
     if (Array.isArray(fieldConfig)) {
       fieldConfig
-        .filter(f => f.show_in_list_view !== false && f.overall_visibility !== 'hidden')
+        .filter(f => f.overall_visibility !== 'hidden')
         .forEach(field => {
           // Special handling: combine first_name and last_name into a single 'name' column
           if (field.field_name === 'first_name') {
@@ -135,10 +137,20 @@ const Contacts = () => {
     columns.push(SPECIAL_COLUMNS.transactions)
 
     // Create default visible columns object
+    // Columns should be visible by default only if show_in_list_view=true
     const defaultVisibleCols = {}
     columns.forEach(col => {
-      // All columns visible by default (they've already been filtered by show_in_list_view)
-      defaultVisibleCols[col.key] = true
+      if (col.isSpecial) {
+        // Special columns (accounts, transactions, actions) show by default
+        defaultVisibleCols[col.key] = true
+      } else if (col.key === 'name') {
+        // Composite name field shows by default
+        defaultVisibleCols[col.key] = true
+      } else {
+        // Other fields: check the field config's show_in_list_view setting
+        const fieldDef = fieldConfig.find(f => f.field_name === col.key)
+        defaultVisibleCols[col.key] = fieldDef?.show_in_list_view !== false
+      }
     })
 
     return {
