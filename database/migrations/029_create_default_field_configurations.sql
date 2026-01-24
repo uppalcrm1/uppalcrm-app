@@ -45,14 +45,24 @@ COMMENT ON COLUMN default_field_configurations.entity_type IS 'Which entity type
 
 -- Trigger for updated_at
 CREATE OR REPLACE FUNCTION update_default_field_config_updated_at()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
 BEGIN
   NEW.updated_at = NOW();
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
-CREATE TRIGGER trigger_default_field_config_updated_at
-  BEFORE UPDATE ON default_field_configurations
-  FOR EACH ROW
-  EXECUTE FUNCTION update_default_field_config_updated_at();
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgname = 'trigger_default_field_config_updated_at'
+  ) THEN
+    CREATE TRIGGER trigger_default_field_config_updated_at
+      BEFORE UPDATE ON default_field_configurations
+      FOR EACH ROW
+      EXECUTE FUNCTION update_default_field_config_updated_at();
+  END IF;
+END $$;
