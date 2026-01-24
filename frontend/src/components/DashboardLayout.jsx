@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { Outlet, NavLink, useLocation } from 'react-router-dom'
+import toast from 'react-hot-toast'
 import { useAuth } from '../contexts/AuthContext'
 import { useNotifications } from '../context/NotificationContext'
 import { useCall } from '../context/CallContext'
@@ -29,6 +30,7 @@ import {
 } from 'lucide-react'
 import LoadingSpinner from './LoadingSpinner'
 import IncomingCallNotification from './IncomingCallNotification'
+import Dialpad from './Dialpad'
 
 // COMPLETE navigation with all your CRM sections
 const navigation = [
@@ -53,6 +55,9 @@ const DashboardLayout = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [adminMenuOpen, setAdminMenuOpen] = useState(false)
+  const [showIncomingCallDialpad, setShowIncomingCallDialpad] = useState(false)
+  const [incomingCallNumber, setIncomingCallNumber] = useState('')
+  const [incomingCallName, setIncomingCallName] = useState('')
   const location = useLocation()
 
   // Request browser notification permission on first visit
@@ -65,6 +70,44 @@ const DashboardLayout = () => {
       return () => clearTimeout(timer)
     }
   }, [browserPermission, requestBrowserPermission])
+
+  // Listen for incoming call events
+  React.useEffect(() => {
+    // Handle dial back event (from accepting call in queue system)
+    const handleOpenDialpad = (event) => {
+      const { phoneNumber, callerName } = event.detail
+      setIncomingCallNumber(phoneNumber)
+      setIncomingCallName(callerName)
+      setShowIncomingCallDialpad(true)
+      console.log('Opening Dialpad for incoming call:', phoneNumber, callerName)
+    }
+
+    // Handle joining existing conference (new queue system - agent joins customer's conference)
+    const handleJoinConference = (event) => {
+      const { conferenceId, callerPhone, callerName } = event.detail
+
+      console.log('Agent joining incoming call conference:', conferenceId)
+
+      // Pass conference ID to Dialpad via window variable
+      window.incomingConferenceId = conferenceId
+
+      // Show dialpad with caller info
+      setIncomingCallNumber(callerPhone)
+      setIncomingCallName(callerName)
+      setShowIncomingCallDialpad(true)
+
+      // Use react-hot-toast for notification
+      toast.success(`Joining call with ${callerName || callerPhone}...`)
+    }
+
+    window.addEventListener('openDialpadWithNumber', handleOpenDialpad)
+    window.addEventListener('joinIncomingCallConference', handleJoinConference)
+
+    return () => {
+      window.removeEventListener('openDialpadWithNumber', handleOpenDialpad)
+      window.removeEventListener('joinIncomingCallConference', handleJoinConference)
+    }
+  }, [])
 
   if (isLoading) {
     return <LoadingSpinner />
@@ -83,6 +126,19 @@ const DashboardLayout = () => {
           callerName={incomingCall.callerName}
           onAccept={acceptCall}
           onDecline={declineCall}
+        />
+      )}
+
+      {/* Dialpad for Incoming Call Dial Back */}
+      {showIncomingCallDialpad && (
+        <Dialpad
+          onClose={() => {
+            setShowIncomingCallDialpad(false)
+            setIncomingCallNumber('')
+            setIncomingCallName('')
+          }}
+          prefilledNumber={incomingCallNumber}
+          contactName={incomingCallName}
         />
       )}
 

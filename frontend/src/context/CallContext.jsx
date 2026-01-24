@@ -65,6 +65,10 @@ export const CallProvider = ({ children }) => {
                 icon: '/phone-icon.png'
               })
             }
+          } else if (!data.incomingCall && incomingCall) {
+            // Call was accepted by another agent - clear the popup
+            console.log('Incoming call no longer available (accepted by another agent)')
+            setIncomingCall(null)
           }
         }
       } catch (error) {
@@ -75,8 +79,8 @@ export const CallProvider = ({ children }) => {
     // Only start polling if authenticated
     if (!isAuthenticated) return;
 
-    // Poll every 3 seconds
-    const interval = setInterval(checkForIncomingCalls, 3000)
+    // Poll every 2 seconds
+    const interval = setInterval(checkForIncomingCalls, 2000)
 
     return () => clearInterval(interval)
   }, [incomingCall, isAuthenticated])
@@ -105,30 +109,48 @@ export const CallProvider = ({ children }) => {
     }
   }
 
-  // Accept incoming call
+  // Accept incoming call - Move customer from queue to conference
   const acceptCall = async () => {
     if (!incomingCall) return
 
     try {
-      // Clear the pending call from backend
+      console.log('Accepting incoming call:', incomingCall)
+
+      // Call backend to dequeue customer into conference
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3004/api'
-      await fetch(`${API_URL}/twilio/incoming-calls/clear`, {
+      const response = await fetch(`${API_URL}/twilio/incoming-calls/accept`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
           'X-Organization-Slug': localStorage.getItem('organizationSlug'),
           'Content-Type': 'application/json'
-        }
+        },
+        body: JSON.stringify({
+          callSid: incomingCall.callSid
+        })
       })
 
-      // In a real implementation, this would connect the call
-      setActiveCall({
-        ...incomingCall,
-        status: 'connected',
-        startTime: new Date()
-      })
+      if (!response.ok) {
+        throw new Error('Failed to accept call')
+      }
+
+      const { conferenceId } = await response.json()
+
+      console.log('Customer moved to conference:', conferenceId)
+
+      // Clear the incoming notification
       setIncomingCall(null)
-      toast.success('Call accepted')
+
+      // Dispatch event to connect agent to conference
+      window.dispatchEvent(new CustomEvent('joinIncomingCallConference', {
+        detail: {
+          conferenceId,
+          callerPhone: incomingCall.from,
+          callerName: incomingCall.callerName
+        }
+      }))
+
+      toast.success('Connecting to caller...')
     } catch (error) {
       console.error('Error accepting call:', error)
       toast.error('Failed to accept call')
@@ -140,15 +162,18 @@ export const CallProvider = ({ children }) => {
     if (!incomingCall) return
 
     try {
-      // Clear the pending call from backend
+      // Call backend to decline and hang up the call
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3004/api'
-      await fetch(`${API_URL}/twilio/incoming-calls/clear`, {
+      await fetch(`${API_URL}/twilio/incoming-calls/decline`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
           'X-Organization-Slug': localStorage.getItem('organizationSlug'),
           'Content-Type': 'application/json'
-        }
+        },
+        body: JSON.stringify({
+          callSid: incomingCall.callSid
+        })
       })
 
       setMissedCallCount(prev => prev + 1)
@@ -158,6 +183,7 @@ export const CallProvider = ({ children }) => {
       console.error('Error declining call:', error)
       // Still clear the call locally even if backend fails
       setIncomingCall(null)
+      toast.error('Failed to decline call')
     }
   }
 
@@ -167,33 +193,6 @@ export const CallProvider = ({ children }) => {
       setActiveCall(null)
       toast.info('Call ended')
       fetchCallHistory() // Refresh history
-    }
-  }
-
-  // Make outgoing call
-  const makeCall = async (phoneNumber, contactInfo = {}) => {
-    try {
-      const result = await twilioAPI.makeCall({
-        to: phoneNumber,
-        leadId: contactInfo.leadId,
-        contactId: contactInfo.contactId
-      })
-
-      setActiveCall({
-        id: result.id,
-        phoneNumber,
-        direction: 'outbound',
-        status: 'calling',
-        startTime: new Date(),
-        ...contactInfo
-      })
-
-      toast.success('Calling...')
-      return result
-    } catch (error) {
-      console.error('Error making call:', error)
-      toast.error(error.response?.data?.error || 'Failed to make call')
-      throw error
     }
   }
 
@@ -217,7 +216,6 @@ export const CallProvider = ({ children }) => {
     acceptCall,
     declineCall,
     endCall,
-    makeCall,
     clearMissedCalls,
     fetchCallHistory
   }

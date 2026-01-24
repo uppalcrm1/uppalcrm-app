@@ -16,6 +16,8 @@ const CommunicationsPage = () => {
   const [showSendSMS, setShowSendSMS] = useState(false);
   const [showConfig, setShowConfig] = useState(false);
   const [showDialpad, setShowDialpad] = useState(false);
+  const [dialpadNumber, setDialpadNumber] = useState('');
+  const [dialpadCallerName, setDialpadCallerName] = useState('');
   const [selectedPhone, setSelectedPhone] = useState(null);
   const queryClient = useQueryClient();
   const { clearUnread } = useNotifications();
@@ -24,6 +26,20 @@ const CommunicationsPage = () => {
   useEffect(() => {
     clearUnread();
   }, [clearUnread]);
+
+  // Listen for dialpad open event (from incoming call acceptance)
+  useEffect(() => {
+    const handleOpenDialpad = (event) => {
+      const { phoneNumber, callerName } = event.detail;
+      setDialpadNumber(phoneNumber);
+      setDialpadCallerName(callerName);
+      setSelectedPhone(null);
+      setShowDialpad(true);
+    };
+
+    window.addEventListener('openDialpadWithNumber', handleOpenDialpad);
+    return () => window.removeEventListener('openDialpadWithNumber', handleOpenDialpad);
+  }, []);
 
   // Check Twilio configuration
   const { data: config, isLoading: configLoading } = useQuery({
@@ -300,7 +316,13 @@ const CommunicationsPage = () => {
 
       {showDialpad && (
         <Dialpad
-          onClose={() => setShowDialpad(false)}
+          onClose={() => {
+            setShowDialpad(false);
+            setDialpadNumber('');
+            setDialpadCallerName('');
+          }}
+          prefilledNumber={dialpadNumber}
+          contactName={dialpadCallerName}
         />
       )}
     </div>
