@@ -35,36 +35,17 @@ import ContactDetail from '../components/ContactDetail'
 import ContactForm from '../components/ContactForm'
 import ConvertLeadModal from '../components/ConvertLeadModal'
 import api from '../services/api'
+import { useFieldVisibility } from '../hooks/useFieldVisibility'
 
-// Define available columns with metadata
-const COLUMN_DEFINITIONS = [
-  { key: 'name', label: 'Name', description: 'Contact name', required: true },
-  { key: 'email', label: 'Email', description: 'Email address', required: false },
-  { key: 'phone', label: 'Phone', description: 'Phone number', required: false },
-  { key: 'company', label: 'Company', description: 'Company name', required: false },
-  { key: 'status', label: 'Status', description: 'Contact status', required: false },
-  { key: 'type', label: 'Type', description: 'Contact type', required: false },
-  { key: 'accounts', label: 'Accounts', description: 'Number of accounts', required: false },
-  { key: 'transactions', label: 'Transactions', description: 'Number of transactions', required: false },
-  { key: 'value', label: 'Value', description: 'Contact value', required: false },
-  { key: 'assigned', label: 'Assigned', description: 'Assigned team member', required: false },
-  { key: 'created', label: 'Created', description: 'Creation date', required: false }
-]
-
-// Default visible columns
-const DEFAULT_VISIBLE_COLUMNS = {
-  name: true,
-  email: true,
-  phone: true,
-  company: true,
-  status: true,
-  type: true,
-  accounts: true,
-  transactions: true,
-  value: true,
-  assigned: true,
-  created: true
+// Hardcoded special columns (not from field configuration)
+const SPECIAL_COLUMNS = {
+  accounts: { key: 'accounts', label: 'Accounts', description: 'Number of accounts', required: false, isSpecial: true },
+  transactions: { key: 'transactions', label: 'Transactions', description: 'Number of transactions', required: false, isSpecial: true },
+  actions: { key: 'actions', label: 'Actions', description: 'Edit/Delete actions', required: false, isSpecial: true }
 }
+
+// Build column definitions dynamically based on field configuration
+// This will be set in the component using useFieldVisibility hook
 
 const CONTACT_STATUSES = [
   { value: 'active', label: 'Active', color: 'green' },
@@ -94,7 +75,10 @@ const Contacts = () => {
   const [searchParams, setSearchParams] = useSearchParams()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
-  
+
+  // Use field visibility hook for all field configuration
+  const { fieldConfig, loading: fieldConfigLoading, isFieldVisible, getVisibleFields, getFieldLabel } = useFieldVisibility('contacts')
+
   // State
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
@@ -102,36 +86,84 @@ const Contacts = () => {
   const [selectedContact, setSelectedContact] = useState(null)
   const [showFilters, setShowFilters] = useState(false)
   const [viewMode, setViewMode] = useState('list') // 'list' or 'detail'
-  const [fieldLabels, setFieldLabels] = useState({})
+  const [loadingEditContact, setLoadingEditContact] = useState(false)
+
+  // Build dynamic column definitions from field configuration
+  const { COLUMN_DEFINITIONS, DEFAULT_VISIBLE_COLUMNS } = React.useMemo(() => {
+    // Collect ALL available fields for the column picker
+    // Note: We include all fields here (not just show_in_list_view=true)
+    // so users can toggle any field as a column option
+    const columns = []
+    const addedFields = new Set()
+
+    // Add system fields - include ALL fields so they're available in column picker
+    if (Array.isArray(fieldConfig)) {
+      fieldConfig
+        .filter(f => f.overall_visibility !== 'hidden')
+        .forEach(field => {
+          // Special handling: combine first_name and last_name into a single 'name' column
+          if (field.field_name === 'first_name') {
+            if (!addedFields.has('name')) {
+              columns.push({
+                key: 'name',
+                label: 'Name',
+                type: 'text',
+                isCustom: false,
+                description: 'Contact name',
+                required: true
+              })
+              addedFields.add('name')
+            }
+          } else if (field.field_name === 'last_name') {
+            // Skip last_name since we combine it with first_name
+            return
+          } else {
+            // Add other fields normally
+            columns.push({
+              key: field.field_name,
+              label: field.field_label,
+              type: field.field_type,
+              isCustom: false,
+              description: `${field.field_label}`,
+              required: field.is_required
+            })
+            addedFields.add(field.field_name)
+          }
+        })
+    }
+
+    // Add special columns (accounts, transactions)
+    columns.push(SPECIAL_COLUMNS.accounts)
+    columns.push(SPECIAL_COLUMNS.transactions)
+
+    // Create default visible columns object
+    // Columns should be visible by default only if show_in_list_view=true
+    const defaultVisibleCols = {}
+    columns.forEach(col => {
+      if (col.isSpecial) {
+        // Special columns (accounts, transactions, actions) show by default
+        defaultVisibleCols[col.key] = true
+      } else if (col.key === 'name') {
+        // Composite name field shows by default
+        defaultVisibleCols[col.key] = true
+      } else {
+        // Other fields: check the field config's show_in_list_view setting
+        const fieldDef = fieldConfig.find(f => f.field_name === col.key)
+        defaultVisibleCols[col.key] = fieldDef?.show_in_list_view !== false
+      }
+    })
+
+    return {
+      COLUMN_DEFINITIONS: columns,
+      DEFAULT_VISIBLE_COLUMNS: defaultVisibleCols
+    }
+  }, [fieldConfig])
 
   // Load column visibility from localStorage or use defaults
   const [visibleColumns, setVisibleColumns] = useState(() => {
     const saved = localStorage.getItem('contacts_visible_columns')
     return saved ? JSON.parse(saved) : DEFAULT_VISIBLE_COLUMNS
   })
-
-  // Fetch field configuration to get dynamic column labels
-  useEffect(() => {
-    const loadFieldConfiguration = async () => {
-      try {
-        const response = await api.get('/custom-fields?entity_type=contacts')
-        const allFields = [
-          ...(response.data.systemFields || []),
-          ...(response.data.customFields || [])
-        ]
-        const labelMap = {}
-        allFields.forEach(field => {
-          labelMap[field.field_name] = field.field_label
-        })
-        setFieldLabels(labelMap)
-        console.log('📋 Field labels loaded for contacts:', labelMap)
-      } catch (error) {
-        console.error('❌ Error loading field configuration:', error)
-        setFieldLabels({})
-      }
-    }
-    loadFieldConfiguration()
-  }, [])
 
   // Get current filters from URL - memoized to prevent unnecessary re-renders
   const currentFilters = React.useMemo(() => ({
@@ -171,15 +203,12 @@ const Contacts = () => {
   }
 
   const handleResetColumns = () => {
-    setVisibleColumns(DEFAULT_VISIBLE_COLUMNS)
+    // Reset to defaults
+    setVisibleColumns({ ...DEFAULT_VISIBLE_COLUMNS })
     localStorage.setItem('contacts_visible_columns', JSON.stringify(DEFAULT_VISIBLE_COLUMNS))
-    console.log('📋 Columns reset to defaults')
+    console.log('📋 Columns reset to defaults (respecting field configuration)')
   }
 
-  // Helper function to get field label with fallback
-  const getFieldLabel = (fieldName, defaultLabel) => {
-    return fieldLabels[fieldName] || defaultLabel
-  }
 
   // Fetch contacts
   const { data: contactsData, isLoading: contactsLoading, isFetching: contactsFetching } = useQuery({
@@ -236,6 +265,21 @@ const Contacts = () => {
     }
   })
 
+  // Handler to fetch full contact before opening edit modal
+  const handleEditContact = async (contactFromList) => {
+    try {
+      setLoadingEditContact(true)
+      const response = await contactsAPI.getContact(contactFromList.id)
+      setSelectedContact(response.contact)
+      setShowEditModal(true)
+    } catch (error) {
+      console.error('Failed to load contact for editing:', error)
+      toast.error('Failed to load contact details')
+    } finally {
+      setLoadingEditContact(false)
+    }
+  }
+
   const getStatusBadgeColor = (status) => {
     const statusConfig = CONTACT_STATUSES.find(s => s.value === status)
     return statusConfig ? statusConfig.color : 'gray'
@@ -249,6 +293,163 @@ const Contacts = () => {
   const getPriorityBadgeColor = (priority) => {
     const priorityConfig = CONTACT_PRIORITIES.find(p => p.value === priority)
     return priorityConfig ? priorityConfig.color : 'gray'
+  }
+
+  // Helper function to get field value from contact (handles custom fields)
+  const getFieldValue = (contact, fieldName) => {
+    // Check if it's a custom field
+    if (contact.custom_fields && contact.custom_fields[fieldName]) {
+      return contact.custom_fields[fieldName]
+    }
+    // Otherwise get from contact object
+    return contact[fieldName]
+  }
+
+  // Render cell content based on field type and name
+  const renderCellContent = (contact, column) => {
+    const value = getFieldValue(contact, column.key)
+
+    // Handle special columns
+    switch (column.key) {
+      case 'name':
+        return (
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              handleViewContact(contact)
+            }}
+            className="font-semibold text-blue-600 hover:text-blue-800 hover:underline text-left"
+          >
+            {contact.full_name || `${contact.first_name || ''} ${contact.last_name || ''}`.trim() || 'Unnamed Contact'}
+          </button>
+        )
+
+      case 'email':
+        return value ? (
+          <div className="flex items-center text-gray-900">
+            <Mail size={14} className="mr-2 text-gray-400" />
+            {value}
+          </div>
+        ) : (
+          <span className="text-gray-500">—</span>
+        )
+
+      case 'phone':
+        return value ? (
+          <div className="flex items-center text-gray-900">
+            <Phone size={14} className="mr-2 text-gray-400" />
+            {value}
+          </div>
+        ) : (
+          <span className="text-gray-500">—</span>
+        )
+
+      case 'company':
+        return value ? (
+          <div className="flex items-center text-gray-900">
+            <Building size={14} className="mr-2 text-gray-400" />
+            {value}
+          </div>
+        ) : (
+          <span className="text-gray-500">—</span>
+        )
+
+      case 'status':
+        return (
+          <span className={`badge badge-${getStatusBadgeColor(value)}`}>
+            {CONTACT_STATUSES.find(s => s.value === value)?.label || value || '—'}
+          </span>
+        )
+
+      case 'type':
+        return (
+          <span className={`badge badge-${getTypeBadgeColor(value)}`}>
+            {CONTACT_TYPES.find(t => t.value === value)?.label || value || '—'}
+          </span>
+        )
+
+      case 'priority':
+        return (
+          <span className={`badge badge-${getPriorityBadgeColor(value)}`}>
+            {CONTACT_PRIORITIES.find(p => p.value === value)?.label || value || '—'}
+          </span>
+        )
+
+      case 'value':
+        return (
+          <div className="flex items-center text-gray-900">
+            <DollarSign size={14} className="mr-1" />
+            {value?.toLocaleString() || 0}
+          </div>
+        )
+
+      case 'assigned_to':
+        return contact.assigned_user ? (
+          <div className="flex items-center">
+            <div className="w-6 h-6 bg-primary-600 rounded-full flex items-center justify-center mr-2">
+              <span className="text-white text-xs font-medium">
+                {contact.assigned_user.first_name?.[0]}{contact.assigned_user.last_name?.[0]}
+              </span>
+            </div>
+            <span className="text-sm text-gray-900">{contact.assigned_user.full_name}</span>
+          </div>
+        ) : (
+          <span className="text-sm text-gray-500">Unassigned</span>
+        )
+
+      case 'created_at':
+        return (
+          <div className="text-sm text-gray-600">
+            {value ? format(new Date(value), 'MMM d, yyyy') : '—'}
+          </div>
+        )
+
+      case 'next_follow_up':
+        return (
+          <div className="text-sm text-gray-600">
+            {value ? format(new Date(value), 'MMM d, yyyy') : '—'}
+          </div>
+        )
+
+      case 'last_contact_date':
+        return (
+          <div className="text-sm text-gray-600">
+            {value ? format(new Date(value), 'MMM d, yyyy') : '—'}
+          </div>
+        )
+
+      case 'accounts':
+        return (
+          <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-700 font-semibold text-sm">
+            {contact.accounts_count || 0}
+          </span>
+        )
+
+      case 'transactions':
+        return (
+          <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-green-100 text-green-700 font-semibold text-sm">
+            {contact.transactions_count || 0}
+          </span>
+        )
+
+      // Default rendering for other text/select/number fields
+      default:
+        if (column.type === 'date') {
+          return value ? (
+            <div className="text-sm text-gray-600">{format(new Date(value), 'MMM d, yyyy')}</div>
+          ) : (
+            <span className="text-gray-500">—</span>
+          )
+        }
+        if (column.type === 'select') {
+          return <span className="text-gray-900">{value || '—'}</span>
+        }
+        return value ? (
+          <span className="text-gray-900">{String(value).substring(0, 50)}</span>
+        ) : (
+          <span className="text-gray-500">—</span>
+        )
+    }
   }
 
   const handleViewContact = (contact) => {
@@ -268,13 +469,10 @@ const Contacts = () => {
   // Show contact detail view
   if (viewMode === 'detail' && selectedContact) {
     return (
-      <ContactDetail 
+      <ContactDetail
         contact={selectedContact}
         onBack={handleBackToList}
-        onEdit={(contact) => {
-          setSelectedContact(contact)
-          setShowEditModal(true)
-        }}
+        onEdit={(contact) => handleEditContact(contact)}
         onDelete={(id) => {
           if (window.confirm('Are you sure you want to delete this contact?')) {
             deleteMutation.mutate(id)
@@ -479,17 +677,24 @@ const Contacts = () => {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-200">
-                    {visibleColumns.name && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('name', 'Name')}</th>}
-                    {visibleColumns.email && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('email', 'Email')}</th>}
-                    {visibleColumns.phone && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('phone', 'Phone')}</th>}
-                    {visibleColumns.company && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('company', 'Company')}</th>}
-                    {visibleColumns.status && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('status', 'Status')}</th>}
-                    {visibleColumns.type && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('type', 'Type')}</th>}
-                    {visibleColumns.accounts && <th className="text-center py-3 px-4 font-medium text-gray-900">Accounts</th>}
-                    {visibleColumns.transactions && <th className="text-center py-3 px-4 font-medium text-gray-900">Transactions</th>}
-                    {visibleColumns.value && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('value', 'Value')}</th>}
-                    {visibleColumns.assigned && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('assigned_to', 'Assigned')}</th>}
-                    {visibleColumns.created && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('created_at', 'Created')}</th>}
+                    {/* Dynamic columns from field configuration */}
+                    {COLUMN_DEFINITIONS.map(column => {
+                      if (!visibleColumns[column.key]) return null
+
+                      const textAlignment = (column.isSpecial && (column.key === 'accounts' || column.key === 'transactions'))
+                        ? 'text-center'
+                        : 'text-left'
+
+                      return (
+                        <th
+                          key={column.key}
+                          className={`${textAlignment} py-3 px-4 font-medium text-gray-900`}
+                        >
+                          {column.label}
+                        </th>
+                      )
+                    })}
+                    {/* Actions column */}
                     <th className="text-left py-3 px-4 font-medium text-gray-900">Actions</th>
                   </tr>
                 </thead>
@@ -499,123 +704,30 @@ const Contacts = () => {
                       key={contact.id}
                       className="border-b border-gray-100 hover:bg-gray-50"
                     >
-                      {visibleColumns.name && (
-                        <td className="py-4 px-4">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleViewContact(contact);
-                            }}
-                            className="font-semibold text-blue-600 hover:text-blue-800 hover:underline text-left"
+                      {/* Dynamic cells from field configuration */}
+                      {COLUMN_DEFINITIONS.map(column => {
+                        if (!visibleColumns[column.key]) return null
+
+                        const textAlignment = (column.isSpecial && (column.key === 'accounts' || column.key === 'transactions'))
+                          ? 'text-center'
+                          : ''
+
+                        return (
+                          <td
+                            key={`${contact.id}-${column.key}`}
+                            className={`py-4 px-4 ${textAlignment}`}
                           >
-                            {contact.full_name || `${contact.first_name || ''} ${contact.last_name || ''}`.trim() || 'Unnamed Contact'}
-                          </button>
-                        </td>
-                      )}
-                      {visibleColumns.email && (
-                        <td className="py-4 px-4">
-                          {contact.email ? (
-                            <div className="flex items-center text-gray-900">
-                              <Mail size={14} className="mr-2 text-gray-400" />
-                              {contact.email}
-                            </div>
-                          ) : (
-                            <span className="text-gray-500">—</span>
-                          )}
-                        </td>
-                      )}
-                      {visibleColumns.phone && (
-                        <td className="py-4 px-4">
-                          {contact.phone ? (
-                            <div className="flex items-center text-gray-900">
-                              <Phone size={14} className="mr-2 text-gray-400" />
-                              {contact.phone}
-                            </div>
-                          ) : (
-                            <span className="text-gray-500">—</span>
-                          )}
-                        </td>
-                      )}
-                      {visibleColumns.company && (
-                        <td className="py-4 px-4">
-                          <div className="flex items-center text-gray-900">
-                            {contact.company && (
-                              <>
-                                <Building size={14} className="mr-2 text-gray-400" />
-                                {contact.company}
-                              </>
-                            )}
-                            {!contact.company && <span className="text-gray-500">—</span>}
-                          </div>
-                        </td>
-                      )}
-                      {visibleColumns.status && (
-                        <td className="py-4 px-4">
-                          <span className={`badge badge-${getStatusBadgeColor(contact.status)}`}>
-                            {CONTACT_STATUSES.find(s => s.value === contact.status)?.label || contact.status}
-                          </span>
-                        </td>
-                      )}
-                      {visibleColumns.type && (
-                        <td className="py-4 px-4">
-                          <span className={`badge badge-${getTypeBadgeColor(contact.type)}`}>
-                            {CONTACT_TYPES.find(t => t.value === contact.type)?.label || contact.type}
-                          </span>
-                        </td>
-                      )}
-                      {visibleColumns.accounts && (
-                        <td className="py-4 px-4 text-center">
-                          <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-700 font-semibold text-sm">
-                            {contact.accounts_count || 0}
-                          </span>
-                        </td>
-                      )}
-                      {visibleColumns.transactions && (
-                        <td className="py-4 px-4 text-center">
-                          <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-green-100 text-green-700 font-semibold text-sm">
-                            {contact.transactions_count || 0}
-                          </span>
-                        </td>
-                      )}
-                      {visibleColumns.value && (
-                        <td className="py-4 px-4">
-                          <div className="flex items-center text-gray-900">
-                            <DollarSign size={14} className="mr-1" />
-                            {contact.value?.toLocaleString() || 0}
-                          </div>
-                        </td>
-                      )}
-                      {visibleColumns.assigned && (
-                        <td className="py-4 px-4">
-                          {contact.assigned_user ? (
-                            <div className="flex items-center">
-                              <div className="w-6 h-6 bg-primary-600 rounded-full flex items-center justify-center mr-2">
-                                <span className="text-white text-xs font-medium">
-                                  {contact.assigned_user.first_name[0]}{contact.assigned_user.last_name[0]}
-                                </span>
-                              </div>
-                              <span className="text-sm text-gray-900">{contact.assigned_user.full_name}</span>
-                            </div>
-                          ) : (
-                            <span className="text-sm text-gray-500">Unassigned</span>
-                          )}
-                        </td>
-                      )}
-                      {visibleColumns.created && (
-                        <td className="py-4 px-4">
-                          <div className="text-sm text-gray-600">
-                            {format(new Date(contact.created_at), 'MMM d, yyyy')}
-                          </div>
-                        </td>
-                      )}
+                            {renderCellContent(contact, column)}
+                          </td>
+                        )
+                      })}
+                      {/* Actions column */}
                       <td className="py-4 px-4">
                         <div className="flex items-center space-x-2" onClick={(e) => e.stopPropagation()}>
                           <button
-                            onClick={() => {
-                              setSelectedContact(contact)
-                              setShowEditModal(true)
-                            }}
-                            className="p-1 text-gray-600 hover:text-primary-600"
+                            onClick={() => handleEditContact(contact)}
+                            disabled={loadingEditContact}
+                            className="p-1 text-gray-600 hover:text-primary-600 disabled:opacity-50 disabled:cursor-not-allowed"
                             title="Edit Contact"
                           >
                             <Edit size={16} />

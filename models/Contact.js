@@ -24,6 +24,22 @@ class Contact {
     this.last_contact_date = data.last_contact_date;
     this.next_follow_up = data.next_follow_up;
     this.converted_from_lead_id = data.converted_from_lead_id;
+
+    // Additional contact fields
+    this.department = data.department;
+    this.linkedin = data.linkedin;
+    this.customer_value = data.customer_value;
+
+    // Address fields
+    this.address_line1 = data.address_line1;
+    this.address_line2 = data.address_line2;
+    this.city = data.city;
+    this.state = data.state;
+    this.postal_code = data.postal_code;
+    this.country = data.country;
+
+    // Store custom fields from JSONB column
+    this.custom_fields = data.custom_fields || {};
   }
 
   /**
@@ -34,6 +50,28 @@ class Contact {
    * @returns {Contact} Created contact instance
    */
   static async create(contactData, organizationId, createdBy) {
+    // Define standard fields that map to database columns
+    const standardFieldNames = [
+      'title', 'company', 'first_name', 'last_name', 'email', 'phone',
+      'status', 'type', 'source', 'priority', 'value', 'notes',
+      'assigned_to', 'next_follow_up', 'converted_from_lead_id',
+      'department', 'linkedin', 'customer_value', 'last_contact_date',
+      'address_line1', 'address_line2', 'city', 'state', 'postal_code', 'country'
+    ];
+
+    // Separate standard fields from custom fields
+    const standardData = {};
+    const customFields = {};
+
+    Object.keys(contactData).forEach(key => {
+      if (standardFieldNames.includes(key)) {
+        standardData[key] = contactData[key];
+      } else {
+        customFields[key] = contactData[key];
+      }
+    });
+
+    // Extract standard fields with defaults
     const {
       title,
       company,
@@ -50,7 +88,7 @@ class Contact {
       assigned_to,
       next_follow_up,
       converted_from_lead_id
-    } = contactData;
+    } = standardData;
 
     if (!first_name || !last_name || !organizationId) {
       throw new Error('Missing required fields: first_name, last_name');
@@ -64,10 +102,10 @@ class Contact {
         INSERT INTO contacts (
           organization_id, title, company, first_name, last_name, email, phone,
           contact_status, contact_source, priority, lifetime_value, notes, assigned_to, created_by,
-          next_follow_up
+          next_follow_up, custom_fields
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-        RETURNING id, organization_id, contact_status, contact_source, email, first_name, last_name, company, phone, notes, created_at, updated_at
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+        RETURNING *
       `, [
         organizationId,
         title,
@@ -83,8 +121,11 @@ class Contact {
         notes,
         assigned_to,
         createdBy,
-        next_follow_up
+        next_follow_up,
+        JSON.stringify(customFields) // Store custom fields as JSONB
       ], organizationId);
+
+      console.log('✅ Created contact with custom fields:', Object.keys(customFields));
 
       return new Contact(result.rows[0]);
     } catch (error) {
@@ -412,15 +453,29 @@ class Contact {
    * @returns {Contact|null} Updated contact
    */
   static async update(id, updates, organizationId) {
-    const allowedFields = [
+    // Define standard fields that map to database columns
+    const standardFields = [
       'title', 'company', 'first_name', 'last_name', 'email', 'phone',
-      'type', 'priority', 'notes', 'assigned_to',
-      'last_contact_date', 'next_follow_up'
+      'type', 'status', 'source', 'priority', 'notes', 'assigned_to',
+      'last_contact_date', 'next_follow_up', 'department', 'linkedin', 'customer_value',
+      'address_line1', 'address_line2', 'city', 'state', 'postal_code', 'country'
     ];
-    
-    const updateFields = Object.keys(updates).filter(key => allowedFields.includes(key));
-    
-    if (updateFields.length === 0) {
+
+    // Separate standard fields from custom fields
+    const standardUpdates = {};
+    const customUpdates = {};
+
+    Object.keys(updates).forEach(key => {
+      if (standardFields.includes(key)) {
+        standardUpdates[key] = updates[key];
+      } else {
+        // Everything else goes to custom_fields JSONB
+        customUpdates[key] = updates[key];
+      }
+    });
+
+    // Need at least one field to update
+    if (Object.keys(standardUpdates).length === 0 && Object.keys(customUpdates).length === 0) {
       throw new Error('No valid fields to update');
     }
 
@@ -429,28 +484,38 @@ class Contact {
     const values = [id, organizationId];
     let paramIndex = 3;
 
-    for (const field of updateFields) {
-      let value = updates[field];
-      
+    // Handle standard field updates
+    for (const field of Object.keys(standardUpdates)) {
+      let value = standardUpdates[field];
+
       // Convert empty strings to null
       if (['email', 'phone', 'notes', 'title', 'company'].includes(field)) {
         if (value === '' || value === undefined) {
           value = null;
         }
       }
-      
+
       setClauses.push(`${field} = $${paramIndex}`);
       values.push(value);
+      paramIndex++;
+    }
+
+    // Handle custom field updates - merge into custom_fields JSONB
+    if (Object.keys(customUpdates).length > 0) {
+      setClauses.push(`custom_fields = COALESCE(custom_fields, '{}'::jsonb) || $${paramIndex}::jsonb`);
+      values.push(JSON.stringify(customUpdates));
       paramIndex++;
     }
 
     const setClause = setClauses.join(', ');
 
     try {
-      console.log('📝 Updating contact:', id, 'with fields:', updateFields);
-      
+      console.log('📝 Updating contact:', id);
+      console.log('  Standard fields:', Object.keys(standardUpdates));
+      console.log('  Custom fields:', Object.keys(customUpdates));
+
       const result = await query(`
-        UPDATE contacts 
+        UPDATE contacts
         SET ${setClause}, updated_at = NOW()
         WHERE id = $1 AND organization_id = $2
         RETURNING *
@@ -1495,7 +1560,19 @@ class Contact {
       last_contact_date: this.last_contact_date,
       next_follow_up: this.next_follow_up,
       converted_from_lead_id: this.converted_from_lead_id,
-      converted_from_lead: this.converted_from_lead
+      converted_from_lead: this.converted_from_lead,
+      department: this.department,
+      linkedin: this.linkedin,
+      customer_value: this.customer_value,
+      address_line1: this.address_line1,
+      address_line2: this.address_line2,
+      city: this.city,
+      state: this.state,
+      postal_code: this.postal_code,
+      country: this.country,
+      custom_fields: this.custom_fields,
+      // Merge custom fields at the top level
+      ...this.custom_fields
     };
   }
 }

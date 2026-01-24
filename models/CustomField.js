@@ -40,7 +40,9 @@ class CustomField {
           field_group,
           is_active,
           created_at,
-          updated_at
+          updated_at,
+          overall_visibility,
+          visibility_logic
         FROM custom_field_definitions
         WHERE organization_id = $1 AND entity_type = $2
       `
@@ -98,6 +100,8 @@ class CustomField {
           validation_rules,
           field_options,
           default_value,
+          overall_visibility,
+          visibility_logic,
           placeholder,
           field_group,
           is_active,

@@ -473,8 +473,22 @@ const DynamicLeadForm = ({
   };
 
   const getEnabledSystemFields = () => {
-    // Use the system fields from the API response, but only return enabled ones
-    return (formConfig.systemFields || []).filter(f => f.is_enabled !== false);
+    // Filter system fields by is_enabled AND visibility flags
+    return (formConfig.systemFields || []).filter(f => {
+      if (f.is_enabled === false) return false;
+
+      // For create mode, check show_in_create_form
+      if (mode === 'create' || mode !== 'edit') {
+        return f.show_in_create_form !== false; // Default to true if not set
+      }
+
+      // For edit mode, check show_in_edit_form
+      if (mode === 'edit') {
+        return f.show_in_edit_form !== false; // Default to true if not set
+      }
+
+      return true;
+    });
   };
 
   if (loading) {

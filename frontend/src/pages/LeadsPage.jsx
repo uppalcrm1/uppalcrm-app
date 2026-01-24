@@ -29,6 +29,8 @@ import TaskManager from '../components/TaskManager'
 import toast from 'react-hot-toast'
 import { useForm } from 'react-hook-form'
 import { format } from 'date-fns'
+import api from '../services/api'
+import { useFieldVisibility } from '../hooks/useFieldVisibility'
 
 const LEAD_STATUSES = [
   { value: 'new', label: 'New', color: 'blue' },
@@ -59,6 +61,9 @@ const LeadsPage = () => {
   const [searchParams, setSearchParams] = useSearchParams()
   const queryClient = useQueryClient()
 
+  // Use field visibility hook for all field configuration
+  const { isFieldVisible, getFieldLabel } = useFieldVisibility('leads')
+
   // State
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
@@ -81,6 +86,7 @@ const LeadsPage = () => {
   }), [searchParams])
 
   console.log('🔵 currentFilters memoized:', currentFilters)
+
 
   // Update URL with new filters
   const updateFilters = (newFilters) => {
@@ -343,15 +349,15 @@ const LeadsPage = () => {
               <table className="w-full table-auto">
                 <thead className="bg-gray-50">
                   <tr className="border-b-2 border-gray-200">
-                    <th className="text-left py-3 px-4 font-medium text-gray-900">Name</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-900">Email</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-900">Phone</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-900">Company</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-900">Status</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-900">Priority</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-900">Value</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-900">Assigned</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-900">Created</th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('first_name', 'Name')}</th>
+                    {isFieldVisible('email', 'list') && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('email', 'Email')}</th>}
+                    {isFieldVisible('phone', 'list') && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('phone', 'Phone')}</th>}
+                    {isFieldVisible('company', 'list') && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('company', 'Company')}</th>}
+                    <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('status', 'Status')}</th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('priority', 'Priority')}</th>
+                    {isFieldVisible('lead_value', 'list') && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('lead_value', 'Value')}</th>}
+                    {isFieldVisible('assigned_to', 'list') && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('assigned_to', 'Assigned')}</th>}
+                    {isFieldVisible('created_at', 'list') && <th className="text-left py-3 px-4 font-medium text-gray-900">{getFieldLabel('created_at', 'Created')}</th>}
                     <th className="text-left py-3 px-4 font-medium text-gray-900">Actions</th>
                   </tr>
                 </thead>
@@ -364,45 +370,51 @@ const LeadsPage = () => {
                       </td>
 
                       {/* Email Column */}
-                      <td className="py-4 px-4">
-                        {lead.email ? (
-                          <div className="flex items-center text-sm text-gray-900">
-                            <Mail size={14} className="mr-2 text-gray-400" />
-                            <a href={`mailto:${lead.email}`} className="hover:text-primary-600">
-                              {lead.email}
-                            </a>
-                          </div>
-                        ) : (
-                          <span className="text-gray-400 text-sm">—</span>
-                        )}
-                      </td>
+                      {isFieldVisible('email', 'list') && (
+                        <td className="py-4 px-4">
+                          {lead.email ? (
+                            <div className="flex items-center text-sm text-gray-900">
+                              <Mail size={14} className="mr-2 text-gray-400" />
+                              <a href={`mailto:${lead.email}`} className="hover:text-primary-600">
+                                {lead.email}
+                              </a>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 text-sm">—</span>
+                          )}
+                        </td>
+                      )}
 
                       {/* Phone Column */}
-                      <td className="py-4 px-4">
-                        {lead.phone ? (
-                          <div className="flex items-center text-sm text-gray-900">
-                            <Phone size={14} className="mr-2 text-gray-400" />
-                            <a href={`tel:${lead.phone}`} className="hover:text-primary-600">
-                              {lead.phone}
-                            </a>
-                          </div>
-                        ) : (
-                          <span className="text-gray-400 text-sm">—</span>
-                        )}
-                      </td>
+                      {isFieldVisible('phone', 'list') && (
+                        <td className="py-4 px-4">
+                          {lead.phone ? (
+                            <div className="flex items-center text-sm text-gray-900">
+                              <Phone size={14} className="mr-2 text-gray-400" />
+                              <a href={`tel:${lead.phone}`} className="hover:text-primary-600">
+                                {lead.phone}
+                              </a>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 text-sm">—</span>
+                          )}
+                        </td>
+                      )}
 
                       {/* Company Column */}
-                      <td className="py-4 px-4">
-                        <div className="flex items-center text-gray-900">
-                          {lead.company && (
-                            <>
-                              <Building size={14} className="mr-2 text-gray-400" />
-                              {lead.company}
-                            </>
-                          )}
-                          {!lead.company && <span className="text-gray-500">—</span>}
-                        </div>
-                      </td>
+                      {isFieldVisible('company', 'list') && (
+                        <td className="py-4 px-4">
+                          <div className="flex items-center text-gray-900">
+                            {lead.company && (
+                              <>
+                                <Building size={14} className="mr-2 text-gray-400" />
+                                {lead.company}
+                              </>
+                            )}
+                            {!lead.company && <span className="text-gray-500">—</span>}
+                          </div>
+                        </td>
+                      )}
                       <td className="py-4 px-4">
                         <span className={`badge badge-${getStatusBadgeColor(lead.status)}`}>
                           {LEAD_STATUSES.find(s => s.value === lead.status)?.label || lead.status}
@@ -413,39 +425,45 @@ const LeadsPage = () => {
                           {LEAD_PRIORITIES.find(p => p.value === lead.priority)?.label || lead.priority}
                         </span>
                       </td>
-                      <td className="py-4 px-4">
-                        <div className="flex items-center text-gray-900">
-                          <DollarSign size={14} className="mr-1" />
-                          {lead.value?.toLocaleString() || 0}
-                        </div>
-                      </td>
-                      <td className="py-4 px-4">
-                        {lead.assigned_user ? (
-                          <div className="flex items-center">
-                            <div className="w-6 h-6 bg-primary-600 rounded-full flex items-center justify-center mr-2">
-                              <span className="text-white text-xs font-medium">
-                                {lead.assigned_user.first_name[0]}{lead.assigned_user.last_name[0]}
-                              </span>
-                            </div>
-                            <span className="text-sm text-gray-900">{lead.assigned_user.full_name}</span>
+                      {isFieldVisible('lead_value', 'list') && (
+                        <td className="py-4 px-4">
+                          <div className="flex items-center text-gray-900">
+                            <DollarSign size={14} className="mr-1" />
+                            {lead.lead_value?.toLocaleString() || 0}
                           </div>
-                        ) : (
-                          <button
-                            onClick={() => {
-                              setSelectedLead(lead)
-                              setShowAssignModal(true)
-                            }}
-                            className="text-sm text-gray-500 hover:text-primary-600"
-                          >
-                            Assign
-                          </button>
-                        )}
-                      </td>
-                      <td className="py-4 px-4">
-                        <div className="text-sm text-gray-600">
-                          {format(new Date(lead.created_at), 'MMM d, yyyy')}
-                        </div>
-                      </td>
+                        </td>
+                      )}
+                      {isFieldVisible('assigned_to', 'list') && (
+                        <td className="py-4 px-4">
+                          {lead.assigned_user ? (
+                            <div className="flex items-center">
+                              <div className="w-6 h-6 bg-primary-600 rounded-full flex items-center justify-center mr-2">
+                                <span className="text-white text-xs font-medium">
+                                  {lead.assigned_user.first_name[0]}{lead.assigned_user.last_name[0]}
+                                </span>
+                              </div>
+                              <span className="text-sm text-gray-900">{lead.assigned_user.full_name}</span>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setSelectedLead(lead)
+                                setShowAssignModal(true)
+                              }}
+                              className="text-sm text-gray-500 hover:text-primary-600"
+                            >
+                              Assign
+                            </button>
+                          )}
+                        </td>
+                      )}
+                      {isFieldVisible('created_at', 'list') && (
+                        <td className="py-4 px-4">
+                          <div className="text-sm text-gray-600">
+                            {format(new Date(lead.created_at), 'MMM d, yyyy')}
+                          </div>
+                        </td>
+                      )}
                       <td className="py-4 px-4">
                         <div className="flex items-center space-x-2">
                           <button
