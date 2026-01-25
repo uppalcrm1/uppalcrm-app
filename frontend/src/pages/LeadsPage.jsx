@@ -192,6 +192,17 @@ const LeadsPage = () => {
   const leads = leadsData?.leads || []
   const pagination = leadsData?.pagination || {}
 
+  // Debug: Log the leads to see what fields are available
+  React.useEffect(() => {
+    if (leads.length > 0) {
+      console.log('🔍 DEBUG: Leads data structure:', JSON.stringify(leads[0], null, 2))
+      console.log('🔍 DEBUG: First lead has name field?', 'name' in leads[0])
+      console.log('🔍 DEBUG: First lead.name =', leads[0].name)
+      console.log('🔍 DEBUG: First lead.firstName =', leads[0].firstName)
+      console.log('🔍 DEBUG: First lead.lastName =', leads[0].lastName)
+    }
+  }, [leads])
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -370,8 +381,9 @@ const LeadsPage = () => {
                         <button
                           onClick={() => setSelectedLead(lead)}
                           className="font-medium text-blue-600 hover:text-blue-800 hover:underline text-left"
+                          title={`Debug: name=${lead.name}, firstName=${lead.firstName}, lastName=${lead.lastName}`}
                         >
-                          {lead.name || 'Unnamed Lead'}
+                          {lead.name || `${lead.firstName || ''} ${lead.lastName || ''}`.trim() || '—'}
                         </button>
                       </td>
 
