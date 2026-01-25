@@ -144,6 +144,33 @@ const FieldManager = () => {
           options: null
         },
         {
+          name: 'last_contact_date',
+          label: 'Last Contact Date',
+          type: 'date',
+          required: false,
+          editable: true,
+          deletable: true,
+          options: null
+        },
+        {
+          name: 'created_at',
+          label: 'Created At',
+          type: 'date',
+          required: false,
+          editable: false,
+          deletable: false,
+          options: null
+        },
+        {
+          name: 'converted_date',
+          label: 'Converted Date',
+          type: 'date',
+          required: false,
+          editable: false,
+          deletable: false,
+          options: null
+        },
+        {
           name: 'notes',
           label: 'Notes',
           type: 'textarea',

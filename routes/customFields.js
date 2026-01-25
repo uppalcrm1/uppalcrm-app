@@ -712,6 +712,9 @@ router.get('/', async (req, res) => {
         potential_value: { label: 'Potential Value ($)', type: 'number', required: false, editable: true },
         assigned_to: { label: 'Assign To', type: 'user_select', required: false, editable: true },
         next_follow_up: { label: 'Next Follow Up', type: 'date', required: false, editable: true },
+        last_contact_date: { label: 'Last Contact Date', type: 'date', required: false, editable: true },
+        created_at: { label: 'Created At', type: 'date', required: false, editable: false },
+        converted_date: { label: 'Converted Date', type: 'date', required: false, editable: false },
         notes: { label: 'Notes', type: 'textarea', required: false, editable: true }
       },
       contacts: {
@@ -1274,6 +1277,9 @@ router.put('/default/:fieldName', async (req, res) => {
         potential_value: { label: 'Potential Value ($)', type: 'number', required: false, editable: true },
         assigned_to: { label: 'Assign To', type: 'user_select', required: false, editable: true },
         next_follow_up: { label: 'Next Follow Up', type: 'date', required: false, editable: true },
+        last_contact_date: { label: 'Last Contact Date', type: 'date', required: false, editable: true },
+        created_at: { label: 'Created At', type: 'date', required: false, editable: false },
+        converted_date: { label: 'Converted Date', type: 'date', required: false, editable: false },
         notes: { label: 'Notes', type: 'textarea', required: false, editable: true }
       },
       contacts: {
@@ -1877,6 +1883,9 @@ router.get('/form-config', async (req, res) => {
       potential_value: { label: 'Potential Value ($)', type: 'number', required: false, editable: true },
       assigned_to: { label: 'Assign To', type: 'user_select', required: false, editable: true },
       next_follow_up: { label: 'Next Follow Up', type: 'date', required: false, editable: true },
+      last_contact_date: { label: 'Last Contact Date', type: 'date', required: false, editable: true },
+      created_at: { label: 'Created At', type: 'date', required: false, editable: false },
+      converted_date: { label: 'Converted Date', type: 'date', required: false, editable: false },
       notes: { label: 'Notes', type: 'textarea', required: false, editable: true }
     };
 
