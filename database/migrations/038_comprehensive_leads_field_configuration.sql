@@ -6,62 +6,58 @@
 BEGIN;
 
 -- Insert or update leads field visibility configurations
--- These seed the default field visibility for all organizations
+-- Using only columns that definitely exist in the table
 INSERT INTO default_field_configurations (
   organization_id,
   entity_type,
   field_name,
-  field_type,
   is_enabled,
   is_required,
   show_in_list_view,
   show_in_detail_view,
   show_in_create_form,
-  show_in_edit_form,
-  display_order
+  show_in_edit_form
 )
 SELECT
   org.id,
   'leads' AS entity_type,
   field_config.field_name,
-  field_config.field_type,
   field_config.is_enabled,
   field_config.is_required,
   field_config.show_in_list_view,
   field_config.show_in_detail_view,
   field_config.show_in_create_form,
-  field_config.show_in_edit_form,
-  field_config.display_order
+  field_config.show_in_edit_form
 FROM organizations org
 CROSS JOIN (
   VALUES
-    -- Contact Information (1-5)
-    ('first_name', 'text', true, false, true, true, true, true, 1),
-    ('last_name', 'text', true, false, true, true, true, true, 2),
-    ('email', 'email', true, false, true, true, true, true, 3),
-    ('phone', 'tel', true, false, true, true, true, true, 4),
-    ('company', 'text', true, false, true, true, true, true, 5),
+    -- Contact Information (primary)
+    ('first_name', true, false, true, true, true, true),
+    ('last_name', true, false, true, true, true, true),
+    ('email', true, false, true, true, true, true),
+    ('phone', true, false, true, true, true, true),
+    ('company', true, false, true, true, true, true),
 
-    -- Lead Status & Management (6-10)
-    ('status', 'select', true, false, false, true, true, true, 6),
-    ('source', 'select', true, false, false, true, true, true, 7),
-    ('priority', 'select', true, false, false, true, true, true, 8),
-    ('assigned_to', 'user_select', true, false, false, true, true, true, 9),
-    ('next_follow_up', 'datetime', false, false, false, true, true, true, 10),
+    -- Lead Status & Management
+    ('status', true, false, false, true, true, true),
+    ('source', true, false, false, true, true, true),
+    ('priority', true, false, false, true, true, true),
+    ('assigned_to', true, false, false, true, true, true),
+    ('next_follow_up', false, false, false, true, true, true),
 
-    -- Valuation (11)
-    ('potential_value', 'number', false, false, false, true, true, true, 11),
+    -- Valuation
+    ('potential_value', false, false, false, true, true, true),
 
-    -- Timeline & History (12-14)
-    ('last_contact_date', 'date', false, false, false, false, false, false, 12),
-    ('created_at', 'date', false, false, false, false, false, false, 13),
-    ('converted_date', 'date', false, false, false, false, false, false, 14),
+    -- Timeline & History
+    ('last_contact_date', false, false, false, false, false, false),
+    ('created_at', false, false, false, false, false, false),
+    ('converted_date', false, false, false, false, false, false),
 
-    -- Notes & Comments (15)
-    ('notes', 'textarea', false, false, false, true, true, true, 15)
+    -- Notes & Comments
+    ('notes', false, false, false, true, true, true)
 ) AS field_config(
-  field_name, field_type, is_enabled, is_required,
-  show_in_list_view, show_in_detail_view, show_in_create_form, show_in_edit_form, display_order
+  field_name, is_enabled, is_required,
+  show_in_list_view, show_in_detail_view, show_in_create_form, show_in_edit_form
 )
 WHERE NOT EXISTS (
   SELECT 1 FROM default_field_configurations dfc
