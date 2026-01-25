@@ -286,7 +286,7 @@ const LeadsPage = () => {
                   <option value="">All Team Members</option>
                   <option value="null">Unassigned</option>
                   {usersData?.users?.map(user => (
-                    <option key={user.id} value={user.id}>{user.full_name}</option>
+                    <option key={user.id} value={user.id}>{user.full_name || `${user.firstName || ''} ${user.lastName || ''}`.trim()}</option>
                   ))}
                 </select>
               </div>
@@ -363,11 +363,18 @@ const LeadsPage = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {leads.map((lead) => (
+                  {leads.map((lead) => {
+                    const leadName = `${lead.firstName || ''} ${lead.lastName || ''}`.trim() || 'Unnamed Lead';
+                    return (
                     <tr key={lead.id} className="border-b border-gray-100 hover:bg-gray-50">
                       {/* Name Column */}
                       <td className="py-4 px-4">
-                        <p className="font-medium text-gray-900">{lead.full_name}</p>
+                        <button
+                          onClick={() => setSelectedLead(lead)}
+                          className="font-medium text-blue-600 hover:text-blue-800 hover:underline text-left"
+                        >
+                          {leadName}
+                        </button>
                       </td>
 
                       {/* Email Column */}
@@ -440,10 +447,10 @@ const LeadsPage = () => {
                             <div className="flex items-center">
                               <div className="w-6 h-6 bg-primary-600 rounded-full flex items-center justify-center mr-2">
                                 <span className="text-white text-xs font-medium">
-                                  {lead.assigned_user.first_name[0]}{lead.assigned_user.last_name[0]}
+                                  {(lead.assigned_user.firstName || 'U')[0]}{(lead.assigned_user.lastName || 'N')[0]}
                                 </span>
                               </div>
-                              <span className="text-sm text-gray-900">{lead.assigned_user.full_name}</span>
+                              <span className="text-sm text-gray-900">{`${lead.assigned_user.firstName || ''} ${lead.assigned_user.lastName || ''}`.trim()}</span>
                             </div>
                           ) : (
                             <button
@@ -510,7 +517,8 @@ const LeadsPage = () => {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -738,7 +746,7 @@ const AssignLeadModal = ({ lead, onClose, onSubmit, users, isLoading }) => {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <p className="text-sm text-gray-600 mb-4">
-                Assign <strong>{lead.full_name}</strong> to a team member:
+                Assign <strong>{`${lead.firstName || ''} ${lead.lastName || ''}`.trim() || 'this lead'}</strong> to a team member:
               </p>
 
               <select
@@ -750,7 +758,7 @@ const AssignLeadModal = ({ lead, onClose, onSubmit, users, isLoading }) => {
                 <option value="">Select team member</option>
                 {users.map(user => (
                   <option key={user.id} value={user.id}>
-                    {user.full_name} ({user.email})
+                    {user.full_name || `${user.firstName || ''} ${user.lastName || ''}`.trim()} ({user.email})
                   </option>
                 ))}
               </select>

@@ -21,8 +21,8 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
 
   // Form state
   const [contactForm, setContactForm] = useState({
-    firstName: lead?.first_name || '',
-    lastName: lead?.last_name || '',
+    firstName: lead?.firstName || lead?.first_name || '',
+    lastName: lead?.lastName || lead?.last_name || '',
     email: lead?.email || '',
     phone: lead?.phone || ''
   });
@@ -30,22 +30,22 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
   const [accountForm, setAccountForm] = useState({
     productId: '',
     product: '',
-    accountName: `${lead?.first_name || ''} ${lead?.last_name || ''}'s Account`.trim(),
+    accountName: `${lead?.firstName || lead?.first_name || ''} ${lead?.lastName || lead?.last_name || ''}'s Account`.trim(),
     deviceName: '',
     macAddress: '',
     term: '1', // Default to Monthly (value = 1)
-    app: lead?.custom_fields?.app || '' // Pre-populate from lead's custom fields
+    app: lead?.customFields?.app || lead?.custom_fields?.app || '' // Pre-populate from lead's custom fields
   });
 
   const [transactionForm, setTransactionForm] = useState({
     paymentMethod: 'Credit Card',
     amount: '',
     currency: 'CAD',
-    owner: (lead?.assigned_first_name && lead?.assigned_last_name)
-      ? `${lead.assigned_first_name} ${lead.assigned_last_name}`
+    owner: (lead?.assignedFirstName || lead?.assigned_first_name) && (lead?.assignedLastName || lead?.assigned_last_name)
+      ? `${lead?.assignedFirstName || lead?.assigned_first_name} ${lead?.assignedLastName || lead?.assigned_last_name}`
       : null,
     paymentDate: new Date().toISOString().split('T')[0],
-    source: lead?.source_name || lead?.source || 'website',
+    source: lead?.sourceName || lead?.source_name || lead?.source || 'website',
     term: '1', // Default to Monthly (value = 1)
     nextRenewalDate: ''
   });
@@ -75,10 +75,11 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
   const users = usersData?.users || [];
   const products = productsData?.products || [];
   const defaultProduct = products.find(p => p.is_default);
-  const filteredContacts = existingContacts.filter(contact =>
-    contact.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    contact.email?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredContacts = existingContacts.filter(contact => {
+    const fullName = contact.fullName || `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
+    return fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      contact.email?.toLowerCase().includes(searchTerm.toLowerCase());
+  });
 
   // Auto-calculate renewal date based on term and payment date
   useEffect(() => {
@@ -172,10 +173,10 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
 
   // Sync owner when users load - ensure it matches the dropdown options format
   useEffect(() => {
-    if (users.length > 0 && lead?.assigned_to) {
-      const assignedUser = users.find(u => u.id === lead.assigned_to);
+    if (users.length > 0 && lead?.assignedTo) {
+      const assignedUser = users.find(u => u.id === lead.assignedTo);
       if (assignedUser) {
-        const ownerName = assignedUser.full_name || `${assignedUser.first_name} ${assignedUser.last_name}`;
+        const ownerName = assignedUser.fullName || assignedUser.full_name || `${assignedUser.firstName || assignedUser.first_name || ''} ${assignedUser.lastName || assignedUser.last_name || ''}`.trim();
         setTransactionForm(prev => ({
           ...prev,
           owner: ownerName
@@ -264,7 +265,7 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <div>
             <h2 className="text-xl font-semibold">Convert Lead</h2>
-            <p className="text-sm text-gray-600 mt-0.5">{lead.full_name}</p>
+            <p className="text-sm text-gray-600 mt-0.5">{lead?.fullName || `${lead?.firstName || ''} ${lead?.lastName || ''}`.trim() || lead?.full_name}</p>
           </div>
           <button
             onClick={onClose}
@@ -495,7 +496,7 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
                                 )}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <div className="text-sm font-medium truncate">{contact.full_name}</div>
+                                <div className="text-sm font-medium truncate">{contact.fullName || `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || contact.full_name}</div>
                                 <div className="text-xs text-gray-600 truncate">{contact.email}</div>
                               </div>
                             </div>
@@ -718,11 +719,14 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
                         className="select h-9"
                       >
                         {users.length > 0 ? (
-                          users.map(user => (
-                            <option key={user.id} value={user.full_name || `${user.first_name} ${user.last_name}`}>
-                              {user.full_name || `${user.first_name} ${user.last_name}`}
+                          users.map(user => {
+                            const userName = user.fullName || user.full_name || `${user.firstName || user.first_name || ''} ${user.lastName || user.last_name || ''}`.trim();
+                            return (
+                            <option key={user.id} value={userName}>
+                              {userName}
                             </option>
-                          ))
+                            );
+                          })
                         ) : (
                           <option value={transactionForm.owner}>{transactionForm.owner}</option>
                         )}
