@@ -221,11 +221,11 @@ const LeadDetail = () => {
               </button>
               <div>
                 <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                  {lead.first_name} {lead.last_name}
+                  {lead.firstName} {lead.lastName}
                 </h1>
                 <div className="flex items-center flex-wrap gap-3">
                   <span className={`px-3 py-1.5 rounded-full text-sm font-semibold ${getStatusColor(lead.status)}`}>
-                    {lead.status_name || lead.status}
+                    {lead.statusName || lead.status}
                   </span>
                   {lead.company && isFieldVisible('company', 'detail') && (
                     <div className="flex items-center gap-1.5 text-sm text-gray-600">
@@ -235,7 +235,7 @@ const LeadDetail = () => {
                   )}
                   <div className="flex items-center gap-1.5 text-sm text-gray-600">
                     <User size={14} className="text-gray-400" />
-                    <span>Owner: {lead.owner_first_name} {lead.owner_last_name}</span>
+                    <span>Owner: {lead.ownerFirstName} {lead.ownerLastName}</span>
                   </div>
                 </div>
               </div>
@@ -534,13 +534,13 @@ const LeadDetailsPanel = ({ lead, isFieldVisible }) => {
             {isFieldVisible('first_name', 'detail') && (
               <div>
                 <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">First Name</div>
-                <div className="text-base font-semibold text-gray-900">{lead.first_name}</div>
+                <div className="text-base font-semibold text-gray-900">{lead.firstName}</div>
               </div>
             )}
             {isFieldVisible('last_name', 'detail') && (
               <div>
                 <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Last Name</div>
-                <div className="text-base font-semibold text-gray-900">{lead.last_name}</div>
+                <div className="text-base font-semibold text-gray-900">{lead.lastName}</div>
               </div>
             )}
             {isFieldVisible('email', 'detail') && (
@@ -621,7 +621,7 @@ const LeadDetailsPanel = ({ lead, isFieldVisible }) => {
                     lead.status === 'lost' ? 'bg-red-100 text-red-800' :
                     'bg-gray-100 text-gray-800'
                   }`}>
-                    {lead.status_name || lead.status || 'New'}
+                    {lead.statusName || lead.status || 'New'}
                   </span>
                 </div>
               </div>
@@ -660,8 +660,8 @@ const LeadDetailsPanel = ({ lead, isFieldVisible }) => {
                 <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Assigned To</div>
                 <div className="text-base font-semibold text-gray-900 flex items-center gap-2">
                   <User className="w-4 h-4 text-gray-400" />
-                  {lead.owner_first_name && lead.owner_last_name ? (
-                    <span>{lead.owner_first_name} {lead.owner_last_name}</span>
+                  {lead.ownerFirstName && lead.ownerLastName ? (
+                    <span>{lead.ownerFirstName} {lead.ownerLastName}</span>
                   ) : (
                     <span className="text-gray-400 italic font-normal">Not assigned</span>
                   )}
