@@ -281,7 +281,7 @@ const LeadDetail = () => {
             <LeadProgressBar
               currentStatus={lead.status}
               onStatusChange={handleStatusUpdate}
-              timeInCurrentStage={lead.time_in_current_stage}
+              timeInCurrentStage={lead.timeInCurrentStage}
             />
           </div>
 
@@ -439,7 +439,7 @@ const LeadDetail = () => {
                     <div className="flex-1 min-w-0">
                       <div className="text-xs text-gray-500 mb-0.5">Created</div>
                       <div className="text-sm font-medium text-gray-900">
-                        {new Date(lead.created_at).toLocaleDateString('en-US', {
+                        {new Date(lead.createdAt).toLocaleDateString('en-US', {
                           month: 'short',
                           day: 'numeric',
                           year: 'numeric'
@@ -603,7 +603,7 @@ const LeadDetailsPanel = ({ lead, isFieldVisible }) => {
               <div>
                 <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Source</div>
                 <div className="text-base font-semibold text-gray-900">
-                  {lead.source_name || lead.source || lead.lead_source || <span className="text-gray-400 italic font-normal">Not specified</span>}
+                  {lead.sourceName || lead.source || lead.leadSource || <span className="text-gray-400 italic font-normal">Not specified</span>}
                 </div>
               </div>
             )}
@@ -630,10 +630,10 @@ const LeadDetailsPanel = ({ lead, isFieldVisible }) => {
               <div>
                 <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Potential Value</div>
                 <div className="text-base font-semibold text-gray-900 flex items-center gap-2">
-                  {lead.value || lead.potential_value ? (
+                  {lead.value || lead.potentialValue ? (
                     <>
                       <DollarSign className="w-4 h-4 text-green-600" />
-                      <span className="text-green-600">${(lead.value || lead.potential_value).toLocaleString()}</span>
+                      <span className="text-green-600">${(lead.value || lead.potentialValue).toLocaleString()}</span>
                     </>
                   ) : (
                     <span className="text-gray-400 italic font-normal">Not specified</span>
@@ -673,9 +673,9 @@ const LeadDetailsPanel = ({ lead, isFieldVisible }) => {
                 <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Next Follow-up</div>
                 <div className="text-base font-semibold text-gray-900 flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-gray-400" />
-                  {lead.next_follow_up ? (
+                  {lead.nextFollowUp ? (
                     <span className="text-blue-600">
-                      {new Date(lead.next_follow_up).toLocaleDateString('en-US', {
+                      {new Date(lead.nextFollowUp).toLocaleDateString('en-US', {
                         month: 'short',
                         day: 'numeric',
                         year: 'numeric',
