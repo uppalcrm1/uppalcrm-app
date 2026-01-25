@@ -58,6 +58,7 @@ const LeadsPage = () => {
   console.log('🟢 DEPLOYMENT CHECK - Build timestamp:', new Date().toISOString())
   console.log('✅ TASK MANAGER INTEGRATION - Version 2.0 - Loaded:', new Date().toISOString())
   console.log('📦 TaskManager component imported:', typeof TaskManager)
+  console.log('🔵 PAGE INITIALIZED')
 
   const [searchParams, setSearchParams] = useSearchParams()
   const queryClient = useQueryClient()
@@ -192,8 +193,13 @@ const LeadsPage = () => {
   const leads = leadsData?.leads || []
   const pagination = leadsData?.pagination || {}
 
+  console.log('📊 Leads count:', leads.length)
+  console.log('📊 leadsLoading:', leadsLoading)
+  console.log('📊 leadsData:', leadsData)
+
   // Debug: Log the leads to see what fields are available
   React.useEffect(() => {
+    console.log('useEffect triggered - leads.length:', leads.length)
     if (leads.length > 0) {
       console.log('🔍 DEBUG: Leads data structure:', JSON.stringify(leads[0], null, 2))
       console.log('🔍 DEBUG: First lead has name field?', 'name' in leads[0])

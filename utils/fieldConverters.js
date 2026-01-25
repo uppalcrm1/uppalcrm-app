@@ -21,6 +21,11 @@ function convertSnakeToCamel(obj) {
     return obj;
   }
 
+  // Don't recurse into Date objects - keep them as-is
+  if (obj instanceof Date) {
+    return obj;
+  }
+
   if (Array.isArray(obj)) {
     return obj.map(item => convertSnakeToCamel(item));
   }
@@ -56,6 +61,11 @@ function camelToSnake(str) {
  */
 function convertCamelToSnake(obj) {
   if (obj === null || obj === undefined) {
+    return obj;
+  }
+
+  // Don't recurse into Date objects - keep them as-is
+  if (obj instanceof Date) {
     return obj;
   }
 
