@@ -267,6 +267,14 @@ const LeadListTable = ({
 
     // Save to server
     try {
+      // Filter out invalid fields that don't exist in leads table schema
+      const invalidFields = ['address', 'city', 'state', 'postal_code'];
+
+      if (invalidFields.includes(fieldName)) {
+        console.warn(`⚠️ Field "${fieldName}" is not supported in leads table, skipping update`);
+        return;
+      }
+
       if (isCustom) {
         // For custom fields, update the custom_fields object
         const currentLead = localLeads.find(l => l.id === recordId)

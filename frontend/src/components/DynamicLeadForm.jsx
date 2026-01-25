@@ -185,6 +185,24 @@ const DynamicLeadForm = ({
     return Object.keys(newErrors).length === 0;
   };
 
+  // Filter out invalid fields that don't exist in leads table schema
+  const filterValidFields = (data) => {
+    const validLeadFields = [
+      'first_name', 'last_name', 'title', 'email', 'phone', 'company',
+      'source', 'status', 'priority', 'value', 'potential_value', 'notes',
+      'assigned_to', 'next_follow_up', 'last_contact_date', 'created_at',
+      'converted_date'
+    ];
+
+    const filtered = {};
+    Object.keys(data).forEach(key => {
+      if (validLeadFields.includes(key)) {
+        filtered[key] = data[key];
+      }
+    });
+    return filtered;
+  };
+
   const handleSubmit = async () => {
     if (!validateForm()) {
       return;
@@ -220,13 +238,16 @@ const DynamicLeadForm = ({
         customFields: formData.customFields || {}
       };
 
+      // Filter out any invalid fields that don't exist in leads table
+      const cleanData = filterValidFields(submitData);
+
       let response;
       if (mode === 'edit' && actualInitialData?.id) {
         // Update existing lead
-        response = await leadsAPI.updateLead(actualInitialData.id, submitData);
+        response = await leadsAPI.updateLead(actualInitialData.id, cleanData);
       } else {
         // Create new lead
-        response = await leadsAPI.createLead(submitData);
+        response = await leadsAPI.createLead(cleanData);
       }
 
       // Call onSuccess if provided, otherwise onSubmit for backward compatibility
@@ -489,11 +510,16 @@ const DynamicLeadForm = ({
     return <div className="flex justify-center p-8">Initializing form...</div>;
   }
 
-  const enabledSystemFields = getEnabledSystemFields();
+  const enabledSystemFields = getEnabledSystemFields()
+    // Filter out fields that don't exist in leads table schema
+    .filter(field => !['address', 'city', 'state', 'postal_code'].includes(field.field_name));
 
   // Filter custom fields based on mode and visibility flags
   const enabledCustomFields = (formConfig.customFields || []).filter(f => {
     if (!f.is_enabled) return false;
+
+    // Filter out invalid fields that don't exist in leads table schema
+    if (['address', 'city', 'state', 'postal_code'].includes(f.field_name)) return false;
 
     // For create mode, check show_in_create_form
     if (mode === 'create' || mode !== 'edit') {
