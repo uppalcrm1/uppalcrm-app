@@ -17,14 +17,11 @@ INSERT INTO default_field_configurations (
   field_type,
   is_enabled,
   is_required,
-  is_system_field,
   show_in_list_view,
   show_in_detail_view,
   show_in_create_form,
   show_in_edit_form,
-  sort_order,
-  overall_visibility,
-  visibility_logic
+  display_order
 )
 SELECT
   org.id,
@@ -34,14 +31,11 @@ SELECT
   field_config.field_type,
   field_config.is_enabled,
   field_config.is_required,
-  true AS is_system_field,
   field_config.show_in_list_view,
   field_config.show_in_detail_view,
   field_config.show_in_create_form,
   field_config.show_in_edit_form,
-  field_config.sort_order,
-  'visible' AS overall_visibility,
-  'master_override' AS visibility_logic
+  field_config.display_order
 FROM organizations org
 CROSS JOIN (
   VALUES
@@ -81,7 +75,7 @@ CROSS JOIN (
     ('customer_value', 'Customer Value', 'number', true, false, false, true, true, true, 23)
 ) AS field_config(
   field_name, field_label, field_type, is_enabled, is_required,
-  show_in_list_view, show_in_detail_view, show_in_create_form, show_in_edit_form, sort_order
+  show_in_list_view, show_in_detail_view, show_in_create_form, show_in_edit_form, display_order
 );
 
 COMMIT;
