@@ -54,11 +54,12 @@ const LEAD_SOURCES = [
 ]
 
 const LeadsPage = () => {
-  console.log('🔴 LeadsPage RENDER', Date.now())
+  const BUILD_TIMESTAMP = '2026-01-25-014100'
+  console.log('🔴 LeadsPage RENDER', Date.now(), 'BUILD:', BUILD_TIMESTAMP)
   console.log('🟢 DEPLOYMENT CHECK - Build timestamp:', new Date().toISOString())
   console.log('✅ TASK MANAGER INTEGRATION - Version 2.0 - Loaded:', new Date().toISOString())
   console.log('📦 TaskManager component imported:', typeof TaskManager)
-  console.log('🔵 PAGE INITIALIZED')
+  console.log('🔵 PAGE INITIALIZED - BUILD:', BUILD_TIMESTAMP)
 
   const [searchParams, setSearchParams] = useSearchParams()
   const queryClient = useQueryClient()
