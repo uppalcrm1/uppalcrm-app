@@ -414,8 +414,8 @@ async function buildDynamicLeadSchema(organizationId, isUpdate = false) {
   const schemaFields = {
     title: Joi.string().max(100).allow('', null).optional(),
     company: Joi.string().max(255).allow('', null).optional(),
-    first_name: Joi.string().min(1).max(100).allow(null).optional(),
-    last_name: Joi.string().min(1).max(100).allow(null).optional(),
+    first_name: Joi.string().min(1).max(100).allow('', null).optional(),
+    last_name: Joi.string().min(1).max(100).allow('', null).optional(),
     email: Joi.string().email().allow('', null).optional(),
     phone: Joi.string().max(50).allow('', null).optional(),
     notes: Joi.string().allow('', null).optional(),

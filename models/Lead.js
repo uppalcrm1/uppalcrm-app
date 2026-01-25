@@ -425,7 +425,8 @@ class Lead {
         setClauses.push(`${field} = $${paramIndex}`);
         if (field === 'value') {
           values.push(parseFloat(updates[field]) || 0);
-        } else if ((field === 'assigned_to' || field === 'next_follow_up' || field === 'last_contact_date') && updates[field] === '') {
+        } else if ((field === 'first_name' || field === 'last_name' || field === 'title' || field === 'email' || field === 'phone' || field === 'assigned_to' || field === 'next_follow_up' || field === 'last_contact_date') && updates[field] === '') {
+          // Convert empty strings to null for optional fields
           values.push(null);
         } else {
           values.push(updates[field]);
