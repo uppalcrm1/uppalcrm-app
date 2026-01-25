@@ -31,6 +31,7 @@ import { useForm } from 'react-hook-form'
 import { format } from 'date-fns'
 import api from '../services/api'
 import { useFieldVisibility } from '../hooks/useFieldVisibility'
+import { formatDate } from '../utils/dateFormatter'
 
 const LEAD_STATUSES = [
   { value: 'new', label: 'New', color: 'blue' },
@@ -460,7 +461,7 @@ const LeadsPage = () => {
                       {isFieldVisible('created_at', 'list') && (
                         <td className="py-4 px-4">
                           <div className="text-sm text-gray-600">
-                            {format(new Date(lead.created_at), 'MMM d, yyyy')}
+                            {formatDate(lead.createdAt)}
                           </div>
                         </td>
                       )}

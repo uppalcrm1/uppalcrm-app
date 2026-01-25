@@ -28,6 +28,7 @@ import TaskManager from './TaskManager'
 import InteractionsTimeline from './InteractionsTimeline'
 import api from '../services/api'
 import { leadsAPI } from '../services/api'
+import { formatDate } from '../utils/dateFormatter'
 
 // Define system columns with metadata (comprehensive list)
 const SYSTEM_COLUMN_DEFINITIONS = [
@@ -648,7 +649,7 @@ const LeadListTable = ({
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-1 text-sm text-gray-600">
                         <Calendar className="w-3 h-3" />
-                        {format(new Date(lead.created_at), 'MMM d, yyyy')}
+                        {formatDate(lead.createdAt)}
                       </div>
                     </td>
                   )}
@@ -733,7 +734,7 @@ const LeadListTable = ({
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-1 text-sm text-gray-600">
                         <Calendar className="w-3 h-3" />
-                        {format(new Date(lead.updated_at), 'MMM d, yyyy')}
+                        {formatDate(lead.updatedAt)}
                       </div>
                     </td>
                   )}
