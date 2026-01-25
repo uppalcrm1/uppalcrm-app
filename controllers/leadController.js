@@ -1,6 +1,6 @@
 const db = require('../database/connection');
 const { v4: uuidv4 } = require('uuid');
-const { convertSnakeToCamel } = require('../utils/fieldConverters');
+const { convertSnakeToCamel, addComputedNameField } = require('../utils/fieldConverters');
 
 class LeadController {
   // Get detailed lead with activities and history
@@ -88,9 +88,9 @@ class LeadController {
       console.log('🔍 ===== GET /leads/:id/detail DEBUG END =====');
 
       res.json({
-        lead: convertSnakeToCamel(lead),
+        lead: addComputedNameField(convertSnakeToCamel(lead)),
         activityStats: convertSnakeToCamel(activityStats),
-        duplicates: convertSnakeToCamel(duplicates)
+        duplicates: addComputedNameField(convertSnakeToCamel(duplicates))
       });
     } catch (error) {
       console.error('❌ Error fetching lead detail:', error);
@@ -432,7 +432,7 @@ class LeadController {
 
       res.json({
         message: 'Lead status updated successfully',
-        lead: convertSnakeToCamel(result.rows[0])
+        lead: addComputedNameField(convertSnakeToCamel(result.rows[0]))
       });
     } catch (error) {
       // Rollback on error
@@ -532,7 +532,7 @@ class LeadController {
 
       const duplicates = await db.query(duplicatesQuery, [id, organization_id]);
 
-      res.json({ duplicates: convertSnakeToCamel(duplicates.rows) });
+      res.json({ duplicates: addComputedNameField(convertSnakeToCamel(duplicates.rows)) });
     } catch (error) {
       console.error('Error fetching lead duplicates:', error);
       res.status(500).json({ message: 'Internal server error' });

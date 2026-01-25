@@ -76,7 +76,7 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
   const products = productsData?.products || [];
   const defaultProduct = products.find(p => p.is_default);
   const filteredContacts = existingContacts.filter(contact => {
-    const fullName = contact.fullName || `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
+    const fullName = contact.name || contact.fullName || `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
     return fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       contact.email?.toLowerCase().includes(searchTerm.toLowerCase());
   });
@@ -265,7 +265,7 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <div>
             <h2 className="text-xl font-semibold">Convert Lead</h2>
-            <p className="text-sm text-gray-600 mt-0.5">{lead?.fullName || `${lead?.firstName || ''} ${lead?.lastName || ''}`.trim() || lead?.full_name}</p>
+            <p className="text-sm text-gray-600 mt-0.5">{lead?.name || lead?.fullName || `${lead?.firstName || ''} ${lead?.lastName || ''}`.trim()}</p>
           </div>
           <button
             onClick={onClose}
@@ -496,7 +496,7 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
                                 )}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <div className="text-sm font-medium truncate">{contact.fullName || `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || contact.full_name}</div>
+                                <div className="text-sm font-medium truncate">{contact.name || contact.fullName || `${contact.firstName || ''} ${contact.lastName || ''}`.trim()}</div>
                                 <div className="text-xs text-gray-600 truncate">{contact.email}</div>
                               </div>
                             </div>

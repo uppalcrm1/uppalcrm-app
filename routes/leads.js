@@ -12,7 +12,7 @@ const {
 const Joi = require('joi');
 const db = require('../database/connection');
 const nodemailer = require('nodemailer');
-const { convertSnakeToCamel } = require('../utils/fieldConverters');
+const { convertSnakeToCamel, addComputedNameField } = require('../utils/fieldConverters');
 
 const router = express.Router();
 
@@ -604,8 +604,8 @@ router.get('/by-status', async (req, res) => {
       ORDER BY created_at DESC
     `, [req.organizationId]);
 
-    // Convert leads to camelCase
-    const convertedLeads = convertSnakeToCamel(leads.rows);
+    // Convert leads to camelCase and add computed name field
+    const convertedLeads = addComputedNameField(convertSnakeToCamel(leads.rows));
 
     // Group leads by status
     const leadsByStatus = {};
@@ -758,8 +758,10 @@ router.get('/',
 
       console.log(`Found ${leads.rows.length} leads out of ${total} total`);
 
+      const leadsWithNames = addComputedNameField(convertSnakeToCamel(leads.rows));
+
       res.json({
-        leads: convertSnakeToCamel(leads.rows),
+        leads: leadsWithNames,
         pagination: {
           page: parseInt(page),
           limit: parseInt(limit),
@@ -1613,7 +1615,7 @@ router.get('/:id',
       }
 
       res.json({
-        lead: convertSnakeToCamel(lead.toJSON())
+        lead: addComputedNameField(convertSnakeToCamel(lead.toJSON()))
       });
     } catch (error) {
       console.error('Get lead error:', error);

@@ -363,9 +363,7 @@ const LeadsPage = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {leads.map((lead) => {
-                    const leadName = `${lead.firstName || ''} ${lead.lastName || ''}`.trim() || 'Unnamed Lead';
-                    return (
+                  {leads.map((lead) => (
                     <tr key={lead.id} className="border-b border-gray-100 hover:bg-gray-50">
                       {/* Name Column */}
                       <td className="py-4 px-4">
@@ -373,7 +371,7 @@ const LeadsPage = () => {
                           onClick={() => setSelectedLead(lead)}
                           className="font-medium text-blue-600 hover:text-blue-800 hover:underline text-left"
                         >
-                          {leadName}
+                          {lead.name || 'Unnamed Lead'}
                         </button>
                       </td>
 
@@ -517,8 +515,7 @@ const LeadsPage = () => {
                         </div>
                       </td>
                     </tr>
-                    );
-                  })}
+                  ))}
                 </tbody>
               </table>
             </div>

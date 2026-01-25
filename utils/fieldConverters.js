@@ -78,9 +78,34 @@ function convertCamelToSnake(obj) {
   return snakeObj;
 }
 
+/**
+ * Add computed "name" field to lead objects by concatenating firstName and lastName
+ * @param {object|array} data - Lead object or array of leads
+ * @returns {object|array} Lead(s) with added "name" field
+ */
+function addComputedNameField(data) {
+  if (!data) {
+    return data;
+  }
+
+  if (Array.isArray(data)) {
+    return data.map(item => addComputedNameField(item));
+  }
+
+  if (typeof data === 'object' && data.firstName !== undefined && data.lastName !== undefined) {
+    return {
+      ...data,
+      name: `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'Unnamed'
+    };
+  }
+
+  return data;
+}
+
 module.exports = {
   snakeToCamel,
   convertSnakeToCamel,
   camelToSnake,
-  convertCamelToSnake
+  convertCamelToSnake,
+  addComputedNameField
 };
