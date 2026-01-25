@@ -32,6 +32,26 @@ class Lead {
    * @returns {Lead} Created lead instance
    */
   static async create(leadData, organizationId, createdBy) {
+    // Define standard fields that map to database columns
+    const standardFieldNames = [
+      'title', 'company', 'first_name', 'last_name', 'email', 'phone',
+      'source', 'status', 'priority', 'value', 'notes', 'assigned_to',
+      'next_follow_up', 'last_contact_date'
+    ];
+
+    // Separate standard fields from custom fields
+    const standardData = {};
+    const customFields = {};
+
+    Object.keys(leadData).forEach(key => {
+      if (standardFieldNames.includes(key)) {
+        standardData[key] = leadData[key];
+      } else {
+        customFields[key] = leadData[key];
+      }
+    });
+
+    // Extract standard fields with defaults
     const {
       title,
       company,
@@ -46,7 +66,7 @@ class Lead {
       notes,
       assigned_to,
       next_follow_up
-    } = leadData;
+    } = standardData;
 
     // Validate required fields
     if (!first_name || !last_name || !organizationId) {
@@ -56,14 +76,14 @@ class Lead {
     try {
       // Set organization context for RLS
       await query(`SELECT set_config('app.current_organization_id', $1, true)`, [organizationId]);
-      
+
       const result = await query(`
         INSERT INTO leads (
           organization_id, title, company, first_name, last_name, email, phone,
           source, status, priority, value, notes, assigned_to, created_by,
-          next_follow_up
+          next_follow_up, custom_fields
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
         RETURNING *
       `, [
         organizationId,
@@ -80,8 +100,11 @@ class Lead {
         notes,
         assigned_to,
         createdBy,
-        next_follow_up
+        next_follow_up,
+        JSON.stringify(customFields)
       ], organizationId);
+
+      console.log('✅ Created lead with custom fields:', Object.keys(customFields));
 
       // Log the lead creation in change history (only if createdBy is provided)
       if (createdBy) {
