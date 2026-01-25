@@ -523,9 +523,8 @@ const LeadListTable = ({
                         <button
                           onClick={() => navigate(`/leads/${lead.id}`)}
                           className="text-sm font-medium text-blue-600 hover:text-blue-900 hover:underline cursor-pointer text-left block"
-                          title={`Debug: name=${lead.name}, firstName=${lead.firstName}, lastName=${lead.lastName}, first_name=${lead.first_name}, last_name=${lead.last_name}`}
                         >
-                          {lead.name || `${lead.firstName || lead.first_name || ''} ${lead.lastName || lead.last_name || ''}`.trim() || '—'}
+                          {lead.name || `${lead.first_name || ''} ${lead.last_name || ''}`.trim() || '—'}
                         </button>
                         {lead.title && (
                           <div className="text-xs text-gray-500 mt-0.5">{lead.title}</div>

@@ -21,8 +21,8 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
 
   // Form state
   const [contactForm, setContactForm] = useState({
-    firstName: lead?.firstName || lead?.first_name || '',
-    lastName: lead?.lastName || lead?.last_name || '',
+    first_name: lead?.first_name || '',
+    last_name: lead?.last_name || '',
     email: lead?.email || '',
     phone: lead?.phone || ''
   });
@@ -30,7 +30,7 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
   const [accountForm, setAccountForm] = useState({
     productId: '',
     product: '',
-    accountName: `${lead?.firstName || lead?.first_name || ''} ${lead?.lastName || lead?.last_name || ''}'s Account`.trim(),
+    accountName: `${lead?.first_name || ''} ${lead?.last_name || ''}'s Account`.trim(),
     deviceName: '',
     macAddress: '',
     term: '1', // Default to Monthly (value = 1)
@@ -173,10 +173,10 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
 
   // Sync owner when users load - ensure it matches the dropdown options format
   useEffect(() => {
-    if (users.length > 0 && lead?.assignedTo) {
-      const assignedUser = users.find(u => u.id === lead.assignedTo);
+    if (users.length > 0 && lead?.assigned_to) {
+      const assignedUser = users.find(u => u.id === lead.assigned_to);
       if (assignedUser) {
-        const ownerName = assignedUser.fullName || assignedUser.full_name || `${assignedUser.firstName || assignedUser.first_name || ''} ${assignedUser.lastName || assignedUser.last_name || ''}`.trim();
+        const ownerName = assignedUser.fullName || assignedUser.full_name || `${assignedUser.first_name || ''} ${assignedUser.last_name || ''}`.trim();
         setTransactionForm(prev => ({
           ...prev,
           owner: ownerName
@@ -203,8 +203,8 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
     if (contactMode === 'existing') {
       return selectedContact !== '';
     }
-    return contactForm.firstName.trim() !== '' &&
-           contactForm.lastName.trim() !== '' &&
+    return contactForm.first_name.trim() !== '' &&
+           contactForm.last_name.trim() !== '' &&
            (contactForm.email.trim() !== '' || contactForm.phone.trim() !== '');
   };
 
@@ -265,7 +265,7 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <div>
             <h2 className="text-xl font-semibold">Convert Lead</h2>
-            <p className="text-sm text-gray-600 mt-0.5">{lead?.name || lead?.fullName || `${lead?.firstName || ''} ${lead?.lastName || ''}`.trim()}</p>
+            <p className="text-sm text-gray-600 mt-0.5">{lead?.name || `${lead?.first_name || ''} ${lead?.last_name || ''}`.trim()}</p>
           </div>
           <button
             onClick={onClose}
@@ -424,8 +424,8 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
                       <label className="block text-xs font-medium text-gray-700 mb-1">First Name *</label>
                       <input
                         type="text"
-                        value={contactForm.firstName}
-                        onChange={(e) => setContactForm({ ...contactForm, firstName: e.target.value })}
+                        value={contactForm.first_name}
+                        onChange={(e) => setContactForm({ ...contactForm, first_name: e.target.value })}
                         className="input h-9"
                       />
                     </div>
@@ -433,8 +433,8 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
                       <label className="block text-xs font-medium text-gray-700 mb-1">Last Name *</label>
                       <input
                         type="text"
-                        value={contactForm.lastName}
-                        onChange={(e) => setContactForm({ ...contactForm, lastName: e.target.value })}
+                        value={contactForm.last_name}
+                        onChange={(e) => setContactForm({ ...contactForm, last_name: e.target.value })}
                         className="input h-9"
                       />
                     </div>

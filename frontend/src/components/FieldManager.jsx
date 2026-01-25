@@ -45,7 +45,7 @@ const FieldManager = () => {
       // Merge system field configurations with defaults
       const systemFieldDefaults = [
         {
-          name: 'firstName',
+          name: 'first_name',
           label: 'First Name',
           type: 'text',
           required: false,
@@ -54,7 +54,7 @@ const FieldManager = () => {
           options: null
         },
         {
-          name: 'lastName',
+          name: 'last_name',
           label: 'Last Name',
           type: 'text',
           required: false,
@@ -117,7 +117,7 @@ const FieldManager = () => {
           options: ['low', 'medium', 'high']
         },
         {
-          name: 'potentialValue',
+          name: 'potential_value',
           label: 'Potential Value ($)',
           type: 'number',
           required: false,
@@ -126,7 +126,7 @@ const FieldManager = () => {
           options: null
         },
         {
-          name: 'assignedTo',
+          name: 'assigned_to',
           label: 'Assign To',
           type: 'text',
           required: false,
@@ -135,7 +135,7 @@ const FieldManager = () => {
           options: null
         },
         {
-          name: 'nextFollowUp',
+          name: 'next_follow_up',
           label: 'Next Follow Up',
           type: 'date',
           required: false,

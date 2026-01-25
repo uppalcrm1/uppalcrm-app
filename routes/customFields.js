@@ -683,8 +683,8 @@ router.get('/', async (req, res) => {
     // Define entity-specific system fields
     const systemFieldsByEntity = {
       leads: {
-        firstName: { label: 'First Name', type: 'text', required: false, editable: true },
-        lastName: { label: 'Last Name', type: 'text', required: false, editable: true },
+        first_name: { label: 'First Name', type: 'text', required: false, editable: true },
+        last_name: { label: 'Last Name', type: 'text', required: false, editable: true },
         email: { label: 'Email', type: 'email', required: false, editable: true },
         phone: { label: 'Phone', type: 'tel', required: false, editable: true },
         company: { label: 'Company', type: 'text', required: false, editable: true },
@@ -709,9 +709,9 @@ router.get('/', async (req, res) => {
           editable: true,
           options: ['low', 'medium', 'high']
         },
-        potentialValue: { label: 'Potential Value ($)', type: 'number', required: false, editable: true },
-        assignedTo: { label: 'Assign To', type: 'user_select', required: false, editable: true },
-        nextFollowUp: { label: 'Next Follow Up', type: 'date', required: false, editable: true },
+        potential_value: { label: 'Potential Value ($)', type: 'number', required: false, editable: true },
+        assigned_to: { label: 'Assign To', type: 'user_select', required: false, editable: true },
+        next_follow_up: { label: 'Next Follow Up', type: 'date', required: false, editable: true },
         notes: { label: 'Notes', type: 'textarea', required: false, editable: true }
       },
       contacts: {
@@ -1224,8 +1224,8 @@ router.put('/default/:fieldName', async (req, res) => {
     // Define entity-specific system field defaults
     const systemFieldDefaultsByEntity = {
       leads: {
-        firstName: { label: 'First Name', type: 'text', required: false, editable: true },
-        lastName: { label: 'Last Name', type: 'text', required: false, editable: true },
+        first_name: { label: 'First Name', type: 'text', required: false, editable: true },
+        last_name: { label: 'Last Name', type: 'text', required: false, editable: true },
         email: { label: 'Email', type: 'email', required: false, editable: true },
         phone: { label: 'Phone', type: 'tel', required: false, editable: true },
         company: { label: 'Company', type: 'text', required: false, editable: true },
@@ -1271,9 +1271,9 @@ router.put('/default/:fieldName', async (req, res) => {
             { value: 'high', label: 'High' }
           ]
         },
-        potentialValue: { label: 'Potential Value ($)', type: 'number', required: false, editable: true },
-        assignedTo: { label: 'Assign To', type: 'user_select', required: false, editable: true },
-        nextFollowUp: { label: 'Next Follow Up', type: 'date', required: false, editable: true },
+        potential_value: { label: 'Potential Value ($)', type: 'number', required: false, editable: true },
+        assigned_to: { label: 'Assign To', type: 'user_select', required: false, editable: true },
+        next_follow_up: { label: 'Next Follow Up', type: 'date', required: false, editable: true },
         notes: { label: 'Notes', type: 'textarea', required: false, editable: true }
       },
       contacts: {
@@ -1827,8 +1827,8 @@ router.get('/form-config', async (req, res) => {
 
     // Define system field defaults
     const systemFieldDefaults = {
-      firstName: { label: 'First Name', type: 'text', required: true, editable: false },
-      lastName: { label: 'Last Name', type: 'text', required: true, editable: false },
+      first_name: { label: 'First Name', type: 'text', required: true, editable: false },
+      last_name: { label: 'Last Name', type: 'text', required: true, editable: false },
       email: { label: 'Email', type: 'email', required: false, editable: true },
       phone: { label: 'Phone', type: 'tel', required: false, editable: true },
       company: { label: 'Company', type: 'text', required: false, editable: true },
@@ -1874,9 +1874,9 @@ router.get('/form-config', async (req, res) => {
           { value: 'high', label: 'High' }
         ]
       },
-      potentialValue: { label: 'Potential Value ($)', type: 'number', required: false, editable: true },
-      assignedTo: { label: 'Assign To', type: 'user_select', required: false, editable: true },
-      nextFollowUp: { label: 'Next Follow Up', type: 'date', required: false, editable: true },
+      potential_value: { label: 'Potential Value ($)', type: 'number', required: false, editable: true },
+      assigned_to: { label: 'Assign To', type: 'user_select', required: false, editable: true },
+      next_follow_up: { label: 'Next Follow Up', type: 'date', required: false, editable: true },
       notes: { label: 'Notes', type: 'textarea', required: false, editable: true }
     };
 
