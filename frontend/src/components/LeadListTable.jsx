@@ -70,6 +70,7 @@ const LeadListTable = ({
   statuses,
   loading
 }) => {
+  console.log('🟢 LeadListTable RENDER - BUILD TIMESTAMP: 2026-01-25-095000', { leadsCount: leads?.length, firstLead: leads?.[0] })
   const navigate = useNavigate()
   const [sortConfig, setSortConfig] = useState({ key: 'created_at', direction: 'desc' })
   const [selectedLeads, setSelectedLeads] = useState([])
@@ -91,6 +92,14 @@ const LeadListTable = ({
   // Sync local leads with prop leads
   useEffect(() => {
     setLocalLeads(leads)
+    // DEBUG: Log the actual data structure
+    if (leads && leads.length > 0) {
+      console.log('🔴 LeadListTable: Leads data received', {
+        totalLeads: leads.length,
+        firstLead: leads[0],
+        fieldNames: Object.keys(leads[0] || {})
+      })
+    }
   }, [leads])
 
   // Fetch field configuration to get dynamic column labels AND build column definitions
@@ -514,8 +523,9 @@ const LeadListTable = ({
                         <button
                           onClick={() => navigate(`/leads/${lead.id}`)}
                           className="text-sm font-medium text-blue-600 hover:text-blue-900 hover:underline cursor-pointer text-left block"
+                          title={`Debug: name=${lead.name}, firstName=${lead.firstName}, lastName=${lead.lastName}, first_name=${lead.first_name}, last_name=${lead.last_name}`}
                         >
-                          {lead.first_name} {lead.last_name}
+                          {lead.name || `${lead.firstName || lead.first_name || ''} ${lead.lastName || lead.last_name || ''}`.trim() || '—'}
                         </button>
                         {lead.title && (
                           <div className="text-xs text-gray-500 mt-0.5">{lead.title}</div>
