@@ -12,6 +12,7 @@ const {
 const Joi = require('joi');
 const db = require('../database/connection');
 const nodemailer = require('nodemailer');
+const { convertSnakeToCamel } = require('../utils/fieldConverters');
 
 const router = express.Router();
 
@@ -603,6 +604,9 @@ router.get('/by-status', async (req, res) => {
       ORDER BY created_at DESC
     `, [req.organizationId]);
 
+    // Convert leads to camelCase
+    const convertedLeads = convertSnakeToCamel(leads.rows);
+
     // Group leads by status
     const leadsByStatus = {};
     const statuses = ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'converted', 'lost'];
@@ -613,7 +617,7 @@ router.get('/by-status', async (req, res) => {
     });
 
     // Group leads by their status
-    leads.rows.forEach(lead => {
+    convertedLeads.forEach(lead => {
       if (leadsByStatus[lead.status]) {
         leadsByStatus[lead.status].push(lead);
       }
@@ -755,7 +759,7 @@ router.get('/',
       console.log(`Found ${leads.rows.length} leads out of ${total} total`);
 
       res.json({
-        leads: leads.rows,
+        leads: convertSnakeToCamel(leads.rows),
         pagination: {
           page: parseInt(page),
           limit: parseInt(limit),
@@ -1600,7 +1604,7 @@ router.get('/:id',
   async (req, res) => {
     try {
       const lead = await Lead.findById(req.params.id, req.organizationId);
-      
+
       if (!lead) {
         return res.status(404).json({
           error: 'Lead not found',
@@ -1609,7 +1613,7 @@ router.get('/:id',
       }
 
       res.json({
-        lead: lead.toJSON()
+        lead: convertSnakeToCamel(lead.toJSON())
       });
     } catch (error) {
       console.error('Get lead error:', error);
