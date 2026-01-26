@@ -391,7 +391,7 @@ async function getSystemFieldConfigurations(organizationId) {
 /**
  * Build dynamic Joi schema based on field configurations
  */
-async function buildDynamicLeadSchema(organizationId, isUpdate = false, currentData = null) {
+async function buildDynamicLeadSchema(organizationId, isUpdate = false) {
   const fieldConfigs = await getSystemFieldConfigurations(organizationId);
   const configMap = {};
 
@@ -434,9 +434,7 @@ async function buildDynamicLeadSchema(organizationId, isUpdate = false, currentD
   // Dynamic validation for status field
   const statusValues = getAllowedValues('status', ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'converted', 'lost']);
   if (isUpdate) {
-    // For updates, also allow the current status value even if not in config
-    const allowedStatuses = [...new Set([...statusValues, currentData?.status || null].filter(Boolean))];
-    schemaFields.status = Joi.string().valid(...allowedStatuses, null).optional();
+    schemaFields.status = Joi.string().valid(...statusValues, null).optional();
   } else {
     schemaFields.status = Joi.string().valid(...statusValues).default('new');
   }
@@ -444,9 +442,7 @@ async function buildDynamicLeadSchema(organizationId, isUpdate = false, currentD
   // Dynamic validation for priority field
   const priorityValues = getAllowedValues('priority', ['low', 'medium', 'high']);
   if (isUpdate) {
-    // For updates, also allow the current priority value even if not in config
-    const allowedPriorities = [...new Set([...priorityValues, currentData?.priority || null].filter(Boolean))];
-    schemaFields.priority = Joi.string().valid(...allowedPriorities, null).optional();
+    schemaFields.priority = Joi.string().valid(...priorityValues, null).optional();
   } else {
     schemaFields.priority = Joi.string().valid(...priorityValues).default('medium');
   }
@@ -482,26 +478,23 @@ async function buildDynamicLeadSchema(organizationId, isUpdate = false, currentD
 function validateLeadDynamic(isUpdate = false) {
   return async (req, res, next) => {
     try {
-      // For updates, pass the current status to allow existing values
-      const currentData = isUpdate ? req.body : null;
-      const schema = await buildDynamicLeadSchema(req.organizationId, isUpdate, currentData);
+      const schema = await buildDynamicLeadSchema(req.organizationId, isUpdate);
       const { error, value } = schema.validate(req.body, { abortEarly: false });
 
       if (error) {
         const errors = error.details.map(detail => ({
           field: detail.path.join('.'),
-          message: detail.message,
-          context: detail.context
+          message: detail.message
         }));
 
-        console.error('❌ Validation error details:', JSON.stringify(errors, null, 2));
+        console.error('❌ Validation failed for PUT /leads/:id');
+        console.error('❌ Errors:', JSON.stringify(errors, null, 2));
         console.error('❌ Request body:', JSON.stringify(req.body, null, 2));
 
         return res.status(400).json({
           error: 'Request data is invalid',
           details: errors,
-          message: errors.map(e => `${e.field}: ${e.message}`).join('; '),
-          receivedData: req.body
+          message: errors.map(e => `${e.field}: ${e.message}`).join('; ')
         });
       }
 
