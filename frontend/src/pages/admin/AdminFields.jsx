@@ -532,8 +532,8 @@ const AdminFields = () => {
     }
 
     const allFields = filteredFields
-    const oldIndex = allFields.findIndex(f => f.id === active.id)
-    const newIndex = allFields.findIndex(f => f.id === over.id)
+    const oldIndex = allFields.findIndex(f => (f.id || f.field_name) === active.id)
+    const newIndex = allFields.findIndex(f => (f.id || f.field_name) === over.id)
 
     if (oldIndex === -1 || newIndex === -1) {
       return
