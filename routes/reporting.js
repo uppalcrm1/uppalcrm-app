@@ -40,4 +40,7 @@ router.get('/dashboard/accounts-by-product', reportingController.getAccountsByPr
 // GET /api/reporting/standard-reports/transactions-by-source - Get transactions grouped by source
 router.get('/standard-reports/transactions-by-source', reportingController.getTransactionsBySource);
 
+// GET /api/reporting/standard-reports/transactions-revenue-by-source - Get transactions revenue grouped by source
+router.get('/standard-reports/transactions-revenue-by-source', reportingController.getTransactionRevenueBySource);
+
 module.exports = router;

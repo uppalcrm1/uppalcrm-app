@@ -1158,6 +1158,14 @@ export const reportingAPI = {
       params: { year, month }
     })
     return response.data
+  },
+
+  // Get transactions revenue grouped by source for a given month
+  getTransactionRevenueBySource: async (year, month) => {
+    const response = await api.get('/reporting/standard-reports/transactions-revenue-by-source', {
+      params: { year, month }
+    })
+    return response.data
   }
 }
 

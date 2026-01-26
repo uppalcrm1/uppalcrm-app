@@ -486,6 +486,75 @@ const getTransactionsBySource = async (organizationId, year, month) => {
   };
 };
 
+/**
+ * Get transactions revenue grouped by source for a given month
+ * @param {string} organizationId - Organization ID
+ * @param {number} year - Year (e.g., 2024)
+ * @param {number} month - Month (1-12)
+ * @returns {Promise<Object>} Transaction revenue by source with summary
+ */
+const getTransactionRevenueBySource = async (organizationId, year, month) => {
+  // Validate month
+  if (month < 1 || month > 12) {
+    throw new Error('Invalid month. Must be between 1 and 12.');
+  }
+
+  // Create date range for the given month
+  const startDate = new Date(year, month - 1, 1);
+  const endDate = new Date(year, month, 0, 23, 59, 59, 999);
+
+  const result = await db.query(
+    `SELECT
+      COALESCE(source, 'Not Specified') as source,
+      COUNT(id) as transaction_count,
+      ROUND(SUM(amount)::numeric, 2) as total_amount
+     FROM transactions
+     WHERE organization_id = $1
+       AND deleted_at IS NULL
+       AND is_void = FALSE
+       AND status = 'completed'
+       AND transaction_date >= $2
+       AND transaction_date <= $3
+     GROUP BY source
+     ORDER BY total_amount DESC`,
+    [organizationId, startDate, endDate],
+    organizationId
+  );
+
+  // Calculate total revenue and percentages
+  const rows = result.rows.map(row => ({
+    source: row.source,
+    count: parseInt(row.transaction_count),
+    amount: parseFloat(row.total_amount || 0)
+  }));
+
+  const totalTransactions = rows.reduce((sum, row) => sum + row.count, 0);
+  const totalAmount = rows.reduce((sum, row) => sum + row.amount, 0);
+
+  // Add percentage to each row (based on revenue, not count)
+  const dataWithPercentage = rows.map(row => ({
+    ...row,
+    percentage: totalAmount > 0
+      ? parseFloat(((row.amount / totalAmount) * 100).toFixed(2))
+      : 0
+  }));
+
+  // Find top source by revenue
+  const topSource = dataWithPercentage.length > 0 ? dataWithPercentage[0] : null;
+
+  return {
+    data: dataWithPercentage,
+    summary: {
+      totalTransactions,
+      totalAmount: parseFloat(totalAmount.toFixed(2)),
+      topSource: topSource ? topSource.source : null,
+      topSourceAmount: topSource ? topSource.amount : 0,
+      month,
+      year
+    }
+  };
+};
+
 module.exports = {
   getTotalRevenue,
   getRevenueThisMonth,
@@ -500,5 +569,6 @@ module.exports = {
   getNewCustomersTrend,
   getDashboardKPIs,
   getAccountsByProduct,
-  getTransactionsBySource
+  getTransactionsBySource,
+  getTransactionRevenueBySource
 };

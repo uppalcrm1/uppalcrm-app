@@ -128,7 +128,7 @@ const ReportsPage = () => {
               <div>
                 <h3 className="text-lg font-semibold text-gray-900">Transactions by Source</h3>
                 <p className="text-sm text-gray-500 mt-1">
-                  View transaction volume grouped by source
+                  View transaction count grouped by source
                 </p>
               </div>
             </div>
@@ -139,6 +139,35 @@ const ReportsPage = () => {
                 onClick={(e) => {
                   e.stopPropagation();
                   navigate('/reports/transactions-by-source');
+                }}
+                className="btn btn-secondary flex items-center space-x-2 text-sm"
+              >
+                <Play className="h-3 w-3" />
+                <span>View</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Transactions Revenue by Source Report */}
+          <div
+            className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow cursor-pointer"
+            onClick={() => navigate('/reports/transactions-revenue-by-source')}
+          >
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Transactions Revenue by Source</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  View revenue volume grouped by source
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+              <span className="text-sm text-gray-600">Pre-built standard report</span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate('/reports/transactions-revenue-by-source');
                 }}
                 className="btn btn-secondary flex items-center space-x-2 text-sm"
               >
