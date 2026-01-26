@@ -500,6 +500,7 @@ function validateLeadDynamic(isUpdate = false) {
         return res.status(400).json({
           error: 'Request data is invalid',
           details: errors,
+          message: errors.map(e => `${e.field}: ${e.message}`).join('; '),
           receivedData: req.body
         });
       }
