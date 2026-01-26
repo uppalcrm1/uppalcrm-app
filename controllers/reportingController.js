@@ -269,6 +269,50 @@ const getTransactionRevenueBySource = async (req, res) => {
   }
 };
 
+/**
+ * GET /api/reporting/standard-reports/transactions-count-by-owner
+ * Get transaction count grouped by lead owner at time of conversion
+ * Query params: year, month (defaults to current year/month)
+ */
+const getTransactionCountByOwner = async (req, res) => {
+  try {
+    const organizationId = req.user.organization_id;
+    const now = new Date();
+    const year = parseInt(req.query.year) || now.getFullYear();
+    const month = parseInt(req.query.month) || (now.getMonth() + 1);
+
+    // Validate year and month
+    if (year < 2000 || year > 2100) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid year parameter. Must be between 2000 and 2100.'
+      });
+    }
+
+    if (month < 1 || month > 12) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid month parameter. Must be between 1 and 12.'
+      });
+    }
+
+    const result = await reportingService.getTransactionCountByOwner(organizationId, year, month);
+
+    res.json({
+      success: true,
+      data: result
+    });
+
+  } catch (error) {
+    console.error('Error fetching transactions count by owner:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch transactions count by owner',
+      message: error.message
+    });
+  }
+};
+
 module.exports = {
   getDashboardKPIs,
   getRevenueTrend,
@@ -277,5 +321,6 @@ module.exports = {
   getNewCustomersTrend,
   getAccountsByProduct,
   getTransactionsBySource,
-  getTransactionRevenueBySource
+  getTransactionRevenueBySource,
+  getTransactionCountByOwner
 };

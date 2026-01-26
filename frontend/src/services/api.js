@@ -1166,6 +1166,14 @@ export const reportingAPI = {
       params: { year, month }
     })
     return response.data
+  },
+
+  // Get transaction count grouped by lead owner for a given month
+  getTransactionCountByOwner: async (year, month) => {
+    const response = await api.get('/reporting/standard-reports/transactions-count-by-owner', {
+      params: { year, month }
+    })
+    return response.data
   }
 }
 
