@@ -33,7 +33,6 @@ import DynamicLeadForm from '../components/DynamicLeadForm'
 import ConvertLeadModal from '../components/ConvertLeadModal'
 import TaskManager from '../components/TaskManager'
 import { useFieldVisibility } from '../hooks/useFieldVisibility'
-import { convertCamelToSnake } from '../utils/fieldConverters'
 
 const LeadDetail = () => {
   const { id } = useParams()
@@ -66,13 +65,11 @@ const LeadDetail = () => {
       const response = await api.get(`/leads/${id}/detail`)
       const { lead: leadData, activityStats: stats, duplicates: dups } = response.data
 
-      // Convert camelCase field names to snake_case for form compatibility
-      const convertedLead = convertCamelToSnake(leadData)
-
-      setLead(convertedLead)
+      // API now returns snake_case directly, no conversion needed
+      setLead(leadData)
       setActivityStats(stats)
       setDuplicates(dups)
-      setIsFollowing(!!convertedLead.is_following)
+      setIsFollowing(!!leadData.is_following)
       setError('')
     } catch (err) {
       console.error('Error fetching lead detail:', err)
