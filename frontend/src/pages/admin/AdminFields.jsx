@@ -106,7 +106,7 @@ const SortableRow = ({ field, entityType, isReorderMode, onEdit, onDelete, onTog
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: field.id })
+  } = useSortable({ id: field.id || field.field_name })
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -127,8 +127,13 @@ const SortableRow = ({ field, entityType, isReorderMode, onEdit, onDelete, onTog
       <div className="flex items-center">
         {/* Drag Handle */}
         {isReorderMode && (
-          <div className="px-4 py-4 cursor-move flex-shrink-0" {...attributes} {...listeners}>
-            <GripVertical size={20} className="text-gray-400" />
+          <div
+            className="px-4 py-4 cursor-grab active:cursor-grabbing flex-shrink-0 relative z-10"
+            style={{ touchAction: 'none' }}
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical size={20} className="text-gray-400 pointer-events-none" />
           </div>
         )}
         {/* Field Content */}
@@ -508,7 +513,11 @@ const AdminFields = () => {
 
   // Drag and drop sensors
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // 8px movement required to start drag
+      },
+    }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
