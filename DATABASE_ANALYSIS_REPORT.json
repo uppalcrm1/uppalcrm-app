@@ -1,0 +1,200 @@
+{
+  "report_metadata": {
+    "generated_date": "2026-01-24",
+    "database": "uppalcrm_devtest",
+    "entity": "leads",
+    "total_fields_analyzed": 29,
+    "ssl_required": true,
+    "host": "dpg-d5hjcs75r7bs73bg0ngg-a.oregon-postgres.render.com"
+  },
+  "summary": {
+    "total_columns": 29,
+    "system_fields_count": 16,
+    "extended_fields_count": 10,
+    "internal_fields_count": 3,
+    "custom_fields_defined": 3,
+    "missing_from_custom_definitions": 10
+  },
+  "extended_fields": {
+    "description": "Fields that exist in database but need custom_field_definitions entries",
+    "count": 10,
+    "status": "REQUIRES ACTION",
+    "fields": [
+      {
+        "field_name": "address",
+        "data_type": "character varying",
+        "nullable": true,
+        "suggested_field_type": "text",
+        "priority": "HIGH",
+        "category": "address"
+      },
+      {
+        "field_name": "city",
+        "data_type": "character varying",
+        "nullable": true,
+        "suggested_field_type": "text",
+        "priority": "HIGH",
+        "category": "address"
+      },
+      {
+        "field_name": "state",
+        "data_type": "character varying",
+        "nullable": true,
+        "suggested_field_type": "text",
+        "priority": "HIGH",
+        "category": "address"
+      },
+      {
+        "field_name": "postal_code",
+        "data_type": "character varying",
+        "nullable": true,
+        "suggested_field_type": "text",
+        "priority": "HIGH",
+        "category": "address"
+      },
+      {
+        "field_name": "country",
+        "data_type": "character varying",
+        "nullable": true,
+        "suggested_field_type": "text",
+        "priority": "HIGH",
+        "category": "address"
+      },
+      {
+        "field_name": "created_by",
+        "data_type": "uuid",
+        "nullable": true,
+        "suggested_field_type": "text",
+        "priority": "MEDIUM",
+        "category": "relationship"
+      },
+      {
+        "field_name": "linked_contact_id",
+        "data_type": "uuid",
+        "nullable": true,
+        "suggested_field_type": "text",
+        "priority": "MEDIUM",
+        "category": "relationship"
+      },
+      {
+        "field_name": "relationship_type",
+        "data_type": "character varying",
+        "nullable": true,
+        "suggested_field_type": "text",
+        "priority": "MEDIUM",
+        "category": "relationship"
+      },
+      {
+        "field_name": "interest_type",
+        "data_type": "character varying",
+        "nullable": true,
+        "suggested_field_type": "text",
+        "priority": "MEDIUM",
+        "category": "relationship"
+      },
+      {
+        "field_name": "converted_date",
+        "data_type": "timestamp with time zone",
+        "nullable": true,
+        "suggested_field_type": "date",
+        "priority": "HIGH",
+        "category": "timeline"
+      }
+    ]
+  },
+  "current_custom_fields": {
+    "count": 3,
+    "fields": [
+      {
+        "field_name": "prefer_method",
+        "field_type": "text",
+        "field_label": "prefer method"
+      },
+      {
+        "field_name": "test_field_123",
+        "field_type": "text",
+        "field_label": "Test Field 123"
+      },
+      {
+        "field_name": "test_website_url",
+        "field_type": "text",
+        "field_label": "Test Website URL"
+      }
+    ]
+  },
+  "migrations_required": {
+    "action": "Execute these INSERT statements to add missing fields",
+    "fields_to_add": [
+      {
+        "field_name": "address",
+        "field_type": "text",
+        "field_label": "Address",
+        "entity_type": "leads",
+        "is_required": false
+      },
+      {
+        "field_name": "city",
+        "field_type": "text",
+        "field_label": "City",
+        "entity_type": "leads",
+        "is_required": false
+      },
+      {
+        "field_name": "state",
+        "field_type": "text",
+        "field_label": "State/Province",
+        "entity_type": "leads",
+        "is_required": false
+      },
+      {
+        "field_name": "postal_code",
+        "field_type": "text",
+        "field_label": "Postal Code",
+        "entity_type": "leads",
+        "is_required": false
+      },
+      {
+        "field_name": "country",
+        "field_type": "text",
+        "field_label": "Country",
+        "entity_type": "leads",
+        "is_required": false
+      },
+      {
+        "field_name": "created_by",
+        "field_type": "text",
+        "field_label": "Created By",
+        "entity_type": "leads",
+        "is_required": false
+      },
+      {
+        "field_name": "linked_contact_id",
+        "field_type": "text",
+        "field_label": "Linked Contact ID",
+        "entity_type": "leads",
+        "is_required": false
+      },
+      {
+        "field_name": "relationship_type",
+        "field_type": "text",
+        "field_label": "Relationship Type",
+        "entity_type": "leads",
+        "is_required": false
+      },
+      {
+        "field_name": "interest_type",
+        "field_type": "text",
+        "field_label": "Interest Type",
+        "entity_type": "leads",
+        "is_required": false
+      },
+      {
+        "field_name": "converted_date",
+        "field_type": "date",
+        "field_label": "Converted Date",
+        "entity_type": "leads",
+        "is_required": false
+      }
+    ]
+  }
+}

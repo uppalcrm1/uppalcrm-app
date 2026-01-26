@@ -32,6 +32,7 @@ import {
   Plus
 } from 'lucide-react'
 import { format } from 'date-fns'
+import { formatDate } from '../utils/dateFormatter'
 
 // Sortable Lead Card Component
 const SortableLeadCard = ({ lead, users, onEdit, onDelete }) => {
@@ -183,7 +184,7 @@ const LeadCard = ({ lead, users, onEdit, onDelete }) => {
       <div className="flex items-center gap-2 text-xs text-gray-500">
         <Calendar className="w-3 h-3" />
         <span>
-          {format(new Date(lead.created_at), 'MMM d, yyyy')}
+          {formatDate(lead.createdAt)}
         </span>
       </div>
     </div>

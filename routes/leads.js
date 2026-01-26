@@ -12,6 +12,7 @@ const {
 const Joi = require('joi');
 const db = require('../database/connection');
 const nodemailer = require('nodemailer');
+const { convertSnakeToCamel, addComputedNameField } = require('../utils/fieldConverters');
 
 const router = express.Router();
 
@@ -413,8 +414,8 @@ async function buildDynamicLeadSchema(organizationId, isUpdate = false) {
   const schemaFields = {
     title: Joi.string().max(100).allow('', null).optional(),
     company: Joi.string().max(255).allow('', null).optional(),
-    first_name: Joi.string().min(1).max(100).allow(null).optional(),
-    last_name: Joi.string().min(1).max(100).allow(null).optional(),
+    first_name: Joi.string().min(1).max(100).allow('', null).optional(),
+    last_name: Joi.string().min(1).max(100).allow('', null).optional(),
     email: Joi.string().email().allow('', null).optional(),
     phone: Joi.string().max(50).allow('', null).optional(),
     notes: Joi.string().allow('', null).optional(),
@@ -603,6 +604,9 @@ router.get('/by-status', async (req, res) => {
       ORDER BY created_at DESC
     `, [req.organizationId]);
 
+    // Convert leads to camelCase and add computed name field
+    const convertedLeads = addComputedNameField(convertSnakeToCamel(leads.rows));
+
     // Group leads by status
     const leadsByStatus = {};
     const statuses = ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'converted', 'lost'];
@@ -613,7 +617,7 @@ router.get('/by-status', async (req, res) => {
     });
 
     // Group leads by their status
-    leads.rows.forEach(lead => {
+    convertedLeads.forEach(lead => {
       if (leadsByStatus[lead.status]) {
         leadsByStatus[lead.status].push(lead);
       }
@@ -754,8 +758,10 @@ router.get('/',
 
       console.log(`Found ${leads.rows.length} leads out of ${total} total`);
 
+      const leadsWithNames = addComputedNameField(convertSnakeToCamel(leads.rows));
+
       res.json({
-        leads: leads.rows,
+        leads: leadsWithNames,
         pagination: {
           page: parseInt(page),
           limit: parseInt(limit),
@@ -1600,7 +1606,7 @@ router.get('/:id',
   async (req, res) => {
     try {
       const lead = await Lead.findById(req.params.id, req.organizationId);
-      
+
       if (!lead) {
         return res.status(404).json({
           error: 'Lead not found',
@@ -1609,7 +1615,7 @@ router.get('/:id',
       }
 
       res.json({
-        lead: lead.toJSON()
+        lead: addComputedNameField(convertSnakeToCamel(lead.toJSON()))
       });
     } catch (error) {
       console.error('Get lead error:', error);
@@ -1631,18 +1637,6 @@ router.post('/', validateLeadDynamic(false), async (req, res) => {
     console.log('🔍 Creating lead with data:', req.body);
     console.log('🔍 Organization ID:', req.organizationId);
     console.log('🔍 User ID:', req.user.id);
-    console.log('🔍 Value column name:', valueColumnName);
-
-    const {
-      firstName, lastName, email, phone, company, source,
-      status, priority, potentialValue, assignedTo, nextFollowUp, next_follow_up, notes,
-      customFields = {} // Accept custom fields
-    } = req.body;
-
-    // Handle both camelCase and snake_case for follow-up date
-    const followUpDate = nextFollowUp || next_follow_up;
-
-    // Note: firstName and lastName are now optional fields (no validation required)
 
     // Validate authentication context
     if (!req.organizationId || !req.user.id) {
@@ -1652,10 +1646,19 @@ router.post('/', validateLeadDynamic(false), async (req, res) => {
       });
     }
 
-    // Ensure value column is detected
-    if (!valueColumnName) {
-      await detectValueColumn();
-    }
+    // Convert camelCase to snake_case for database
+    const { convertCamelToSnake } = require('../utils/fieldConverters');
+    const leadData = convertCamelToSnake(req.body);
+
+    // Extract known fields and custom fields
+    const {
+      first_name, last_name, email, phone, company, source,
+      status, priority, potential_value, assigned_to, next_follow_up, notes,
+      ...customFields
+    } = leadData;
+
+    console.log('🔍 Converted data:', { first_name, last_name, email, phone, company, source, status, priority, potential_value, assigned_to, next_follow_up, notes });
+    console.log('🔍 Custom fields detected:', Object.keys(customFields));
 
     // Get field configurations for validation
     const fieldConfigs = await getFieldConfigurations(req.organizationId);
@@ -1670,53 +1673,35 @@ router.post('/', validateLeadDynamic(false), async (req, res) => {
       });
     }
 
-    const result = await db.query(`
-      INSERT INTO leads
-      (organization_id, first_name, last_name, email, phone, company, source,
-       status, priority, ${valueColumnName}, assigned_to, next_follow_up, notes, created_by)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-      RETURNING id, first_name, last_name, email, phone, company, source, status,
-                priority, ${valueColumnName}, assigned_to, next_follow_up, notes, created_at
-    `, [
-      req.organizationId, firstName, lastName, email, phone, company, source,
-      status || 'new', priority || 'medium', potentialValue, assignedTo, followUpDate, notes,
-      req.user.id
-    ]);
+    // Use the Lead model to create the lead (which handles custom fields)
+    const lead = await Lead.create({
+      title: leadData.title,
+      company,
+      first_name,
+      last_name,
+      email,
+      phone,
+      source,
+      status: status || 'new',
+      priority: priority || 'medium',
+      value: potential_value || 0,
+      notes,
+      assigned_to,
+      next_follow_up,
+      ...customFields // Include any additional custom fields
+    }, req.organizationId, req.user.id);
 
-    const createdLead = result.rows[0];
-
-    // ========================================
-    // PHASE 1: Save custom fields to JSONB column
-    // ========================================
-    if (customFields && Object.keys(customFields).length > 0) {
-      console.log('💾 Saving custom fields to lead:', customFields);
-
-      try {
-        await db.query(
-          `UPDATE leads
-           SET custom_fields = $1
-           WHERE id = $2 AND organization_id = $3`,
-          [JSON.stringify(customFields), createdLead.id, req.organizationId]
-        );
-
-        console.log('✅ Custom fields saved successfully');
-
-        // Add custom_fields to the response object
-        createdLead.custom_fields = customFields;
-
-      } catch (error) {
-        console.error('❌ Error saving custom fields:', error);
-        // Don't fail the entire lead creation, just log the error
-      }
-    }
-    // ========================================
+    const createdLead = lead.toJSON();
+    const followUpDate = next_follow_up;
+    const firstName = first_name;
+    const lastName = last_name;
 
     // Auto-create follow-up task if next_follow_up is set
     if (followUpDate) {
       try {
         console.log('📅 Creating follow-up task for next_follow_up date:', followUpDate);
         const leadName = `${firstName || ''} ${lastName || ''}`.trim() || company || 'this lead';
-        const taskUserId = assignedTo || req.user.id; // Assign to lead owner or creator
+        const taskUserId = assigned_to || req.user.id; // Assign to lead owner or creator
 
         // Adjust date if it's at midnight UTC (convert to noon UTC for better timezone display)
         const taskDate = new Date(followUpDate);
@@ -1754,7 +1739,7 @@ router.post('/', validateLeadDynamic(false), async (req, res) => {
       try {
         console.log('📧 Starting email sending process...');
         console.log('📧 Lead email:', createdLead.email);
-        console.log('📧 Assigned to:', assignedTo);
+        console.log('📧 Assigned to:', assigned_to);
 
         // Send welcome email to the lead
         if (createdLead.email) {
@@ -1770,11 +1755,11 @@ router.post('/', validateLeadDynamic(false), async (req, res) => {
         }
 
         // Send notification to assigned user
-        if (assignedTo) {
-          console.log('📧 Looking up assigned user email for ID:', assignedTo);
+        if (assigned_to) {
+          console.log('📧 Looking up assigned user email for ID:', assigned_to);
           const userResult = await db.query(
             'SELECT email FROM users WHERE id = $1',
-            [assignedTo]
+            [assigned_to]
           );
           const assignedUserEmail = userResult.rows[0]?.email;
           console.log('📧 Assigned user email:', assignedUserEmail);
@@ -1791,7 +1776,7 @@ router.post('/', validateLeadDynamic(false), async (req, res) => {
               source: createdLead.source,
               status: createdLead.status,
               priority: createdLead.priority,
-              value: createdLead[valueColumnName],
+              value: createdLead.value,
               createdAt: createdLead.created_at
             }, assignedUserEmail);
             console.log('📧 User notification email sent successfully');
@@ -1831,6 +1816,10 @@ router.put('/:id',
       console.log('📝 Organization ID:', req.organizationId);
       console.log('📝 Request body:', JSON.stringify(req.body, null, 2));
 
+      // Convert camelCase to snake_case for database
+      const { convertCamelToSnake } = require('../utils/fieldConverters');
+      const updateData = convertCamelToSnake(req.body);
+
       // Get the old lead data to check if next_follow_up changed
       const oldLeadResult = await db.query(
         'SELECT next_follow_up, first_name, last_name, company, assigned_to FROM leads WHERE id = $1 AND organization_id = $2',
@@ -1840,7 +1829,7 @@ router.put('/:id',
 
       // Pass user ID for audit trail tracking
       const userId = req.user?.id || null;
-      const lead = await Lead.update(req.params.id, req.body, req.organizationId, userId);
+      const lead = await Lead.update(req.params.id, updateData, req.organizationId, userId);
 
       if (!lead) {
         console.log('❌ Lead not found:', req.params.id);
@@ -1851,20 +1840,20 @@ router.put('/:id',
       }
 
       // Auto-create follow-up task if next_follow_up changed
-      if (oldLead && req.body.next_follow_up) {
+      if (oldLead && updateData.next_follow_up) {
         const oldDate = oldLead.next_follow_up ? new Date(oldLead.next_follow_up).getTime() : null;
-        const newDate = new Date(req.body.next_follow_up).getTime();
+        const newDate = new Date(updateData.next_follow_up).getTime();
 
         // Only create task if the date actually changed
         if (oldDate !== newDate) {
           try {
             console.log('📅 Next follow-up date changed, creating new task...');
-            const leadName = `${req.body.first_name || oldLead.first_name || ''} ${req.body.last_name || oldLead.last_name || ''}`.trim()
-              || req.body.company || oldLead.company || 'this lead';
-            const taskUserId = req.body.assigned_to || oldLead.assigned_to || req.user.id;
+            const leadName = `${updateData.first_name || oldLead.first_name || ''} ${updateData.last_name || oldLead.last_name || ''}`.trim()
+              || updateData.company || oldLead.company || 'this lead';
+            const taskUserId = updateData.assigned_to || oldLead.assigned_to || req.user.id;
 
             // Adjust date if it's at midnight UTC (convert to noon UTC for better timezone display)
-            const taskDate = new Date(req.body.next_follow_up);
+            const taskDate = new Date(updateData.next_follow_up);
             if (taskDate.getUTCHours() === 0 && taskDate.getUTCMinutes() === 0 && taskDate.getUTCSeconds() === 0) {
               taskDate.setUTCHours(12, 0, 0, 0); // Set to noon UTC
               console.log('📅 Adjusted task date from midnight UTC to noon UTC:', taskDate.toISOString());
@@ -1898,34 +1887,9 @@ router.put('/:id',
       }
 
       // ========================================
-      // PHASE 1: Update custom fields if provided
-      // ========================================
-      const { customFields = {}, custom_fields = {} } = req.body;
-      const fieldsToUpdate = Object.keys(customFields).length > 0 ? customFields : custom_fields;
-
-      if (fieldsToUpdate && Object.keys(fieldsToUpdate).length > 0) {
-        console.log('💾 Updating custom fields:', fieldsToUpdate);
-
-        try {
-          await db.query(
-            `UPDATE leads
-             SET custom_fields = $1
-             WHERE id = $2 AND organization_id = $3`,
-            [JSON.stringify(fieldsToUpdate), req.params.id, req.organizationId]
-          );
-
-          console.log('✅ Custom fields updated successfully');
-
-          // Add to lead object if it has toJSON method, otherwise add directly
-          if (lead.custom_fields !== undefined) {
-            lead.custom_fields = fieldsToUpdate;
-          }
-
-        } catch (error) {
-          console.error('❌ Error updating custom fields:', error);
-          // Don't fail the entire update, just log the error
-        }
-      }
+      // Custom fields are now handled by Lead.update()
+      // which uses PostgreSQL JSONB merge operator
+      // for efficient field merging
       // ========================================
 
       console.log('✅ Lead updated successfully:', lead.id);

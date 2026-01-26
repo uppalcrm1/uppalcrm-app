@@ -13,7 +13,6 @@ import {
   Mail,
   Calendar,
   Building2,
-  MapPin,
   DollarSign,
   Clock,
   MoreVertical,
@@ -34,6 +33,7 @@ import DynamicLeadForm from '../components/DynamicLeadForm'
 import ConvertLeadModal from '../components/ConvertLeadModal'
 import TaskManager from '../components/TaskManager'
 import { useFieldVisibility } from '../hooks/useFieldVisibility'
+import { convertCamelToSnake } from '../utils/fieldConverters'
 
 const LeadDetail = () => {
   const { id } = useParams()
@@ -66,10 +66,13 @@ const LeadDetail = () => {
       const response = await api.get(`/leads/${id}/detail`)
       const { lead: leadData, activityStats: stats, duplicates: dups } = response.data
 
-      setLead(leadData)
+      // Convert camelCase field names to snake_case for form compatibility
+      const convertedLead = convertCamelToSnake(leadData)
+
+      setLead(convertedLead)
       setActivityStats(stats)
       setDuplicates(dups)
-      setIsFollowing(!!leadData.is_following)
+      setIsFollowing(!!convertedLead.is_following)
       setError('')
     } catch (err) {
       console.error('Error fetching lead detail:', err)
@@ -420,14 +423,14 @@ const LeadDetail = () => {
                   </div>
                 )}
 
-                {lead.lead_value && isFieldVisible('lead_value', 'detail') && (
+                {(lead.value || lead.potential_value) && isFieldVisible('lead_value', 'detail') && (
                   <div className="flex items-center gap-3 p-3 bg-amber-50 rounded-lg border border-amber-100">
                     <div className="flex-shrink-0 w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center">
                       <DollarSign size={16} className="text-amber-600" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="text-xs text-gray-500 mb-0.5">Value</div>
-                      <div className="text-sm font-semibold text-amber-700">${lead.lead_value.toLocaleString()}</div>
+                      <div className="text-sm font-semibold text-amber-700">${(lead.value || lead.potential_value).toLocaleString()}</div>
                     </div>
                   </div>
                 )}
@@ -631,10 +634,10 @@ const LeadDetailsPanel = ({ lead, isFieldVisible }) => {
               <div>
                 <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Potential Value</div>
                 <div className="text-base font-semibold text-gray-900 flex items-center gap-2">
-                  {lead.lead_value || lead.potential_value ? (
+                  {lead.value || lead.potential_value ? (
                     <>
                       <DollarSign className="w-4 h-4 text-green-600" />
-                      <span className="text-green-600">${(lead.lead_value || lead.potential_value).toLocaleString()}</span>
+                      <span className="text-green-600">${(lead.value || lead.potential_value).toLocaleString()}</span>
                     </>
                   ) : (
                     <span className="text-gray-400 italic font-normal">Not specified</span>
@@ -694,54 +697,6 @@ const LeadDetailsPanel = ({ lead, isFieldVisible }) => {
         </div>
       </div>
 
-      {/* Address Information Card */}
-      {(isFieldVisible('address', 'detail') || isFieldVisible('city', 'detail') || isFieldVisible('state', 'detail') || isFieldVisible('postal_code', 'detail')) &&
-       (lead.address || lead.city || lead.state || lead.postal_code) && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div className="bg-gradient-to-r from-green-50 to-teal-50 px-6 py-4 border-b border-gray-200">
-            <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
-              <MapPin className="w-5 h-5 text-green-600" />
-              Address Information
-            </h3>
-          </div>
-          <div className="p-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              {isFieldVisible('address', 'detail') && (
-                <div className="sm:col-span-2">
-                  <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Street Address</div>
-                  <div className="text-base font-semibold text-gray-900">
-                    {lead.address || <span className="text-gray-400 italic font-normal">Not provided</span>}
-                  </div>
-                </div>
-              )}
-              {isFieldVisible('city', 'detail') && (
-                <div>
-                  <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">City</div>
-                  <div className="text-base font-semibold text-gray-900">
-                    {lead.city || <span className="text-gray-400 italic font-normal">Not provided</span>}
-                  </div>
-                </div>
-              )}
-              {isFieldVisible('state', 'detail') && (
-                <div>
-                  <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">State</div>
-                  <div className="text-base font-semibold text-gray-900">
-                    {lead.state || <span className="text-gray-400 italic font-normal">Not provided</span>}
-                  </div>
-                </div>
-              )}
-              {isFieldVisible('postal_code', 'detail') && (
-                <div>
-                  <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Postal Code</div>
-                  <div className="text-base font-semibold text-gray-900">
-                    {lead.postal_code || <span className="text-gray-400 italic font-normal">Not provided</span>}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Notes Card */}
       {isFieldVisible('notes') && lead.notes && (

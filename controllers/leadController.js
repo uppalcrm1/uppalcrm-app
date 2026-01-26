@@ -1,5 +1,6 @@
 const db = require('../database/connection');
 const { v4: uuidv4 } = require('uuid');
+const { convertSnakeToCamel, addComputedNameField } = require('../utils/fieldConverters');
 
 class LeadController {
   // Get detailed lead with activities and history
@@ -87,9 +88,9 @@ class LeadController {
       console.log('🔍 ===== GET /leads/:id/detail DEBUG END =====');
 
       res.json({
-        lead,
-        activityStats,
-        duplicates
+        lead: addComputedNameField(convertSnakeToCamel(lead)),
+        activityStats: convertSnakeToCamel(activityStats),
+        duplicates: addComputedNameField(convertSnakeToCamel(duplicates))
       });
     } catch (error) {
       console.error('❌ Error fetching lead detail:', error);
@@ -208,7 +209,7 @@ class LeadController {
         const total = parseInt(countResult.rows[0].total);
 
         res.json({
-          activities: activitiesResult.rows,
+          activities: convertSnakeToCamel(activitiesResult.rows),
           pagination: {
             page: parseInt(page),
             limit: parseInt(limit),
@@ -303,7 +304,7 @@ class LeadController {
 
       res.status(201).json({
         message: 'Activity added successfully',
-        activity: completeActivity.rows[0]
+        activity: convertSnakeToCamel(completeActivity.rows[0])
       });
     } catch (error) {
       console.error('Error adding activity:', error);
@@ -349,7 +350,7 @@ class LeadController {
       const total = parseInt(countResult.rows[0].total);
 
       res.json({
-        history: historyResult.rows,
+        history: convertSnakeToCamel(historyResult.rows),
         pagination: {
           page: parseInt(page),
           limit: parseInt(limit),
@@ -431,7 +432,7 @@ class LeadController {
 
       res.json({
         message: 'Lead status updated successfully',
-        lead: result.rows[0]
+        lead: addComputedNameField(convertSnakeToCamel(result.rows[0]))
       });
     } catch (error) {
       // Rollback on error
@@ -531,7 +532,7 @@ class LeadController {
 
       const duplicates = await db.query(duplicatesQuery, [id, organization_id]);
 
-      res.json({ duplicates: duplicates.rows });
+      res.json({ duplicates: addComputedNameField(convertSnakeToCamel(duplicates.rows)) });
     } catch (error) {
       console.error('Error fetching lead duplicates:', error);
       res.status(500).json({ message: 'Internal server error' });

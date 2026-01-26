@@ -1,0 +1,30 @@
+Field Name,Data Type,Nullable,Category,Visibility Status,In Custom Definitions,Action Required,Suggested Field Type,Priority,Notes
+first_name,character varying,YES,contact_info,VISIBLE,N/A,None,N/A,N/A,System field - always visible
+last_name,character varying,YES,contact_info,VISIBLE,N/A,None,N/A,N/A,System field - always visible
+email,character varying,YES,contact_info,VISIBLE,N/A,None,N/A,N/A,System field - always visible
+phone,character varying,YES,contact_info,VISIBLE,N/A,None,N/A,N/A,System field - always visible
+company,character varying,YES,contact_info,VISIBLE,N/A,None,N/A,N/A,System field - always visible
+title,character varying,YES,contact_info,VISIBLE,N/A,None,N/A,N/A,System field - always visible
+source,character varying,YES,lead_metadata,VISIBLE,N/A,None,N/A,N/A,System field - always visible
+status,character varying,YES,lead_metadata,VISIBLE,N/A,None,N/A,N/A,System field - always visible
+priority,character varying,YES,lead_metadata,VISIBLE,N/A,None,N/A,N/A,System field - always visible
+assigned_to,uuid,YES,assignment,VISIBLE,N/A,None,N/A,N/A,System field - always visible
+notes,text,YES,lead_metadata,VISIBLE,N/A,None,N/A,N/A,System field - always visible
+created_at,timestamp with time zone,YES,audit_trail,VISIBLE,N/A,None,N/A,N/A,System field - always visible
+updated_at,timestamp with time zone,YES,audit_trail,VISIBLE,N/A,None,N/A,N/A,System field - always visible
+last_contact_date,timestamp with time zone,YES,engagement,VISIBLE,N/A,None,N/A,N/A,System field - always visible
+next_follow_up,timestamp with time zone,YES,engagement,VISIBLE,N/A,None,N/A,N/A,System field - always visible
+value,numeric,YES,lead_metadata,VISIBLE,N/A,None,N/A,N/A,System field - always visible
+address,character varying,YES,address,HIDDEN - NEEDS TO BE ADDED,NO,ADD TO CUSTOM FIELDS,text,HIGH,Street address field
+city,character varying,YES,address,HIDDEN - NEEDS TO BE ADDED,NO,ADD TO CUSTOM FIELDS,text,HIGH,City/Municipality
+state,character varying,YES,address,HIDDEN - NEEDS TO BE ADDED,NO,ADD TO CUSTOM FIELDS,text,HIGH,State/Province
+postal_code,character varying,YES,address,HIDDEN - NEEDS TO BE ADDED,NO,ADD TO CUSTOM FIELDS,text,HIGH,ZIP/Postal code
+country,character varying,YES,address,HIDDEN - NEEDS TO BE ADDED,NO,ADD TO CUSTOM FIELDS,text,HIGH,Country name
+created_by,uuid,YES,relationship,HIDDEN - NEEDS TO BE ADDED,NO,ADD TO CUSTOM FIELDS,text,MEDIUM,User who created the lead
+linked_contact_id,uuid,YES,relationship,HIDDEN - NEEDS TO BE ADDED,NO,ADD TO CUSTOM FIELDS,text,MEDIUM,Reference to linked contact
+relationship_type,character varying,YES,relationship,HIDDEN - NEEDS TO BE ADDED,NO,ADD TO CUSTOM FIELDS,text,MEDIUM,Type of relationship
+interest_type,character varying,YES,relationship,HIDDEN - NEEDS TO BE ADDED,NO,ADD TO CUSTOM FIELDS,text,MEDIUM,Type of interest
+converted_date,timestamp with time zone,YES,timeline,HIDDEN - NEEDS TO BE ADDED,NO,ADD TO CUSTOM FIELDS,date,HIGH,When lead was converted
+id,uuid,NO,system,HIDDEN,N/A,None,N/A,N/A,Primary key - internal only
+organization_id,uuid,NO,system,HIDDEN,N/A,None,N/A,N/A,Organization reference - internal only
+custom_fields,jsonb,YES,system,HIDDEN,N/A,None,N/A,N/A,Dynamic field storage - internal only

@@ -8,6 +8,7 @@ import { leadInteractionsAPI } from '../services/api';
 import { format, formatDistanceToNow } from 'date-fns';
 import LoadingSpinner from './LoadingSpinner';
 import AddInteractionModal from './AddInteractionModal';
+import { formatDate, formatDateRelative, isValidDate } from '../utils/dateFormatter';
 
 const INTERACTION_ICONS = {
   call: Phone,
@@ -62,7 +63,7 @@ const InteractionsTimeline = ({ leadId }) => {
 
   const handleComplete = (interaction) => {
     const outcome = prompt('Outcome (optional):');
-    const duration = interaction.interaction_type === 'call' || interaction.interaction_type === 'meeting'
+    const duration = interaction.interactionType === 'call' || interaction.interactionType === 'meeting'
       ? prompt('Duration in minutes:')
       : null;
 
@@ -111,10 +112,10 @@ const InteractionsTimeline = ({ leadId }) => {
       ) : (
         <div className="space-y-3">
           {interactions.map((interaction, index) => {
-            const Icon = INTERACTION_ICONS[interaction.interaction_type];
-            const colorClass = INTERACTION_COLORS[interaction.interaction_type];
+            const Icon = INTERACTION_ICONS[interaction.interactionType];
+            const colorClass = INTERACTION_COLORS[interaction.interactionType];
             const isScheduled = interaction.status === 'scheduled';
-            const isOverdue = isScheduled && new Date(interaction.scheduled_at) < new Date();
+            const isOverdue = isScheduled && isValidDate(interaction.scheduledAt) && new Date(interaction.scheduledAt) < new Date();
 
             return (
               <div
@@ -135,8 +136,8 @@ const InteractionsTimeline = ({ leadId }) => {
                       {/* Header */}
                       <div className="flex items-center gap-2 mb-1">
                         <span className="font-medium text-gray-900 capitalize">
-                          {interaction.interaction_type}
-                          {interaction.interaction_type === 'task' && interaction.priority && (
+                          {interaction.interactionType}
+                          {interaction.interactionType === 'task' && interaction.priority && (
                             <span className="ml-2">
                               {interaction.priority === 'high' ? '🔴' :
                                interaction.priority === 'medium' ? '🟠' : '⚪'}
@@ -172,11 +173,11 @@ const InteractionsTimeline = ({ leadId }) => {
                             <Clock className="w-3 h-3" />
                             {isScheduled ? (
                               <span>
-                                Scheduled for {format(new Date(interaction.scheduled_at), 'MMM d, yyyy h:mm a')}
+                                Scheduled for {isValidDate(interaction.scheduledAt) ? format(new Date(interaction.scheduledAt), 'MMM d, yyyy h:mm a') : '—'}
                               </span>
                             ) : (
                               <span>
-                                {formatDistanceToNow(new Date(interaction.created_at), { addSuffix: true })}
+                                {isValidDate(interaction.createdAt) ? formatDistanceToNow(new Date(interaction.createdAt), { addSuffix: true }) : '—'}
                               </span>
                             )}
                           </div>
@@ -188,32 +189,32 @@ const InteractionsTimeline = ({ leadId }) => {
                             </>
                           )}
 
-                          {interaction.duration_minutes && (
+                          {interaction.durationMinutes && (
                             <>
                               <span>•</span>
-                              <span>{interaction.duration_minutes} minutes</span>
+                              <span>{interaction.durationMinutes} minutes</span>
                             </>
                           )}
                         </div>
 
                         {/* Task-specific metadata */}
-                        {interaction.interaction_type === 'task' && (
+                        {interaction.interactionType === 'task' && (
                           <div className="flex items-center gap-4 flex-wrap">
-                            {interaction.created_by_first_name && (
+                            {interaction.createdByFirstName && (
                               <span>
-                                Created by {interaction.created_by_first_name} {interaction.created_by_last_name}
+                                Created by {interaction.createdByFirstName} {interaction.createdByLastName}
                               </span>
                             )}
-                            {interaction.user_first_name && (
+                            {interaction.userFirstName && (
                               <>
                                 <span>•</span>
-                                <span>Assigned to {interaction.user_first_name} {interaction.user_last_name}</span>
+                                <span>Assigned to {interaction.userFirstName} {interaction.userLastName}</span>
                               </>
                             )}
-                            {interaction.completed_at && (
+                            {interaction.completedAt && isValidDate(interaction.completedAt) && (
                               <>
                                 <span>•</span>
-                                <span>Completed {formatDistanceToNow(new Date(interaction.completed_at), { addSuffix: true })}</span>
+                                <span>Completed {formatDistanceToNow(new Date(interaction.completedAt), { addSuffix: true })}</span>
                               </>
                             )}
                             {interaction.priority && (
@@ -232,9 +233,9 @@ const InteractionsTimeline = ({ leadId }) => {
                         )}
 
                         {/* Non-task metadata (calls, emails, meetings, notes) */}
-                        {interaction.interaction_type !== 'task' && interaction.created_by_first_name && (
+                        {interaction.interactionType !== 'task' && interaction.createdByFirstName && (
                           <div className="flex items-center gap-4">
-                            <span>by {interaction.created_by_first_name} {interaction.created_by_last_name}</span>
+                            <span>by {interaction.createdByFirstName} {interaction.createdByLastName}</span>
                           </div>
                         )}
                       </div>

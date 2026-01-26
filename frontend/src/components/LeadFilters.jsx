@@ -35,7 +35,7 @@ const LeadFilters = ({ filters, onFiltersChange, statuses, users, loading }) => 
       search: '',
       status: '',
       priority: '',
-      assignedTo: '',
+      assigned_to: '',
       source: '',
       dateFrom: '',
       dateTo: '',
@@ -176,8 +176,8 @@ const LeadFilters = ({ filters, onFiltersChange, statuses, users, loading }) => 
                 Assigned To
               </label>
               <select
-                value={localFilters.assignedTo}
-                onChange={(e) => updateFilter('assignedTo', e.target.value)}
+                value={localFilters.assigned_to}
+                onChange={(e) => updateFilter('assigned_to', e.target.value)}
                 className="block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="">All users</option>
