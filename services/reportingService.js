@@ -574,7 +574,7 @@ const getTransactionCountByOwner = async (organizationId, year, month) => {
 
   const result = await db.query(
     `SELECT
-      COALESCE(u.id, 'unknown') as owner_id,
+      COALESCE(u.id::text, 'unknown') as owner_id,
       COALESCE(u.name, 'Unassigned') as owner_name,
       COUNT(t.id) as transaction_count,
       ROUND(SUM(t.amount)::numeric, 2) as total_amount
@@ -589,7 +589,7 @@ const getTransactionCountByOwner = async (organizationId, year, month) => {
        AND t.status = 'completed'
        AND t.transaction_date >= $2
        AND t.transaction_date <= $3
-     GROUP BY u.id, u.name
+     GROUP BY COALESCE(u.id::text, 'unknown'), COALESCE(u.name, 'Unassigned')
      ORDER BY transaction_count DESC`,
     [organizationId, startDate, endDate],
     organizationId
