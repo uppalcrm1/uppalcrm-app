@@ -11,7 +11,7 @@ import {
   Download,
   RefreshCw
 } from 'lucide-react'
-import { leadsAPI, usersAPI } from '../services/api'
+import { leadsAPI, usersAPI, customFieldsAPI } from '../services/api'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ErrorMessage from '../components/ErrorMessage'
 import KanbanBoard from '../components/KanbanBoard'
@@ -20,19 +20,10 @@ import ViewToggle from '../components/ViewToggle'
 import LeadFilters from '../components/LeadFilters'
 import toast from 'react-hot-toast'
 
-const LEAD_STATUSES = [
-  { value: 'new', label: 'New', color: 'blue' },
-  { value: 'contacted', label: 'Contacted', color: 'yellow' },
-  { value: 'qualified', label: 'Qualified', color: 'purple' },
-  { value: 'proposal', label: 'Proposal', color: 'indigo' },
-  { value: 'negotiation', label: 'Negotiation', color: 'pink' },
-  { value: 'converted', label: 'Converted', color: 'green' },
-  { value: 'lost', label: 'Lost', color: 'red' }
-]
-
 const LeadViews = ({ onAddLead, onEditLead, onDeleteLead }) => {
   const [searchParams, setSearchParams] = useSearchParams()
   const [view, setView] = useState(searchParams.get('view') || 'list')
+  const [statuses, setStatuses] = useState([]) // Fetch from API instead of hardcoded
   const [filters, setFilters] = useState({
     search: searchParams.get('search') || '',
     status: searchParams.get('status') || '',
@@ -79,6 +70,33 @@ const LeadViews = ({ onAddLead, onEditLead, onDeleteLead }) => {
     staleTime: 5 * 60 * 1000, // 5 minutes
     cacheTime: 10 * 60 * 1000 // 10 minutes
   })
+
+  // Fetch statuses from form config (same as add/edit forms)
+  useEffect(() => {
+    const loadStatuses = async () => {
+      try {
+        const formConfig = await customFieldsAPI.getFormConfig()
+
+        // Extract status field from system fields
+        const statusField = formConfig.systemFields?.find(f => f.field_name === 'status')
+        if (statusField && statusField.field_options) {
+          // Convert field options to status format for dropdown
+          const statusOptions = statusField.field_options.map(opt => ({
+            value: typeof opt === 'string' ? opt : opt.value,
+            label: typeof opt === 'string' ? opt : opt.label,
+            color: 'blue' // Color will be handled by component
+          }))
+          setStatuses(statusOptions)
+          console.log('✅ Loaded custom statuses:', statusOptions)
+        }
+      } catch (error) {
+        console.error('❌ Failed to load statuses:', error)
+        setStatuses([]) // Empty array if fetch fails
+      }
+    }
+
+    loadStatuses()
+  }, [])
 
   // Fetch users for assignment filter
   const { data: usersData } = useQuery({
@@ -244,7 +262,7 @@ const LeadViews = ({ onAddLead, onEditLead, onDeleteLead }) => {
       <LeadFilters
         filters={filters}
         onFiltersChange={handleFiltersChange}
-        statuses={LEAD_STATUSES}
+        statuses={statuses}
         users={usersData?.users || []}
         loading={leadsLoading}
       />
@@ -258,7 +276,7 @@ const LeadViews = ({ onAddLead, onEditLead, onDeleteLead }) => {
         ) : view === 'kanban' ? (
           <KanbanBoard
             leads={leadsData?.leadsByStatus || {}}
-            statuses={LEAD_STATUSES}
+            statuses={statuses}
             users={usersData?.users || []}
             onStatusUpdate={handleStatusUpdate}
             onEditLead={onEditLead}
@@ -274,7 +292,7 @@ const LeadViews = ({ onAddLead, onEditLead, onDeleteLead }) => {
             onDeleteLead={onDeleteLead}
             onBulkAction={handleBulkAction}
             users={usersData?.users || []}
-            statuses={LEAD_STATUSES}
+            statuses={statuses}
             loading={leadsLoading}
           />
         )}
