@@ -604,8 +604,8 @@ router.get('/by-status', async (req, res) => {
       ORDER BY created_at DESC
     `, [req.organizationId]);
 
-    // Convert leads to camelCase and add computed name field
-    const convertedLeads = addComputedNameField(convertSnakeToCamel(leads.rows));
+    // Add computed name field - return snake_case directly for consistency
+    const convertedLeads = addComputedNameField(leads.rows);
 
     // Group leads by status
     const leadsByStatus = {};
@@ -758,7 +758,8 @@ router.get('/',
 
       console.log(`Found ${leads.rows.length} leads out of ${total} total`);
 
-      const leadsWithNames = addComputedNameField(convertSnakeToCamel(leads.rows));
+      // Return snake_case directly - consistent with lead detail endpoint
+      const leadsWithNames = addComputedNameField(leads.rows);
 
       res.json({
         leads: leadsWithNames,
@@ -1615,7 +1616,7 @@ router.get('/:id',
       }
 
       res.json({
-        lead: addComputedNameField(convertSnakeToCamel(lead.toJSON()))
+        lead: addComputedNameField(lead.toJSON())
       });
     } catch (error) {
       console.error('Get lead error:', error);
