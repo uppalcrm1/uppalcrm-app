@@ -1150,6 +1150,14 @@ export const reportingAPI = {
   getAccountsByProduct: async () => {
     const response = await api.get('/reporting/dashboard/accounts-by-product')
     return response.data
+  },
+
+  // Get transactions grouped by source for a given month
+  getTransactionsBySource: async (year, month) => {
+    const response = await api.get('/reporting/standard-reports/transactions-by-source', {
+      params: { year, month }
+    })
+    return response.data
   }
 }
 
