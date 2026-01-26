@@ -547,19 +547,19 @@ const AdminFields = () => {
     try {
       const updates = reorderedFields.map((field, index) => ({
         field,
-        sort_order: index + 1
+        display_order: index + 1
       }))
 
-      // Update each field's sort_order
-      for (const { field, sort_order } of updates) {
+      // Update each field's display_order
+      for (const { field, display_order } of updates) {
         if (field.isSystemField) {
           await api.put(`/custom-fields/default/${field.field_name}`, {
-            sort_order,
+            display_order,
             entity_type: activeTab
           })
         } else {
           await api.put(`/custom-fields/${field.id}`, {
-            sort_order
+            display_order
           })
         }
       }
