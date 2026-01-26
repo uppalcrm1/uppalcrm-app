@@ -391,7 +391,7 @@ async function getSystemFieldConfigurations(organizationId) {
 /**
  * Build dynamic Joi schema based on field configurations
  */
-async function buildDynamicLeadSchema(organizationId, isUpdate = false) {
+async function buildDynamicLeadSchema(organizationId, isUpdate = false, currentData = null) {
   const fieldConfigs = await getSystemFieldConfigurations(organizationId);
   const configMap = {};
 
@@ -434,7 +434,9 @@ async function buildDynamicLeadSchema(organizationId, isUpdate = false) {
   // Dynamic validation for status field
   const statusValues = getAllowedValues('status', ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'converted', 'lost']);
   if (isUpdate) {
-    schemaFields.status = Joi.string().valid(...statusValues, null).optional();
+    // For updates, also allow the current status value even if not in config
+    const allowedStatuses = [...new Set([...statusValues, currentData?.status || null].filter(Boolean))];
+    schemaFields.status = Joi.string().valid(...allowedStatuses, null).optional();
   } else {
     schemaFields.status = Joi.string().valid(...statusValues).default('new');
   }
@@ -442,7 +444,9 @@ async function buildDynamicLeadSchema(organizationId, isUpdate = false) {
   // Dynamic validation for priority field
   const priorityValues = getAllowedValues('priority', ['low', 'medium', 'high']);
   if (isUpdate) {
-    schemaFields.priority = Joi.string().valid(...priorityValues, null).optional();
+    // For updates, also allow the current priority value even if not in config
+    const allowedPriorities = [...new Set([...priorityValues, currentData?.priority || null].filter(Boolean))];
+    schemaFields.priority = Joi.string().valid(...allowedPriorities, null).optional();
   } else {
     schemaFields.priority = Joi.string().valid(...priorityValues).default('medium');
   }
@@ -478,7 +482,9 @@ async function buildDynamicLeadSchema(organizationId, isUpdate = false) {
 function validateLeadDynamic(isUpdate = false) {
   return async (req, res, next) => {
     try {
-      const schema = await buildDynamicLeadSchema(req.organizationId, isUpdate);
+      // For updates, pass the current status to allow existing values
+      const currentData = isUpdate ? req.body : null;
+      const schema = await buildDynamicLeadSchema(req.organizationId, isUpdate, currentData);
       const { error, value } = schema.validate(req.body, { abortEarly: false });
 
       if (error) {
