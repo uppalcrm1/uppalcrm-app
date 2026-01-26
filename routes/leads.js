@@ -487,9 +487,14 @@ function validateLeadDynamic(isUpdate = false) {
           message: detail.message
         }));
 
+        console.error('❌ Validation failed for PUT /leads/:id');
+        console.error('❌ Errors:', JSON.stringify(errors, null, 2));
+        console.error('❌ Request body:', JSON.stringify(req.body, null, 2));
+
         return res.status(400).json({
           error: 'Request data is invalid',
-          details: errors
+          details: errors,
+          message: errors.map(e => `${e.field}: ${e.message}`).join('; ')
         });
       }
 
