@@ -508,6 +508,19 @@ router.post('/convert-from-lead/:leadId',
 
       // Step 2: Handle contact creation or linking
       if (contactMode === 'new') {
+        // Prepare contact name data - ensure last_name is not null
+        const firstName = contactData?.firstName || lead.first_name || 'Contact';
+        const lastName = contactData?.lastName || lead.last_name || firstName; // Use firstName as fallback if lastName is empty
+
+        // Validate that we have at least first_name
+        if (!firstName || firstName.trim() === '') {
+          await query('ROLLBACK');
+          return res.status(400).json({
+            error: 'Missing required field',
+            message: 'Lead must have a first name to convert to contact'
+          });
+        }
+
         // Create new contact from lead data
         const contactInsertResult = await query(
           `INSERT INTO contacts (
@@ -518,8 +531,8 @@ router.post('/convert-from-lead/:leadId',
           RETURNING *`,
           [
             req.organizationId,
-            contactData?.firstName || lead.first_name,
-            contactData?.lastName || lead.last_name,
+            firstName.trim(),
+            lastName.trim(),
             contactData?.email || lead.email,
             contactData?.phone || lead.phone,
             'customer',
