@@ -490,12 +490,17 @@ function validateLeadDynamic(isUpdate = false) {
       if (error) {
         const errors = error.details.map(detail => ({
           field: detail.path.join('.'),
-          message: detail.message
+          message: detail.message,
+          context: detail.context
         }));
+
+        console.error('❌ Validation error details:', JSON.stringify(errors, null, 2));
+        console.error('❌ Request body:', JSON.stringify(req.body, null, 2));
 
         return res.status(400).json({
           error: 'Request data is invalid',
-          details: errors
+          details: errors,
+          receivedData: req.body
         });
       }
 
