@@ -2,6 +2,24 @@ const db = require('../database/connection');
 const { v4: uuidv4 } = require('uuid');
 const { convertSnakeToCamel, addComputedNameField } = require('../utils/fieldConverters');
 
+// Add computed 'name' field while keeping snake_case format
+function addComputedNameFieldSnakeCase(data) {
+  if (!data) return data;
+
+  if (Array.isArray(data)) {
+    return data.map(item => addComputedNameFieldSnakeCase(item));
+  }
+
+  if (typeof data === 'object' && (data.first_name || data.last_name)) {
+    return {
+      ...data,
+      name: `${data.first_name || ''} ${data.last_name || ''}`.trim() || 'Unnamed'
+    };
+  }
+
+  return data;
+}
+
 class LeadController {
   // Get detailed lead with activities and history
   async getLeadDetail(req, res) {
@@ -88,9 +106,9 @@ class LeadController {
       console.log('🔍 ===== GET /leads/:id/detail DEBUG END =====');
 
       res.json({
-        lead: addComputedNameField(convertSnakeToCamel(lead)),
-        activityStats: convertSnakeToCamel(activityStats),
-        duplicates: addComputedNameField(convertSnakeToCamel(duplicates))
+        lead: addComputedNameFieldSnakeCase(lead),
+        activityStats: activityStats,
+        duplicates: addComputedNameFieldSnakeCase(duplicates)
       });
     } catch (error) {
       console.error('❌ Error fetching lead detail:', error);

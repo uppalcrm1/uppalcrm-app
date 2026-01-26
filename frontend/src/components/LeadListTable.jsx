@@ -666,7 +666,7 @@ const LeadListTable = ({
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-1 text-sm text-gray-600">
                         <Calendar className="w-3 h-3" />
-                        {formatDate(lead.createdAt)}
+                        {formatDate(lead.created_at)}
                       </div>
                     </td>
                   )}
@@ -751,7 +751,7 @@ const LeadListTable = ({
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-1 text-sm text-gray-600">
                         <Calendar className="w-3 h-3" />
-                        {formatDate(lead.updatedAt)}
+                        {formatDate(lead.updated_at)}
                       </div>
                     </td>
                   )}
