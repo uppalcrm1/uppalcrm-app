@@ -117,21 +117,26 @@ const SortableRow = ({ field, entityType, isReorderMode, onEdit, onDelete, onTog
   const isProtectedField = isProductNameField(field, entityType)
 
   return (
-    <tr
+    <div
       ref={setNodeRef}
       style={style}
-      className={`border-b border-gray-100 hover:bg-gray-50 transition-all ${
+      className={`border-b border-gray-100 transition-all ${
         !field.is_enabled ? 'bg-gray-50 opacity-60' : ''
-      } ${isProtectedField ? 'bg-blue-50' : ''} ${isDragging ? 'shadow-lg' : ''}`}
+      } ${isProtectedField ? 'bg-blue-50' : ''} ${isDragging ? 'shadow-lg z-50' : ''}`}
     >
-      {/* Drag Handle Column */}
-      {isReorderMode && (
-        <td className="py-4 px-4 cursor-move" {...attributes} {...listeners}>
-          <GripVertical size={20} className="text-gray-400" />
-        </td>
-      )}
-      {children}
-    </tr>
+      <div className="flex items-center">
+        {/* Drag Handle */}
+        {isReorderMode && (
+          <div className="px-4 py-4 cursor-move flex-shrink-0" {...attributes} {...listeners}>
+            <GripVertical size={20} className="text-gray-400" />
+          </div>
+        )}
+        {/* Field Content */}
+        <div className="flex-1">
+          {children}
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -1357,16 +1362,9 @@ const AdminFields = () => {
                         entityType={activeTab}
                         isReorderMode={isReorderMode}
                       >
-                        <div className="grid grid-cols-12 gap-4 px-6 py-4 hover:bg-gray-50 transition-colors">
-                          {/* Drag Handle Column */}
-                          {isReorderMode && (
-                            <div className="col-span-0 flex items-center -ml-4">
-                              <GripVertical size={20} className="text-gray-400" />
-                            </div>
-                          )}
-
+                        <div className="grid grid-cols-12 gap-4 py-4 hover:bg-gray-50 transition-colors">
                           {/* Field Info */}
-                          <div className={`${isReorderMode ? 'col-span-3' : 'col-span-3'}`}>
+                          <div className="col-span-3">
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="text-lg">
                                 {field.isSystemField ? '🔧' : '⭐'}
