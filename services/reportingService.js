@@ -438,7 +438,7 @@ const getTransactionsBySource = async (organizationId, year, month) => {
     `SELECT
       COALESCE(source, 'Not Specified') as source,
       COUNT(id) as transaction_count,
-      ROUND(SUM(amount)::numeric, 2) as total_amount
+      ARRAY_AGG(JSONB_BUILD_OBJECT('amount', amount, 'currency', COALESCE(currency, 'CAD'))) as transactions
      FROM transactions
      WHERE organization_id = $1
        AND deleted_at IS NULL
@@ -452,12 +452,29 @@ const getTransactionsBySource = async (organizationId, year, month) => {
     organizationId
   );
 
-  // Calculate total and percentages
-  const rows = result.rows.map(row => ({
-    source: row.source,
-    count: parseInt(row.transaction_count),
-    amount: parseFloat(row.total_amount || 0)
-  }));
+  const exchangeRate = await ConfigService.getExchangeRate(organizationId);
+
+  // Calculate amounts with currency conversion
+  const rows = result.rows.map(row => {
+    let totalAmountInCAD = 0;
+
+    row.transactions.forEach(trans => {
+      const amount = parseFloat(trans.amount);
+      const currency = trans.currency || 'CAD';
+
+      if (currency === 'CAD') {
+        totalAmountInCAD += amount;
+      } else if (currency === 'USD') {
+        totalAmountInCAD += CurrencyHelper.toCAD(amount, 'USD', exchangeRate);
+      }
+    });
+
+    return {
+      source: row.source,
+      count: parseInt(row.transaction_count),
+      amount: parseFloat(totalAmountInCAD.toFixed(2))
+    };
+  });
 
   const totalTransactions = rows.reduce((sum, row) => sum + row.count, 0);
   const totalAmount = rows.reduce((sum, row) => sum + row.amount, 0);
@@ -507,7 +524,7 @@ const getTransactionRevenueBySource = async (organizationId, year, month) => {
     `SELECT
       COALESCE(source, 'Not Specified') as source,
       COUNT(id) as transaction_count,
-      ROUND(SUM(amount)::numeric, 2) as total_amount
+      ARRAY_AGG(JSONB_BUILD_OBJECT('amount', amount, 'currency', COALESCE(currency, 'CAD'))) as transactions
      FROM transactions
      WHERE organization_id = $1
        AND deleted_at IS NULL
@@ -516,17 +533,37 @@ const getTransactionRevenueBySource = async (organizationId, year, month) => {
        AND transaction_date >= $2
        AND transaction_date <= $3
      GROUP BY source
-     ORDER BY total_amount DESC`,
+     ORDER BY COUNT(id) DESC`,
     [organizationId, startDate, endDate],
     organizationId
   );
 
-  // Calculate total revenue and percentages
-  const rows = result.rows.map(row => ({
-    source: row.source,
-    count: parseInt(row.transaction_count),
-    amount: parseFloat(row.total_amount || 0)
-  }));
+  const exchangeRate = await ConfigService.getExchangeRate(organizationId);
+
+  // Calculate amounts with currency conversion
+  const rows = result.rows.map(row => {
+    let totalAmountInCAD = 0;
+
+    row.transactions.forEach(trans => {
+      const amount = parseFloat(trans.amount);
+      const currency = trans.currency || 'CAD';
+
+      if (currency === 'CAD') {
+        totalAmountInCAD += amount;
+      } else if (currency === 'USD') {
+        totalAmountInCAD += CurrencyHelper.toCAD(amount, 'USD', exchangeRate);
+      }
+    });
+
+    return {
+      source: row.source,
+      count: parseInt(row.transaction_count),
+      amount: parseFloat(totalAmountInCAD.toFixed(2))
+    };
+  });
+
+  // Sort by amount (descending)
+  rows.sort((a, b) => b.amount - a.amount);
 
   const totalTransactions = rows.reduce((sum, row) => sum + row.count, 0);
   const totalAmount = rows.reduce((sum, row) => sum + row.amount, 0);
@@ -577,7 +614,7 @@ const getTransactionCountByOwner = async (organizationId, year, month) => {
       COALESCE(u.id::text, 'unknown') as owner_id,
       COALESCE(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), 'Unassigned') as owner_name,
       COUNT(t.id) as transaction_count,
-      ROUND(SUM(t.amount)::numeric, 2) as total_amount
+      ARRAY_AGG(JSONB_BUILD_OBJECT('amount', t.amount, 'currency', COALESCE(t.currency, 'CAD'))) as transactions
      FROM transactions t
      LEFT JOIN accounts a ON t.account_id = a.id
      LEFT JOIN contacts c ON a.contact_id = c.id
@@ -595,13 +632,30 @@ const getTransactionCountByOwner = async (organizationId, year, month) => {
     organizationId
   );
 
-  // Calculate totals and percentages
-  const rows = result.rows.map(row => ({
-    ownerId: row.owner_id,
-    ownerName: row.owner_name,
-    count: parseInt(row.transaction_count),
-    amount: parseFloat(row.total_amount || 0)
-  }));
+  const exchangeRate = await ConfigService.getExchangeRate(organizationId);
+
+  // Calculate totals and percentages with currency conversion
+  const rows = result.rows.map(row => {
+    let totalAmountInCAD = 0;
+
+    row.transactions.forEach(trans => {
+      const amount = parseFloat(trans.amount);
+      const currency = trans.currency || 'CAD';
+
+      if (currency === 'CAD') {
+        totalAmountInCAD += amount;
+      } else if (currency === 'USD') {
+        totalAmountInCAD += CurrencyHelper.toCAD(amount, 'USD', exchangeRate);
+      }
+    });
+
+    return {
+      ownerId: row.owner_id,
+      ownerName: row.owner_name,
+      count: parseInt(row.transaction_count),
+      amount: parseFloat(totalAmountInCAD.toFixed(2))
+    };
+  });
 
   const totalTransactions = rows.reduce((sum, row) => sum + row.count, 0);
   const totalAmount = rows.reduce((sum, row) => sum + row.amount, 0);
@@ -655,7 +709,7 @@ const getTransactionRevenueByOwner = async (organizationId, year, month) => {
       COALESCE(u.id::text, 'unknown') as owner_id,
       COALESCE(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), 'Unassigned') as owner_name,
       COUNT(t.id) as transaction_count,
-      ROUND(SUM(t.amount)::numeric, 2) as total_amount
+      ARRAY_AGG(JSONB_BUILD_OBJECT('amount', t.amount, 'currency', COALESCE(t.currency, 'CAD'))) as transactions
      FROM transactions t
      LEFT JOIN accounts a ON t.account_id = a.id
      LEFT JOIN contacts c ON a.contact_id = c.id
@@ -667,19 +721,38 @@ const getTransactionRevenueByOwner = async (organizationId, year, month) => {
        AND t.status = 'completed'
        AND t.transaction_date >= $2
        AND t.transaction_date <= $3
-     GROUP BY COALESCE(u.id::text, 'unknown'), COALESCE(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), 'Unassigned')
-     ORDER BY total_amount DESC`,
+     GROUP BY COALESCE(u.id::text, 'unknown'), COALESCE(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), 'Unassigned')`,
     [organizationId, startDate, endDate],
     organizationId
   );
 
-  // Calculate totals and percentages
-  const rows = result.rows.map(row => ({
-    ownerId: row.owner_id,
-    ownerName: row.owner_name,
-    count: parseInt(row.transaction_count),
-    amount: parseFloat(row.total_amount || 0)
-  }));
+  const exchangeRate = await ConfigService.getExchangeRate(organizationId);
+
+  // Calculate totals and percentages with currency conversion
+  const rows = result.rows.map(row => {
+    let totalAmountInCAD = 0;
+
+    row.transactions.forEach(trans => {
+      const amount = parseFloat(trans.amount);
+      const currency = trans.currency || 'CAD';
+
+      if (currency === 'CAD') {
+        totalAmountInCAD += amount;
+      } else if (currency === 'USD') {
+        totalAmountInCAD += CurrencyHelper.toCAD(amount, 'USD', exchangeRate);
+      }
+    });
+
+    return {
+      ownerId: row.owner_id,
+      ownerName: row.owner_name,
+      count: parseInt(row.transaction_count),
+      amount: parseFloat(totalAmountInCAD.toFixed(2))
+    };
+  });
+
+  // Sort by amount (descending)
+  rows.sort((a, b) => b.amount - a.amount);
 
   const totalTransactions = rows.reduce((sum, row) => sum + row.count, 0);
   const totalAmount = rows.reduce((sum, row) => sum + row.amount, 0);
