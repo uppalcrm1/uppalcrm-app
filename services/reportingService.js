@@ -417,6 +417,300 @@ const getAccountsByProduct = async (organizationId) => {
   }));
 };
 
+/**
+ * Get transactions grouped by source for a given month
+ * @param {string} organizationId - Organization ID
+ * @param {number} year - Year (e.g., 2024)
+ * @param {number} month - Month (1-12)
+ * @returns {Promise<Object>} Transactions by source with summary
+ */
+const getTransactionsBySource = async (organizationId, year, month) => {
+  // Validate month
+  if (month < 1 || month > 12) {
+    throw new Error('Invalid month. Must be between 1 and 12.');
+  }
+
+  // Create date range for the given month
+  const startDate = new Date(year, month - 1, 1);
+  const endDate = new Date(year, month, 0, 23, 59, 59, 999);
+
+  const result = await db.query(
+    `SELECT
+      COALESCE(source, 'Not Specified') as source,
+      COUNT(id) as transaction_count,
+      ROUND(SUM(amount)::numeric, 2) as total_amount
+     FROM transactions
+     WHERE organization_id = $1
+       AND deleted_at IS NULL
+       AND is_void = FALSE
+       AND status = 'completed'
+       AND transaction_date >= $2
+       AND transaction_date <= $3
+     GROUP BY source
+     ORDER BY transaction_count DESC`,
+    [organizationId, startDate, endDate],
+    organizationId
+  );
+
+  // Calculate total and percentages
+  const rows = result.rows.map(row => ({
+    source: row.source,
+    count: parseInt(row.transaction_count),
+    amount: parseFloat(row.total_amount || 0)
+  }));
+
+  const totalTransactions = rows.reduce((sum, row) => sum + row.count, 0);
+  const totalAmount = rows.reduce((sum, row) => sum + row.amount, 0);
+
+  // Add percentage to each row
+  const dataWithPercentage = rows.map(row => ({
+    ...row,
+    percentage: totalTransactions > 0
+      ? parseFloat(((row.count / totalTransactions) * 100).toFixed(2))
+      : 0
+  }));
+
+  // Find top source
+  const topSource = dataWithPercentage.length > 0 ? dataWithPercentage[0] : null;
+
+  return {
+    data: dataWithPercentage,
+    summary: {
+      totalTransactions,
+      totalAmount: parseFloat(totalAmount.toFixed(2)),
+      topSource: topSource ? topSource.source : null,
+      topSourceCount: topSource ? topSource.count : 0,
+      month,
+      year
+    }
+  };
+};
+
+/**
+ * Get transactions revenue grouped by source for a given month
+ * @param {string} organizationId - Organization ID
+ * @param {number} year - Year (e.g., 2024)
+ * @param {number} month - Month (1-12)
+ * @returns {Promise<Object>} Transaction revenue by source with summary
+ */
+const getTransactionRevenueBySource = async (organizationId, year, month) => {
+  // Validate month
+  if (month < 1 || month > 12) {
+    throw new Error('Invalid month. Must be between 1 and 12.');
+  }
+
+  // Create date range for the given month
+  const startDate = new Date(year, month - 1, 1);
+  const endDate = new Date(year, month, 0, 23, 59, 59, 999);
+
+  const result = await db.query(
+    `SELECT
+      COALESCE(source, 'Not Specified') as source,
+      COUNT(id) as transaction_count,
+      ROUND(SUM(amount)::numeric, 2) as total_amount
+     FROM transactions
+     WHERE organization_id = $1
+       AND deleted_at IS NULL
+       AND is_void = FALSE
+       AND status = 'completed'
+       AND transaction_date >= $2
+       AND transaction_date <= $3
+     GROUP BY source
+     ORDER BY total_amount DESC`,
+    [organizationId, startDate, endDate],
+    organizationId
+  );
+
+  // Calculate total revenue and percentages
+  const rows = result.rows.map(row => ({
+    source: row.source,
+    count: parseInt(row.transaction_count),
+    amount: parseFloat(row.total_amount || 0)
+  }));
+
+  const totalTransactions = rows.reduce((sum, row) => sum + row.count, 0);
+  const totalAmount = rows.reduce((sum, row) => sum + row.amount, 0);
+
+  // Add percentage to each row (based on revenue, not count)
+  const dataWithPercentage = rows.map(row => ({
+    ...row,
+    percentage: totalAmount > 0
+      ? parseFloat(((row.amount / totalAmount) * 100).toFixed(2))
+      : 0
+  }));
+
+  // Find top source by revenue
+  const topSource = dataWithPercentage.length > 0 ? dataWithPercentage[0] : null;
+
+  return {
+    data: dataWithPercentage,
+    summary: {
+      totalTransactions,
+      totalAmount: parseFloat(totalAmount.toFixed(2)),
+      topSource: topSource ? topSource.source : null,
+      topSourceAmount: topSource ? topSource.amount : 0,
+      month,
+      year
+    }
+  };
+};
+
+/**
+ * Get transaction count grouped by lead owner at time of conversion
+ * @param {string} organizationId - Organization ID
+ * @param {number} year - Year (e.g., 2024)
+ * @param {number} month - Month (1-12)
+ * @returns {Promise<Object>} Transaction count by owner with summary
+ */
+const getTransactionCountByOwner = async (organizationId, year, month) => {
+  // Validate month
+  if (month < 1 || month > 12) {
+    throw new Error('Invalid month. Must be between 1 and 12.');
+  }
+
+  // Create date range for the given month
+  const startDate = new Date(year, month - 1, 1);
+  const endDate = new Date(year, month, 0, 23, 59, 59, 999);
+
+  const result = await db.query(
+    `SELECT
+      COALESCE(u.id::text, 'unknown') as owner_id,
+      COALESCE(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), 'Unassigned') as owner_name,
+      COUNT(t.id) as transaction_count,
+      ROUND(SUM(t.amount)::numeric, 2) as total_amount
+     FROM transactions t
+     LEFT JOIN accounts a ON t.account_id = a.id
+     LEFT JOIN contacts c ON a.contact_id = c.id
+     LEFT JOIN leads l ON c.converted_from_lead_id = l.id
+     LEFT JOIN users u ON l.assigned_to = u.id
+     WHERE t.organization_id = $1
+       AND t.deleted_at IS NULL
+       AND t.is_void = FALSE
+       AND t.status = 'completed'
+       AND t.transaction_date >= $2
+       AND t.transaction_date <= $3
+     GROUP BY COALESCE(u.id::text, 'unknown'), COALESCE(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), 'Unassigned')
+     ORDER BY transaction_count DESC`,
+    [organizationId, startDate, endDate],
+    organizationId
+  );
+
+  // Calculate totals and percentages
+  const rows = result.rows.map(row => ({
+    ownerId: row.owner_id,
+    ownerName: row.owner_name,
+    count: parseInt(row.transaction_count),
+    amount: parseFloat(row.total_amount || 0)
+  }));
+
+  const totalTransactions = rows.reduce((sum, row) => sum + row.count, 0);
+  const totalAmount = rows.reduce((sum, row) => sum + row.amount, 0);
+
+  // Add percentage to each row
+  const dataWithPercentage = rows.map(row => ({
+    ...row,
+    percentage: totalTransactions > 0
+      ? parseFloat(((row.count / totalTransactions) * 100).toFixed(2))
+      : 0
+  }));
+
+  // Find top owner by transaction count
+  const topOwner = dataWithPercentage.length > 0 ? dataWithPercentage[0] : null;
+
+  return {
+    data: dataWithPercentage,
+    summary: {
+      totalTransactions,
+      totalAmount: parseFloat(totalAmount.toFixed(2)),
+      topOwner: topOwner ? topOwner.ownerName : null,
+      topOwnerCount: topOwner ? topOwner.count : 0,
+      topOwnerPercentage: topOwner && totalTransactions > 0
+        ? parseFloat(((topOwner.count / totalTransactions) * 100).toFixed(2))
+        : 0,
+      month,
+      year
+    }
+  };
+};
+
+/**
+ * Get transaction revenue grouped by lead owner at time of conversion
+ * @param {string} organizationId - Organization ID
+ * @param {number} year - Year (e.g., 2024)
+ * @param {number} month - Month (1-12)
+ * @returns {Promise<Object>} Transaction revenue by owner with summary
+ */
+const getTransactionRevenueByOwner = async (organizationId, year, month) => {
+  // Validate month
+  if (month < 1 || month > 12) {
+    throw new Error('Invalid month. Must be between 1 and 12.');
+  }
+
+  // Create date range for the given month
+  const startDate = new Date(year, month - 1, 1);
+  const endDate = new Date(year, month, 0, 23, 59, 59, 999);
+
+  const result = await db.query(
+    `SELECT
+      COALESCE(u.id::text, 'unknown') as owner_id,
+      COALESCE(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), 'Unassigned') as owner_name,
+      COUNT(t.id) as transaction_count,
+      ROUND(SUM(t.amount)::numeric, 2) as total_amount
+     FROM transactions t
+     LEFT JOIN accounts a ON t.account_id = a.id
+     LEFT JOIN contacts c ON a.contact_id = c.id
+     LEFT JOIN leads l ON c.converted_from_lead_id = l.id
+     LEFT JOIN users u ON l.assigned_to = u.id
+     WHERE t.organization_id = $1
+       AND t.deleted_at IS NULL
+       AND t.is_void = FALSE
+       AND t.status = 'completed'
+       AND t.transaction_date >= $2
+       AND t.transaction_date <= $3
+     GROUP BY COALESCE(u.id::text, 'unknown'), COALESCE(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), 'Unassigned')
+     ORDER BY total_amount DESC`,
+    [organizationId, startDate, endDate],
+    organizationId
+  );
+
+  // Calculate totals and percentages
+  const rows = result.rows.map(row => ({
+    ownerId: row.owner_id,
+    ownerName: row.owner_name,
+    count: parseInt(row.transaction_count),
+    amount: parseFloat(row.total_amount || 0)
+  }));
+
+  const totalTransactions = rows.reduce((sum, row) => sum + row.count, 0);
+  const totalAmount = rows.reduce((sum, row) => sum + row.amount, 0);
+
+  // Add percentage to each row (based on revenue)
+  const dataWithPercentage = rows.map(row => ({
+    ...row,
+    percentage: totalAmount > 0
+      ? parseFloat(((row.amount / totalAmount) * 100).toFixed(2))
+      : 0
+  }));
+
+  // Find top owner by revenue
+  const topOwner = dataWithPercentage.length > 0 ? dataWithPercentage[0] : null;
+
+  return {
+    data: dataWithPercentage,
+    summary: {
+      totalTransactions,
+      totalAmount: parseFloat(totalAmount.toFixed(2)),
+      topOwner: topOwner ? topOwner.ownerName : null,
+      topOwnerAmount: topOwner ? topOwner.amount : 0,
+      topOwnerPercentage: topOwner && totalAmount > 0
+        ? parseFloat(((topOwner.amount / totalAmount) * 100).toFixed(2))
+        : 0,
+      month,
+      year
+    }
+  };
+};
+
 module.exports = {
   getTotalRevenue,
   getRevenueThisMonth,
@@ -430,5 +724,9 @@ module.exports = {
   getNewCustomersThisMonth,
   getNewCustomersTrend,
   getDashboardKPIs,
-  getAccountsByProduct
+  getAccountsByProduct,
+  getTransactionsBySource,
+  getTransactionRevenueBySource,
+  getTransactionCountByOwner,
+  getTransactionRevenueByOwner
 };

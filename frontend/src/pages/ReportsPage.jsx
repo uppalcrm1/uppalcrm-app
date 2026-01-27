@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { FileBarChart, Plus, Star, Play, Edit, Trash2, Search, Filter } from 'lucide-react';
+import { FileBarChart, Plus, Star, Play, Edit, Trash2, Search, Filter, BarChart3 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { reportsAPI } from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -14,6 +14,7 @@ const ReportsPage = () => {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterFavorites, setFilterFavorites] = useState(false);
+  const [viewMode, setViewMode] = useState('all'); // 'all', 'standard', 'custom'
 
   // Fetch saved reports
   const { data: reportsData, isLoading } = useQuery({
@@ -98,7 +99,7 @@ const ReportsPage = () => {
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
           <FileBarChart className="h-8 w-8 text-blue-600" />
-          <h1 className="text-2xl font-bold text-gray-900">My Reports</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
         </div>
 
         <button
@@ -110,8 +111,141 @@ const ReportsPage = () => {
         </button>
       </div>
 
-      {/* Filters and Search */}
-      <div className="bg-white border border-gray-200 rounded-lg p-4">
+      {/* Standard Reports Section */}
+      <div className="space-y-4">
+        <div className="flex items-center space-x-2">
+          <BarChart3 className="h-5 w-5 text-blue-600" />
+          <h2 className="text-lg font-semibold text-gray-900">Standard Reports</h2>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Transactions by Source Report */}
+          <div
+            className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow cursor-pointer"
+            onClick={() => navigate('/reports/transactions-by-source')}
+          >
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Transactions by Source</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  View transaction count grouped by source
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+              <span className="text-sm text-gray-600">Pre-built standard report</span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate('/reports/transactions-by-source');
+                }}
+                className="btn btn-secondary flex items-center space-x-2 text-sm"
+              >
+                <Play className="h-3 w-3" />
+                <span>View</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Transactions Revenue by Source Report */}
+          <div
+            className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow cursor-pointer"
+            onClick={() => navigate('/reports/transactions-revenue-by-source')}
+          >
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Transactions Revenue by Source</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  View revenue volume grouped by source
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+              <span className="text-sm text-gray-600">Pre-built standard report</span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate('/reports/transactions-revenue-by-source');
+                }}
+                className="btn btn-secondary flex items-center space-x-2 text-sm"
+              >
+                <Play className="h-3 w-3" />
+                <span>View</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Transaction Count by Owner Report */}
+          <div
+            className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow cursor-pointer"
+            onClick={() => navigate('/reports/transactions-count-by-owner')}
+          >
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Transaction Count by Owner</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  View transaction count by lead owner at conversion time
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+              <span className="text-sm text-gray-600">Pre-built standard report</span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate('/reports/transactions-count-by-owner');
+                }}
+                className="btn btn-secondary flex items-center space-x-2 text-sm"
+              >
+                <Play className="h-3 w-3" />
+                <span>View</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Transaction Revenue by Owner Report */}
+          <div
+            className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow cursor-pointer"
+            onClick={() => navigate('/reports/transactions-revenue-by-owner')}
+          >
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Transaction Revenue by Owner</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  View revenue by lead owner at conversion time
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+              <span className="text-sm text-gray-600">Pre-built standard report</span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate('/reports/transactions-revenue-by-owner');
+                }}
+                className="btn btn-secondary flex items-center space-x-2 text-sm"
+              >
+                <Play className="h-3 w-3" />
+                <span>View</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Custom Reports Section */}
+      <div className="space-y-4 mt-8 pt-8 border-t border-gray-200">
+        <div className="flex items-center space-x-2">
+          <FileBarChart className="h-5 w-5 text-blue-600" />
+          <h2 className="text-lg font-semibold text-gray-900">Custom Reports</h2>
+        </div>
+
+        {/* Filters and Search */}
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
         <div className="flex items-center space-x-4">
           {/* Search */}
           <div className="flex-1 relative">
@@ -282,6 +416,7 @@ const ReportsPage = () => {
           {filterFavorites && ' (favorites only)'}
         </div>
       )}
+      </div>
     </div>
   );
 };
