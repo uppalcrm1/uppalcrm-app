@@ -50,6 +50,7 @@ import ReportBuilderPage from './pages/ReportBuilderPage'
 import TransactionsBySourceReportPage from './pages/TransactionsBySourceReportPage'
 import TransactionsRevenueBySourceReportPage from './pages/TransactionsRevenueBySourceReportPage'
 import TransactionCountByOwnerReportPage from './pages/TransactionCountByOwnerReportPage'
+import TransactionsRevenueByOwnerReportPage from './pages/TransactionsRevenueByOwnerReportPage'
 import CustomDashboardsPage from './pages/CustomDashboardsPage'
 import DashboardBuilderPage from './pages/DashboardBuilderPage'
 
@@ -143,6 +144,7 @@ function App() {
         <Route path="reports/transactions-by-source" element={<TransactionsBySourceReportPage />} />
         <Route path="reports/transactions-revenue-by-source" element={<TransactionsRevenueBySourceReportPage />} />
         <Route path="reports/transactions-count-by-owner" element={<TransactionCountByOwnerReportPage />} />
+        <Route path="reports/transactions-revenue-by-owner" element={<TransactionsRevenueByOwnerReportPage />} />
         <Route path="reports/builder" element={<ReportBuilderPage />} />
         <Route path="reports/builder/:id" element={<ReportBuilderPage />} />
         <Route path="custom-dashboards" element={<CustomDashboardsPage />} />

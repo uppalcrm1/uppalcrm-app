@@ -633,6 +633,84 @@ const getTransactionCountByOwner = async (organizationId, year, month) => {
   };
 };
 
+/**
+ * Get transaction revenue grouped by lead owner at time of conversion
+ * @param {string} organizationId - Organization ID
+ * @param {number} year - Year (e.g., 2024)
+ * @param {number} month - Month (1-12)
+ * @returns {Promise<Object>} Transaction revenue by owner with summary
+ */
+const getTransactionRevenueByOwner = async (organizationId, year, month) => {
+  // Validate month
+  if (month < 1 || month > 12) {
+    throw new Error('Invalid month. Must be between 1 and 12.');
+  }
+
+  // Create date range for the given month
+  const startDate = new Date(year, month - 1, 1);
+  const endDate = new Date(year, month, 0, 23, 59, 59, 999);
+
+  const result = await db.query(
+    `SELECT
+      COALESCE(u.id::text, 'unknown') as owner_id,
+      COALESCE(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), 'Unassigned') as owner_name,
+      COUNT(t.id) as transaction_count,
+      ROUND(SUM(t.amount)::numeric, 2) as total_amount
+     FROM transactions t
+     LEFT JOIN accounts a ON t.account_id = a.id
+     LEFT JOIN contacts c ON a.contact_id = c.id
+     LEFT JOIN leads l ON c.converted_from_lead_id = l.id
+     LEFT JOIN users u ON l.assigned_to = u.id
+     WHERE t.organization_id = $1
+       AND t.deleted_at IS NULL
+       AND t.is_void = FALSE
+       AND t.status = 'completed'
+       AND t.transaction_date >= $2
+       AND t.transaction_date <= $3
+     GROUP BY COALESCE(u.id::text, 'unknown'), COALESCE(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), 'Unassigned')
+     ORDER BY total_amount DESC`,
+    [organizationId, startDate, endDate],
+    organizationId
+  );
+
+  // Calculate totals and percentages
+  const rows = result.rows.map(row => ({
+    ownerId: row.owner_id,
+    ownerName: row.owner_name,
+    count: parseInt(row.transaction_count),
+    amount: parseFloat(row.total_amount || 0)
+  }));
+
+  const totalTransactions = rows.reduce((sum, row) => sum + row.count, 0);
+  const totalAmount = rows.reduce((sum, row) => sum + row.amount, 0);
+
+  // Add percentage to each row (based on revenue)
+  const dataWithPercentage = rows.map(row => ({
+    ...row,
+    percentage: totalAmount > 0
+      ? parseFloat(((row.amount / totalAmount) * 100).toFixed(2))
+      : 0
+  }));
+
+  // Find top owner by revenue
+  const topOwner = dataWithPercentage.length > 0 ? dataWithPercentage[0] : null;
+
+  return {
+    data: dataWithPercentage,
+    summary: {
+      totalTransactions,
+      totalAmount: parseFloat(totalAmount.toFixed(2)),
+      topOwner: topOwner ? topOwner.ownerName : null,
+      topOwnerAmount: topOwner ? topOwner.amount : 0,
+      topOwnerPercentage: topOwner && totalAmount > 0
+        ? parseFloat(((topOwner.amount / totalAmount) * 100).toFixed(2))
+        : 0,
+      month,
+      year
+    }
+  };
+};
+
 module.exports = {
   getTotalRevenue,
   getRevenueThisMonth,
@@ -649,5 +727,6 @@ module.exports = {
   getAccountsByProduct,
   getTransactionsBySource,
   getTransactionRevenueBySource,
-  getTransactionCountByOwner
+  getTransactionCountByOwner,
+  getTransactionRevenueByOwner
 };

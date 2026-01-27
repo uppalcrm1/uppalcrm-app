@@ -46,4 +46,7 @@ router.get('/standard-reports/transactions-revenue-by-source', reportingControll
 // GET /api/reporting/standard-reports/transactions-count-by-owner - Get transaction count grouped by lead owner
 router.get('/standard-reports/transactions-count-by-owner', reportingController.getTransactionCountByOwner);
 
+// GET /api/reporting/standard-reports/transactions-revenue-by-owner - Get transaction revenue grouped by lead owner
+router.get('/standard-reports/transactions-revenue-by-owner', reportingController.getTransactionRevenueByOwner);
+
 module.exports = router;

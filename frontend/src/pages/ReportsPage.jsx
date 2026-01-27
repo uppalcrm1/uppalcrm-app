@@ -205,6 +205,35 @@ const ReportsPage = () => {
               </button>
             </div>
           </div>
+
+          {/* Transaction Revenue by Owner Report */}
+          <div
+            className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow cursor-pointer"
+            onClick={() => navigate('/reports/transactions-revenue-by-owner')}
+          >
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Transaction Revenue by Owner</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  View revenue by lead owner at conversion time
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+              <span className="text-sm text-gray-600">Pre-built standard report</span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate('/reports/transactions-revenue-by-owner');
+                }}
+                className="btn btn-secondary flex items-center space-x-2 text-sm"
+              >
+                <Play className="h-3 w-3" />
+                <span>View</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 

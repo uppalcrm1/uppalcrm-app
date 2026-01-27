@@ -1174,6 +1174,14 @@ export const reportingAPI = {
       params: { year, month }
     })
     return response.data
+  },
+
+  // Get transaction revenue grouped by lead owner for a given month
+  getTransactionRevenueByOwner: async (year, month) => {
+    const response = await api.get('/reporting/standard-reports/transactions-revenue-by-owner', {
+      params: { year, month }
+    })
+    return response.data
   }
 }
 
