@@ -28,6 +28,7 @@ import TaskManager from './TaskManager'
 import InteractionsTimeline from './InteractionsTimeline'
 import api from '../services/api'
 import { leadsAPI } from '../services/api'
+import { formatDate } from '../utils/dateFormatter'
 
 // Define system columns with metadata (comprehensive list)
 const SYSTEM_COLUMN_DEFINITIONS = [
@@ -69,6 +70,7 @@ const LeadListTable = ({
   statuses,
   loading
 }) => {
+  console.log('🟢 LeadListTable RENDER - BUILD TIMESTAMP: 2026-01-25-095000', { leadsCount: leads?.length, firstLead: leads?.[0] })
   const navigate = useNavigate()
   const [sortConfig, setSortConfig] = useState({ key: 'created_at', direction: 'desc' })
   const [selectedLeads, setSelectedLeads] = useState([])
@@ -90,6 +92,14 @@ const LeadListTable = ({
   // Sync local leads with prop leads
   useEffect(() => {
     setLocalLeads(leads)
+    // DEBUG: Log the actual data structure
+    if (leads && leads.length > 0) {
+      console.log('🔴 LeadListTable: Leads data received', {
+        totalLeads: leads.length,
+        firstLead: leads[0],
+        fieldNames: Object.keys(leads[0] || {})
+      })
+    }
   }, [leads])
 
   // Fetch field configuration to get dynamic column labels AND build column definitions
@@ -257,6 +267,14 @@ const LeadListTable = ({
 
     // Save to server
     try {
+      // Filter out invalid fields that don't exist in leads table schema
+      const invalidFields = ['address', 'city', 'state', 'postal_code'];
+
+      if (invalidFields.includes(fieldName)) {
+        console.warn(`⚠️ Field "${fieldName}" is not supported in leads table, skipping update`);
+        return;
+      }
+
       if (isCustom) {
         // For custom fields, update the custom_fields object
         const currentLead = localLeads.find(l => l.id === recordId)
@@ -514,7 +532,7 @@ const LeadListTable = ({
                           onClick={() => navigate(`/leads/${lead.id}`)}
                           className="text-sm font-medium text-blue-600 hover:text-blue-900 hover:underline cursor-pointer text-left block"
                         >
-                          {lead.first_name} {lead.last_name}
+                          {lead.name || `${lead.first_name || ''} ${lead.last_name || ''}`.trim() || '—'}
                         </button>
                         {lead.title && (
                           <div className="text-xs text-gray-500 mt-0.5">{lead.title}</div>
@@ -648,7 +666,7 @@ const LeadListTable = ({
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-1 text-sm text-gray-600">
                         <Calendar className="w-3 h-3" />
-                        {format(new Date(lead.created_at), 'MMM d, yyyy')}
+                        {formatDate(lead.created_at)}
                       </div>
                     </td>
                   )}
@@ -733,7 +751,7 @@ const LeadListTable = ({
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-1 text-sm text-gray-600">
                         <Calendar className="w-3 h-3" />
-                        {format(new Date(lead.updated_at), 'MMM d, yyyy')}
+                        {formatDate(lead.updated_at)}
                       </div>
                     </td>
                   )}

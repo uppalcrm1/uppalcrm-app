@@ -50,9 +50,8 @@ const CreateAccountModal = ({ isOpen, onClose, onSuccess }) => {
     if (formData.contact_id && contacts.length > 0) {
       const selectedContact = contacts.find(c => c.id === formData.contact_id)
       if (selectedContact && !formData.account_name) {
-        // Handle both snake_case and camelCase field names
-        const firstName = selectedContact.first_name || selectedContact.firstName || ''
-        const lastName = selectedContact.last_name || selectedContact.lastName || ''
+        const firstName = selectedContact.first_name || ''
+        const lastName = selectedContact.last_name || ''
         const contactName = `${firstName} ${lastName}`.trim()
         const devicePart = formData.device_name ? ` - ${formData.device_name}` : ''
         setFormData(prev => ({
@@ -78,9 +77,7 @@ const CreateAccountModal = ({ isOpen, onClose, onSuccess }) => {
         console.log(`Contact ${index + 1}:`, {
           id: contact.id,
           first_name: contact.first_name,
-          firstName: contact.firstName,
           last_name: contact.last_name,
-          lastName: contact.lastName,
           email: contact.email
         })
       })
@@ -254,9 +251,8 @@ const CreateAccountModal = ({ isOpen, onClose, onSuccess }) => {
     if (!contactSearch) return true
     const searchLower = contactSearch.toLowerCase().trim()
 
-    // Handle both snake_case and camelCase field names
-    const firstName = (contact.first_name || contact.firstName || '').toLowerCase().trim()
-    const lastName = (contact.last_name || contact.lastName || '').toLowerCase().trim()
+    const firstName = (contact.first_name || '').toLowerCase().trim()
+    const lastName = (contact.last_name || '').toLowerCase().trim()
     const fullName = `${firstName} ${lastName}`.trim()
     const email = (contact.email || '').toLowerCase().trim()
     const company = (contact.company || '').toLowerCase().trim()
@@ -328,9 +324,8 @@ const CreateAccountModal = ({ isOpen, onClose, onSuccess }) => {
                     {loadingContacts ? 'Loading contacts...' : 'Select a contact'}
                   </option>
                   {filteredContacts.map((contact) => {
-                    // Handle both snake_case and camelCase field names
-                    const firstName = contact.first_name || contact.firstName || ''
-                    const lastName = contact.last_name || contact.lastName || ''
+                    const firstName = contact.first_name || ''
+                    const lastName = contact.last_name || ''
                     const fullName = `${firstName} ${lastName}`.trim()
 
                     return (

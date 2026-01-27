@@ -1,0 +1,108 @@
+================================================================================
+                    LEADS TABLE - COMPLETE FIELD ANALYSIS
+                            devtest Database
+                            Generated: 2026-01-24
+================================================================================
+
+TOTAL FIELDS: 29
+├── System Fields (Always Visible): 16
+├── Extended Fields (Hidden - Needs Action): 10
+├── Internal Fields (Never Visible): 3
+└── Current Custom Fields: 3
+
+================================================================================
+SECTION 1: SYSTEM FIELDS (16) - ALREADY CONFIGURED
+================================================================================
+
+STATUS: COMPLETE - NO ACTION REQUIRED
+
+Contact Information (6 fields):
+- first_name ................. VARCHAR | Nullable | VISIBLE
+- last_name .................. VARCHAR | Nullable | VISIBLE
+- email ...................... VARCHAR | Nullable | VISIBLE
+- phone ...................... VARCHAR | Nullable | VISIBLE
+- company .................... VARCHAR | Nullable | VISIBLE
+- title ...................... VARCHAR | Nullable | VISIBLE
+
+Lead Management (6 fields):
+- source ..................... VARCHAR | Nullable | VISIBLE
+- status ..................... VARCHAR | Nullable | VISIBLE
+- priority ................... VARCHAR | Nullable | VISIBLE
+- assigned_to ................ UUID | Nullable | VISIBLE
+- notes ...................... TEXT | Nullable | VISIBLE
+- value ...................... NUMERIC | Nullable | VISIBLE
+
+Timeline & Engagement (4 fields):
+- created_at ................. TIMESTAMP | Nullable | VISIBLE
+- updated_at ................. TIMESTAMP | Nullable | VISIBLE
+- last_contact_date .......... TIMESTAMP | Nullable | VISIBLE
+- next_follow_up ............. TIMESTAMP | Nullable | VISIBLE
+
+================================================================================
+SECTION 2: EXTENDED FIELDS (10) - ACTION REQUIRED
+================================================================================
+
+STATUS: ACTION REQUIRED - Add to custom_field_definitions
+
+ADDRESS INFORMATION (5 fields) - PRIORITY: HIGH
+- address .................... VARCHAR | Nullable | Field Type: text
+- city ....................... VARCHAR | Nullable | Field Type: text
+- state ...................... VARCHAR | Nullable | Field Type: text
+- postal_code ................ VARCHAR | Nullable | Field Type: text
+- country .................... VARCHAR | Nullable | Field Type: text
+
+RELATIONSHIP & REFERENCE (4 fields) - PRIORITY: MEDIUM
+- created_by ................. UUID | Nullable | Field Type: text
+- linked_contact_id .......... UUID | Nullable | Field Type: text
+- relationship_type .......... VARCHAR | Nullable | Field Type: text
+- interest_type .............. VARCHAR | Nullable | Field Type: text
+
+TIMELINE (1 field) - PRIORITY: HIGH
+- converted_date ............. TIMESTAMP | Nullable | Field Type: date
+
+================================================================================
+SECTION 3: INTERNAL FIELDS (3) - PROPERLY HIDDEN
+================================================================================
+
+STATUS: CORRECTLY HIDDEN - NO ACTION REQUIRED
+
+System-Only Fields:
+- id ......................... UUID | NOT Nullable | HIDDEN (Primary Key)
+- organization_id ............ UUID | NOT Nullable | HIDDEN (Org Ref)
+- custom_fields .............. JSONB | Nullable | HIDDEN (Dynamic Storage)
+
+================================================================================
+SECTION 4: CURRENT CUSTOM FIELDS (3) - ALREADY DEFINED
+================================================================================
+
+STATUS: ACTIVE
+
+- prefer_method .............. Type: text
+- test_field_123 ............. Type: text
+- test_website_url ........... Type: text
+
+After migration: 13 total custom fields
+
+================================================================================
+IMPLEMENTATION CHECKLIST
+================================================================================
+
+Phase 1: Database Migration (IMMEDIATE)
+  [ ] Execute MIGRATION_ADD_MISSING_CUSTOM_FIELDS.sql
+  [ ] Verify 13 rows in custom_field_definitions for leads
+
+Phase 2: UI Implementation (SHORT-TERM)
+  [ ] Update leads form to show new fields
+  [ ] Add field visibility toggles
+  [ ] Implement form validation
+
+Phase 3: Testing (CONCURRENT)
+  [ ] Test data entry
+  [ ] Test data retrieval
+  [ ] Validate field functionality
+
+================================================================================
+Generated: 2026-01-24
+Database: uppalcrm_devtest (PostgreSQL)
+Analysis: Complete
+================================================================================

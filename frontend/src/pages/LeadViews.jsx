@@ -28,7 +28,7 @@ const LeadViews = ({ onAddLead, onEditLead, onDeleteLead }) => {
     search: searchParams.get('search') || '',
     status: searchParams.get('status') || '',
     priority: searchParams.get('priority') || '',
-    assignedTo: searchParams.get('assignedTo') || '',
+    assigned_to: searchParams.get('assigned_to') || '',
     source: searchParams.get('source') || '',
     dateFrom: searchParams.get('dateFrom') || '',
     dateTo: searchParams.get('dateTo') || '',

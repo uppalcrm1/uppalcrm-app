@@ -79,6 +79,12 @@ const TransactionsPage = () => {
   const [loadingRevenue, setLoadingRevenue] = useState(false)
   const [sortDirection, setSortDirection] = useState('desc') // 'asc' or 'desc'
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(50)
+  const [totalCount, setTotalCount] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
+
   // Load column visibility from localStorage or use defaults
   const [visibleColumns, setVisibleColumns] = useState(() => {
     const saved = localStorage.getItem('transactions_visible_columns')
@@ -102,15 +108,22 @@ const TransactionsPage = () => {
 
   // Fetch transactions on component mount
   useEffect(() => {
-    fetchTransactions()
+    fetchTransactions(1, pageSize)
     fetchRevenueStats()
   }, [])
 
-  const fetchTransactions = async () => {
+  const fetchTransactions = async (page = 1, size = pageSize) => {
     try {
       setLoading(true)
-      const response = await transactionsAPI.getTransactions()
+      const offset = (page - 1) * size
+      const response = await transactionsAPI.getTransactions({
+        limit: size,
+        offset: offset
+      })
       setTransactions(response.transactions || [])
+      setTotalCount(response.total || 0)
+      setTotalPages(response.totalPages || 0)
+      setCurrentPage(page)
       // Also refresh revenue stats when transactions change
       fetchRevenueStats()
     } catch (error) {
@@ -231,18 +244,42 @@ const TransactionsPage = () => {
   const handleEditSuccess = () => {
     setShowEditModal(false)
     setSelectedTransaction(null)
-    fetchTransactions() // Refresh the list
+    fetchTransactions(currentPage, pageSize) // Refresh the current page
   }
 
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this transaction?')) {
       try {
         await transactionsAPI.deleteTransaction(id)
-        fetchTransactions() // Refresh the list
+        fetchTransactions(currentPage, pageSize) // Refresh the list
       } catch (error) {
         console.error('Error deleting transaction:', error)
         alert('Failed to delete transaction')
       }
+    }
+  }
+
+  // Pagination handlers
+  const handlePreviousPage = () => {
+    if (currentPage > 1) {
+      fetchTransactions(currentPage - 1, pageSize)
+    }
+  }
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      fetchTransactions(currentPage + 1, pageSize)
+    }
+  }
+
+  const handlePageSizeChange = (newSize) => {
+    setPageSize(newSize)
+    fetchTransactions(1, newSize)
+  }
+
+  const handleGoToPage = (page) => {
+    if (page >= 1 && page <= totalPages) {
+      fetchTransactions(page, pageSize)
     }
   }
 
@@ -397,7 +434,8 @@ const TransactionsPage = () => {
             <div className="flex items-center gap-2">
               <FileText size={20} className="text-gray-700" />
               <span className="text-sm font-medium text-gray-700">
-                {filteredTransactions.length} {filteredTransactions.length === 1 ? 'Transaction' : 'Transactions'}
+                {totalCount} total {totalCount === 1 ? 'Transaction' : 'Transactions'}
+                {totalPages > 1 && <span className="text-gray-500"> • Showing {filteredTransactions.length} per page</span>}
               </span>
             </div>
             <div className="flex items-center gap-2">
@@ -597,6 +635,79 @@ const TransactionsPage = () => {
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Pagination Controls */}
+        {!loading && filteredTransactions.length > 0 && totalPages > 1 && (
+          <div className="border-t border-gray-200 px-4 py-4 flex items-center justify-between bg-gray-50">
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-gray-700">Rows per page:</label>
+              <select
+                value={pageSize}
+                onChange={(e) => handlePageSizeChange(parseInt(e.target.value))}
+                className="input input-sm"
+              >
+                <option value="25">25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+                <option value="200">200</option>
+              </select>
+            </div>
+
+            <div className="text-sm text-gray-700">
+              Page <span className="font-medium">{currentPage}</span> of{' '}
+              <span className="font-medium">{totalPages}</span> ({' '}
+              <span className="font-medium">{totalCount}</span> total)
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handlePreviousPage}
+                disabled={currentPage === 1}
+                className="btn btn-sm btn-outline"
+              >
+                Previous
+              </button>
+
+              {/* Page number buttons */}
+              <div className="flex gap-1">
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum
+                  if (totalPages <= 5) {
+                    pageNum = i + 1
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1
+                  } else if (currentPage > totalPages - 3) {
+                    pageNum = totalPages - 4 + i
+                  } else {
+                    pageNum = currentPage - 2 + i
+                  }
+
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => handleGoToPage(pageNum)}
+                      className={`btn btn-sm ${
+                        currentPage === pageNum
+                          ? 'btn-primary'
+                          : 'btn-outline'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  )
+                })}
+              </div>
+
+              <button
+                onClick={handleNextPage}
+                disabled={currentPage === totalPages}
+                className="btn btn-sm btn-outline"
+              >
+                Next
+              </button>
+            </div>
           </div>
         )}
       </div>

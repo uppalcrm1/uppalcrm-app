@@ -34,17 +34,6 @@ const DynamicLeadForm = ({
       console.log('📝 DynamicLeadForm - Received leadData:', actualInitialData);
       console.log('📋 Custom fields from leadData:', actualInitialData.custom_fields);
 
-      // Map API field names to form field names
-      const mappedData = {
-        ...actualInitialData,
-        // Map snake_case to camelCase for form fields
-        firstName: actualInitialData.first_name || actualInitialData.firstName || '',
-        lastName: actualInitialData.last_name || actualInitialData.lastName || '',
-        potentialValue: actualInitialData.potential_value || actualInitialData.potentialValue || 0,
-        assignedTo: actualInitialData.assigned_to || actualInitialData.assignedTo || '',
-        nextFollowUp: actualInitialData.next_follow_up || actualInitialData.nextFollowUp || '',
-      };
-
       // Extract and properly map custom fields
       const customFieldsData = actualInitialData.custom_fields || actualInitialData.customFields || {};
 
@@ -52,7 +41,7 @@ const DynamicLeadForm = ({
 
       setFormData(prev => ({
         ...prev,
-        ...mappedData,
+        ...actualInitialData,
         customFields: { ...customFieldsData }
       }));
     }
@@ -196,6 +185,24 @@ const DynamicLeadForm = ({
     return Object.keys(newErrors).length === 0;
   };
 
+  // Filter out invalid fields that don't exist in leads table schema
+  const filterValidFields = (data) => {
+    const validLeadFields = [
+      'first_name', 'last_name', 'title', 'email', 'phone', 'company',
+      'source', 'status', 'priority', 'value', 'potential_value', 'notes',
+      'assigned_to', 'next_follow_up', 'last_contact_date', 'created_at',
+      'converted_date'
+    ];
+
+    const filtered = {};
+    Object.keys(data).forEach(key => {
+      if (validLeadFields.includes(key)) {
+        filtered[key] = data[key];
+      }
+    });
+    return filtered;
+  };
+
   const handleSubmit = async () => {
     if (!validateForm()) {
       return;
@@ -207,8 +214,8 @@ const DynamicLeadForm = ({
       // DO NOT spread formData as it contains read-only fields like created_at, updated_at, etc.
       const submitData = {
         // Basic contact info
-        first_name: formData.firstName || formData.first_name || '',
-        last_name: formData.lastName || formData.last_name || '',
+        first_name: formData.first_name || '',
+        last_name: formData.last_name || '',
         title: formData.title || '',
         email: formData.email || '',
         phone: formData.phone || '',
@@ -218,11 +225,11 @@ const DynamicLeadForm = ({
         source: formData.source || '',
         status: formData.status || 'new',
         priority: formData.priority || 'medium',
-        potential_value: formData.potentialValue || formData.potential_value || formData.value || 0,
+        potential_value: formData.potential_value || formData.value || 0,
 
         // Assignment and follow-up
-        assigned_to: formData.assignedTo || formData.assigned_to || null,
-        next_follow_up: formData.nextFollowUp || formData.next_follow_up || null,
+        assigned_to: formData.assigned_to || null,
+        next_follow_up: formData.next_follow_up || null,
 
         // Additional info
         notes: formData.notes || '',
@@ -231,13 +238,16 @@ const DynamicLeadForm = ({
         customFields: formData.customFields || {}
       };
 
+      // Filter out any invalid fields that don't exist in leads table
+      const cleanData = filterValidFields(submitData);
+
       let response;
       if (mode === 'edit' && actualInitialData?.id) {
         // Update existing lead
-        response = await leadsAPI.updateLead(actualInitialData.id, submitData);
+        response = await leadsAPI.updateLead(actualInitialData.id, cleanData);
       } else {
         // Create new lead
-        response = await leadsAPI.createLead(submitData);
+        response = await leadsAPI.createLead(cleanData);
       }
 
       // Call onSuccess if provided, otherwise onSubmit for backward compatibility
@@ -295,8 +305,8 @@ const DynamicLeadForm = ({
 
     const getFieldIcon = (type) => {
       switch(type) {
-        case 'firstName':
-        case 'lastName':
+        case 'first_name':
+        case 'last_name':
           return <User className="w-4 h-4 text-gray-400" />;
         case 'company':
           return <Building className="w-4 h-4 text-gray-400" />;
@@ -305,9 +315,9 @@ const DynamicLeadForm = ({
         case 'phone':
         case 'tel':
           return <Phone className="w-4 h-4 text-gray-400" />;
-        case 'potentialValue':
+        case 'potential_value':
           return <DollarSign className="w-4 h-4 text-gray-400" />;
-        case 'nextFollowUp':
+        case 'next_follow_up':
         case 'date':
           return <Calendar className="w-4 h-4 text-gray-400" />;
         default:
@@ -500,11 +510,16 @@ const DynamicLeadForm = ({
     return <div className="flex justify-center p-8">Initializing form...</div>;
   }
 
-  const enabledSystemFields = getEnabledSystemFields();
+  const enabledSystemFields = getEnabledSystemFields()
+    // Filter out fields that don't exist in leads table schema
+    .filter(field => !['address', 'city', 'state', 'postal_code'].includes(field.field_name));
 
   // Filter custom fields based on mode and visibility flags
   const enabledCustomFields = (formConfig.customFields || []).filter(f => {
     if (!f.is_enabled) return false;
+
+    // Filter out invalid fields that don't exist in leads table schema
+    if (['address', 'city', 'state', 'postal_code'].includes(f.field_name)) return false;
 
     // For create mode, check show_in_create_form
     if (mode === 'create' || mode !== 'edit') {

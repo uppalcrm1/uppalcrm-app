@@ -106,7 +106,7 @@ const SortableRow = ({ field, entityType, isReorderMode, onEdit, onDelete, onTog
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: field.id })
+  } = useSortable({ id: field.id || field.field_name })
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -117,21 +117,31 @@ const SortableRow = ({ field, entityType, isReorderMode, onEdit, onDelete, onTog
   const isProtectedField = isProductNameField(field, entityType)
 
   return (
-    <tr
+    <div
       ref={setNodeRef}
       style={style}
-      className={`border-b border-gray-100 hover:bg-gray-50 transition-all ${
+      className={`border-b border-gray-100 transition-all ${
         !field.is_enabled ? 'bg-gray-50 opacity-60' : ''
-      } ${isProtectedField ? 'bg-blue-50' : ''} ${isDragging ? 'shadow-lg' : ''}`}
+      } ${isProtectedField ? 'bg-blue-50' : ''} ${isDragging ? 'shadow-lg z-50' : ''}`}
     >
-      {/* Drag Handle Column */}
-      {isReorderMode && (
-        <td className="py-4 px-4 cursor-move" {...attributes} {...listeners}>
-          <GripVertical size={20} className="text-gray-400" />
-        </td>
-      )}
-      {children}
-    </tr>
+      <div className="flex items-center">
+        {/* Drag Handle */}
+        {isReorderMode && (
+          <div
+            className="px-4 py-4 cursor-grab active:cursor-grabbing flex-shrink-0 relative z-10"
+            style={{ touchAction: 'none' }}
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical size={20} className="text-gray-400 pointer-events-none" />
+          </div>
+        )}
+        {/* Field Content */}
+        <div className="flex-1">
+          {children}
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -503,7 +513,11 @@ const AdminFields = () => {
 
   // Drag and drop sensors
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // 8px movement required to start drag
+      },
+    }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
@@ -518,8 +532,8 @@ const AdminFields = () => {
     }
 
     const allFields = filteredFields
-    const oldIndex = allFields.findIndex(f => f.id === active.id)
-    const newIndex = allFields.findIndex(f => f.id === over.id)
+    const oldIndex = allFields.findIndex(f => (f.id || f.field_name) === active.id)
+    const newIndex = allFields.findIndex(f => (f.id || f.field_name) === over.id)
 
     if (oldIndex === -1 || newIndex === -1) {
       return
@@ -547,19 +561,19 @@ const AdminFields = () => {
     try {
       const updates = reorderedFields.map((field, index) => ({
         field,
-        sort_order: index + 1
+        display_order: index + 1
       }))
 
-      // Update each field's sort_order
-      for (const { field, sort_order } of updates) {
+      // Update each field's display_order
+      for (const { field, display_order } of updates) {
         if (field.isSystemField) {
           await api.put(`/custom-fields/default/${field.field_name}`, {
-            sort_order,
+            display_order,
             entity_type: activeTab
           })
         } else {
           await api.put(`/custom-fields/${field.id}`, {
-            sort_order
+            display_order
           })
         }
       }
@@ -1357,16 +1371,9 @@ const AdminFields = () => {
                         entityType={activeTab}
                         isReorderMode={isReorderMode}
                       >
-                        <div className="grid grid-cols-12 gap-4 px-6 py-4 hover:bg-gray-50 transition-colors">
-                          {/* Drag Handle Column */}
-                          {isReorderMode && (
-                            <div className="col-span-0 flex items-center -ml-4">
-                              <GripVertical size={20} className="text-gray-400" />
-                            </div>
-                          )}
-
+                        <div className="grid grid-cols-12 gap-4 py-4 hover:bg-gray-50 transition-colors">
                           {/* Field Info */}
-                          <div className={`${isReorderMode ? 'col-span-3' : 'col-span-3'}`}>
+                          <div className="col-span-3">
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="text-lg">
                                 {field.isSystemField ? '🔧' : '⭐'}

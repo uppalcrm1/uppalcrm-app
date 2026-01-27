@@ -475,6 +475,7 @@ const updateFieldSchema = Joi.object({
   is_required: Joi.boolean(),
   is_enabled: Joi.boolean(),
   sort_order: Joi.number().integer().min(0),
+  display_order: Joi.number().integer().min(0),
   // Phase 1 visibility fields
   overall_visibility: Joi.string()
     .valid('visible', 'hidden'),
@@ -683,8 +684,8 @@ router.get('/', async (req, res) => {
     // Define entity-specific system fields
     const systemFieldsByEntity = {
       leads: {
-        firstName: { label: 'First Name', type: 'text', required: false, editable: true },
-        lastName: { label: 'Last Name', type: 'text', required: false, editable: true },
+        first_name: { label: 'First Name', type: 'text', required: false, editable: true },
+        last_name: { label: 'Last Name', type: 'text', required: false, editable: true },
         email: { label: 'Email', type: 'email', required: false, editable: true },
         phone: { label: 'Phone', type: 'tel', required: false, editable: true },
         company: { label: 'Company', type: 'text', required: false, editable: true },
@@ -709,9 +710,12 @@ router.get('/', async (req, res) => {
           editable: true,
           options: ['low', 'medium', 'high']
         },
-        potentialValue: { label: 'Potential Value ($)', type: 'number', required: false, editable: true },
-        assignedTo: { label: 'Assign To', type: 'user_select', required: false, editable: true },
-        nextFollowUp: { label: 'Next Follow Up', type: 'date', required: false, editable: true },
+        potential_value: { label: 'Potential Value ($)', type: 'number', required: false, editable: true },
+        assigned_to: { label: 'Assign To', type: 'user_select', required: false, editable: true },
+        next_follow_up: { label: 'Next Follow Up', type: 'date', required: false, editable: true },
+        last_contact_date: { label: 'Last Contact Date', type: 'date', required: false, editable: true },
+        created_at: { label: 'Created At', type: 'date', required: false, editable: false },
+        converted_date: { label: 'Converted Date', type: 'date', required: false, editable: false },
         notes: { label: 'Notes', type: 'textarea', required: false, editable: true }
       },
       contacts: {
@@ -1140,12 +1144,15 @@ router.put('/:fieldId', async (req, res) => {
 
     Object.entries(value).forEach(([key, val]) => {
       if (val !== undefined) {
+        // Map display_order parameter to sort_order column
+        const dbColumn = key === 'display_order' ? 'sort_order' : key;
+
         // For JSONB columns, stringify and use ::jsonb cast
         if (key === 'field_options') {
-          updates.push(`${key} = $${paramCount++}::jsonb`);
+          updates.push(`${dbColumn} = $${paramCount++}::jsonb`);
           values.push(JSON.stringify(val));
         } else {
-          updates.push(`${key} = $${paramCount++}`);
+          updates.push(`${dbColumn} = $${paramCount++}`);
           values.push(val);
         }
       }
@@ -1212,7 +1219,8 @@ router.put('/default/:fieldName', async (req, res) => {
     const {
       is_enabled, is_required, is_deleted, field_options, field_label, field_type, entity_type,
       overall_visibility, visibility_logic,
-      show_in_create_form, show_in_edit_form, show_in_detail_view, show_in_list_view
+      show_in_create_form, show_in_edit_form, show_in_detail_view, show_in_list_view,
+      display_order, sort_order
     } = req.body;
     const { fieldName } = req.params;
 
@@ -1224,8 +1232,8 @@ router.put('/default/:fieldName', async (req, res) => {
     // Define entity-specific system field defaults
     const systemFieldDefaultsByEntity = {
       leads: {
-        firstName: { label: 'First Name', type: 'text', required: false, editable: true },
-        lastName: { label: 'Last Name', type: 'text', required: false, editable: true },
+        first_name: { label: 'First Name', type: 'text', required: false, editable: true },
+        last_name: { label: 'Last Name', type: 'text', required: false, editable: true },
         email: { label: 'Email', type: 'email', required: false, editable: true },
         phone: { label: 'Phone', type: 'tel', required: false, editable: true },
         company: { label: 'Company', type: 'text', required: false, editable: true },
@@ -1271,9 +1279,12 @@ router.put('/default/:fieldName', async (req, res) => {
             { value: 'high', label: 'High' }
           ]
         },
-        potentialValue: { label: 'Potential Value ($)', type: 'number', required: false, editable: true },
-        assignedTo: { label: 'Assign To', type: 'user_select', required: false, editable: true },
-        nextFollowUp: { label: 'Next Follow Up', type: 'date', required: false, editable: true },
+        potential_value: { label: 'Potential Value ($)', type: 'number', required: false, editable: true },
+        assigned_to: { label: 'Assign To', type: 'user_select', required: false, editable: true },
+        next_follow_up: { label: 'Next Follow Up', type: 'date', required: false, editable: true },
+        last_contact_date: { label: 'Last Contact Date', type: 'date', required: false, editable: true },
+        created_at: { label: 'Created At', type: 'date', required: false, editable: false },
+        converted_date: { label: 'Converted Date', type: 'date', required: false, editable: false },
         notes: { label: 'Notes', type: 'textarea', required: false, editable: true }
       },
       contacts: {
@@ -1441,6 +1452,9 @@ router.put('/default/:fieldName', async (req, res) => {
 
     // For system fields, we'll store the configuration in default_field_configurations
     // and store any custom options/settings in a JSON format
+    // Note: display_order is the parameter name sent from frontend, but stored as sort_order in DB
+    const sortOrder = display_order !== undefined ? display_order : (sort_order !== undefined ? sort_order : 0);
+
     const fieldConfig = {
       label: field_label || fieldDefault.label,
       type: field_type || fieldDefault.type,
@@ -1448,6 +1462,7 @@ router.put('/default/:fieldName', async (req, res) => {
       is_enabled: is_enabled !== undefined ? is_enabled : true,
       is_required: is_required !== undefined ? is_required : fieldDefault.required,
       is_deleted: is_deleted !== undefined ? is_deleted : false,
+      sort_order: sortOrder,
       overall_visibility: overall_visibility || 'visible',
       visibility_logic: visibility_logic || 'master_override',
       show_in_create_form: show_in_create_form !== undefined ? show_in_create_form : true,
@@ -1476,6 +1491,7 @@ router.put('/default/:fieldName', async (req, res) => {
             is_required = $3,
             field_label = $4,
             field_type = $5,
+            sort_order = $14,
             overall_visibility = $8,
             visibility_logic = $9,
             show_in_create_form = $10,
@@ -1484,7 +1500,7 @@ router.put('/default/:fieldName', async (req, res) => {
             show_in_list_view = $13,
             updated_at = NOW()
         WHERE organization_id = $6 AND field_name = $7 AND entity_type IS NULL
-        RETURNING field_name, field_options, is_enabled, is_required, overall_visibility, visibility_logic,
+        RETURNING field_name, field_options, is_enabled, is_required, sort_order, overall_visibility, visibility_logic,
                   show_in_create_form, show_in_edit_form, show_in_detail_view, show_in_list_view
       `, [
         JSON.stringify(fieldConfig.options),
@@ -1499,7 +1515,8 @@ router.put('/default/:fieldName', async (req, res) => {
         fieldConfig.show_in_create_form,
         fieldConfig.show_in_edit_form,
         fieldConfig.show_in_detail_view,
-        fieldConfig.show_in_list_view
+        fieldConfig.show_in_list_view,
+        fieldConfig.sort_order
       ]);
     } else {
       // Fall back to default_field_configurations for entity-specific fields
@@ -1543,7 +1560,7 @@ router.put('/default/:fieldName', async (req, res) => {
         JSON.stringify(fieldConfig.options),
         fieldConfig.is_enabled,
         fieldConfig.is_required,
-        0, // default sort order
+        fieldConfig.sort_order, // use the sort_order from fieldConfig
         fieldConfig.overall_visibility,
         fieldConfig.visibility_logic,
         fieldConfig.show_in_create_form,
@@ -1827,8 +1844,8 @@ router.get('/form-config', async (req, res) => {
 
     // Define system field defaults
     const systemFieldDefaults = {
-      firstName: { label: 'First Name', type: 'text', required: true, editable: false },
-      lastName: { label: 'Last Name', type: 'text', required: true, editable: false },
+      first_name: { label: 'First Name', type: 'text', required: true, editable: false },
+      last_name: { label: 'Last Name', type: 'text', required: true, editable: false },
       email: { label: 'Email', type: 'email', required: false, editable: true },
       phone: { label: 'Phone', type: 'tel', required: false, editable: true },
       company: { label: 'Company', type: 'text', required: false, editable: true },
@@ -1874,9 +1891,12 @@ router.get('/form-config', async (req, res) => {
           { value: 'high', label: 'High' }
         ]
       },
-      potentialValue: { label: 'Potential Value ($)', type: 'number', required: false, editable: true },
-      assignedTo: { label: 'Assign To', type: 'user_select', required: false, editable: true },
-      nextFollowUp: { label: 'Next Follow Up', type: 'date', required: false, editable: true },
+      potential_value: { label: 'Potential Value ($)', type: 'number', required: false, editable: true },
+      assigned_to: { label: 'Assign To', type: 'user_select', required: false, editable: true },
+      next_follow_up: { label: 'Next Follow Up', type: 'date', required: false, editable: true },
+      last_contact_date: { label: 'Last Contact Date', type: 'date', required: false, editable: true },
+      created_at: { label: 'Created At', type: 'date', required: false, editable: false },
+      converted_date: { label: 'Converted Date', type: 'date', required: false, editable: false },
       notes: { label: 'Notes', type: 'textarea', required: false, editable: true }
     };
 

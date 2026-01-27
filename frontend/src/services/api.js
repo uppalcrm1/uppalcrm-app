@@ -1145,6 +1145,38 @@ export const reportingAPI = {
   getAccountsByProduct: async () => {
     const response = await api.get('/reporting/dashboard/accounts-by-product')
     return response.data
+  },
+
+  // Get transactions grouped by source for a given month
+  getTransactionsBySource: async (year, month) => {
+    const response = await api.get('/reporting/standard-reports/transactions-by-source', {
+      params: { year, month }
+    })
+    return response.data
+  },
+
+  // Get transactions revenue grouped by source for a given month
+  getTransactionRevenueBySource: async (year, month) => {
+    const response = await api.get('/reporting/standard-reports/transactions-revenue-by-source', {
+      params: { year, month }
+    })
+    return response.data
+  },
+
+  // Get transaction count grouped by lead owner for a given month
+  getTransactionCountByOwner: async (year, month) => {
+    const response = await api.get('/reporting/standard-reports/transactions-count-by-owner', {
+      params: { year, month }
+    })
+    return response.data
+  },
+
+  // Get transaction revenue grouped by lead owner for a given month
+  getTransactionRevenueByOwner: async (year, month) => {
+    const response = await api.get('/reporting/standard-reports/transactions-revenue-by-owner', {
+      params: { year, month }
+    })
+    return response.data
   }
 }
 

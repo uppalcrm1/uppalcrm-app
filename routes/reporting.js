@@ -33,4 +33,20 @@ router.get('/dashboard/new-customers', reportingController.getNewCustomersTrend)
 // GET /api/reporting/dashboard/accounts-by-product - Get accounts by product
 router.get('/dashboard/accounts-by-product', reportingController.getAccountsByProduct);
 
+/**
+ * Standard Reports Endpoints
+ */
+
+// GET /api/reporting/standard-reports/transactions-by-source - Get transactions grouped by source
+router.get('/standard-reports/transactions-by-source', reportingController.getTransactionsBySource);
+
+// GET /api/reporting/standard-reports/transactions-revenue-by-source - Get transactions revenue grouped by source
+router.get('/standard-reports/transactions-revenue-by-source', reportingController.getTransactionRevenueBySource);
+
+// GET /api/reporting/standard-reports/transactions-count-by-owner - Get transaction count grouped by lead owner
+router.get('/standard-reports/transactions-count-by-owner', reportingController.getTransactionCountByOwner);
+
+// GET /api/reporting/standard-reports/transactions-revenue-by-owner - Get transaction revenue grouped by lead owner
+router.get('/standard-reports/transactions-revenue-by-owner', reportingController.getTransactionRevenueByOwner);
+
 module.exports = router;
