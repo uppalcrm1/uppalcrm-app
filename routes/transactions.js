@@ -373,12 +373,40 @@ router.get('/', async (req, res) => {
     query += ` LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
     params.push(limit, offset);
 
+    // Get total count (without LIMIT/OFFSET)
+    let countQuery = `
+      SELECT COUNT(*) as total_count
+      FROM transactions t
+      LEFT JOIN accounts a ON t.account_id = a.id
+      LEFT JOIN contacts c ON t.contact_id = c.id
+      LEFT JOIN products p ON t.product_id = p.id
+      WHERE t.organization_id = $1
+    `;
+
+    const countParams = [organization_id];
+
+    if (status) {
+      countQuery += ` AND t.status = $${countParams.length + 1}`;
+      countParams.push(status);
+    }
+
+    if (contact_id) {
+      countQuery += ` AND t.contact_id = $${countParams.length + 1}`;
+      countParams.push(contact_id);
+    }
+
     const result = await db.query(query, params);
+    const countResult = await db.query(countQuery, countParams);
+    const totalCount = parseInt(countResult.rows[0].total_count, 10);
 
     res.json({
       success: true,
       transactions: result.rows,
-      count: result.rows.length
+      count: result.rows.length,
+      total: totalCount,
+      limit: parseInt(limit, 10),
+      offset: parseInt(offset, 10),
+      totalPages: Math.ceil(totalCount / parseInt(limit, 10))
     });
   } catch (error) {
     console.error('Error fetching transactions:', error);
