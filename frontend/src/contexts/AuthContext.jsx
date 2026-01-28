@@ -7,6 +7,7 @@ const AuthContext = createContext()
 const initialState = {
   user: null,
   organization: null,
+  timezone: 'America/New_York',
   isLoading: true,
   isAuthenticated: false,
 }
@@ -20,6 +21,7 @@ const authReducer = (state, action) => {
         ...state,
         user: action.payload.user,
         organization: action.payload.organization,
+        timezone: action.payload.user?.timezone || 'America/New_York',
         isLoading: false,
         isAuthenticated: true,
       }
@@ -28,6 +30,7 @@ const authReducer = (state, action) => {
         ...state,
         user: null,
         organization: null,
+        timezone: 'America/New_York',
         isLoading: false,
         isAuthenticated: false,
       }
@@ -40,6 +43,12 @@ const authReducer = (state, action) => {
       return {
         ...state,
         user: { ...state.user, ...action.payload },
+        timezone: action.payload.timezone || state.timezone,
+      }
+    case 'SET_TIMEZONE':
+      return {
+        ...state,
+        timezone: action.payload,
       }
     default:
       return state
@@ -53,7 +62,8 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const initAuth = async () => {
       const token = localStorage.getItem('authToken')
-      
+      const storedTimezone = localStorage.getItem('userTimezone')
+
       if (!token) {
         dispatch({ type: 'AUTH_ERROR' })
         return
@@ -62,12 +72,16 @@ export const AuthProvider = ({ children }) => {
       try {
         setAuthToken(token)
         const data = await authAPI.me()
-        
+
         // Set organization slug from the response if not already set
         if (data.organization?.slug) {
           setOrganizationSlug(data.organization.slug)
         }
-        
+
+        // Store timezone from user data
+        const userTimezone = data.user?.timezone || storedTimezone || 'America/New_York'
+        localStorage.setItem('userTimezone', userTimezone)
+
         dispatch({
           type: 'AUTH_SUCCESS',
           payload: {
@@ -87,13 +101,17 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     dispatch({ type: 'AUTH_START' })
-    
+
     try {
       const data = await authAPI.login(email, password)
-      
+
       setAuthToken(data.token)
       setOrganizationSlug(data.organization.slug)
-      
+
+      // Store timezone from login response
+      const userTimezone = data.user?.timezone || 'America/New_York'
+      localStorage.setItem('userTimezone', userTimezone)
+
       dispatch({
         type: 'AUTH_SUCCESS',
         payload: {
@@ -101,7 +119,7 @@ export const AuthProvider = ({ children }) => {
           organization: data.organization,
         },
       })
-      
+
       toast.success(`Welcome back, ${data.user.first_name}!`)
       return { success: true, data }
     } catch (error) {
@@ -114,13 +132,17 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (organizationData, adminData) => {
     dispatch({ type: 'AUTH_START' })
-    
+
     try {
       const data = await authAPI.register(organizationData, adminData)
-      
+
       setAuthToken(data.token)
       setOrganizationSlug(data.organization.slug)
-      
+
+      // Store timezone from register response
+      const userTimezone = data.user?.timezone || 'America/New_York'
+      localStorage.setItem('userTimezone', userTimezone)
+
       dispatch({
         type: 'AUTH_SUCCESS',
         payload: {
@@ -128,7 +150,7 @@ export const AuthProvider = ({ children }) => {
           organization: data.organization,
         },
       })
-      
+
       toast.success('Organization created successfully!')
       return { success: true, data }
     } catch (error) {
@@ -146,6 +168,7 @@ export const AuthProvider = ({ children }) => {
       console.error('Logout error:', error)
     } finally {
       clearAuth()
+      localStorage.removeItem('userTimezone')
       dispatch({ type: 'LOGOUT' })
       toast.success('Logged out successfully')
     }
@@ -155,12 +178,18 @@ export const AuthProvider = ({ children }) => {
     dispatch({ type: 'UPDATE_USER', payload: userData })
   }
 
+  const setTimezone = (timezone) => {
+    localStorage.setItem('userTimezone', timezone)
+    dispatch({ type: 'SET_TIMEZONE', payload: timezone })
+  }
+
   const value = {
     ...state,
     login,
     register,
     logout,
     updateUser,
+    setTimezone,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

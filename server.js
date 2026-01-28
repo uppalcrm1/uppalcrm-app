@@ -64,6 +64,7 @@ const twilioRoutes = require('./routes/twilio');
 const reportingRoutes = require('./routes/reporting');
 const reportsRoutes = require('./routes/reports');
 const dashboardsRoutes = require('./routes/dashboards');
+const timezoneRoutes = require('./routes/timezone');
 
 // Field Mapping System Routes
 const fieldMappingsRoutes = require('./routes/fieldMappings');
@@ -216,6 +217,7 @@ app.use('/api/auth', rateLimiters.general, authRoutes);
 app.use('/api/users', rateLimiters.general, userRoutes);
 app.use('/api/user-management', rateLimiters.general, require('./routes/user-management'));
 app.use('/api/organizations', rateLimiters.general, organizationRoutes);
+app.use('/api/timezones', rateLimiters.general, timezoneRoutes);
 
 // Debug: Log routes registered in leadRoutes
 console.log('🔍 Registering leadRoutes...');

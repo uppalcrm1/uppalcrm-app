@@ -19,6 +19,7 @@ class User {
     this.is_active = data.is_active !== false;
     this.is_first_login = data.is_first_login || false;
     this.failed_login_attempts = data.failed_login_attempts || 0;
+    this.timezone = data.timezone || 'America/New_York';
     this.created_at = data.created_at;
     this.updated_at = data.updated_at;
     this.deleted_at = data.deleted_at;
@@ -33,7 +34,7 @@ class User {
    * @returns {User} Created user instance
    */
   static async create(userData, organizationId, createdBy = null) {
-    const { email, password, first_name, last_name, role = 'user', is_first_login = false } = userData;
+    const { email, password, first_name, last_name, role = 'user', is_first_login = false, timezone = 'America/New_York' } = userData;
 
     // Validate required fields
     if (!email || !password || !first_name || !last_name || !organizationId) {
@@ -90,9 +91,9 @@ class User {
       const result = await query(`
         INSERT INTO users (
           organization_id, email, password_hash, first_name, last_name,
-          role, created_by, email_verified, is_first_login
+          role, created_by, email_verified, is_first_login, timezone
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING *
       `, [
         organizationId,
@@ -103,7 +104,8 @@ class User {
         role,
         createdBy,
         false, // email_verified
-        is_first_login
+        is_first_login,
+        timezone
       ], organizationId);
 
       return new User(result.rows[0]);
@@ -279,7 +281,8 @@ class User {
       userId: this.id,
       organizationId: this.organization_id,
       email: this.email,
-      role: this.role
+      role: this.role,
+      timezone: this.timezone
     };
 
     const token = jwt.sign(payload, process.env.JWT_SECRET, {
@@ -346,7 +349,7 @@ class User {
         SELECT
           u.id, u.organization_id, u.email, u.first_name, u.last_name,
           u.role, u.permissions, u.last_login, u.email_verified,
-          u.is_active, u.created_at, u.updated_at, u.created_by
+          u.is_active, u.timezone, u.created_at, u.updated_at, u.created_by
         FROM user_sessions s
         JOIN users u ON u.id = s.user_id
         WHERE s.token_hash = $1 AND s.expires_at > NOW() AND u.is_active = true
@@ -561,6 +564,7 @@ class User {
       last_login: this.last_login,
       email_verified: this.email_verified,
       is_active: this.is_active,
+      timezone: this.timezone,
       created_at: this.created_at,
       updated_at: this.updated_at
     };
@@ -577,8 +581,8 @@ class User {
    */
   static async update(id, updates, organizationId) {
     const allowedFields = [
-      'name', 'email', 'role', 'status', 'first_name', 'last_name', 
-      'is_first_login', 'failed_login_attempts', 'password', 'deleted_at'
+      'name', 'email', 'role', 'status', 'first_name', 'last_name',
+      'is_first_login', 'failed_login_attempts', 'password', 'deleted_at', 'timezone'
     ];
     
     const updateFields = Object.keys(updates).filter(key => allowedFields.includes(key));
