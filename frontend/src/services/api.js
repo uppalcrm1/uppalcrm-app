@@ -21,6 +21,7 @@ const api = axios.create({
 // Auth token management
 let authToken = localStorage.getItem('authToken')
 let organizationSlug = localStorage.getItem('organizationSlug')
+let userTimezone = localStorage.getItem('userTimezone') || 'America/New_York'
 
 export const setAuthToken = (token) => {
   authToken = token
@@ -34,18 +35,31 @@ export const setOrganizationSlug = (slug) => {
   api.defaults.headers.common['X-Organization-Slug'] = slug
 }
 
+export const setUserTimezone = (timezone) => {
+  userTimezone = timezone
+  localStorage.setItem('userTimezone', timezone)
+  api.defaults.headers.common['X-User-Timezone'] = timezone
+}
+
 export const clearAuth = () => {
   authToken = null
   organizationSlug = null
+  userTimezone = 'America/New_York'
   localStorage.removeItem('authToken')
   localStorage.removeItem('organizationSlug')
+  localStorage.removeItem('userTimezone')
   delete api.defaults.headers.common['Authorization']
   delete api.defaults.headers.common['X-Organization-Slug']
+  delete api.defaults.headers.common['X-User-Timezone']
 }
 
 // Set initial headers if tokens exist
 if (authToken) {
   api.defaults.headers.common['Authorization'] = `Bearer ${authToken}`
+  // Only set timezone header if we have an auth token (user is logged in)
+  if (userTimezone) {
+    api.defaults.headers.common['X-User-Timezone'] = userTimezone
+  }
 }
 if (organizationSlug) {
   api.defaults.headers.common['X-Organization-Slug'] = organizationSlug
@@ -153,6 +167,26 @@ export const authAPI = {
   
   refresh: async () => {
     const response = await api.post('/auth/refresh')
+    return response.data
+  }
+}
+
+// Timezone API
+export const timezoneAPI = {
+  getTimezones: async () => {
+    const response = await api.get('/timezones')
+    return response.data
+  },
+
+  getUserTimezone: async () => {
+    const response = await api.get('/timezones/user')
+    return response.data
+  },
+
+  setUserTimezone: async (timezone) => {
+    const response = await api.put('/timezones/user', { timezone })
+    // Update local timezone header
+    setUserTimezone(timezone)
     return response.data
   }
 }

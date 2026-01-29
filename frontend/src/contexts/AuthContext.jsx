@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react'
-import { authAPI, setAuthToken, setOrganizationSlug, clearAuth } from '../services/api'
+import { authAPI, setAuthToken, setOrganizationSlug, setUserTimezone, clearAuth } from '../services/api'
 import toast from 'react-hot-toast'
 
 const AuthContext = createContext()
@@ -62,12 +62,17 @@ export const AuthProvider = ({ children }) => {
       try {
         setAuthToken(token)
         const data = await authAPI.me()
-        
+
         // Set organization slug from the response if not already set
         if (data.organization?.slug) {
           setOrganizationSlug(data.organization.slug)
         }
-        
+
+        // Set user timezone if available
+        if (data.user?.timezone) {
+          setUserTimezone(data.user.timezone)
+        }
+
         dispatch({
           type: 'AUTH_SUCCESS',
           payload: {
@@ -90,10 +95,15 @@ export const AuthProvider = ({ children }) => {
     
     try {
       const data = await authAPI.login(email, password)
-      
+
       setAuthToken(data.token)
       setOrganizationSlug(data.organization.slug)
-      
+
+      // Set user timezone if available
+      if (data.user?.timezone) {
+        setUserTimezone(data.user.timezone)
+      }
+
       dispatch({
         type: 'AUTH_SUCCESS',
         payload: {
@@ -101,7 +111,7 @@ export const AuthProvider = ({ children }) => {
           organization: data.organization,
         },
       })
-      
+
       toast.success(`Welcome back, ${data.user.first_name}!`)
       return { success: true, data }
     } catch (error) {
@@ -117,10 +127,15 @@ export const AuthProvider = ({ children }) => {
     
     try {
       const data = await authAPI.register(organizationData, adminData)
-      
+
       setAuthToken(data.token)
       setOrganizationSlug(data.organization.slug)
-      
+
+      // Set user timezone if available
+      if (data.user?.timezone) {
+        setUserTimezone(data.user.timezone)
+      }
+
       dispatch({
         type: 'AUTH_SUCCESS',
         payload: {
@@ -128,7 +143,7 @@ export const AuthProvider = ({ children }) => {
           organization: data.organization,
         },
       })
-      
+
       toast.success('Organization created successfully!')
       return { success: true, data }
     } catch (error) {
