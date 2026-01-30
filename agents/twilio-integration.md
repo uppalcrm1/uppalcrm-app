@@ -56,6 +56,130 @@ Build a complete Twilio integration that enables organizations to:
 
 ---
 
+## ✅ VOICE CALLING - WORKING ARCHITECTURE (Jan 30, 2026)
+
+### Status
+**FULLY FUNCTIONAL** - Outbound and incoming calls working with two-way audio
+
+### Architecture Overview
+The system uses a **hybrid approach**:
+- **Agent side**: Twilio Voice SDK (browser-based, WebRTC)
+- **Customer side**: Twilio REST API (phone number dialing)
+- **Connection**: Twilio Conferences (both join same conference)
+
+### OUTBOUND CALLS (Agent Initiates)
+```
+1. Agent clicks "Call" in Dialpad
+   ↓
+2. Frontend generates unique conferenceId
+   ↓
+3. Agent joins conference FIRST via Voice SDK:
+   device.connect({
+     params: { conference: conferenceId, participant: 'agent' }
+   })
+   ↓
+4. Voice webhook receives params from req.body (Voice SDK)
+   → Returns: <Conference startConferenceOnEnter="true">
+   ↓
+5. REST API called to dial customer with URL params:
+   /api/twilio/webhook/voice?conference={id}&participant=customer
+   ↓
+6. Customer answers
+   ↓
+7. Voice webhook receives params from req.query (REST API)
+   → Returns: <Conference startConferenceOnEnter="false">
+   ↓
+8. BOTH CONNECTED - Two-way audio works ✅
+```
+
+### INCOMING CALLS (Customer Calls CRM)
+```
+1. Customer calls Twilio number: +1 236 761 7676
+   ↓
+2. Voice webhook creates conference:
+   conferenceId = "incoming-{CallSid}"
+   ↓
+3. Customer placed in conference with hold music
+   ↓
+4. CRM shows popup to all agents
+   ↓
+5. Agent clicks "Accept"
+   ↓
+6. Backend returns conferenceId
+   ↓
+7. Dialpad auto-joins same conference via Voice SDK:
+   device.connect({
+     params: { conference: "incoming-{CallSid}", participant: 'agent' }
+   })
+   ↓
+8. BOTH CONNECTED - Two-way audio works ✅
+```
+
+### Key Code Locations
+- **Frontend Outbound**: `frontend/src/components/Dialpad.jsx` line 45-117
+- **Frontend Incoming**: `frontend/src/context/CallContext.jsx` line 113, `frontend/src/components/Dialpad.jsx` line 305
+- **Backend Voice Webhook**: `routes/twilio.js` line 722-808
+- **Backend Accept**: `routes/twilio.js` line 915-937
+- **Service Call**: `services/twilioService.js` line 89-151
+
+### Critical Implementation Details
+
+**✅ CRITICAL**: Agent must pre-join conference BEFORE calling REST API
+- This is the fundamental difference from incorrect implementations
+- Agent joins first → conference created
+- Then REST API dials customer → customer joins same conference
+
+**✅ CRITICAL**: Read conference params from BOTH sources
+```javascript
+const conference = req.query.conference || req.body.conference;
+const participant = req.query.participant || req.body.participant;
+```
+- Voice SDK sends params in `req.body`
+- REST API sends params in `req.query`
+- Must check both!
+
+**✅ Conference Settings**:
+- Agent: `startConferenceOnEnter="true"` (starts conference)
+- Customer: `startConferenceOnEnter="false"` (joins existing)
+- Both: `endConferenceOnExit="true"` (ends when they leave)
+- Both: `record="record-from-start"` (automatic recording)
+
+### Common Issues & Solutions
+
+**Issue**: Agent hears waiting music instead of voice
+- **Root Cause**: Conference params not read from req.body
+- **Fix**: Ensure webhook checks both req.query AND req.body
+
+**Issue**: No audio between agent and customer
+- **Root Cause**: Agent didn't pre-join conference before REST API call
+- **Fix**: Ensure agent joins first, THEN call REST API with conferenceId
+
+**Issue**: Recording callback fails with "updated_at doesn't exist"
+- **Root Cause**: Trying to update non-existent column
+- **Fix**: Remove updated_at from UPDATE query, use existing columns only
+
+### Environment Variables Required
+```
+TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TWILIO_AUTH_TOKEN=your_auth_token
+TWILIO_API_KEY=SKxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TWILIO_API_SECRET=your_api_secret
+TWILIO_TWIML_APP_SID=APxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+API_BASE_URL=https://uppalcrm-api.onrender.com
+```
+
+### Testing Checklist
+- [ ] Outbound: Agent dials customer → both have audio ✅
+- [ ] Incoming: Customer calls CRM → both have audio ✅
+- [ ] Multi-agent: Second agent's popup clears when first accepts
+- [ ] Recording: Calls are recorded and saved to database
+- [ ] Hangup: Call ends properly when either party disconnects
+
+### Reference Documentation
+See: `TWILIO_WORKING_ARCHITECTURE.md` for complete details, diagrams, and troubleshooting
+
+---
+
 
 
 \## Phase 1: Database Schema
