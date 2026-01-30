@@ -65,7 +65,7 @@ const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
     }
 
     setIsDialing(true)
-    setCallStatus('Connecting...')
+    setCallStatus('Calling customer...')
 
     try {
       // Format phone number in E.164 format
@@ -73,63 +73,50 @@ const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
         ? `+${cleanNumber}`
         : `+1${cleanNumber}`
 
-      // Generate unique conference ID for this call
-      const conferenceId = `conf-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      console.log(`📞 Initiating outbound call to ${formattedNumber}`)
 
-      console.log(`📞 Initiating call to ${formattedNumber} via conference ${conferenceId}`)
-
-      // Step 1: Agent joins conference first via Voice SDK (browser only, no phone callback)
-      setCallStatus('Joining conference...')
-
-      const call = await deviceRef.current.connect({
-        params: {
-          conference: conferenceId,
-          participant: 'agent'
-        }
-      })
-
-      activeCallRef.current = call
-
-      // Add comprehensive event listeners BEFORE making the customer call
-      call.on('disconnect', () => {
-        console.log('❌ AGENT DISCONNECTED from conference')
-        handleEndCall()
-      })
-
-      call.on('error', (error) => {
-        console.error('❌ AGENT CALL ERROR:', error)
-        toast.error(`Call error: ${error.message}`)
-        setIsCallActive(false)
-        setCallStatus('')
-      })
-
-      call.on('accept', () => {
-        console.log('✅ Agent call accepted')
-      })
-
-      call.on('mute', (isMuted) => {
-        console.log('📞 Agent mute status:', isMuted)
-      })
-
-      // Step 2: Now call the customer and put them in the same conference
-      setCallStatus('Calling customer...')
-      console.log(`📞 Making call to customer: ${formattedNumber}`)
-
+      // Just make the outbound call directly
+      // TwiML will use <Client> to have the customer dial back the agent's Voice SDK
       const result = await twilioAPI.makeCall({
-        to: formattedNumber,
-        conferenceId: conferenceId
+        to: formattedNumber
       })
 
-      console.log('✅ Customer call initiated, waiting for answer...')
-      setIsCallActive(true)
-      setCallStatus('Connected')
+      console.log('✅ Customer call initiated')
 
-      // Start call timer
-      timerRef.current = setInterval(() => {
-        setCallDuration(prev => prev + 1)
-      }, 1000)
+      // Wait for incoming client call from Twilio
+      // The customer's TwiML will use <Dial><Client>agentClient</Client></Dial>
+      // which will send an incoming call to this device
+      setCallStatus('Waiting for customer to answer...')
 
-      toast.success('Connected to customer')
+      // Listen for incoming calls from Twilio
+      deviceRef.current.on('incoming', (call) => {
+        console.log('📞 Incoming call from customer:', call)
+
+        // Auto-accept the incoming call from customer
+        call.accept()
+        activeCallRef.current = call
+
+        setIsCallActive(true)
+        setCallStatus('Connected')
+
+        // Start call timer
+        timerRef.current = setInterval(() => {
+          setCallDuration(prev => prev + 1)
+        }, 1000)
+
+        toast.success('Connected to customer')
+
+        call.on('disconnect', () => {
+          console.log('✅ Call ended')
+          handleEndCall()
+        })
+
+        call.on('error', (error) => {
+          console.error('❌ Call error:', error)
+          toast.error(`Call error: ${error.message}`)
+          handleEndCall()
+        })
+      })
     } catch (error) {
       console.error('Error making call:', error)
 

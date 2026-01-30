@@ -727,24 +727,17 @@ router.post('/webhook/voice', async (req, res) => {
     console.log('Voice webhook call:', { From, To, CallSid, Direction, conferenceId });
 
     // For OUTBOUND calls (when customer answers a call from our team)
+    // Have the customer dial the agent's Voice SDK client
     if (Direction === 'outbound' || Direction === 'outbound-api') {
-      if (conferenceId) {
-        // Put customer in the agent's conference
-        console.log(`✅ Putting customer in conference: ${conferenceId}`);
-        const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+      console.log('✅ Customer answered outbound call - connecting to agent via Client');
+      const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Dial>
-    <Conference endConferenceOnExit="false">${conferenceId}</Conference>
+  <Dial record="record-from-answer">
+    <Client>agentClient</Client>
   </Dial>
 </Response>`;
-        res.type('text/xml');
-        res.send(twiml);
-      } else {
-        // No conference specified, just establish connection
-        console.log('✅ Outbound call - connection established');
-        res.type('text/xml');
-        res.send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
-      }
+      res.type('text/xml');
+      res.send(twiml);
       return;
     }
 

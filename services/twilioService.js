@@ -105,23 +105,18 @@ class TwilioService {
         throw new Error('Organization does not have a Twilio phone number configured');
       }
 
-      // Build call options
+      // Build call options - simple outbound call
+      // TwiML will use <Client> to connect customer to agent's Voice SDK
       const callOptions = {
         to,
         from: phoneNumber,
+        url: `${API_BASE_URL}/api/twilio/webhook/voice`,
         record: true,
         statusCallback: `${API_BASE_URL}/api/twilio/webhook/call-status`,
         statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed']
       };
 
-      // Add conference parameter if provided (for putting customer in agent's conference)
-      if (conferenceId) {
-        callOptions.url = `${API_BASE_URL}/api/twilio/webhook/voice?conferenceId=${encodeURIComponent(conferenceId)}`;
-      } else {
-        callOptions.url = `${API_BASE_URL}/api/twilio/webhook/voice`;
-      }
-
-      console.log('📞 Call options:', { to: callOptions.to, from: callOptions.from, url: callOptions.url });
+      console.log('📞 Call options:', { to: callOptions.to, from: callOptions.from });
 
       const call = await client.calls.create(callOptions);
 
