@@ -35,6 +35,19 @@ router.post('/token', authenticateToken, async (req, res) => {
     const organizationId = req.organizationId;
     const userId = req.userId;
 
+    // Verify required environment variables
+    const apiKey = process.env.TWILIO_API_KEY;
+    const apiSecret = process.env.TWILIO_API_SECRET;
+    const twimlAppSid = process.env.TWILIO_TWIML_APP_SID;
+
+    if (!apiKey || !apiSecret) {
+      console.error('Missing Twilio API credentials in environment variables');
+      return res.status(500).json({
+        error: 'Twilio API credentials not configured',
+        message: 'TWILIO_API_KEY and TWILIO_API_SECRET must be set in environment'
+      });
+    }
+
     // Get Twilio configuration
     const configQuery = `
       SELECT account_sid, auth_token, phone_number
@@ -58,12 +71,14 @@ router.post('/token', authenticateToken, async (req, res) => {
     // Create access token
     const token = new AccessToken(
       config.account_sid,
-      process.env.TWILIO_API_KEY || '',
-      process.env.TWILIO_API_SECRET || ''
+      apiKey,
+      apiSecret
     );
 
     token.identity = identity;
-    token.addGrant(new VoiceGrant({ outgoingApplicationSid: process.env.TWILIO_TWIML_APP_SID || '' }));
+    token.addGrant(new VoiceGrant({
+      outgoingApplicationSid: twimlAppSid || undefined
+    }));
 
     res.json({
       token: token.toJwt(),
@@ -72,7 +87,10 @@ router.post('/token', authenticateToken, async (req, res) => {
     });
   } catch (error) {
     console.error('Error generating Twilio token:', error);
-    res.status(500).json({ error: 'Failed to generate access token' });
+    res.status(500).json({
+      error: 'Failed to generate access token',
+      message: error.message
+    });
   }
 });
 
