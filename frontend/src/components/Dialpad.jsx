@@ -65,7 +65,7 @@ const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
     }
 
     setIsDialing(true)
-    setCallStatus('Dialing customer...')
+    setCallStatus('Connecting to conference...')
 
     try {
       // Format phone number in E.164 format
@@ -75,14 +75,52 @@ const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
 
       console.log(`📞 Initiating outbound call to ${formattedNumber}`)
 
-      // Call customer - they will be put in queue and agent will need to accept
+      // STEP 1: Generate unique conference ID
+      const conferenceId = `conf-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      console.log('Generated conference ID:', conferenceId)
+
+      // STEP 2: Agent joins conference FIRST via Voice SDK
+      console.log('Agent joining conference via Voice SDK...')
+      const call = await deviceRef.current.connect({
+        params: {
+          conference: conferenceId,
+          participant: 'agent'
+        }
+      })
+
+      activeCallRef.current = call
+      setIsCallActive(true)
+      setCallStatus('Connected to conference')
+
+      // Start call timer
+      timerRef.current = setInterval(() => {
+        setCallDuration(prev => prev + 1)
+      }, 1000)
+
+      console.log('✅ Agent joined conference')
+      toast.success('Waiting for customer...')
+
+      // STEP 3: NOW call customer with the conference ID
+      console.log('Dialing customer with conference ID:', conferenceId)
       const result = await twilioAPI.makeCall({
-        to: formattedNumber
+        to: formattedNumber,
+        conferenceId // Pass conference ID to REST API
       })
 
       console.log('✅ Customer call initiated')
       setCallStatus('Ringing customer...')
-      toast.success('Calling customer...')
+
+      // Set up event listeners
+      call.on('disconnect', () => {
+        console.log('✅ Call ended')
+        handleEndCall()
+      })
+
+      call.on('error', (error) => {
+        console.error('❌ Call error:', error)
+        toast.error(`Call error: ${error.message}`)
+        handleEndCall()
+      })
 
     } catch (error) {
       console.error('Error making call:', error)
@@ -98,6 +136,13 @@ const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
       }
 
       toast.error(errorMessage)
+
+      // Disconnect if we partially connected
+      if (activeCallRef.current) {
+        activeCallRef.current.disconnect()
+      }
+
+      setIsCallActive(false)
       setCallStatus('')
     } finally {
       setIsDialing(false)
