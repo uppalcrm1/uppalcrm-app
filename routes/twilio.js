@@ -726,12 +726,25 @@ router.post('/webhook/voice', async (req, res) => {
 
     console.log('Voice webhook call:', { From, To, CallSid, Direction, conferenceId });
 
-    // For OUTBOUND calls (when customer answers a call from our team),
-    // just establish the connection without additional TwiML
+    // For OUTBOUND calls (when customer answers a call from our team)
     if (Direction === 'outbound' || Direction === 'outbound-api') {
-      console.log('✅ Outbound call - connection established, no TwiML needed');
-      res.type('text/xml');
-      res.send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+      if (conferenceId) {
+        // Put customer in the agent's conference
+        console.log(`✅ Putting customer in conference: ${conferenceId}`);
+        const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Dial>
+    <Conference endConferenceOnExit="false">${conferenceId}</Conference>
+  </Dial>
+</Response>`;
+        res.type('text/xml');
+        res.send(twiml);
+      } else {
+        // No conference specified, just establish connection
+        console.log('✅ Outbound call - connection established');
+        res.type('text/xml');
+        res.send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+      }
       return;
     }
 
