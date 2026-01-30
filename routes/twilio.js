@@ -727,9 +727,9 @@ router.post('/webhook/voice', async (req, res) => {
     console.log('Voice webhook call:', { From, To, CallSid, Direction, conferenceId });
 
     // For OUTBOUND calls (when customer answers a call from our team),
-    // just establish the connection
-    if (Direction === 'outbound') {
-      console.log('Outbound call - connection established');
+    // just establish the connection without additional TwiML
+    if (Direction === 'outbound' || Direction === 'outbound-api') {
+      console.log('✅ Outbound call - connection established, no TwiML needed');
       res.type('text/xml');
       res.send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
       return;
