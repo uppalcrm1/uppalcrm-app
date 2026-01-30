@@ -5,6 +5,9 @@ const { authenticateToken } = require('../middleware/auth');
 const db = require('../database/connection');
 const Joi = require('joi');
 
+// Fallback to production URL if API_BASE_URL not set
+const API_BASE_URL = process.env.API_BASE_URL || 'https://uppalcrm-api.onrender.com';
+
 // Validation schemas
 const sendSMSSchema = Joi.object({
   to: Joi.string().required(),
