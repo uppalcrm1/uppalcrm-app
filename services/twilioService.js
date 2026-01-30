@@ -109,12 +109,13 @@ class TwilioService {
       const callOptions = {
         to,
         from: phoneNumber,
+        url: `${API_BASE_URL}/api/twilio/webhook/voice`,
         record: true,
         statusCallback: `${API_BASE_URL}/api/twilio/webhook/call-status`,
         statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed']
       };
 
-      console.log('📞 Call options:', { to: callOptions.to, from: callOptions.from });
+      console.log('📞 Call options:', { to: callOptions.to, from: callOptions.from, url: callOptions.url });
 
       const call = await client.calls.create(callOptions);
 
