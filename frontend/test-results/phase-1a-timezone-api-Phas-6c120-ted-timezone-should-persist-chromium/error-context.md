@@ -1,0 +1,331 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - banner [ref=e4]:
+        - generic [ref=e6]:
+          - generic [ref=e8]:
+            - img [ref=e9]
+            - generic [ref=e13]:
+              - heading "DevTest" [level=1] [ref=e14]
+              - paragraph [ref=e15]: CRM Dashboard
+          - generic [ref=e16]:
+            - generic [ref=e18]:
+              - img [ref=e19]
+              - textbox "Search..." [ref=e22]
+            - button [ref=e23] [cursor=pointer]:
+              - img
+            - button "Admin" [ref=e25] [cursor=pointer]:
+              - img
+              - generic: Admin
+              - img
+            - button "AU Admin User DevTest" [ref=e27] [cursor=pointer]:
+              - generic:
+                - generic: AU
+              - generic:
+                - paragraph: Admin User
+                - paragraph: DevTest
+              - img
+        - navigation [ref=e28]:
+          - generic [ref=e30]:
+            - link "Dashboard" [ref=e31] [cursor=pointer]:
+              - /url: /dashboard
+              - img
+              - text: Dashboard
+            - link "Leads" [ref=e32] [cursor=pointer]:
+              - /url: /leads
+              - img
+              - text: Leads
+            - link "Tasks" [ref=e33] [cursor=pointer]:
+              - /url: /tasks
+              - img
+              - text: Tasks
+            - link "Contacts" [ref=e34] [cursor=pointer]:
+              - /url: /contacts
+              - img
+              - text: Contacts
+            - link "Accounts" [ref=e35] [cursor=pointer]:
+              - /url: /accounts
+              - img
+              - text: Accounts
+            - link "Transactions" [ref=e36] [cursor=pointer]:
+              - /url: /transactions
+              - img
+              - text: Transactions
+            - link "Communications" [ref=e37] [cursor=pointer]:
+              - /url: /communications
+              - img
+              - text: Communications
+            - link "Reports" [ref=e38] [cursor=pointer]:
+              - /url: /reports
+              - img
+              - text: Reports
+            - link "My Dashboards" [ref=e39] [cursor=pointer]:
+              - /url: /custom-dashboards
+              - img
+              - text: My Dashboards
+            - link "Billing" [ref=e40] [cursor=pointer]:
+              - /url: /billing
+              - img
+              - text: Billing
+            - link "Team" [ref=e41] [cursor=pointer]:
+              - /url: /team
+              - img
+              - text: Team
+            - link "Settings" [ref=e42] [cursor=pointer]:
+              - /url: /settings
+              - img
+              - text: Settings
+      - main [ref=e43]:
+        - generic [ref=e44]:
+          - generic [ref=e45]:
+            - heading "Dashboard" [level=1] [ref=e46]
+            - paragraph [ref=e47]: Welcome back! Here's what's happening with your leads and contacts.
+          - generic [ref=e48]:
+            - generic [ref=e50]:
+              - img [ref=e52]
+              - generic [ref=e54]:
+                - paragraph [ref=e55]: Total Revenue
+                - paragraph [ref=e56]: $425.25
+            - generic [ref=e58]:
+              - img [ref=e60]
+              - generic [ref=e62]:
+                - paragraph [ref=e63]: Revenue This Month
+                - paragraph [ref=e64]: $356.50
+                - paragraph [ref=e65]: +418.5% from last month
+            - generic [ref=e67]:
+              - img [ref=e69]
+              - generic [ref=e72]:
+                - paragraph [ref=e73]: Avg Transaction
+                - paragraph [ref=e74]: $32.71
+            - generic [ref=e76]:
+              - img [ref=e78]
+              - generic [ref=e82]:
+                - paragraph [ref=e83]: Active Accounts
+                - paragraph [ref=e84]: "25"
+            - generic [ref=e86]:
+              - img [ref=e88]
+              - generic [ref=e93]:
+                - paragraph [ref=e94]: Total Customers
+                - paragraph [ref=e95]: "30"
+            - generic [ref=e97]:
+              - img [ref=e99]
+              - generic [ref=e102]:
+                - paragraph [ref=e103]: New Customers
+                - paragraph [ref=e104]: "13"
+                - paragraph [ref=e105]: This month
+            - generic [ref=e107]:
+              - img [ref=e109]
+              - generic [ref=e111]:
+                - paragraph [ref=e112]: Renewals Due
+                - paragraph [ref=e113]: "8"
+                - paragraph [ref=e114]: Next 30 days
+            - generic [ref=e116]:
+              - img [ref=e118]
+              - generic [ref=e120]:
+                - paragraph [ref=e121]: Total Leads
+                - paragraph [ref=e122]: "31"
+                - paragraph [ref=e123]: 74.19% conversion
+          - generic [ref=e124]:
+            - heading "Revenue Trend (Last 12 Months)" [level=3] [ref=e125]
+            - generic [ref=e127]:
+              - img [ref=e128]:
+                - generic [ref=e133]:
+                  - generic [ref=e135]: Nov 25
+                  - generic [ref=e137]: Dec 25
+                - generic [ref=e139]:
+                  - generic [ref=e141]: $0
+                  - generic [ref=e143]: $90
+                  - generic [ref=e145]: $180
+                  - generic [ref=e147]: $270
+                  - generic [ref=e149]: $360
+              - list [ref=e153]:
+                - listitem [ref=e154]:
+                  - img [ref=e155]
+                  - text: Revenue
+          - generic [ref=e157]:
+            - generic [ref=e158]:
+              - heading "Revenue by Product" [level=3] [ref=e159]
+              - generic [ref=e161]:
+                - img [ref=e162]:
+                  - generic [ref=e164]:
+                    - generic [ref=e166]: 86%
+                    - generic [ref=e168]: 10%
+                    - generic [ref=e170]: 4%
+                - list [ref=e172]:
+                  - listitem [ref=e173]:
+                    - img [ref=e174]
+                    - generic [ref=e176]: Standard
+                  - listitem [ref=e177]:
+                    - img [ref=e178]
+                    - generic [ref=e180]: Premium
+                  - listitem [ref=e181]:
+                    - img [ref=e182]
+                    - generic [ref=e184]: Standard (Default)
+            - generic [ref=e185]:
+              - heading "Payment Methods" [level=3] [ref=e186]
+              - generic [ref=e188]:
+                - img [ref=e189]:
+                  - generic [ref=e193]: 100%
+                - list [ref=e195]:
+                  - listitem [ref=e196]:
+                    - img [ref=e197]
+                    - generic [ref=e199]: Credit Card
+          - generic [ref=e200]:
+            - generic [ref=e201]:
+              - heading "Lead Status Distribution" [level=3] [ref=e202]
+              - img [ref=e206]
+              - generic [ref=e207]:
+                - generic [ref=e210]: "New: 7"
+                - generic [ref=e213]: "Contacted: 0"
+                - generic [ref=e216]: "Qualified: 1"
+                - generic [ref=e219]: "Converted: 23"
+                - generic [ref=e222]: "Lost: 0"
+            - generic [ref=e223]:
+              - heading "Weekly Activity" [level=3] [ref=e224]
+              - img [ref=e228]:
+                - generic [ref=e233]:
+                  - generic [ref=e235]: Mon
+                  - generic [ref=e237]: Tue
+                  - generic [ref=e239]: Wed
+                  - generic [ref=e241]: Thu
+                  - generic [ref=e243]: Fri
+                  - generic [ref=e245]: Sat
+                  - generic [ref=e247]: Sun
+                - generic [ref=e249]:
+                  - generic [ref=e251]: "0"
+                  - generic [ref=e253]: "6"
+                  - generic [ref=e255]: "12"
+                  - generic [ref=e257]: "18"
+                  - generic [ref=e259]: "24"
+          - generic [ref=e260]:
+            - generic [ref=e261]:
+              - generic [ref=e262]:
+                - heading "Recent Leads" [level=3] [ref=e263]
+                - link "View all" [ref=e264] [cursor=pointer]:
+                  - /url: /leads
+              - generic [ref=e265]:
+                - generic [ref=e266]:
+                  - generic [ref=e267]:
+                    - paragraph
+                    - paragraph [ref=e268]: No company
+                    - generic [ref=e270]: converted
+                  - generic [ref=e271]:
+                    - paragraph [ref=e272]: $0.00
+                    - paragraph [ref=e273]: 1/25/2026
+                - generic [ref=e274]:
+                  - generic [ref=e275]:
+                    - paragraph
+                    - paragraph [ref=e276]: abc corp
+                    - generic [ref=e278]: converted
+                  - generic [ref=e279]:
+                    - paragraph [ref=e280]: $0.00
+                    - paragraph [ref=e281]: 1/25/2026
+                - generic [ref=e282]:
+                  - generic [ref=e283]:
+                    - paragraph
+                    - paragraph [ref=e284]: abc corp
+                    - generic [ref=e286]: converted
+                  - generic [ref=e287]:
+                    - paragraph [ref=e288]: $350.00
+                    - paragraph [ref=e289]: 1/24/2026
+                - generic [ref=e290]:
+                  - generic [ref=e291]:
+                    - paragraph
+                    - paragraph [ref=e292]: TestCo1769207265370
+                    - generic [ref=e294]: converted
+                  - generic [ref=e295]:
+                    - paragraph [ref=e296]: $0.00
+                    - paragraph [ref=e297]: 1/23/2026
+                - generic [ref=e298]:
+                  - generic [ref=e299]:
+                    - paragraph
+                    - paragraph [ref=e300]: TestCo1769207069724
+                    - generic [ref=e302]: new
+                  - generic [ref=e303]:
+                    - paragraph [ref=e304]: $0.00
+                    - paragraph [ref=e305]: 1/23/2026
+            - generic [ref=e306]:
+              - generic [ref=e307]:
+                - heading "Recent Contacts" [level=3] [ref=e308]
+                - link "View all" [ref=e309] [cursor=pointer]:
+                  - /url: /contacts
+              - generic [ref=e310]:
+                - generic [ref=e311]:
+                  - generic [ref=e312]:
+                    - paragraph
+                    - paragraph [ref=e313]: TestCo1769207265370
+                    - generic [ref=e315]: Active
+                  - paragraph [ref=e317]: 1/25/2026
+                - generic [ref=e318]:
+                  - generic [ref=e319]:
+                    - paragraph
+                    - paragraph [ref=e320]: No company
+                    - generic [ref=e322]: Active
+                  - paragraph [ref=e324]: 1/25/2026
+                - generic [ref=e325]:
+                  - generic [ref=e326]:
+                    - paragraph
+                    - paragraph [ref=e327]: No company
+                    - generic [ref=e329]: Active
+                  - paragraph [ref=e331]: 1/25/2026
+                - generic [ref=e332]:
+                  - generic [ref=e333]:
+                    - paragraph
+                    - paragraph [ref=e334]: abc corp
+                    - generic [ref=e336]: Active
+                  - paragraph [ref=e338]: 1/25/2026
+                - generic [ref=e339]:
+                  - generic [ref=e340]:
+                    - paragraph
+                    - paragraph [ref=e341]: abc corp
+                    - generic [ref=e343]: Active
+                  - paragraph [ref=e345]: 1/25/2026
+            - generic [ref=e346]:
+              - heading "Quick Actions" [level=3] [ref=e347]
+              - generic [ref=e348]:
+                - link "Follow up on new leads 7 new leads waiting" [ref=e349] [cursor=pointer]:
+                  - /url: /leads?status=new
+                  - generic:
+                    - img
+                  - generic:
+                    - paragraph: Follow up on new leads
+                    - paragraph: 7 new leads waiting
+                  - img
+                - link "Add new lead Create a new lead entry" [ref=e350] [cursor=pointer]:
+                  - /url: /leads
+                  - generic:
+                    - img
+                  - generic:
+                    - paragraph: Add new lead
+                    - paragraph: Create a new lead entry
+                  - img
+                - link "Assign unassigned leads 18 unassigned" [ref=e351] [cursor=pointer]:
+                  - /url: /leads?assigned_to=null
+                  - generic:
+                    - img
+                  - generic:
+                    - paragraph: Assign unassigned leads
+                    - paragraph: 18 unassigned
+                  - img
+                - link "Manage contacts 30 total contacts" [ref=e352] [cursor=pointer]:
+                  - /url: /contacts
+                  - generic:
+                    - img
+                  - generic:
+                    - paragraph: Manage contacts
+                    - paragraph: 30 total contacts
+                  - img
+                - link "Manage team 1 active team members" [ref=e353] [cursor=pointer]:
+                  - /url: /team
+                  - generic:
+                    - img
+                  - generic:
+                    - paragraph: Manage team
+                    - paragraph: 1 active team members
+                  - img
+    - status [ref=e359]: Welcome back, Admin!
+  - generic [ref=e360]: "0"
+```

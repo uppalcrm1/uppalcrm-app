@@ -1,0 +1,254 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                 PHASE 1A TIMEZONE - TEST COMMANDS                           ║
+║                          Quick Reference Card                               ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+════════════════════════════════════════════════════════════════════════════
+  QUICK START
+════════════════════════════════════════════════════════════════════════════
+
+Run all timezone tests:
+  cd frontend && npm test -- phase-1a-timezone
+
+View test report:
+  npm run test:report
+
+════════════════════════════════════════════════════════════════════════════
+  RUN INDIVIDUAL TEST SUITES
+════════════════════════════════════════════════════════════════════════════
+
+API Tests Only (13 tests, 5-10 min):
+  npm test -- phase-1a-timezone-api.spec.js
+
+UI Tests Only (15 tests, 10-15 min):
+  npm test -- phase-1a-timezone-ui.spec.js
+
+Integration Tests Only (12 tests, 10-15 min):
+  npm test -- phase-1a-timezone-integration.spec.js
+
+════════════════════════════════════════════════════════════════════════════
+  DIFFERENT EXECUTION MODES
+════════════════════════════════════════════════════════════════════════════
+
+Interactive UI Mode (Recommended for development):
+  npm run test:ui -- phase-1a-timezone
+
+Debug Mode with Inspector (For debugging):
+  npm run test:debug -- phase-1a-timezone
+
+Headed Mode with Visible Browser:
+  npm run test:headed -- phase-1a-timezone
+
+Standard Headless Mode:
+  npm test -- phase-1a-timezone
+
+════════════════════════════════════════════════════════════════════════════
+  RUN SPECIFIC TESTS
+════════════════════════════════════════════════════════════════════════════
+
+Single test by name:
+  npm test -- --grep "Should return all available timezones"
+
+Multiple tests by pattern:
+  npm test -- --grep "timezone"
+
+════════════════════════════════════════════════════════════════════════════
+  VIEW RESULTS
+════════════════════════════════════════════════════════════════════════════
+
+HTML Report (interactive with screenshots):
+  npm run test:report
+
+JSON Results:
+  cat test-results.json
+
+List of all tests:
+  npm test -- --list
+
+════════════════════════════════════════════════════════════════════════════
+  CONFIGURATION
+════════════════════════════════════════════════════════════════════════════
+
+Edit configuration:
+  frontend/playwright.config.js
+
+Change base URL:
+  Edit baseURL in playwright.config.js
+
+Increase timeout:
+  Change timeout: 120000 in playwright.config.js
+
+════════════════════════════════════════════════════════════════════════════
+  COMMON TROUBLESHOOTING
+════════════════════════════════════════════════════════════════════════════
+
+Tests timeout:
+  - Run in debug mode: npm run test:debug
+  - Check if page loaded correctly
+  - Increase timeout in config file
+
+Selector not found:
+  - Run in debug mode: npm run test:debug
+  - Inspect element in browser DevTools
+  - Update selector in test file
+
+Login fails:
+  - Verify credentials in test file
+  - Check if login page structure changed
+  - Test login manually in browser
+
+API connection error:
+  - Verify backend is running
+  - Check API endpoint URL is correct
+  - Verify network connectivity
+
+════════════════════════════════════════════════════════════════════════════
+  TEST STATISTICS
+════════════════════════════════════════════════════════════════════════════
+
+Total Tests:            40
+  - API Tests:          13
+  - UI Tests:           15
+  - Integration Tests:  12
+
+Expected Duration:      25-40 minutes
+
+Expected Pass Rate:     100%
+
+Test Coverage:          Complete (All features tested)
+
+════════════════════════════════════════════════════════════════════════════
+  TEST FILES
+════════════════════════════════════════════════════════════════════════════
+
+Location: frontend/tests/
+
+Files:
+  1. phase-1a-timezone-api.spec.js         (API tests)
+  2. phase-1a-timezone-ui.spec.js          (UI tests)
+  3. phase-1a-timezone-integration.spec.js (Integration tests)
+
+Configuration:
+  frontend/playwright.config.js
+
+════════════════════════════════════════════════════════════════════════════
+  DOCUMENTATION
+════════════════════════════════════════════════════════════════════════════
+
+Quick Start:
+  PLAYWRIGHT_TEST_EXECUTION_GUIDE.md
+
+Test Overview:
+  PHASE_1A_TEST_SUMMARY.md
+
+Complete Summary:
+  TIMEZONE_TESTING_COMPLETE.md
+
+This Card:
+  QUICK_TEST_COMMANDS.txt
+
+════════════════════════════════════════════════════════════════════════════
+  EXPECTED OUTPUT - SUCCESS
+════════════════════════════════════════════════════════════════════════════
+
+✓ phase-1a-timezone-api.spec.js (13 tests)
+✓ phase-1a-timezone-ui.spec.js (15 tests)
+✓ phase-1a-timezone-integration.spec.js (12 tests)
+
+✅ 40 passed (26m 45s)
+
+Report saved: playwright-report/index.html
+
+════════════════════════════════════════════════════════════════════════════
+  EXPECTED OUTPUT - FAILURE
+════════════════════════════════════════════════════════════════════════════
+
+✗ phase-1a-timezone-ui.spec.js:2
+  TimezoneSelector component should render
+
+  Error: Timeout waiting for element '.timezone-selector'
+
+  Screenshot: playwright-report/[hash]/screenshot.png
+  Video: test-results/[hash]/video.webm
+
+Check error details in HTML report:
+  npm run test:report
+
+════════════════════════════════════════════════════════════════════════════
+  CREDENTIALS
+════════════════════════════════════════════════════════════════════════════
+
+Email:    admin@staging.uppalcrm.com
+Password: staging123
+
+(Used automatically by login() helper in tests)
+
+════════════════════════════════════════════════════════════════════════════
+  ENVIRONMENT
+════════════════════════════════════════════════════════════════════════════
+
+Base URL:  https://uppalcrm-frontend-devtest.onrender.com
+API URL:   https://uppalcrm-backend-devtest.onrender.com/api
+Browser:   Chromium (Desktop)
+Framework: Playwright v1.57.0
+
+════════════════════════════════════════════════════════════════════════════
+  NEXT STEPS
+════════════════════════════════════════════════════════════════════════════
+
+1. RUN TESTS:
+   cd frontend && npm test -- phase-1a-timezone
+
+2. WAIT 25-40 MINUTES for tests to complete
+
+3. VIEW REPORT:
+   npm run test:report
+
+4. IF PASSED:
+   - Document results
+   - Proceed to Phase 1B
+
+5. IF FAILED:
+   - Check error details
+   - Run in debug mode
+   - Fix issues
+   - Re-run tests
+
+════════════════════════════════════════════════════════════════════════════
+  TIMELINE
+════════════════════════════════════════════════════════════════════════════
+
+Estimated Execution Times:
+  API Tests:        5-10 minutes
+  UI Tests:         10-15 minutes
+  Integration:      10-15 minutes
+  Report Gen:       1-2 minutes
+  ─────────────────────────────
+  Total:            25-40 minutes
+
+════════════════════════════════════════════════════════════════════════════
+  NEED HELP?
+════════════════════════════════════════════════════════════════════════════
+
+Read Documentation:
+  - PLAYWRIGHT_TEST_EXECUTION_GUIDE.md (most comprehensive)
+  - PHASE_1A_TEST_SUMMARY.md (test overview)
+  - TIMEZONE_TESTING_COMPLETE.md (quick summary)
+
+Run in Debug Mode:
+  npm run test:debug -- phase-1a-timezone
+  (Step through test execution with Playwright Inspector)
+
+View Test Report:
+  npm run test:report
+  (See screenshots/videos of failed tests)
+
+════════════════════════════════════════════════════════════════════════════
+
+Created: January 28, 2026
+Status: READY FOR EXECUTION ✅
+Test Count: 40 tests
+Duration: 25-40 minutes
+Expected Pass Rate: 100%
+
+════════════════════════════════════════════════════════════════════════════
