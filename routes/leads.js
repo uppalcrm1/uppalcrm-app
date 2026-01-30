@@ -378,7 +378,7 @@ async function getSystemFieldConfigurations(organizationId) {
     const result = await db.query(`
       SELECT field_name, field_options, is_enabled, is_required
       FROM default_field_configurations
-      WHERE organization_id = $1
+      WHERE organization_id = $1 AND entity_type = 'leads'
     `, [organizationId]);
 
     return result.rows;
