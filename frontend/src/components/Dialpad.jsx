@@ -90,14 +90,37 @@ const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
 
       activeCallRef.current = call
 
+      // Add comprehensive event listeners BEFORE making the customer call
+      call.on('disconnect', () => {
+        console.log('❌ AGENT DISCONNECTED from conference')
+        handleEndCall()
+      })
+
+      call.on('error', (error) => {
+        console.error('❌ AGENT CALL ERROR:', error)
+        toast.error(`Call error: ${error.message}`)
+        setIsCallActive(false)
+        setCallStatus('')
+      })
+
+      call.on('accept', () => {
+        console.log('✅ Agent call accepted')
+      })
+
+      call.on('mute', (isMuted) => {
+        console.log('📞 Agent mute status:', isMuted)
+      })
+
       // Step 2: Now call the customer and put them in the same conference
       setCallStatus('Calling customer...')
+      console.log(`📞 Making call to customer: ${formattedNumber}`)
+
       const result = await twilioAPI.makeCall({
         to: formattedNumber,
         conferenceId: conferenceId
       })
 
-      console.log('✅ Customer call initiated')
+      console.log('✅ Customer call initiated, waiting for answer...')
       setIsCallActive(true)
       setCallStatus('Connected')
 
@@ -107,18 +130,6 @@ const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
       }, 1000)
 
       toast.success('Connected to customer')
-
-      call.on('disconnect', () => {
-        console.log('Call disconnected')
-        handleEndCall()
-      })
-
-      call.on('error', (error) => {
-        console.error('Call error:', error)
-        toast.error(`Call error: ${error.message}`)
-        setIsCallActive(false)
-        setCallStatus('')
-      })
     } catch (error) {
       console.error('Error making call:', error)
 
