@@ -66,16 +66,16 @@ router.post('/token', authenticateToken, async (req, res) => {
     const VoiceGrant = AccessToken.VoiceGrant;
 
     // Generate a unique identity for this user
-    const identity = `user-${userId}-${Date.now()}`;
+    const identity = `user-${userId}`;
 
-    // Create access token
+    // Create access token with identity in constructor
     const token = new AccessToken(
       config.account_sid,
       apiKey,
-      apiSecret
+      apiSecret,
+      { identity }
     );
 
-    token.identity = identity;
     token.addGrant(new VoiceGrant({
       outgoingApplicationSid: twimlAppSid || undefined
     }));
