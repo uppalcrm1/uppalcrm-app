@@ -856,10 +856,10 @@ router.post('/webhook/voice', async (req, res) => {
         timestamp: new Date().toISOString()
       };
 
-      // Server-side timeout: Force dequeue after 60 seconds if not answered
+      // Timeout: Hang up after 60 seconds if not answered
       setTimeout(async () => {
         console.log('========================================');
-        console.log(`⏰ TIMEOUT: Force dequeueing ${CallSid} after 60 seconds`);
+        console.log(`⏰ TIMEOUT: Ending unanswered call ${CallSid} after 60 seconds`);
         console.log('========================================');
 
         if (global.incomingCalls && global.incomingCalls[cacheKey]?.callSid === CallSid) {
@@ -867,38 +867,35 @@ router.post('/webhook/voice', async (req, res) => {
 
           try {
             const { client } = await twilioService.getClient(organizationId);
-            const queue = await client.queues('support_queue').fetch();
-
-            await client
-              .queues(queue.sid)
-              .members(CallSid)
-              .update({
-                url: `${API_BASE_URL}/api/twilio/webhook/voicemail-redirect`,
-                method: 'POST'
-              })
-              .then(() => {
-                console.log(`✅ Successfully dequeued ${CallSid} and redirected to voicemail`);
-              })
-              .catch(err => {
-                console.log(`❌ Could not dequeue (call may have ended): ${err.message}`);
-              });
+            await client.calls(CallSid).update({
+              status: 'completed'
+            });
+            console.log(`✅ Call ${CallSid} ended due to timeout`);
           } catch (err) {
-            console.error(`Error during force dequeue: ${err.message}`);
+            console.log(`Call already ended: ${err.message}`);
           }
         }
       }, 60000); // 60 seconds
     }
 
-    // Return TwiML to handle incoming calls - put in queue
+    // Return TwiML to handle incoming calls - put in conference based on CallSid
+    // Use CallSid as the conference name so agent can join same conference later
+    const conferenceId = `incoming-${CallSid}`;
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="alice">Thank you for calling. Please hold while we connect you to an agent.</Say>
-  <Enqueue
-    waitUrl="http://twimlets.com/holdmusic?Bucket=com.twilio.music.ambient"
-    maxQueueWait="60"
-    action="${API_BASE_URL}/api/twilio/webhook/queue-result"
-    method="POST"
-  >support_queue</Enqueue>
+  <Dial>
+    <Conference
+      startConferenceOnEnter="false"
+      endConferenceOnExit="true"
+      beep="false"
+      waitUrl="http://twimlets.com/holdmusic?Bucket=com.twilio.music.ambient"
+      record="record-from-start"
+      recordingStatusCallback="${API_BASE_URL}/api/twilio/webhook/recording"
+      statusCallback="${API_BASE_URL}/api/twilio/webhook/conference-status"
+      statusCallbackEvent="start end join leave"
+    >${conferenceId}</Conference>
+  </Dial>
 </Response>`;
 
     res.type('text/xml');
@@ -916,7 +913,7 @@ router.post('/webhook/voice', async (req, res) => {
 });
 
 /**
- * Accept incoming call - Dequeue customer and move to conference
+ * Accept incoming call - Notify frontend to join the conference
  */
 router.post('/incoming-calls/accept', authenticateToken, async (req, res) => {
   try {
@@ -925,24 +922,11 @@ router.post('/incoming-calls/accept', authenticateToken, async (req, res) => {
 
     console.log(`Accepting incoming call: ${callSid}`);
 
-    // Get Twilio client
-    const { client } = await twilioService.getClient(organizationId);
+    // The conference was already created when customer called
+    // Use CallSid as conference name (same as what was created in voice webhook)
+    const conferenceId = `incoming-${callSid}`;
 
-    // Generate conference ID
-    const conferenceId = `conf-incoming-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-    console.log(`Dequeuing caller and moving to conference: ${conferenceId}`);
-
-    // Dequeue the call and send to conference
-    const queue = await client.queues('support_queue').fetch();
-
-    await client
-      .queues(queue.sid)
-      .members(callSid)
-      .update({
-        url: `${API_BASE_URL}/api/twilio/webhook/dequeued?conference=${conferenceId}`,
-        method: 'POST'
-      });
+    console.log(`Agent will join existing conference: ${conferenceId}`);
 
     // Clear from cache
     if (global.incomingCalls) {
@@ -957,7 +941,7 @@ router.post('/incoming-calls/accept', authenticateToken, async (req, res) => {
     res.json({
       success: true,
       conferenceId,
-      message: 'Customer dequeued and being connected to conference'
+      message: 'Agent will join existing conference'
     });
 
   } catch (error) {
@@ -1178,8 +1162,7 @@ router.post('/webhook/recording', async (req, res) => {
       SET
         recording_url = $1,
         duration_seconds = $2,
-        has_recording = true,
-        updated_at = NOW()
+        has_recording = true
       WHERE twilio_call_sid = $3
     `;
 
