@@ -105,7 +105,7 @@ class TwilioService {
         throw new Error('Organization does not have a Twilio phone number configured');
       }
 
-      // Build call options
+      // Build call options - simple direct call to customer
       const callOptions = {
         to,
         from: phoneNumber,
@@ -114,12 +114,7 @@ class TwilioService {
         statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed']
       };
 
-      // Add conference parameter if provided (for agent joining conference)
-      if (conferenceId) {
-        callOptions.url = `${API_BASE_URL}/api/twilio/webhook/voice?conferenceId=${encodeURIComponent(conferenceId)}`;
-      }
-
-      console.log('📞 Call options:', { to: callOptions.to, from: callOptions.from, url: callOptions.url });
+      console.log('📞 Call options:', { to: callOptions.to, from: callOptions.from });
 
       const call = await client.calls.create(callOptions);
 
