@@ -722,7 +722,9 @@ router.post('/webhook/sms-status', async (req, res) => {
 router.post('/webhook/voice', async (req, res) => {
   try {
     const { From, To, CallSid, Direction } = req.body;
-    const { conference, participant } = req.query;
+    // Conference params can come from either query (REST API) or body (Voice SDK)
+    const conference = req.query.conference || req.body.conference;
+    const participant = req.query.participant || req.body.participant;
 
     console.log('Voice webhook call:', { From, To, CallSid, Direction, conference, participant });
 
@@ -758,7 +760,7 @@ router.post('/webhook/voice', async (req, res) => {
   <Dial>
     <Conference
       startConferenceOnEnter="false"
-      endConferenceOnExit="false"
+      endConferenceOnExit="true"
       beep="false"
       record="record-from-start"
       recordingStatusCallback="${API_BASE_URL}/api/twilio/webhook/recording"
@@ -1096,6 +1098,30 @@ router.post('/webhook/dequeued', async (req, res) => {
 
   res.type('text/xml');
   res.send(twiml);
+});
+
+/**
+ * Conference status updates - Track conference events
+ */
+router.post('/webhook/conference-status', async (req, res) => {
+  try {
+    const { ConferenceSid, FriendlyName, StatusCallbackEvent, Timestamp } = req.body;
+
+    console.log('Conference status update:', {
+      ConferenceSid,
+      FriendlyName,
+      StatusCallbackEvent,
+      Timestamp
+    });
+
+    // Log conference events for debugging
+    // Events: start, end, join, leave, mute, hold, etc.
+
+    res.status(200).send('OK');
+  } catch (error) {
+    console.error('Error handling conference status:', error);
+    res.status(200).send('OK'); // Always return 200 for webhook
+  }
 });
 
 /**
