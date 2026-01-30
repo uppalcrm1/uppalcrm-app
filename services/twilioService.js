@@ -344,19 +344,33 @@ class TwilioService {
           has_recording = $4,
           ended_at = CASE WHEN $1 IN ('completed', 'failed', 'busy', 'no-answer') THEN NOW() ELSE ended_at END,
           answered_at = CASE WHEN $1 = 'answered' THEN NOW() ELSE answered_at END
-      WHERE twilio_call_sid = $5
+      WHERE twilio_call_sid = $5::VARCHAR
       RETURNING *
     `;
 
-    const result = await db.query(query, [
-      status,
-      duration,
-      recordingUrl,
-      recordingUrl ? true : false,
-      callSid
-    ]);
+    try {
+      const result = await db.query(query, [
+        status,
+        duration,
+        recordingUrl,
+        recordingUrl ? true : false,
+        callSid
+      ]);
 
-    return result.rows[0];
+      if (result.rows.length > 0) {
+        console.log('✅ Call status updated:', { callSid, status, duration });
+      }
+
+      return result.rows[0];
+    } catch (error) {
+      console.error('❌ Error updating call status:', {
+        callSid,
+        status,
+        error: error.message,
+        detail: error.detail
+      });
+      throw error;
+    }
   }
 }
 
