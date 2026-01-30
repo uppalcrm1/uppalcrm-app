@@ -282,7 +282,7 @@ app.use('/api/subscription', rateLimiters.general, subscriptionRoutes);
 app.use('/api/field-mappings', rateLimiters.general, fieldMappingsRoutes);
 
 // Twilio integration routes
-app.use('/api/twilio', twilioRoutes);
+app.use('/api/twilio', rateLimiters.general, twilioRoutes);
 
 // Public routes (no authentication required)
 console.log('🔍 DEBUG: publicLeadRoutes type:', typeof publicLeadRoutes, 'value:', !!publicLeadRoutes);

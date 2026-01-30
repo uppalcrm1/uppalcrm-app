@@ -27,6 +27,56 @@ const twilioConfigSchema = Joi.object({
 });
 
 /**
+ * Generate Twilio Access Token for frontend (voice/video calls)
+ */
+router.post('/token', authenticateToken, async (req, res) => {
+  try {
+    const twilio = require('twilio');
+    const organizationId = req.organizationId;
+    const userId = req.userId;
+
+    // Get Twilio configuration
+    const configQuery = `
+      SELECT account_sid, auth_token, phone_number
+      FROM twilio_config
+      WHERE organization_id = $1 AND is_active = true
+    `;
+
+    const configResult = await db.query(configQuery, [organizationId]);
+
+    if (configResult.rows.length === 0) {
+      return res.status(400).json({ error: 'Twilio not configured for this organization' });
+    }
+
+    const config = configResult.rows[0];
+    const AccessToken = twilio.jwt.AccessToken;
+    const VoiceGrant = AccessToken.VoiceGrant;
+
+    // Generate a unique identity for this user
+    const identity = `user-${userId}-${Date.now()}`;
+
+    // Create access token
+    const token = new AccessToken(
+      config.account_sid,
+      process.env.TWILIO_API_KEY || '',
+      process.env.TWILIO_API_SECRET || ''
+    );
+
+    token.identity = identity;
+    token.addGrant(new VoiceGrant({ outgoingApplicationSid: process.env.TWILIO_TWIML_APP_SID || '' }));
+
+    res.json({
+      token: token.toJwt(),
+      identity,
+      phoneNumber: config.phone_number
+    });
+  } catch (error) {
+    console.error('Error generating Twilio token:', error);
+    res.status(500).json({ error: 'Failed to generate access token' });
+  }
+});
+
+/**
  * Configure Twilio for organization
  */
 router.post('/config', authenticateToken, async (req, res) => {
