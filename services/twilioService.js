@@ -338,12 +338,12 @@ class TwilioService {
   async updateCallStatus(callSid, status, duration = null, recordingUrl = null) {
     const query = `
       UPDATE phone_calls
-      SET twilio_status = $1,
-          duration_seconds = $2,
-          recording_url = $3,
-          has_recording = $4,
-          ended_at = CASE WHEN $1 IN ('completed', 'failed', 'busy', 'no-answer') THEN NOW() ELSE ended_at END,
-          answered_at = CASE WHEN $1 = 'answered' THEN NOW() ELSE answered_at END
+      SET twilio_status = $1::VARCHAR,
+          duration_seconds = $2::INTEGER,
+          recording_url = $3::VARCHAR,
+          has_recording = $4::BOOLEAN,
+          ended_at = CASE WHEN $1::VARCHAR IN ('completed', 'failed', 'busy', 'no-answer') THEN NOW() ELSE ended_at END,
+          answered_at = CASE WHEN $1::VARCHAR = 'answered' THEN NOW() ELSE answered_at END
       WHERE twilio_call_sid = $5::VARCHAR
       RETURNING *
     `;
