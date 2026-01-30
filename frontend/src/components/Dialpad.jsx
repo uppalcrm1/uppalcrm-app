@@ -131,17 +131,31 @@ const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
     }
 
     setIsDialing(true)
-    setCallStatus('Connecting...')
+    setCallStatus('Calling customer...')
 
     try {
+      // Format phone number in E.164 format
+      const formattedNumber = cleanNumber.startsWith('1')
+        ? `+${cleanNumber}`
+        : `+1${cleanNumber}`
+
       // Generate unique conference ID for this call
       const conferenceId = `conf-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
       conferenceIdRef.current = conferenceId
 
-      // Step 1: Agent connects to conference via Voice SDK
-      console.log(`Agent joining conference: ${conferenceId}`)
-      setCallStatus('Joining conference...')
+      console.log(`📞 Initiating call to ${formattedNumber} via conference ${conferenceId}`)
 
+      // Step 1: Call the customer (without calling back the agent)
+      const result = await twilioAPI.makeCall({
+        to: formattedNumber,
+        conferenceId: conferenceId
+      })
+
+      console.log('✅ Customer call initiated, joining conference...')
+      setCallStatus('Joining call...')
+
+      // Step 2: Agent joins the same conference via Voice SDK to hear the call
+      // We do this AFTER the customer is called to avoid callback
       const call = await deviceRef.current.connect({
         params: {
           conference: conferenceId,
@@ -151,50 +165,15 @@ const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
 
       activeCallRef.current = call
 
-      // Step 2: Agent is now in conference via Voice SDK
-      // Immediately dial customer into the same conference (no need to wait for "accept")
-      setCallStatus('Calling customer...')
+      setIsCallActive(true)
+      setCallStatus('Connected')
 
-      const formattedNumber = cleanNumber.startsWith('1')
-        ? `+${cleanNumber}`
-        : `+1${cleanNumber}`
+      // Start call timer
+      timerRef.current = setInterval(() => {
+        setCallDuration(prev => prev + 1)
+      }, 1000)
 
-      try {
-        // Step 3: Dial customer into the same conference
-        const result = await twilioAPI.makeCall({
-          to: formattedNumber,
-          conferenceId: conferenceId
-        })
-
-        setIsCallActive(true)
-        setCallStatus('Connected')
-
-        // Start call timer
-        timerRef.current = setInterval(() => {
-          setCallDuration(prev => prev + 1)
-        }, 1000)
-
-        toast.success('Customer call initiated - both parties will be connected')
-      } catch (error) {
-        console.error('Error dialing customer:', error)
-
-        // Extract detailed error message from response
-        let errorMessage = 'Failed to dial customer'
-        if (error.response?.data?.error) {
-          errorMessage = error.response.data.error
-        } else if (error.response?.data?.details) {
-          errorMessage = `Validation error: ${error.response.data.details[0]?.message || 'Invalid request'}`
-        } else if (error.message) {
-          errorMessage = error.message
-        }
-
-        toast.error(errorMessage)
-        if (activeCallRef.current) {
-          activeCallRef.current.disconnect()
-        }
-        setIsCallActive(false)
-        setCallStatus('')
-      }
+      toast.success('Connected to customer')
 
       call.on('disconnect', () => {
         console.log('Call disconnected')
@@ -207,18 +186,27 @@ const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
         setIsCallActive(false)
         setCallStatus('')
       })
-
-      toast.success('Connecting to conference...')
     } catch (error) {
       console.error('Error making call:', error)
 
-      // Extract detailed error message
-      let errorMessage = error.message || 'Failed to make call'
+      // Extract detailed error message from response
+      let errorMessage = 'Failed to make call'
       if (error.response?.data?.error) {
         errorMessage = error.response.data.error
+      } else if (error.response?.data?.details) {
+        errorMessage = `Validation error: ${error.response.data.details[0]?.message || 'Invalid request'}`
+      } else if (error.message) {
+        errorMessage = error.message
       }
 
       toast.error(errorMessage)
+
+      // Disconnect if we partially connected
+      if (activeCallRef.current) {
+        activeCallRef.current.disconnect()
+      }
+
+      setIsCallActive(false)
       setCallStatus('')
     } finally {
       setIsDialing(false)

@@ -722,15 +722,29 @@ router.post('/webhook/sms-status', async (req, res) => {
 router.post('/webhook/voice', async (req, res) => {
   try {
     const { From, To, CallSid, Direction } = req.body;
+    const { conferenceId } = req.query;
 
-    console.log('Voice webhook call:', { From, To, CallSid, Direction });
+    console.log('Voice webhook call:', { From, To, CallSid, Direction, conferenceId });
 
     // For OUTBOUND calls (when customer answers a call from our team),
-    // just return empty response to establish connection
+    // put them in the conference if one is specified
     if (Direction === 'outbound') {
-      console.log('Outbound call detected - allowing connection without voicemail');
-      res.type('text/xml');
-      res.send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+      if (conferenceId) {
+        console.log(`Putting outbound call into conference: ${conferenceId}`);
+        const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="alice">Connecting you to the call.</Say>
+  <Dial>
+    <Conference endConferenceOnExit="false">${conferenceId}</Conference>
+  </Dial>
+</Response>`;
+        res.type('text/xml');
+        res.send(twiml);
+      } else {
+        console.log('Outbound call detected - allowing connection without conference');
+        res.type('text/xml');
+        res.send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+      }
       return;
     }
 
