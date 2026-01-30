@@ -722,26 +722,77 @@ router.post('/webhook/sms-status', async (req, res) => {
 router.post('/webhook/voice', async (req, res) => {
   try {
     const { From, To, CallSid, Direction } = req.body;
-    const { conferenceId } = req.query;
+    const { conference, participant } = req.query;
 
-    console.log('Voice webhook call:', { From, To, CallSid, Direction, conferenceId });
+    console.log('Voice webhook call:', { From, To, CallSid, Direction, conference, participant });
 
-    // For OUTBOUND calls (when customer answers a call from our team)
-    // Have the customer dial the agent's Voice SDK client
+    // === HANDLE CONFERENCE CALLS (Voice SDK for agents) ===
+    if (conference && participant) {
+      if (participant === 'agent') {
+        console.log(`Agent joining conference: ${conference}`);
+
+        const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Dial>
+    <Conference
+      startConferenceOnEnter="true"
+      endConferenceOnExit="true"
+      waitUrl="http://twimlets.com/holdmusic?Bucket=com.twilio.music.ambient"
+      record="record-from-start"
+      recordingStatusCallback="${API_BASE_URL}/api/twilio/webhook/recording"
+      statusCallback="${API_BASE_URL}/api/twilio/webhook/conference-status"
+      statusCallbackEvent="start end join leave"
+    >${conference}</Conference>
+  </Dial>
+</Response>`;
+        res.type('text/xml');
+        res.send(twiml);
+        return;
+      }
+
+      if (participant === 'customer') {
+        console.log(`Customer joining conference: ${conference}`);
+
+        const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Dial>
+    <Conference
+      startConferenceOnEnter="false"
+      endConferenceOnExit="false"
+      beep="false"
+      record="record-from-start"
+      recordingStatusCallback="${API_BASE_URL}/api/twilio/webhook/recording"
+      statusCallback="${API_BASE_URL}/api/twilio/webhook/conference-status"
+      statusCallbackEvent="start end join leave"
+    >${conference}</Conference>
+  </Dial>
+</Response>`;
+        res.type('text/xml');
+        res.send(twiml);
+        return;
+      }
+    }
+
+    // === OUTBOUND CALLS (REST API dials customer) ===
     if (Direction === 'outbound' || Direction === 'outbound-api') {
-      console.log('✅ Customer answered outbound call - connecting to agent via Client');
+      console.log('✅ Customer answered outbound call - putting in queue');
+
       const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Dial record="record-from-answer">
-    <Client>agentClient</Client>
-  </Dial>
+  <Say voice="alice">Thank you for calling. Please hold while we connect you to an agent.</Say>
+  <Enqueue
+    waitUrl="http://twimlets.com/holdmusic?Bucket=com.twilio.music.ambient"
+    maxQueueWait="60"
+    action="${API_BASE_URL}/api/twilio/webhook/queue-result"
+    method="POST"
+  >support_queue</Enqueue>
 </Response>`;
       res.type('text/xml');
       res.send(twiml);
       return;
     }
 
-    // INCOMING CALL HANDLING (customer calling the company number)
+    // === INCOMING CALLS (customer calling company number) ===
     // Find organization by Twilio phone number
     const orgQuery = `
       SELECT organization_id FROM twilio_config
@@ -800,21 +851,49 @@ router.post('/webhook/voice', async (req, res) => {
         timestamp: new Date().toISOString()
       };
 
-      // Clear after 30 seconds if not answered
-      setTimeout(() => {
+      // Server-side timeout: Force dequeue after 60 seconds if not answered
+      setTimeout(async () => {
+        console.log('========================================');
+        console.log(`⏰ TIMEOUT: Force dequeueing ${CallSid} after 60 seconds`);
+        console.log('========================================');
+
         if (global.incomingCalls && global.incomingCalls[cacheKey]?.callSid === CallSid) {
           delete global.incomingCalls[cacheKey];
+
+          try {
+            const { client } = await twilioService.getClient(organizationId);
+            const queue = await client.queues('support_queue').fetch();
+
+            await client
+              .queues(queue.sid)
+              .members(CallSid)
+              .update({
+                url: `${API_BASE_URL}/api/twilio/webhook/voicemail-redirect`,
+                method: 'POST'
+              })
+              .then(() => {
+                console.log(`✅ Successfully dequeued ${CallSid} and redirected to voicemail`);
+              })
+              .catch(err => {
+                console.log(`❌ Could not dequeue (call may have ended): ${err.message}`);
+              });
+          } catch (err) {
+            console.error(`Error during force dequeue: ${err.message}`);
+          }
         }
-      }, 30000);
+      }, 60000); // 60 seconds
     }
 
-    // Return TwiML to handle incoming calls
-    // For CRM-based calling, don't forward incoming calls - just accept them
-    // This prevents callback loops and unwanted calls
+    // Return TwiML to handle incoming calls - put in queue
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="alice">Thank you for calling. We have received your call and will get back to you shortly.</Say>
-  <Hangup />
+  <Say voice="alice">Thank you for calling. Please hold while we connect you to an agent.</Say>
+  <Enqueue
+    waitUrl="http://twimlets.com/holdmusic?Bucket=com.twilio.music.ambient"
+    maxQueueWait="60"
+    action="${API_BASE_URL}/api/twilio/webhook/queue-result"
+    method="POST"
+  >support_queue</Enqueue>
 </Response>`;
 
     res.type('text/xml');
@@ -829,6 +908,194 @@ router.post('/webhook/voice', async (req, res) => {
         <Hangup />
       </Response>`);
   }
+});
+
+/**
+ * Accept incoming call - Dequeue customer and move to conference
+ */
+router.post('/incoming-calls/accept', authenticateToken, async (req, res) => {
+  try {
+    const { callSid } = req.body;
+    const organizationId = req.organizationId;
+
+    console.log(`Accepting incoming call: ${callSid}`);
+
+    // Get Twilio client
+    const { client } = await twilioService.getClient(organizationId);
+
+    // Generate conference ID
+    const conferenceId = `conf-incoming-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    console.log(`Dequeuing caller and moving to conference: ${conferenceId}`);
+
+    // Dequeue the call and send to conference
+    const queue = await client.queues('support_queue').fetch();
+
+    await client
+      .queues(queue.sid)
+      .members(callSid)
+      .update({
+        url: `${API_BASE_URL}/api/twilio/webhook/dequeued?conference=${conferenceId}`,
+        method: 'POST'
+      });
+
+    // Clear from cache
+    if (global.incomingCalls) {
+      const cacheKey = Object.keys(global.incomingCalls).find(
+        key => global.incomingCalls[key].callSid === callSid
+      );
+      if (cacheKey) {
+        delete global.incomingCalls[cacheKey];
+      }
+    }
+
+    res.json({
+      success: true,
+      conferenceId,
+      message: 'Customer dequeued and being connected to conference'
+    });
+
+  } catch (error) {
+    console.error('Error accepting call:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Decline incoming call - Hang up and clear from queue
+ */
+router.post('/incoming-calls/decline', authenticateToken, async (req, res) => {
+  try {
+    const { callSid } = req.body;
+    const organizationId = req.organizationId;
+
+    console.log(`Declining incoming call: ${callSid}`);
+
+    // Clear from global cache
+    if (global.incomingCalls) {
+      const cacheKey = Object.keys(global.incomingCalls).find(
+        key => global.incomingCalls[key].callSid === callSid
+      );
+      if (cacheKey) {
+        console.log(`Clearing declined call ${callSid} from global cache`);
+        delete global.incomingCalls[cacheKey];
+      }
+    }
+
+    // Get Twilio client and hang up the call
+    const { client } = await twilioService.getClient(organizationId);
+
+    await client.calls(callSid).update({
+      status: 'completed'
+    });
+
+    res.json({
+      success: true,
+      message: 'Call declined and ended'
+    });
+
+  } catch (error) {
+    console.error('Error declining call:', error);
+    res.status(500).json({
+      error: error.message || 'Failed to decline call'
+    });
+  }
+});
+
+/**
+ * Queue result handler - Called when customer leaves queue or call ends
+ */
+router.post('/webhook/queue-result', async (req, res) => {
+  const { CallSid, QueueResult, QueueTime } = req.body;
+
+  console.log('========================================');
+  console.log('QUEUE RESULT:', QueueResult);
+  console.log('CallSid:', CallSid);
+  console.log('QueueTime:', QueueTime, 'seconds');
+  console.log('========================================');
+
+  if (QueueResult === 'hangup') {
+    console.log('Customer hung up while in queue');
+    const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Hangup />
+</Response>`;
+    res.type('text/xml');
+    res.send(twiml);
+    return;
+  }
+
+  // For all other results (leave, redirected, etc.), send to voicemail
+  console.log(`Sending to voicemail (result: ${QueueResult})`);
+  const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="alice">We apologize, all of our agents are currently assisting other customers. Please leave a detailed message after the beep, and we will return your call as soon as possible.</Say>
+  <Record
+    maxLength="120"
+    playBeep="true"
+    recordingStatusCallback="${API_BASE_URL}/api/twilio/webhook/recording"
+    recordingStatusCallbackEvent="completed"
+  />
+  <Say voice="alice">Thank you for your message. We will get back to you shortly. Goodbye.</Say>
+  <Hangup />
+</Response>`;
+
+  res.type('text/xml');
+  res.send(twiml);
+});
+
+/**
+ * Voicemail redirect - Called when we forcefully dequeue after timeout
+ */
+router.post('/webhook/voicemail-redirect', async (req, res) => {
+  const { CallSid } = req.body;
+
+  console.log('========================================');
+  console.log('📞 VOICEMAIL REDIRECT');
+  console.log('CallSid:', CallSid);
+  console.log('Customer being sent to voicemail after 60s timeout');
+  console.log('========================================');
+
+  const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="alice">We apologize, all of our agents are currently assisting other customers. Please leave a detailed message after the beep, and we will return your call as soon as possible.</Say>
+  <Record
+    maxLength="120"
+    playBeep="true"
+    recordingStatusCallback="${API_BASE_URL}/api/twilio/webhook/recording"
+    recordingStatusCallbackEvent="completed"
+  />
+  <Say voice="alice">Thank you for your message. We will get back to you shortly. Goodbye.</Say>
+  <Hangup />
+</Response>`;
+
+  res.type('text/xml');
+  res.send(twiml);
+});
+
+/**
+ * Dequeued handler - Customer was removed from queue by agent accepting
+ */
+router.post('/webhook/dequeued', async (req, res) => {
+  const { conference } = req.query;
+
+  console.log(`Customer dequeued, joining conference: ${conference}`);
+
+  const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="alice">Connecting you now.</Say>
+  <Dial>
+    <Conference
+      startConferenceOnEnter="true"
+      endConferenceOnExit="true"
+      beep="false"
+      waitUrl="http://twimlets.com/holdmusic?Bucket=com.twilio.music.ambient"
+    >${conference}</Conference>
+  </Dial>
+</Response>`;
+
+  res.type('text/xml');
+  res.send(twiml);
 });
 
 /**

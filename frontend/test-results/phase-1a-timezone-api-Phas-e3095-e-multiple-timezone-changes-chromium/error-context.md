@@ -1,0 +1,83 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - banner [ref=e4]:
+      - generic [ref=e6]:
+        - generic [ref=e8]:
+          - img [ref=e9]
+          - generic [ref=e13]:
+            - heading "DevTest" [level=1] [ref=e14]
+            - paragraph [ref=e15]: CRM Dashboard
+        - generic [ref=e16]:
+          - generic [ref=e18]:
+            - img [ref=e19]
+            - textbox "Search..." [ref=e22]
+          - button [ref=e23] [cursor=pointer]:
+            - img
+          - button "Admin" [ref=e25] [cursor=pointer]:
+            - img
+            - generic: Admin
+            - img
+          - button "AU Admin User DevTest" [ref=e27] [cursor=pointer]:
+            - generic:
+              - generic: AU
+            - generic:
+              - paragraph: Admin User
+              - paragraph: DevTest
+            - img
+      - navigation [ref=e28]:
+        - generic [ref=e30]:
+          - link "Dashboard" [ref=e31] [cursor=pointer]:
+            - /url: /dashboard
+            - img
+            - text: Dashboard
+          - link "Leads" [ref=e32] [cursor=pointer]:
+            - /url: /leads
+            - img
+            - text: Leads
+          - link "Tasks" [ref=e33] [cursor=pointer]:
+            - /url: /tasks
+            - img
+            - text: Tasks
+          - link "Contacts" [ref=e34] [cursor=pointer]:
+            - /url: /contacts
+            - img
+            - text: Contacts
+          - link "Accounts" [ref=e35] [cursor=pointer]:
+            - /url: /accounts
+            - img
+            - text: Accounts
+          - link "Transactions" [ref=e36] [cursor=pointer]:
+            - /url: /transactions
+            - img
+            - text: Transactions
+          - link "Communications" [ref=e37] [cursor=pointer]:
+            - /url: /communications
+            - img
+            - text: Communications
+          - link "Reports" [ref=e38] [cursor=pointer]:
+            - /url: /reports
+            - img
+            - text: Reports
+          - link "My Dashboards" [ref=e39] [cursor=pointer]:
+            - /url: /custom-dashboards
+            - img
+            - text: My Dashboards
+          - link "Billing" [ref=e40] [cursor=pointer]:
+            - /url: /billing
+            - img
+            - text: Billing
+          - link "Team" [ref=e41] [cursor=pointer]:
+            - /url: /team
+            - img
+            - text: Team
+          - link "Settings" [ref=e42] [cursor=pointer]:
+            - /url: /settings
+            - img
+            - text: Settings
+    - main [ref=e43]:
+      - img [ref=e45]
+  - status [ref=e52]: Welcome back, Admin!
+```

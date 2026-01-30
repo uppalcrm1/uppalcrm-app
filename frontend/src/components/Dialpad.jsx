@@ -65,7 +65,7 @@ const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
     }
 
     setIsDialing(true)
-    setCallStatus('Calling customer...')
+    setCallStatus('Dialing customer...')
 
     try {
       // Format phone number in E.164 format
@@ -75,48 +75,15 @@ const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
 
       console.log(`📞 Initiating outbound call to ${formattedNumber}`)
 
-      // Just make the outbound call directly
-      // TwiML will use <Client> to have the customer dial back the agent's Voice SDK
+      // Call customer - they will be put in queue and agent will need to accept
       const result = await twilioAPI.makeCall({
         to: formattedNumber
       })
 
       console.log('✅ Customer call initiated')
+      setCallStatus('Ringing customer...')
+      toast.success('Calling customer...')
 
-      // Wait for incoming client call from Twilio
-      // The customer's TwiML will use <Dial><Client>agentClient</Client></Dial>
-      // which will send an incoming call to this device
-      setCallStatus('Waiting for customer to answer...')
-
-      // Listen for incoming calls from Twilio
-      deviceRef.current.on('incoming', (call) => {
-        console.log('📞 Incoming call from customer:', call)
-
-        // Auto-accept the incoming call from customer
-        call.accept()
-        activeCallRef.current = call
-
-        setIsCallActive(true)
-        setCallStatus('Connected')
-
-        // Start call timer
-        timerRef.current = setInterval(() => {
-          setCallDuration(prev => prev + 1)
-        }, 1000)
-
-        toast.success('Connected to customer')
-
-        call.on('disconnect', () => {
-          console.log('✅ Call ended')
-          handleEndCall()
-        })
-
-        call.on('error', (error) => {
-          console.error('❌ Call error:', error)
-          toast.error(`Call error: ${error.message}`)
-          handleEndCall()
-        })
-      })
     } catch (error) {
       console.error('Error making call:', error)
 
@@ -131,13 +98,6 @@ const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
       }
 
       toast.error(errorMessage)
-
-      // Disconnect if we partially connected
-      if (activeCallRef.current) {
-        activeCallRef.current.disconnect()
-      }
-
-      setIsCallActive(false)
       setCallStatus('')
     } finally {
       setIsDialing(false)
@@ -302,6 +262,66 @@ const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
     }
   }, [])
 
+  // Auto-join incoming call conference when accepted
+  useEffect(() => {
+    const handleJoinIncomingConference = async (event) => {
+      const { conferenceId, callerPhone, callerName } = event.detail
+
+      if (!conferenceId || !deviceRef.current || deviceStatus !== 'ready' || isCallActive) {
+        return
+      }
+
+      console.log('Auto-joining incoming call conference:', conferenceId)
+
+      try {
+        setIsDialing(true)
+        setCallStatus('Joining conference...')
+
+        // Auto-join the conference
+        const call = await deviceRef.current.connect({
+          params: {
+            conference: conferenceId,
+            participant: 'agent'
+          }
+        })
+
+        activeCallRef.current = call
+        setIsCallActive(true)
+        setCallStatus('Connected')
+
+        // Start call timer
+        timerRef.current = setInterval(() => {
+          setCallDuration(prev => prev + 1)
+        }, 1000)
+
+        toast.success(`Connected to ${callerName || callerPhone}`)
+
+        // Event listeners
+        call.on('disconnect', () => {
+          console.log('Call disconnected')
+          handleEndCall()
+        })
+
+        call.on('error', (error) => {
+          console.error('Call error:', error)
+          toast.error(`Call error: ${error.message}`)
+          handleEndCall()
+        })
+      } catch (error) {
+        console.error('Error joining conference:', error)
+        toast.error('Failed to join call')
+        setCallStatus('')
+        setIsCallActive(false)
+      } finally {
+        setIsDialing(false)
+      }
+    }
+
+    window.addEventListener('joinIncomingCallConference', handleJoinIncomingConference)
+    return () => {
+      window.removeEventListener('joinIncomingCallConference', handleJoinIncomingConference)
+    }
+  }, [deviceStatus, isCallActive])
 
   const dialpadButtons = [
     ['1', '2', '3'],

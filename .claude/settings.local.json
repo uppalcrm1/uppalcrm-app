@@ -58,7 +58,14 @@
       "Bash(then cat .env.local)",
       "Bash(git cherry-pick:*)",
       "Bash(find:*)",
-      "Bash(npm run test:phase1:api:*)"
+      "Bash(npm run test:phase1:api:*)",
+      "Bash(git -C \"C:\\\\Users\\\\uppal\\\\uppal-crm-project\" show c4d983ca3269f7e5c7c41058c3d2527cc3f7b875 --stat)",
+      "Bash(git -C \"C:\\\\Users\\\\uppal\\\\uppal-crm-project\" log --all -p --follow -- \"database/migrations/*.sql\")",
+      "Bash(git -C \"C:\\\\Users\\\\uppal\\\\uppal-crm-project\" log --all --pretty=\"%H %s\" -- \"fix-contacts-migration*.sql\")",
+      "Bash(git -C \"C:\\\\Users\\\\uppal\\\\uppal-crm-project\" log --all --pretty=\"%H %s\")",
+      "Bash(git -C \"C:\\\\Users\\\\uppal\\\\uppal-crm-project\" log --all --reverse --pretty=\"%H %s\" -- \"database/contact-management-schema.sql\")",
+      "Bash(git -C \"C:\\\\Users\\\\uppal\\\\uppal-crm-project\" log --all -p -- \"database/contact-management-schema.sql\")",
+      "Bash(git -C \"C:\\\\Users\\\\uppal\\\\uppal-crm-project\" log --all -p)"
     ],
     "deny": [],
     "ask": []
