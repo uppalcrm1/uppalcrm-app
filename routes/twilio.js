@@ -17,7 +17,8 @@ const sendSMSSchema = Joi.object({
 const makeCallSchema = Joi.object({
   to: Joi.string().required(),
   leadId: Joi.string().uuid().optional().allow(null, ''),
-  contactId: Joi.string().uuid().optional().allow(null, '')
+  contactId: Joi.string().uuid().optional().allow(null, ''),
+  conferenceId: Joi.string().optional().allow(null, '')
 });
 
 const twilioConfigSchema = Joi.object({
@@ -442,7 +443,7 @@ router.post('/call/make', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: error.details[0].message });
     }
 
-    const { to, leadId, contactId } = req.body;
+    const { to, leadId, contactId, conferenceId } = req.body;
     const organizationId = req.organizationId;
     const userId = req.userId;
 
@@ -451,7 +452,8 @@ router.post('/call/make', authenticateToken, async (req, res) => {
       to,
       leadId,
       contactId,
-      userId
+      userId,
+      conferenceId
     });
 
     res.json({

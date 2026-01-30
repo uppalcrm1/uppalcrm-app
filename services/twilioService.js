@@ -86,17 +86,25 @@ class TwilioService {
   /**
    * Make phone call
    */
-  async makeCall({ organizationId, to, leadId = null, contactId = null, userId }) {
+  async makeCall({ organizationId, to, leadId = null, contactId = null, userId, conferenceId = null }) {
     try {
       const { client, phoneNumber } = await this.getClient(organizationId);
 
-      const call = await client.calls.create({
+      // Build call options
+      const callOptions = {
         to,
         from: phoneNumber,
         record: true,
         statusCallback: `${API_BASE_URL}/api/twilio/webhook/call-status`,
         statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed']
-      });
+      };
+
+      // Add conference parameter if provided (for agent joining conference)
+      if (conferenceId) {
+        callOptions.url = `${API_BASE_URL}/api/twilio/webhook/voice?conferenceId=${encodeURIComponent(conferenceId)}`;
+      }
+
+      const call = await client.calls.create(callOptions);
 
       // Save to database
       const insertQuery = `
