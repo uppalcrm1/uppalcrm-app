@@ -301,7 +301,7 @@ router.get('/stats',
         SELECT
           COUNT(DISTINCT c.id)::integer as total_contacts,
           COUNT(DISTINCT CASE
-            WHEN COALESCE(c.contact_status, c.status) = 'active'
+            WHEN c.status = 'active'
             THEN c.id
           END)::integer as active_contacts,
           COUNT(DISTINCT a.id)::integer as total_accounts,
@@ -525,7 +525,7 @@ router.post('/convert-from-lead/:leadId',
         const contactInsertResult = await query(
           `INSERT INTO contacts (
             organization_id, first_name, last_name, email, phone,
-            contact_status, contact_source, company, title,
+            status, source, company, title,
             converted_from_lead_id, created_by, assigned_to, priority
           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
           RETURNING *`,

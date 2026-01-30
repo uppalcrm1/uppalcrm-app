@@ -258,10 +258,10 @@ exports.convertLeadWithMappings = async (
           state: mappedData.contacts.state || lead.state,
           postal_code: mappedData.contacts.postal_code || lead.postal_code,
           country: mappedData.contacts.country || lead.country,
-          contact_source: mappedData.contacts.contact_source || lead.source,
+          source: mappedData.contacts.source || lead.source,
           notes: mappedData.contacts.notes || lead.notes,
           type: mappedData.contacts.type || 'customer',
-          contact_status: mappedData.contacts.contact_status || 'active',
+          status: mappedData.contacts.status || 'active',
           custom_fields: { ...(lead.custom_fields || {}), ...mappedData.contacts }
         };
       } else {
@@ -279,10 +279,10 @@ exports.convertLeadWithMappings = async (
           state: lead.state,
           postal_code: lead.postal_code,
           country: lead.country,
-          contact_source: lead.source,
+          source: lead.source,
           notes: lead.notes,
           type: 'customer',
-          contact_status: 'active',
+          status: 'active',
           custom_fields: lead.custom_fields || {}
         };
       }
@@ -292,7 +292,7 @@ exports.convertLeadWithMappings = async (
           organization_id, first_name, last_name, email, phone,
           company, title, address_line1, address_line2, city,
           state, postal_code, country, converted_from_lead_id,
-          contact_source, notes, created_by, type, contact_status, custom_fields
+          source, notes, created_by, type, status, custom_fields
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
         RETURNING *`,
         [
@@ -310,11 +310,11 @@ exports.convertLeadWithMappings = async (
           contactData.postal_code,
           contactData.country,
           lead.id,
-          contactData.contact_source,
+          contactData.source,
           contactData.notes,
           userId,
           contactData.type,
-          contactData.contact_status,
+          contactData.status,
           contactData.custom_fields
         ]
       );

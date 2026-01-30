@@ -2481,7 +2481,7 @@ router.post('/:id/convert',
           email: contact.email,
           phone: contact.phone,
           company: contact.company,
-          status: contact.contact_status
+          status: contact.status
         },
         account: account ? {
           id: account.id,

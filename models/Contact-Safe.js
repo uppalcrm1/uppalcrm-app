@@ -58,12 +58,12 @@ async function findByOrganizationComplex(organizationId, options = {}) {
   let paramCount = 1;
 
   if (status) {
-    whereConditions.push(`COALESCE(c.contact_status, c.status) = $${++paramCount}`);
+    whereConditions.push(`c.status = $${++paramCount}`);
     params.push(status);
   }
 
   if (source) {
-    whereConditions.push(`COALESCE(c.contact_source, c.source) ILIKE $${++paramCount}`);
+    whereConditions.push(`c.source ILIKE $${++paramCount}`);
     params.push(`%${source}%`);
   }
 
@@ -92,7 +92,7 @@ async function findByOrganizationComplex(organizationId, options = {}) {
       c.title,
       c.department,
       c.linkedin,
-      COALESCE(c.contact_status, c.status, 'active') as status,
+      c.status as status,
       c.type,
       c.source,
       c.priority,
@@ -119,7 +119,7 @@ async function findByOrganizationComplex(organizationId, options = {}) {
     WHERE ${whereClause}
 
     GROUP BY c.id, c.first_name, c.last_name, c.name, c.email, c.phone, c.company,
-             c.title, c.department, c.linkedin, c.contact_status, c.status, c.type, c.source, c.priority,
+             c.title, c.department, c.linkedin, c.status, c.type, c.source, c.priority,
              c.notes, c.custom_fields, c.created_at, c.updated_at, c.last_contact_date, c.next_follow_up
 
     ORDER BY c.${sort} ${order}
@@ -197,12 +197,12 @@ async function findByOrganizationSimple(organizationId, options = {}) {
   let paramCount = 1;
 
   if (status) {
-    whereConditions.push(`COALESCE(c.contact_status, c.status) = $${++paramCount}`);
+    whereConditions.push(`c.status = $${++paramCount}`);
     params.push(status);
   }
 
   if (source) {
-    whereConditions.push(`COALESCE(c.contact_source, c.source) ILIKE $${++paramCount}`);
+    whereConditions.push(`c.source ILIKE $${++paramCount}`);
     params.push(`%${source}%`);
   }
 
@@ -230,7 +230,7 @@ async function findByOrganizationSimple(organizationId, options = {}) {
       c.title,
       c.department,
       c.linkedin,
-      COALESCE(c.contact_status, c.status, 'active') as status,
+      c.status as status,
       c.type,
       c.source,
       c.priority,

@@ -101,7 +101,7 @@ class Contact {
       const result = await query(`
         INSERT INTO contacts (
           organization_id, title, company, first_name, last_name, email, phone,
-          contact_status, contact_source, priority, lifetime_value, notes, assigned_to, created_by,
+          status, source, priority, lifetime_value, notes, assigned_to, created_by,
           next_follow_up, custom_fields
         )
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
@@ -114,8 +114,8 @@ class Contact {
         last_name,
         normalizedEmail,
         phone,
-        status, // maps to contact_status
-        source, // maps to contact_source
+        status,
+        source,
         priority,
         parseFloat(value), // maps to lifetime_value
         notes,
@@ -233,7 +233,7 @@ class Contact {
       let paramCount = 1;
 
       if (status) {
-        whereConditions.push(`c.contact_status = $${++paramCount}`);
+        whereConditions.push(`c.status = $${++paramCount}`);
         params.push(status);
       }
 
@@ -253,7 +253,7 @@ class Contact {
       }
 
       if (source) {
-        whereConditions.push(`c.contact_source ILIKE $${++paramCount}`);
+        whereConditions.push(`c.source ILIKE $${++paramCount}`);
         params.push(`%${source}%`);
       }
 
@@ -290,9 +290,9 @@ class Contact {
           c.company,
           c.title,
           c.website,
-          COALESCE(c.contact_status, c.status) as status,
+          c.status,
           c.type,
-          COALESCE(c.contact_source, c.source) as source,
+          c.source,
           c.priority,
           c.lifetime_value as value,
           c.notes,
@@ -365,7 +365,7 @@ class Contact {
         GROUP BY
           c.id, c.organization_id, c.first_name, c.last_name, c.name,
           c.email, c.phone, c.company, c.title, c.website,
-          c.contact_status, c.status, c.type, c.contact_source, c.source,
+          c.status, c.type, c.source,
           c.priority, c.lifetime_value, c.notes, c.assigned_to,
           c.created_by, c.created_at, c.updated_at, c.last_contact_date,
           c.next_follow_up, c.converted_from_lead_id, c.first_purchase_date,
