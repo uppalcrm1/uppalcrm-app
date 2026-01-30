@@ -88,7 +88,22 @@ class TwilioService {
    */
   async makeCall({ organizationId, to, leadId = null, contactId = null, userId, conferenceId = null }) {
     try {
+      console.log('📞 Making call:', { to, organizationId, conferenceId });
+
+      // Validate phone number format
+      if (!to || typeof to !== 'string') {
+        throw new Error('Invalid phone number: must be a non-empty string');
+      }
+
+      if (!to.startsWith('+')) {
+        throw new Error('Invalid phone number format: must start with + (E.164 format)');
+      }
+
       const { client, phoneNumber } = await this.getClient(organizationId);
+
+      if (!phoneNumber) {
+        throw new Error('Organization does not have a Twilio phone number configured');
+      }
 
       // Build call options
       const callOptions = {
@@ -104,7 +119,11 @@ class TwilioService {
         callOptions.url = `${API_BASE_URL}/api/twilio/webhook/voice?conferenceId=${encodeURIComponent(conferenceId)}`;
       }
 
+      console.log('📞 Call options:', { to: callOptions.to, from: callOptions.from, url: callOptions.url });
+
       const call = await client.calls.create(callOptions);
+
+      console.log('✅ Call created with SID:', call.sid);
 
       // Save to database
       const insertQuery = `
@@ -124,7 +143,12 @@ class TwilioService {
 
       return result.rows[0];
     } catch (error) {
-      console.error('Error making call:', error);
+      console.error('❌ Error making call:', {
+        message: error.message,
+        code: error.code,
+        status: error.status,
+        detail: error.detail
+      });
       throw error;
     }
   }

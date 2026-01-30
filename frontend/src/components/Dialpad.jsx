@@ -177,7 +177,18 @@ const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
         toast.success('Customer call initiated - both parties will be connected')
       } catch (error) {
         console.error('Error dialing customer:', error)
-        toast.error('Failed to dial customer')
+
+        // Extract detailed error message from response
+        let errorMessage = 'Failed to dial customer'
+        if (error.response?.data?.error) {
+          errorMessage = error.response.data.error
+        } else if (error.response?.data?.details) {
+          errorMessage = `Validation error: ${error.response.data.details[0]?.message || 'Invalid request'}`
+        } else if (error.message) {
+          errorMessage = error.message
+        }
+
+        toast.error(errorMessage)
         if (activeCallRef.current) {
           activeCallRef.current.disconnect()
         }
@@ -200,7 +211,14 @@ const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
       toast.success('Connecting to conference...')
     } catch (error) {
       console.error('Error making call:', error)
-      toast.error(error.message || 'Failed to make call')
+
+      // Extract detailed error message
+      let errorMessage = error.message || 'Failed to make call'
+      if (error.response?.data?.error) {
+        errorMessage = error.response.data.error
+      }
+
+      toast.error(errorMessage)
       setCallStatus('')
     } finally {
       setIsDialing(false)

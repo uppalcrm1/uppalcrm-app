@@ -438,14 +438,37 @@ router.get('/sms/conversation/:phoneNumber', authenticateToken, async (req, res)
  */
 router.post('/call/make', authenticateToken, async (req, res) => {
   try {
+    console.log('📞 Incoming call request:', {
+      body: req.body,
+      organizationId: req.organizationId,
+      userId: req.userId
+    });
+
     const { error } = makeCallSchema.validate(req.body);
     if (error) {
-      return res.status(400).json({ error: error.details[0].message });
+      console.error('❌ Validation error:', error.details);
+      return res.status(400).json({
+        error: error.details[0].message,
+        details: error.details,
+        received: req.body
+      });
     }
 
     const { to, leadId, contactId, conferenceId } = req.body;
     const organizationId = req.organizationId;
     const userId = req.userId;
+
+    // Validate that organization has Twilio configured
+    const configResult = await db.query(
+      'SELECT * FROM twilio_config WHERE organization_id = $1 AND is_active = true',
+      [organizationId]
+    );
+
+    if (configResult.rows.length === 0) {
+      return res.status(400).json({
+        error: 'Twilio is not configured for this organization'
+      });
+    }
 
     const call = await twilioService.makeCall({
       organizationId,
@@ -456,13 +479,18 @@ router.post('/call/make', authenticateToken, async (req, res) => {
       conferenceId
     });
 
+    console.log('✅ Call initiated successfully:', call.id);
+
     res.json({
       message: 'Call initiated successfully',
       data: call
     });
   } catch (error) {
-    console.error('Error making call:', error);
-    res.status(500).json({ error: error.message || 'Failed to initiate call' });
+    console.error('❌ Error making call:', error);
+    res.status(500).json({
+      error: error.message || 'Failed to initiate call',
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 
