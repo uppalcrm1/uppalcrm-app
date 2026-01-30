@@ -802,27 +802,14 @@ router.post('/webhook/voice', async (req, res) => {
       }, 30000);
     }
 
-    // Return TwiML to handle incoming calls - Voicemail recording system
-    const forwardTo = process.env.FORWARD_CALLS_TO;
-    let twiml;
-
-    if (forwardTo) {
-      twiml = `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Say voice="alice">Connecting your call. Please hold.</Say>
-  <Dial record="record-from-answer" timeout="30" action="/api/twilio/webhook/call-complete">
-    <Number>${forwardTo}</Number>
-  </Dial>
-  <Say voice="alice">We're sorry, but no one is available to take your call. Please leave a message after the beep.</Say>
-  <Record maxLength="120" transcribe="true" />
-</Response>`;
-    } else {
-      twiml = `<?xml version="1.0" encoding="UTF-8"?>
+    // Return TwiML to handle incoming calls
+    // For CRM-based calling, don't forward incoming calls - just accept them
+    // This prevents callback loops and unwanted calls
+    const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="alice">Thank you for calling. We have received your call and will get back to you shortly.</Say>
   <Hangup />
 </Response>`;
-    }
 
     res.type('text/xml');
     res.send(twiml);
