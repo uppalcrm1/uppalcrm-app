@@ -343,7 +343,8 @@ const configureCORS = () => {
       'X-Organization-ID',
       'X-API-Key',
       'X-Webhook-Id',
-      'X-Webhook-Source'
+      'X-Webhook-Source',
+      'X-User-Timezone'
     ]
   };
 };
