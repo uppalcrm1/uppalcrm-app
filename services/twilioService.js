@@ -105,12 +105,17 @@ class TwilioService {
         throw new Error('Organization does not have a Twilio phone number configured');
       }
 
-      // Build call options - simple outbound call
-      // TwiML will use <Client> to connect customer to agent's Voice SDK
+      // Build call options - dial customer into conference
+      // conferenceId should be passed by frontend when agent initiates call
+      let url = `${API_BASE_URL}/api/twilio/webhook/voice`;
+      if (conferenceId) {
+        url += `?conference=${conferenceId}&participant=customer`;
+      }
+
       const callOptions = {
         to,
         from: phoneNumber,
-        url: `${API_BASE_URL}/api/twilio/webhook/voice`,
+        url,
         record: true,
         statusCallback: `${API_BASE_URL}/api/twilio/webhook/call-status`,
         statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed']
