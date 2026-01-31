@@ -1180,6 +1180,14 @@ export const reportingAPI = {
     return response.data
   },
 
+  // Get leads grouped by source for a given month
+  getLeadsBySource: async (year, month) => {
+    const response = await api.get('/reporting/standard-reports/leads-by-source', {
+      params: { year, month }
+    })
+    return response.data
+  },
+
   // Get transactions grouped by source for a given month
   getTransactionsBySource: async (year, month) => {
     const response = await api.get('/reporting/standard-reports/transactions-by-source', {

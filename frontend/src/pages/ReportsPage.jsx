@@ -119,6 +119,35 @@ const ReportsPage = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Leads by Source Report */}
+          <div
+            className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow cursor-pointer"
+            onClick={() => navigate('/reports/leads-by-source')}
+          >
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Leads by Source</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  View lead volume grouped by source
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+              <span className="text-sm text-gray-600">Pre-built standard report</span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate('/reports/leads-by-source');
+                }}
+                className="btn btn-secondary flex items-center space-x-2 text-sm"
+              >
+                <Play className="h-3 w-3" />
+                <span>View</span>
+              </button>
+            </div>
+          </div>
+
           {/* Transactions by Source Report */}
           <div
             className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow cursor-pointer"
