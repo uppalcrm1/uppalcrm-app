@@ -210,13 +210,15 @@ const AccountsPage = () => {
       if (debouncedSearch.trim()) {
         params.search = debouncedSearch
       }
+      // Add timestamp to bypass caching
+      params.t = Date.now()
       console.log('🔍 Fetching accounts with params:', params)
       const response = await accountsAPI.getAccounts(params)
-      console.log('API Response:', response)
+      console.log('📥 API Response:', response)
       // Backend can return either 'accounts' or 'subscriptions' depending on endpoint
       const accountsData = response.accounts || response.subscriptions || []
-      console.log('Accounts data:', accountsData)
-      console.log('Accounts length:', accountsData.length)
+      console.log('📥 Accounts data length:', accountsData.length)
+      console.log('📥 First account:', accountsData[0]?.contact_name)
       setAccounts(accountsData)
     } catch (error) {
       console.error('Error fetching accounts:', error)
