@@ -47,6 +47,7 @@ import AdminProducts from './pages/admin/AdminProducts'
 import CommunicationsPage from './pages/CommunicationsPage'
 import ReportsPage from './pages/ReportsPage'
 import ReportBuilderPage from './pages/ReportBuilderPage'
+import LeadsBySourceReportPage from './pages/LeadsBySourceReportPage'
 import TransactionsBySourceReportPage from './pages/TransactionsBySourceReportPage'
 import TransactionsRevenueBySourceReportPage from './pages/TransactionsRevenueBySourceReportPage'
 import TransactionCountByOwnerReportPage from './pages/TransactionCountByOwnerReportPage'
@@ -141,6 +142,7 @@ function App() {
 
         {/* Reports & Dashboards Routes */}
         <Route path="reports" element={<ReportsPage />} />
+        <Route path="reports/leads-by-source" element={<LeadsBySourceReportPage />} />
         <Route path="reports/transactions-by-source" element={<TransactionsBySourceReportPage />} />
         <Route path="reports/transactions-revenue-by-source" element={<TransactionsRevenueBySourceReportPage />} />
         <Route path="reports/transactions-count-by-owner" element={<TransactionCountByOwnerReportPage />} />
