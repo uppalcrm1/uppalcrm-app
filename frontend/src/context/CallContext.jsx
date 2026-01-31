@@ -79,8 +79,8 @@ export const CallProvider = ({ children }) => {
     // Only start polling if authenticated
     if (!isAuthenticated) return;
 
-    // Poll every 2 seconds
-    const interval = setInterval(checkForIncomingCalls, 2000)
+    // Poll every 10 seconds
+    const interval = setInterval(checkForIncomingCalls, 10000)
 
     return () => clearInterval(interval)
   }, [incomingCall, isAuthenticated])
