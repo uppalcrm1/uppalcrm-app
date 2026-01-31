@@ -90,6 +90,10 @@ const Contacts = () => {
   const [loadingEditContact, setLoadingEditContact] = useState(false)
   const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '')
 
+  // Debounced search - separate immediate input from debounced API calls
+  // Must be defined early, before currentFilters uses it
+  const debouncedSearch = useDebouncedValue(searchTerm, 300)
+
   // Build dynamic column definitions from field configuration
   const { COLUMN_DEFINITIONS, DEFAULT_VISIBLE_COLUMNS } = React.useMemo(() => {
     // Collect ALL available fields for the column picker
@@ -210,9 +214,6 @@ const Contacts = () => {
     localStorage.setItem('contacts_visible_columns', JSON.stringify(DEFAULT_VISIBLE_COLUMNS))
     console.log('📋 Columns reset to defaults (respecting field configuration)')
   }
-
-  // Debounced search - separate immediate input from debounced API calls
-  const debouncedSearch = useDebouncedValue(searchTerm, 300)
 
   // Sync URL when debounced value changes (after 300ms of no typing)
   // Guard clause prevents infinite loop on mount
