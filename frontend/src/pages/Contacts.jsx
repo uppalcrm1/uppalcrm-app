@@ -87,6 +87,7 @@ const Contacts = () => {
   const [showFilters, setShowFilters] = useState(false)
   const [viewMode, setViewMode] = useState('list') // 'list' or 'detail'
   const [loadingEditContact, setLoadingEditContact] = useState(false)
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '')
 
   // Build dynamic column definitions from field configuration
   const { COLUMN_DEFINITIONS, DEFAULT_VISIBLE_COLUMNS } = React.useMemo(() => {
@@ -209,6 +210,31 @@ const Contacts = () => {
     console.log('📋 Columns reset to defaults (respecting field configuration)')
   }
 
+  // Search debounce effect - updates URL after user stops typing
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchParams(prev => {
+        const newParams = new URLSearchParams(prev)
+        if (searchTerm.trim()) {
+          newParams.set('search', searchTerm)
+        } else {
+          newParams.delete('search')
+        }
+        newParams.set('page', '1')
+        return newParams
+      })
+    }, 300)
+
+    return () => clearTimeout(timer)
+  }, [searchTerm])
+
+  // Sync effect - keeps searchTerm in sync with URL changes (back button, external changes)
+  useEffect(() => {
+    const urlSearch = searchParams.get('search') || ''
+    if (urlSearch !== searchTerm) {
+      setSearchTerm(urlSearch)
+    }
+  }, [searchParams.get('search')])
 
   // Fetch contacts
   const { data: contactsData, isLoading: contactsLoading, isFetching: contactsFetching } = useQuery({
@@ -522,8 +548,8 @@ const Contacts = () => {
               <input
                 type="text"
                 placeholder="Search contacts..."
-                value={currentFilters.search}
-                onChange={(e) => updateFilters({ search: e.target.value, page: 1 })}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
                 className="input pl-10"
               />
             </div>
