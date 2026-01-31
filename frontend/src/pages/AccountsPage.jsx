@@ -206,10 +206,11 @@ const AccountsPage = () => {
   const fetchAccounts = React.useCallback(async () => {
     try {
       setLoading(true)
-      const params = {
-        show_deleted: showDeleted,
-        search: debouncedSearch || ''
+      const params = {}
+      if (debouncedSearch.trim()) {
+        params.search = debouncedSearch
       }
+      console.log('🔍 Fetching accounts with params:', params)
       const response = await accountsAPI.getAccounts(params)
       console.log('API Response:', response)
       // Backend can return either 'accounts' or 'subscriptions' depending on endpoint
