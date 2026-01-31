@@ -36,6 +36,7 @@ import ContactForm from '../components/ContactForm'
 import ConvertLeadModal from '../components/ConvertLeadModal'
 import api from '../services/api'
 import { useFieldVisibility } from '../hooks/useFieldVisibility'
+import { useDebouncedValue } from '../hooks/useDebouncedValue'
 
 // Hardcoded special columns (not from field configuration)
 const SPECIAL_COLUMNS = {
@@ -166,17 +167,17 @@ const Contacts = () => {
     return saved ? JSON.parse(saved) : DEFAULT_VISIBLE_COLUMNS
   })
 
-  // Get current filters from URL - memoized to prevent unnecessary re-renders
+  // Build filters - use debouncedSearch for API calls, not searchParams
   const currentFilters = React.useMemo(() => ({
     page: parseInt(searchParams.get('page')) || 1,
     limit: parseInt(searchParams.get('limit')) || 20,
-    search: searchParams.get('search') || '',
+    search: debouncedSearch || '',  // ← Use debounced value, not from URL
     status: searchParams.get('status') || '',
     type: searchParams.get('type') || '',
     priority: searchParams.get('priority') || '',
     assigned_to: searchParams.get('assigned_to') || '',
     source: searchParams.get('source') || '',
-  }), [searchParams])
+  }), [searchParams, debouncedSearch])
 
   // Update URL with new filters
   const updateFilters = (newFilters) => {
@@ -210,25 +211,24 @@ const Contacts = () => {
     console.log('📋 Columns reset to defaults (respecting field configuration)')
   }
 
-  // Search debounce effect - updates URL after user stops typing
+  // Debounced search - separate immediate input from debounced API calls
+  const debouncedSearch = useDebouncedValue(searchTerm, 300)
+
+  // Sync URL when debounced value changes (after 300ms of no typing)
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setSearchParams(prev => {
-        const newParams = new URLSearchParams(prev)
-        if (searchTerm.trim()) {
-          newParams.set('search', searchTerm)
-        } else {
-          newParams.delete('search')
-        }
-        newParams.set('page', '1')
-        return newParams
-      })
-    }, 300)
+    setSearchParams(prev => {
+      const newParams = new URLSearchParams(prev)
+      if (debouncedSearch.trim()) {
+        newParams.set('search', debouncedSearch)
+      } else {
+        newParams.delete('search')
+      }
+      newParams.set('page', '1')
+      return newParams
+    })
+  }, [debouncedSearch])
 
-    return () => clearTimeout(timer)
-  }, [searchTerm])
-
-  // Sync effect - keeps searchTerm in sync with URL changes (back button, external changes)
+  // Sync searchTerm when URL changes externally (back button, etc.)
   useEffect(() => {
     const urlSearch = searchParams.get('search') || ''
     if (urlSearch !== searchTerm) {
