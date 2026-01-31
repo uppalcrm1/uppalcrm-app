@@ -36,6 +36,7 @@ import ContactForm from '../components/ContactForm'
 import ConvertLeadModal from '../components/ConvertLeadModal'
 import api from '../services/api'
 import { useFieldVisibility } from '../hooks/useFieldVisibility'
+import { useDebouncedValue } from '../hooks/useDebouncedValue'
 
 // Hardcoded special columns (not from field configuration)
 const SPECIAL_COLUMNS = {
@@ -87,6 +88,11 @@ const Contacts = () => {
   const [showFilters, setShowFilters] = useState(false)
   const [viewMode, setViewMode] = useState('list') // 'list' or 'detail'
   const [loadingEditContact, setLoadingEditContact] = useState(false)
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '')
+
+  // Debounced search - separate immediate input from debounced API calls
+  // Must be defined early, before currentFilters uses it
+  const debouncedSearch = useDebouncedValue(searchTerm, 300)
 
   // Build dynamic column definitions from field configuration
   const { COLUMN_DEFINITIONS, DEFAULT_VISIBLE_COLUMNS } = React.useMemo(() => {
@@ -165,17 +171,17 @@ const Contacts = () => {
     return saved ? JSON.parse(saved) : DEFAULT_VISIBLE_COLUMNS
   })
 
-  // Get current filters from URL - memoized to prevent unnecessary re-renders
+  // Build filters - use debouncedSearch for API calls, not searchParams
   const currentFilters = React.useMemo(() => ({
     page: parseInt(searchParams.get('page')) || 1,
     limit: parseInt(searchParams.get('limit')) || 20,
-    search: searchParams.get('search') || '',
+    search: debouncedSearch || '',  // ← Use debounced value, not from URL
     status: searchParams.get('status') || '',
     type: searchParams.get('type') || '',
     priority: searchParams.get('priority') || '',
     assigned_to: searchParams.get('assigned_to') || '',
     source: searchParams.get('source') || '',
-  }), [searchParams])
+  }), [searchParams, debouncedSearch])
 
   // Update URL with new filters
   const updateFilters = (newFilters) => {
@@ -209,6 +215,32 @@ const Contacts = () => {
     console.log('📋 Columns reset to defaults (respecting field configuration)')
   }
 
+  // Sync URL when debounced value changes (after 300ms of no typing)
+  // Guard clause prevents infinite loop on mount
+  useEffect(() => {
+    // Skip if search is already in sync with URL
+    const currentSearch = searchParams.get('search') || ''
+    if (currentSearch === debouncedSearch) return
+
+    setSearchParams(prev => {
+      const newParams = new URLSearchParams(prev)
+      if (debouncedSearch.trim()) {
+        newParams.set('search', debouncedSearch)
+      } else {
+        newParams.delete('search')
+      }
+      newParams.set('page', '1')
+      return newParams
+    })
+  }, [debouncedSearch])
+
+  // Sync searchTerm when URL changes externally (back button, etc.)
+  useEffect(() => {
+    const urlSearch = searchParams.get('search') || ''
+    if (urlSearch !== searchTerm) {
+      setSearchTerm(urlSearch)
+    }
+  }, [searchParams.get('search')])
 
   // Fetch contacts
   const { data: contactsData, isLoading: contactsLoading, isFetching: contactsFetching } = useQuery({
@@ -522,8 +554,8 @@ const Contacts = () => {
               <input
                 type="text"
                 placeholder="Search contacts..."
-                value={currentFilters.search}
-                onChange={(e) => updateFilters({ search: e.target.value, page: 1 })}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
                 className="input pl-10"
               />
             </div>

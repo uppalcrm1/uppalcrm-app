@@ -18,6 +18,7 @@ import KanbanBoard from '../components/KanbanBoard'
 import LeadListTable from '../components/LeadListTable'
 import ViewToggle from '../components/ViewToggle'
 import LeadFilters from '../components/LeadFilters'
+import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import toast from 'react-hot-toast'
 
 const LeadViews = ({ onAddLead, onEditLead, onDeleteLead }) => {
@@ -40,6 +41,19 @@ const LeadViews = ({ onAddLead, onEditLead, onDeleteLead }) => {
     limit: parseInt(searchParams.get('limit')) || 20
   })
 
+  // Debounce the search filter to prevent API calls on every keystroke
+  // Other filters (status, priority, etc.) are not debounced
+  const debouncedSearch = useDebouncedValue(filters.search, 300)
+
+  // Create debounced filters by merging debounced search with other filters
+  const debouncedFilters = React.useMemo(
+    () => ({
+      ...filters,
+      search: debouncedSearch
+    }),
+    [filters, debouncedSearch]
+  )
+
   // Fetch leads with filters and pagination
   const {
     data: leadsData,
@@ -47,15 +61,15 @@ const LeadViews = ({ onAddLead, onEditLead, onDeleteLead }) => {
     error: leadsError,
     refetch: refetchLeads
   } = useQuery({
-    queryKey: ['leads', filters, pagination, view],
+    queryKey: ['leads', debouncedFilters, pagination, view],  // ← Use debounced filters
     queryFn: async () => {
       const params = {
         page: pagination.page,
         limit: pagination.limit
       }
 
-      // Add filters
-      Object.entries(filters).forEach(([key, value]) => {
+      // Add debounced filters
+      Object.entries(debouncedFilters).forEach(([key, value]) => {
         if (value) params[key] = value
       })
 

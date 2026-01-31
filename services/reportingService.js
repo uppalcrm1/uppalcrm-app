@@ -504,6 +504,67 @@ const getTransactionsBySource = async (organizationId, year, month) => {
 };
 
 /**
+ * Get leads grouped by source for a given month
+ * @param {string} organizationId - Organization ID
+ * @param {number} year - Year (e.g., 2024)
+ * @param {number} month - Month (1-12)
+ * @returns {Promise<Object>} Leads by source with summary
+ */
+const getLeadsBySource = async (organizationId, year, month) => {
+  // Validate month
+  if (month < 1 || month > 12) {
+    throw new Error('Invalid month. Must be between 1 and 12.');
+  }
+
+  // Create date range for the given month
+  const startDate = new Date(year, month - 1, 1);
+  const endDate = new Date(year, month, 0, 23, 59, 59, 999);
+
+  const result = await db.query(
+    `SELECT
+      COALESCE(source, 'Not Specified') as source,
+      COUNT(id) as lead_count
+     FROM leads
+     WHERE organization_id = $1
+       AND created_at >= $2
+       AND created_at <= $3
+     GROUP BY source
+     ORDER BY lead_count DESC`,
+    [organizationId, startDate, endDate],
+    organizationId
+  );
+
+  const rows = result.rows.map(row => ({
+    source: row.source,
+    count: parseInt(row.lead_count)
+  }));
+
+  const totalLeads = rows.reduce((sum, row) => sum + row.count, 0);
+
+  // Add percentage to each row
+  const dataWithPercentage = rows.map(row => ({
+    ...row,
+    percentage: totalLeads > 0
+      ? parseFloat(((row.count / totalLeads) * 100).toFixed(2))
+      : 0
+  }));
+
+  // Find top source
+  const topSource = dataWithPercentage.length > 0 ? dataWithPercentage[0] : null;
+
+  return {
+    data: dataWithPercentage,
+    summary: {
+      totalLeads,
+      topSource: topSource ? topSource.source : null,
+      topSourceCount: topSource ? topSource.count : 0,
+      month,
+      year
+    }
+  };
+};
+
+/**
  * Get transactions revenue grouped by source for a given month
  * @param {string} organizationId - Organization ID
  * @param {number} year - Year (e.g., 2024)
@@ -798,6 +859,7 @@ module.exports = {
   getNewCustomersTrend,
   getDashboardKPIs,
   getAccountsByProduct,
+  getLeadsBySource,
   getTransactionsBySource,
   getTransactionRevenueBySource,
   getTransactionCountByOwner,

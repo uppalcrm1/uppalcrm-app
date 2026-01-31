@@ -37,6 +37,9 @@ router.get('/dashboard/accounts-by-product', reportingController.getAccountsByPr
  * Standard Reports Endpoints
  */
 
+// GET /api/reporting/standard-reports/leads-by-source - Get leads grouped by source
+router.get('/standard-reports/leads-by-source', reportingController.getLeadsBySource);
+
 // GET /api/reporting/standard-reports/transactions-by-source - Get transactions grouped by source
 router.get('/standard-reports/transactions-by-source', reportingController.getTransactionsBySource);
 
