@@ -20,6 +20,7 @@ import {
   ArrowDown
 } from 'lucide-react'
 import { transactionsAPI } from '../services/api'
+import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import EditTransactionModal from '../components/EditTransactionModal'
 import ColumnSelector from '../components/ColumnSelector'
 import { formatSource, formatPaymentMethod } from '../constants/transactions'
@@ -69,7 +70,7 @@ const formatDate = (dateString) => {
 const TransactionsPage = () => {
   const [transactions, setTransactions] = useState([])
   const [loading, setLoading] = useState(true)
-  const [searchQuery, setSearchQuery] = useState('')
+  const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterMethod, setFilterMethod] = useState('all')
   const [filterSource, setFilterSource] = useState('all')
@@ -84,6 +85,9 @@ const TransactionsPage = () => {
   const [pageSize, setPageSize] = useState(50)
   const [totalCount, setTotalCount] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
+
+  // Debounce search - separate immediate input from debounced API calls
+  const debouncedSearch = useDebouncedValue(searchTerm, 300)
 
   // Load column visibility from localStorage or use defaults
   const [visibleColumns, setVisibleColumns] = useState(() => {
@@ -106,19 +110,14 @@ const TransactionsPage = () => {
     localStorage.setItem('transactions_visible_columns', JSON.stringify(DEFAULT_VISIBLE_COLUMNS))
   }
 
-  // Fetch transactions on component mount
-  useEffect(() => {
-    fetchTransactions(1, pageSize)
-    fetchRevenueStats()
-  }, [])
-
-  const fetchTransactions = async (page = 1, size = pageSize) => {
+  const fetchTransactions = React.useCallback(async (page = 1, size = pageSize) => {
     try {
       setLoading(true)
       const offset = (page - 1) * size
       const response = await transactionsAPI.getTransactions({
         limit: size,
-        offset: offset
+        offset: offset,
+        search: debouncedSearch || ''
       })
       setTransactions(response.transactions || [])
       setTotalCount(response.total || 0)
@@ -131,7 +130,13 @@ const TransactionsPage = () => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [debouncedSearch, pageSize])
+
+  // Fetch transactions on component mount and when debouncedSearch changes
+  useEffect(() => {
+    fetchTransactions(1, pageSize)
+    fetchRevenueStats()
+  }, [fetchTransactions, pageSize])
 
   const fetchRevenueStats = async () => {
     try {
@@ -163,18 +168,8 @@ const TransactionsPage = () => {
     setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')
   }
 
-  // Filter transactions
+  // Filter transactions (search now happens server-side, filter client-side)
   const filteredTransactions = transactions.filter(transaction => {
-    // Search filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase()
-      const matchesSearch =
-        (transaction.transaction_id || '').toLowerCase().includes(query) ||
-        (transaction.account_name || '').toLowerCase().includes(query) ||
-        (transaction.contact_name || '').toLowerCase().includes(query)
-      if (!matchesSearch) return false
-    }
-
     // Status filter
     if (filterStatus !== 'all' && transaction.status !== filterStatus) {
       return false
@@ -379,8 +374,8 @@ const TransactionsPage = () => {
             <input
               type="text"
               placeholder="Search transactions..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
               className="input pl-10"
             />
           </div>
@@ -459,7 +454,7 @@ const TransactionsPage = () => {
             <DollarSign className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No transactions found</h3>
             <p className="text-gray-600">
-              {searchQuery || filterStatus !== 'all' || filterMethod !== 'all' || filterSource !== 'all'
+              {searchTerm || filterStatus !== 'all' || filterMethod !== 'all' || filterSource !== 'all'
                 ? 'Try adjusting your filters'
                 : 'Transaction records will appear here once they are created'}
             </p>
