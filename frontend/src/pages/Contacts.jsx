@@ -215,7 +215,12 @@ const Contacts = () => {
   const debouncedSearch = useDebouncedValue(searchTerm, 300)
 
   // Sync URL when debounced value changes (after 300ms of no typing)
+  // Guard clause prevents infinite loop on mount
   useEffect(() => {
+    // Skip if search is already in sync with URL
+    const currentSearch = searchParams.get('search') || ''
+    if (currentSearch === debouncedSearch) return
+
     setSearchParams(prev => {
       const newParams = new URLSearchParams(prev)
       if (debouncedSearch.trim()) {
