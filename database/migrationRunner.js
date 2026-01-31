@@ -58,8 +58,40 @@ class MigrationRunner {
     console.log(`🔄 Running migration: ${filename}`);
 
     try {
-      // Run migration
-      await db.query(sql);
+      // Split SQL into statements, separating CREATE INDEX CONCURRENTLY
+      const statements = this.parseStatements(sql);
+      const { concurrentStatements, transactionalStatements } = this.separateConcurrentStatements(statements);
+
+      // Get a client directly from the pool for manual transaction control
+      const client = await db.pool.connect();
+
+      try {
+        // Run transactional statements in a transaction
+        if (transactionalStatements.length > 0) {
+          await client.query('BEGIN');
+          try {
+            for (const stmt of transactionalStatements) {
+              if (stmt.trim()) {
+                await client.query(stmt);
+              }
+            }
+            await client.query('COMMIT');
+          } catch (error) {
+            await client.query('ROLLBACK');
+            throw error;
+          }
+        }
+
+        // Run CONCURRENT statements separately (outside of transaction)
+        for (const stmt of concurrentStatements) {
+          if (stmt.trim()) {
+            console.log('  ⚡ Running concurrent index creation...');
+            await client.query(stmt);
+          }
+        }
+      } finally {
+        client.release();
+      }
 
       // Record migration
       await db.query(
@@ -73,6 +105,45 @@ class MigrationRunner {
       console.error(`❌ Migration failed: ${filename}`, error);
       throw error;
     }
+  }
+
+  /**
+   * Parse SQL into individual statements
+   * Handles multi-line statements and comments
+   */
+  parseStatements(sql) {
+    // Remove comments
+    let cleaned = sql
+      .split('\n')
+      .filter(line => !line.trim().startsWith('--'))
+      .join('\n');
+
+    // Split by semicolon but preserve statements
+    const statements = cleaned
+      .split(';')
+      .map(stmt => stmt.trim())
+      .filter(stmt => stmt.length > 0);
+
+    return statements;
+  }
+
+  /**
+   * Separate CREATE INDEX CONCURRENTLY from other statements
+   * These must run outside of transactions
+   */
+  separateConcurrentStatements(statements) {
+    const concurrentStatements = [];
+    const transactionalStatements = [];
+
+    for (const stmt of statements) {
+      if (stmt.toUpperCase().includes('CREATE INDEX') && stmt.toUpperCase().includes('CONCURRENTLY')) {
+        concurrentStatements.push(stmt);
+      } else {
+        transactionalStatements.push(stmt);
+      }
+    }
+
+    return { concurrentStatements, transactionalStatements };
   }
 
   async runPending() {
