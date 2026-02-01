@@ -308,7 +308,9 @@ router.get('/accounts/:accountId', async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const { organization_id } = req.user;
-    const { status, contact_id, limit = 100, offset = 0 } = req.query;
+    const { status, contact_id, limit = 100, offset = 0, search } = req.query;
+
+    console.log('📥 [Transactions GET] Received query:', { status, contact_id, search, limit, offset });
 
     let query = `
       SELECT
@@ -369,6 +371,19 @@ router.get('/', async (req, res) => {
       params.push(contact_id);
     }
 
+    // Add search filter
+    if (search && search.trim()) {
+      query += ` AND (
+        t.transaction_reference ILIKE $${params.length + 1} OR
+        a.account_name ILIKE $${params.length + 1} OR
+        c.first_name ILIKE $${params.length + 1} OR
+        c.last_name ILIKE $${params.length + 1} OR
+        c.email ILIKE $${params.length + 1} OR
+        p.name ILIKE $${params.length + 1}
+      )`;
+      params.push(`%${search}%`);
+    }
+
     query += ` ORDER BY t.transaction_date DESC, t.created_at DESC`;
     query += ` LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
     params.push(limit, offset);
@@ -393,6 +408,19 @@ router.get('/', async (req, res) => {
     if (contact_id) {
       countQuery += ` AND t.contact_id = $${countParams.length + 1}`;
       countParams.push(contact_id);
+    }
+
+    // Add search filter to count query
+    if (search && search.trim()) {
+      countQuery += ` AND (
+        t.transaction_reference ILIKE $${countParams.length + 1} OR
+        a.account_name ILIKE $${countParams.length + 1} OR
+        c.first_name ILIKE $${countParams.length + 1} OR
+        c.last_name ILIKE $${countParams.length + 1} OR
+        c.email ILIKE $${countParams.length + 1} OR
+        p.name ILIKE $${countParams.length + 1}
+      )`;
+      countParams.push(`%${search}%`);
     }
 
     const result = await db.query(query, params);
