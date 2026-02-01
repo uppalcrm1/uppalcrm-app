@@ -92,6 +92,16 @@ const getRenewalColor = (daysUntil) => {
   return 'text-green-600';
 }
 
+// Helper function to render sort indicator
+const SortIndicator = ({ column, currentSort, direction }) => {
+  if (currentSort !== column) return null
+  return (
+    <span className="ml-1 text-xs">
+      {direction === 'asc' ? '▲' : '▼'}
+    </span>
+  )
+}
+
 const AccountsPage = () => {
   const navigate = useNavigate()
   const [accounts, setAccounts] = useState([])
@@ -105,6 +115,8 @@ const AccountsPage = () => {
   const [filterStatus, setFilterStatus] = useState('all')
   const [showDeleted, setShowDeleted] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [sortColumn, setSortColumn] = useState('created_date') // Default sort by created date
+  const [sortDirection, setSortDirection] = useState('desc') // 'asc' or 'desc' - default newest first
 
   // Debounce search - separate immediate input from debounced API calls
   const debouncedSearch = useDebouncedValue(searchTerm, 300)
@@ -128,6 +140,18 @@ const AccountsPage = () => {
   const handleResetColumns = () => {
     setVisibleColumns(DEFAULT_VISIBLE_COLUMNS)
     localStorage.setItem('accounts_visible_columns', JSON.stringify(DEFAULT_VISIBLE_COLUMNS))
+  }
+
+  // Sort handler - toggle sort direction when clicking a sortable column
+  const handleSort = (columnKey) => {
+    if (sortColumn === columnKey) {
+      // Toggle direction if same column clicked
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      // Set new column with ascending order
+      setSortColumn(columnKey)
+      setSortDirection('asc')
+    }
   }
 
   // Inline edit handler with optimistic updates
@@ -185,7 +209,7 @@ const AccountsPage = () => {
   // Use localAccounts for display (optimistic updates), fallback to accounts
   const displayAccounts = localAccounts.length > 0 ? localAccounts : accounts
 
-  // Apply status filter (search now happens server-side)
+  // Apply status filter and sorting
   const filteredAccounts = React.useMemo(() => {
     let filtered = displayAccounts
 
@@ -194,8 +218,36 @@ const AccountsPage = () => {
       filtered = filtered.filter(account => account.status === filterStatus)
     }
 
-    return filtered
-  }, [displayAccounts, filterStatus])
+    // Apply sorting
+    const sorted = [...filtered].sort((a, b) => {
+      let aValue, bValue
+
+      switch (sortColumn) {
+        case 'next_renewal':
+          // Sort by days_until_renewal (null values go to end)
+          aValue = a.days_until_renewal ?? Infinity
+          bValue = b.days_until_renewal ?? Infinity
+          break
+        case 'created_date':
+          aValue = new Date(a.created_at).getTime()
+          bValue = new Date(b.created_at).getTime()
+          break
+        case 'account_name':
+          aValue = (a.account_name || '').toLowerCase()
+          bValue = (b.account_name || '').toLowerCase()
+          break
+        default:
+          return 0
+      }
+
+      // Compare values
+      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1
+      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1
+      return 0
+    })
+
+    return sorted
+  }, [displayAccounts, filterStatus, sortColumn, sortDirection])
 
   // Initialize localAccounts when accounts changes
   React.useEffect(() => {
@@ -452,8 +504,26 @@ const AccountsPage = () => {
                   {visibleColumns.contact && <th className="text-left py-3 px-4 font-medium text-gray-900">Contact</th>}
                   {visibleColumns.accounts_count && <th className="text-center py-3 px-4 font-medium text-gray-900">Accounts</th>}
                   {visibleColumns.transactions_count && <th className="text-center py-3 px-4 font-medium text-gray-900">Transactions</th>}
-                  {visibleColumns.created_date && <th className="text-left py-3 px-4 font-medium text-gray-900">Created Date</th>}
-                  {visibleColumns.next_renewal && <th className="text-left py-3 px-4 font-medium text-gray-900">Next Renewal</th>}
+                  {visibleColumns.created_date && (
+                    <th
+                      onClick={() => handleSort('created_date')}
+                      className="text-left py-3 px-4 font-medium text-gray-900 cursor-pointer hover:bg-gray-100 select-none"
+                      title="Click to sort by Created Date"
+                    >
+                      Created Date
+                      <SortIndicator column="created_date" currentSort={sortColumn} direction={sortDirection} />
+                    </th>
+                  )}
+                  {visibleColumns.next_renewal && (
+                    <th
+                      onClick={() => handleSort('next_renewal')}
+                      className="text-left py-3 px-4 font-medium text-gray-900 cursor-pointer hover:bg-gray-100 select-none"
+                      title="Click to sort by Next Renewal date"
+                    >
+                      Next Renewal
+                      <SortIndicator column="next_renewal" currentSort={sortColumn} direction={sortDirection} />
+                    </th>
+                  )}
                   {visibleColumns.actions && <th className="text-left py-3 px-4 font-medium text-gray-900">Actions</th>}
                 </tr>
               </thead>
