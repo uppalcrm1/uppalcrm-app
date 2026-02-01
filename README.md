@@ -105,10 +105,13 @@ uppal-crm-project/
 │   │   ├── services/       # API service layer
 │   │   └── styles/         # CSS and styling
 │   └── dist/               # Built static files
-├── routes/                  # Express API routes
-├── models/                  # Database models and queries
-├── middleware/             # Authentication, validation, security
-├── database/               # SQL schemas and migrations
+├── backend/
+│   ├── routes/             # Express API routes
+│   ├── models/             # Database models and queries
+│   ├── controllers/        # Request handlers
+│   ├── middleware/         # Authentication, validation, security
+│   └── database/           # SQL schemas and migrations
+├── agents/                  # AI agent documentation and configuration
 ├── scripts/                # Utility scripts
 ├── docs/                   # Documentation
 ├── index.html              # Marketing website
@@ -116,6 +119,26 @@ uppal-crm-project/
 ├── script.js               # Marketing site functionality
 └── server.js               # Main backend server
 ```
+
+## 📝 Recent Updates
+
+### Software Licenses System Cleanup (Feb 1, 2026)
+
+✅ **COMPLETED** - See [CLEANUP_COMPLETE_2026-02-01.md](./CLEANUP_COMPLETE_2026-02-01.md) for details
+
+**What Changed:**
+- Removed empty `software_licenses` table and related dead code
+- Consolidated customer data to `accounts` table as single source of truth
+- Deleted unused API routes (`/api/licenses`)
+- Updated documentation to reflect current system architecture
+- All 407 UppalTV production customer records verified intact
+
+**Impact:**
+- Cleaner codebase (1,418 lines of dead code removed)
+- Aligned frontend/backend terminology
+- Simplified database schema
+- Zero data loss
+- All changes deployed to devtest, staging, and production
 
 ## 🚀 Quick Start
 
