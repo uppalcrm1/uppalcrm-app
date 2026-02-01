@@ -75,7 +75,6 @@ const scheduledJobs = require('./services/scheduledJobs');
 // Account Management Routes
 const accountRoutes = require('./routes/accounts-simple'); // Simple accounts for CRM
 const accountSubscriptionRoutes = require('./routes/accounts'); // Legacy licensing system
-const licenseRoutes = require('./routes/licenses'); // Legacy support
 const deviceRoutes = require('./routes/devices');
 const softwareEditionRoutes = require('./routes/softwareEditions');
 const downloadRoutes = require('./routes/downloads');
@@ -247,8 +246,6 @@ app.use('/api/transactions', rateLimiters.general, transactionsRoutes);
 app.use('/api/reporting', rateLimiters.general, reportingRoutes);
 app.use('/api/reports', rateLimiters.general, reportsRoutes);
 app.use('/api/dashboards', rateLimiters.general, dashboardsRoutes);
-// Legacy License Management API routes (for backward compatibility)
-app.use('/api/licenses', rateLimiters.general, licenseRoutes);
 app.use('/api/devices', rateLimiters.general, deviceRoutes);
 app.use('/api/software-editions', rateLimiters.general, softwareEditionRoutes);
 app.use('/api/downloads', rateLimiters.general, downloadRoutes);

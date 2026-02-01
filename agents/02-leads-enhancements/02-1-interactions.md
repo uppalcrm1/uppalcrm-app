@@ -26,6 +26,8 @@
 
 \- ✅ Authentication and multi-tenant security
 
+\- ✅ \*\*Server-side search with client-side debouncing\*\* (Jan 30, 2026)
+
 
 
 \## Your Mission 🎯
@@ -45,6 +47,112 @@ Build a \*\*complete Lead Interactions system\*\* that allows users to:
 6\. View activity timeline for each lead
 
 7\. Edit/delete interactions
+
+
+
+---
+
+
+
+\## Search Implementation in Leads (Jan 30, 2026)
+
+
+
+\*\*Frontend\*\* (`frontend/src/pages/Leads.jsx`):
+
+\`\`\`javascript
+
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
+
+
+
+\// Add debounced search hook (300ms delay)
+
+const [searchTerm, setSearchTerm] = useState('');
+
+const debouncedSearch = useDebouncedValue(searchTerm, 300);
+
+
+
+\// Use debouncedSearch in query parameters
+
+const fetchLeads = useCallback(async (page = 1) => {
+
+  const response = await leadsAPI.getLeads({
+
+    search: debouncedSearch,
+
+    page,
+
+    limit: 20,
+
+    t: Date.now() \// Cache-busting timestamp
+
+  });
+
+  \// ...
+
+}, [debouncedSearch]);
+
+\`\`\`
+
+
+
+\*\*Backend\*\* (`routes/leads.js`):
+
+\`\`\`javascript
+
+\// Extract search parameter from query
+
+const { search, status, limit, offset } = req.query;
+
+
+
+\// Add ILIKE filtering for case-insensitive search
+
+if (search \&\& search.trim()) {
+
+  query += \` AND (
+
+    l.first_name ILIKE $\${params.length + 1} OR
+
+    l.last_name ILIKE $\${params.length + 1} OR
+
+    l.email ILIKE $\${params.length + 1} OR
+
+    l.company ILIKE $\${params.length + 1}
+
+  )\`;
+
+  params.push(\`%\${search}%\`);
+
+}
+
+\`\`\`
+
+
+
+\*\*Search Fields:\*\*
+
+\- First name
+
+\- Last name
+
+\- Email
+
+\- Company
+
+
+
+\*\*Key Features:\*\*
+
+\- \*\*300ms debounce delay\*\* - Prevents excessive API calls during typing
+
+\- \*\*Case-insensitive matching\*\* - Uses PostgreSQL \`ILIKE\` operator
+
+\- \*\*Multi-field search\*\* - Searches across 4 different fields
+
+\- \*\*Cache-busting\*\* - Includes timestamp parameter to bypass HTTP caching
 
 
 

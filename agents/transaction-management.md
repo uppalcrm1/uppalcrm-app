@@ -50,6 +50,7 @@ Contact (Customer) → Accounts (Licenses) → Transactions (Payments)
 - ✅ Authentication and multi-tenant security
 - ✅ Contact management system
 - ✅ Account management system
+- ✅ **Server-side search with client-side debouncing** (Jan 30, 2026)
 
 ## Your Mission 🎯
 
@@ -150,6 +151,84 @@ As the Transaction Management Agent, you help users with:
 - `POST /api/transactions/:id/fail` - Mark payment as failed
 - `POST /api/transactions/:id/refund` - Process refund
 - `POST /api/transactions/:id/invoice` - Generate invoice
+
+### Search Implementation in Transactions (Jan 30, 2026)
+
+**Frontend** (`frontend/src/pages/TransactionsPage.jsx`):
+```javascript
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
+
+// Add debounced search hook (300ms delay)
+const [searchTerm, setSearchTerm] = useState('');
+const debouncedSearch = useDebouncedValue(searchTerm, 300);
+
+// Use debouncedSearch in query parameters
+const fetchTransactions = useCallback(async (page = 1, pageSize = 20) => {
+  const response = await transactionsAPI.getTransactions({
+    search: debouncedSearch,
+    page,
+    limit: pageSize,
+    t: Date.now() // Cache-busting timestamp
+  });
+  // ...
+}, [debouncedSearch]);
+```
+
+**Backend** (`routes/transactions.js` lines 372-407):
+
+Main Query (lines 372-386):
+```javascript
+// Extract search parameter from query
+const { search, contact_id, limit, offset } = req.query;
+
+// Add ILIKE filtering for case-insensitive search
+if (search && search.trim()) {
+  query += ` AND (
+    t.transaction_reference ILIKE $${params.length + 1} OR
+    a.account_name ILIKE $${params.length + 1} OR
+    c.first_name ILIKE $${params.length + 1} OR
+    c.last_name ILIKE $${params.length + 1} OR
+    c.email ILIKE $${params.length + 1} OR
+    p.name ILIKE $${params.length + 1}
+  )`;
+  params.push(`%${search}%`);
+}
+```
+
+Count Query (lines 393-407):
+```javascript
+// IMPORTANT: Apply same search filters to count query for accurate pagination
+if (search && search.trim()) {
+  countQuery += ` AND (
+    t.transaction_reference ILIKE $1 OR
+    a.account_name ILIKE $1 OR
+    c.first_name ILIKE $1 OR
+    c.last_name ILIKE $1 OR
+    c.email ILIKE $1 OR
+    p.name ILIKE $1
+  )`;
+}
+```
+
+**Search Fields:**
+- Transaction reference number
+- Account name
+- Contact first name
+- Contact last name
+- Contact email
+- Product/edition name
+
+**Critical Implementation Detail:**
+- **Apply search filters to BOTH main query AND count query**
+- Ensures pagination shows correct total when filtered
+- Without this, pagination becomes inaccurate with filtered results
+
+**Key Features:**
+- **300ms debounce delay** - Prevents excessive API calls during typing
+- **Case-insensitive matching** - Uses PostgreSQL `ILIKE` operator
+- **Multi-field search** - Searches across 6 different fields
+- **Pagination-aware** - Count query also filters for accurate page totals
+- **Cache-busting** - Includes timestamp parameter to bypass HTTP caching
 
 ### Model: `models/Transaction.js`
 

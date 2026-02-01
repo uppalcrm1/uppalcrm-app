@@ -23,6 +23,7 @@
 - ✅ Trial management
 - ✅ Import contacts functionality
 - ✅ Authentication and multi-tenant security
+- ✅ **Server-side search with client-side debouncing** (Jan 30, 2026)
 
 ## Your Mission 🎯
 
@@ -505,6 +506,62 @@ Example:
 ```javascript
 GET /api/contacts?status=active&type=customer&search=john&page=1&limit=20
 ```
+
+### Task 7.1: Server-Side Search with Client-Side Debouncing (Jan 30, 2026)
+
+**Implementation Pattern:**
+
+The Contacts page now implements server-side search with client-side debouncing to handle real-time search efficiently:
+
+**Frontend** (`frontend/src/pages/Contacts.jsx`):
+```javascript
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
+
+// Add debounced search hook (300ms delay)
+const [searchTerm, setSearchTerm] = useState('');
+const debouncedSearch = useDebouncedValue(searchTerm, 300);
+
+// Use debouncedSearch in query parameters
+const fetchContacts = useCallback(async (page = 1) => {
+  const response = await contactsAPI.getContacts({
+    search: debouncedSearch,
+    page,
+    limit: 20,
+    t: Date.now() // Cache-busting timestamp
+  });
+  // ...
+}, [debouncedSearch]);
+```
+
+**Backend** (`routes/contacts.js`):
+```javascript
+// Extract search parameter from query
+const { search, status, type, priority, page = 1, limit = 20 } = req.query;
+
+// Add ILIKE filtering for case-insensitive search
+if (search && search.trim()) {
+  query += ` AND (
+    c.first_name ILIKE $${paramIndex} OR
+    c.last_name ILIKE $${paramIndex} OR
+    c.email ILIKE $${paramIndex} OR
+    c.company ILIKE $${paramIndex}
+  )`;
+  params.push(`%${search}%`);
+  paramIndex++;
+}
+```
+
+**Key Features:**
+- **300ms debounce delay** - Reduces API calls from keystroke-based (10+ per second) to debounce-based (1-2 per second)
+- **Case-insensitive matching** - Uses PostgreSQL `ILIKE` operator
+- **Searches across** - First name, last name, email, and company fields
+- **Cache-busting** - Includes timestamp parameter to bypass HTTP caching
+- **Pagination-aware** - Works correctly with paginated results
+
+**Performance Impact:**
+- Typical search: ~50-100ms API response time
+- Debounce prevents excessive database queries
+- User sees results appear smoothly as they type (after 300ms pause)
 
 ---
 

@@ -103,6 +103,7 @@ const response = {
 - ✅ Transactions table (payment records)
 - ✅ Authentication and multi-tenant security
 - ✅ Contact management system
+- ✅ **Server-side search with client-side debouncing** (Jan 30, 2026)
 
 ## Your Mission 🎯
 
@@ -542,6 +543,72 @@ When the user activates this agent, provide:
 - `GET /api/accounts/analytics/churn` - Churn rate analysis
 - `GET /api/accounts/analytics/trials` - Trial conversion metrics
 
+### ⚠️ CRITICAL: Route File Identification (Jan 30, 2026)
+
+**Active Route File:** `routes/accounts-simple.js` (NOT `routes/accounts.js`)
+
+- Line 76 in `server.js`: `const accountRoutes = require('./routes/accounts-simple');`
+- When implementing account features, always use `accounts-simple.js`
+- The `accounts.js` file exists but is NOT being used as the active route
+- This is the active endpoint being called by the frontend
+
+### Search Implementation in Accounts (Jan 30, 2026)
+
+**Frontend** (`frontend/src/pages/AccountsPage.jsx`):
+```javascript
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
+
+// Add debounced search hook (300ms delay)
+const [searchTerm, setSearchTerm] = useState('');
+const debouncedSearch = useDebouncedValue(searchTerm, 300);
+
+// Use debouncedSearch in query parameters
+const fetchAccounts = useCallback(async (page = 1) => {
+  const response = await accountsAPI.getAccounts({
+    search: debouncedSearch,
+    page,
+    limit: 20,
+    t: Date.now() // Cache-busting timestamp
+  });
+  // ...
+}, [debouncedSearch]);
+```
+
+**Backend** (`routes/accounts-simple.js` lines 82-95):
+```javascript
+// Extract search parameter from query
+const { search, status, limit, offset } = req.query;
+
+// Add ILIKE filtering for case-insensitive search
+if (search && search.trim()) {
+  query += ` AND (
+    a.account_name ILIKE $${params.length + 1} OR
+    a.mac_address ILIKE $${params.length + 1} OR
+    c.first_name ILIKE $${params.length + 1} OR
+    c.last_name ILIKE $${params.length + 1} OR
+    c.email ILIKE $${params.length + 1} OR
+    c.company ILIKE $${params.length + 1} OR
+    a.edition ILIKE $${params.length + 1}
+  )`;
+  params.push(`%${search}%`);
+}
+```
+
+**Search Fields:**
+- Account name
+- MAC address (device identifier)
+- Contact first name
+- Contact last name
+- Contact email
+- Contact company
+- Product edition name
+
+**Key Features:**
+- **300ms debounce delay** - Prevents excessive API calls while typing
+- **Case-insensitive matching** - Uses PostgreSQL `ILIKE` operator
+- **Multi-field search** - Searches across 7 different fields
+- **Cache-busting** - Includes timestamp parameter to bypass HTTP caching
+
 ### Model: `models/Account.js`
 
 The Account model should provide methods for:
@@ -835,9 +902,9 @@ CREATE INDEX idx_device_registrations_mac ON device_registrations(mac_address);
 CREATE INDEX idx_device_registrations_contact ON device_registrations(contact_id);
 ```
 
-### software_licenses table
+### accounts table
 ```sql
-CREATE TABLE software_licenses (
+CREATE TABLE accounts (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
 
@@ -872,9 +939,9 @@ CREATE TABLE software_licenses (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX idx_software_licenses_account ON software_licenses(account_id);
-CREATE INDEX idx_software_licenses_license_key ON software_licenses(license_key);
-CREATE INDEX idx_software_licenses_status ON software_licenses(status);
+CREATE INDEX idx_accounts_account ON accounts(account_id);
+CREATE INDEX idx_accounts_license_key ON accounts(license_key);
+CREATE INDEX idx_accounts_status ON accounts(status);
 ```
 
 ### trials table
