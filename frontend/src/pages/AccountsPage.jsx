@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   CreditCard,
@@ -21,6 +21,7 @@ import AccountSelectorModal from '../components/AccountSelectorModal'
 import { AccountActions } from '../components/accounts/AccountActions'
 import CreateAccountModal from '../components/CreateAccountModal'
 import { accountsAPI } from '../services/api'
+import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import toast from 'react-hot-toast'
 import { formatDateOnly } from '../utils/dateUtils'
 
@@ -100,9 +101,13 @@ const AccountsPage = () => {
   const [showCreateTransactionModal, setShowCreateTransactionModal] = useState(false)
   const [selectedAccountForTransaction, setSelectedAccountForTransaction] = useState(null)
   const [showCreateAccountModal, setShowCreateAccountModal] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
+  const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
   const [showDeleted, setShowDeleted] = useState(false)
+  const [loading, setLoading] = useState(false)
+
+  // Debounce search - separate immediate input from debounced API calls
+  const debouncedSearch = useDebouncedValue(searchTerm, 300)
 
   // Load column visibility from localStorage or use defaults
   const [visibleColumns, setVisibleColumns] = useState(() => {
@@ -180,28 +185,17 @@ const AccountsPage = () => {
   // Use localAccounts for display (optimistic updates), fallback to accounts
   const displayAccounts = localAccounts.length > 0 ? localAccounts : accounts
 
-  // Apply search and status filters
+  // Apply status filter (search now happens server-side)
   const filteredAccounts = React.useMemo(() => {
     let filtered = displayAccounts
 
-    // Apply search filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase()
-      filtered = filtered.filter(account => 
-        (account.contact_name?.toLowerCase().includes(query)) ||
-        (account.device?.toLowerCase().includes(query)) ||
-        (account.mac_address?.toLowerCase().includes(query)) ||
-        (account.account_name?.toLowerCase().includes(query))
-      )
-    }
-
-    // Apply status filter
+    // Apply status filter (client-side only)
     if (filterStatus !== 'all') {
       filtered = filtered.filter(account => account.status === filterStatus)
     }
 
     return filtered
-  }, [displayAccounts, searchQuery, filterStatus])
+  }, [displayAccounts, filterStatus])
 
   // Initialize localAccounts when accounts changes
   React.useEffect(() => {
@@ -211,19 +205,29 @@ const AccountsPage = () => {
   // Fetch accounts function (moved outside useEffect to be callable)
   const fetchAccounts = React.useCallback(async () => {
     try {
-      const response = await accountsAPI.getAccounts(showDeleted)
-      console.log('API Response:', response)
+      setLoading(true)
+      const params = {}
+      if (debouncedSearch.trim()) {
+        params.search = debouncedSearch
+      }
+      // Add timestamp to bypass caching
+      params.t = Date.now()
+      console.log('🔍 Fetching accounts with params:', params)
+      const response = await accountsAPI.getAccounts(params)
+      console.log('📥 API Response:', response)
       // Backend can return either 'accounts' or 'subscriptions' depending on endpoint
       const accountsData = response.accounts || response.subscriptions || []
-      console.log('Accounts data:', accountsData)
-      console.log('Accounts length:', accountsData.length)
+      console.log('📥 Accounts data length:', accountsData.length)
+      console.log('📥 First account:', accountsData[0]?.contact_name)
       setAccounts(accountsData)
     } catch (error) {
       console.error('Error fetching accounts:', error)
+    } finally {
+      setLoading(false)
     }
-  }, [showDeleted])
+  }, [showDeleted, debouncedSearch])
 
-  // Fetch accounts on component mount and when showDeleted changes
+  // Fetch accounts when debouncedSearch or showDeleted changes
   React.useEffect(() => {
     fetchAccounts()
   }, [fetchAccounts])
@@ -368,8 +372,8 @@ const AccountsPage = () => {
             <input
               type="text"
               placeholder="Search accounts by contact, device, or MAC address..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
               className="input pl-10"
             />
           </div>

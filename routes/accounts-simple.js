@@ -16,7 +16,9 @@ router.use(validateOrganizationContext);
 router.get('/', async (req, res) => {
   try {
     const { organization_id } = req.user;
-    const { status, limit = 100, offset = 0, includeDeleted = 'false' } = req.query;
+    const { status, limit = 100, offset = 0, includeDeleted = 'false', search } = req.query;
+
+    console.log('📥 [Accounts GET] Received query:', { status, limit, offset, search });
 
     let query = `
       SELECT
@@ -77,6 +79,20 @@ router.get('/', async (req, res) => {
     if (status) {
       query += ` AND a.status = $${params.length + 1}`;
       params.push(status);
+    }
+
+    // Add search filter
+    if (search && search.trim()) {
+      query += ` AND (
+        a.account_name ILIKE $${params.length + 1} OR
+        a.mac_address ILIKE $${params.length + 1} OR
+        c.first_name ILIKE $${params.length + 1} OR
+        c.last_name ILIKE $${params.length + 1} OR
+        c.email ILIKE $${params.length + 1} OR
+        c.company ILIKE $${params.length + 1} OR
+        a.edition ILIKE $${params.length + 1}
+      )`;
+      params.push(`%${search}%`);
     }
 
     query += ` ORDER BY a.created_at DESC`;
