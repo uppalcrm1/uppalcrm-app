@@ -124,6 +124,13 @@ const AccountsPage = () => {
   const [totalCount, setTotalCount] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
 
+  // Stats state (organization-wide, not just current page)
+  const [stats, setStats] = useState({
+    totalRevenue: 0,
+    totalAccounts: 0,
+    activeUsers: 0
+  })
+
   // Debounce search - separate immediate input from debounced API calls
   const debouncedSearch = useDebouncedValue(searchTerm, 300)
 
@@ -218,8 +225,9 @@ const AccountsPage = () => {
   const handleDeleteAccount = async (accountId, reason) => {
     try {
       await accountsAPI.softDeleteAccount(accountId, reason)
-      // Refresh accounts list
+      // Refresh accounts list and stats
       await fetchAccounts()
+      await fetchStats()
     } catch (error) {
       throw error // Let component handle error
     }
@@ -229,8 +237,9 @@ const AccountsPage = () => {
   const handleRestoreAccount = async (accountId) => {
     try {
       await accountsAPI.restoreAccount(accountId)
-      // Refresh accounts list
+      // Refresh accounts list and stats
       await fetchAccounts()
+      await fetchStats()
     } catch (error) {
       throw error // Let component handle error
     }
@@ -295,17 +304,24 @@ const AccountsPage = () => {
     fetchAccounts(1, pageSize)
   }, [fetchAccounts, pageSize, sortColumn, sortDirection])
 
-  // Calculate statistics
-  const stats = {
-    totalRevenue: filteredAccounts.reduce((sum, acc) => {
-      if (acc.status === 'active' || acc.status === 'expiring_soon') {
-        return sum + (parseFloat(acc.price) || 0)
-      }
-      return sum
-    }, 0),
-    totalAccounts: filteredAccounts.length,
-    activeUsers: filteredAccounts.filter(acc => acc.status === 'active').length
-  }
+  // Fetch organization-wide stats (not limited to current page)
+  const fetchStats = React.useCallback(async () => {
+    try {
+      const response = await accountsAPI.getStats()
+      setStats({
+        totalRevenue: response.stats?.total_revenue || 0,
+        totalAccounts: response.stats?.total_accounts || 0,
+        activeUsers: response.stats?.active_accounts || 0
+      })
+    } catch (error) {
+      console.error('Error fetching stats:', error)
+    }
+  }, [])
+
+  // Fetch stats on component mount
+  React.useEffect(() => {
+    fetchStats()
+  }, [fetchStats])
 
   const getStatusBadge = (status, daysUntilExpiry) => {
     if (status === 'active' && daysUntilExpiry > 7) {
@@ -347,12 +363,15 @@ const AccountsPage = () => {
   const handleTransactionCreated = () => {
     setShowCreateTransactionModal(false)
     setSelectedAccountForTransaction(null)
+    fetchAccounts() // Refresh accounts to reflect transaction
+    fetchStats() // Refresh organization-wide stats
     toast.success('Transaction created successfully')
   }
 
   const handleAccountCreated = () => {
     setShowCreateAccountModal(false)
     fetchAccounts() // Refresh the accounts list
+    fetchStats() // Refresh organization-wide stats
     toast.success('Account created successfully')
   }
 
