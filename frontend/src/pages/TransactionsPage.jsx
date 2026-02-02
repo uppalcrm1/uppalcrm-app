@@ -17,7 +17,8 @@ import {
   RotateCcw,
   ArrowUpDown,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  User
 } from 'lucide-react'
 import { transactionsAPI } from '../services/api'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
@@ -38,6 +39,7 @@ const COLUMN_DEFINITIONS = [
   { key: 'status', label: 'Status', description: 'Transaction status', required: false },
   { key: 'source', label: 'Source', description: 'Payment source', required: false },
   { key: 'payment_method', label: 'Payment Method', description: 'Payment method used', required: false },
+  { key: 'created_by', label: 'Created By', description: 'User who created the transaction', required: false },
   { key: 'actions', label: 'Actions', description: 'Transaction actions', required: true }
 ]
 
@@ -52,6 +54,7 @@ const DEFAULT_VISIBLE_COLUMNS = {
   status: true,
   source: true,
   payment_method: true,
+  created_by: false,
   actions: true
 }
 
@@ -487,6 +490,7 @@ const TransactionsPage = () => {
                   {visibleColumns.status && <th className="text-left py-3 px-4 font-medium text-gray-900">Status</th>}
                   {visibleColumns.source && <th className="text-left py-3 px-4 font-medium text-gray-900">Source</th>}
                   {visibleColumns.payment_method && <th className="text-left py-3 px-4 font-medium text-gray-900">Payment Method</th>}
+                  {visibleColumns.created_by && <th className="text-left py-3 px-4 font-medium text-gray-900">Created By</th>}
                   {visibleColumns.actions && <th className="text-left py-3 px-4 font-medium text-gray-900">Actions</th>}
                 </tr>
               </thead>
@@ -597,7 +601,17 @@ const TransactionsPage = () => {
                         </td>
                       )}
 
-                      {/* Column 10: Actions */}
+                      {/* Column 10: Created By */}
+                      {visibleColumns.created_by && (
+                        <td className="py-4 px-4">
+                          <div className="flex items-center text-sm text-gray-700">
+                            <User size={14} className="mr-2 text-gray-400" />
+                            {transaction.created_by_name || 'Unknown'}
+                          </div>
+                        </td>
+                      )}
+
+                      {/* Column 11: Actions */}
                       {visibleColumns.actions && (
                         <td className="py-4 px-4">
                           <div className="flex items-center gap-2">
