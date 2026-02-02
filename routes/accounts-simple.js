@@ -16,7 +16,7 @@ router.use(validateOrganizationContext);
 router.get('/', async (req, res) => {
   try {
     const { organization_id } = req.user;
-    const { status, limit = 100, offset = 0, includeDeleted = 'false', search } = req.query;
+    const { status, limit = 100, offset = 0, includeDeleted = 'false', search, orderBy = 'created_date', orderDirection = 'desc' } = req.query;
 
     console.log('📥 [Accounts GET] Received query:', { status, limit, offset, search });
 
@@ -95,7 +95,25 @@ router.get('/', async (req, res) => {
       params.push(`%${search}%`);
     }
 
-    query += ` ORDER BY a.created_at DESC`;
+    // Build ORDER BY clause based on sort parameters
+    let orderByClause = 'a.created_at'
+    switch (orderBy) {
+      case 'next_renewal':
+        orderByClause = 'a.next_renewal_date'
+        break
+      case 'created_date':
+        orderByClause = 'a.created_at'
+        break
+      case 'account_name':
+        orderByClause = 'a.account_name'
+        break
+      default:
+        orderByClause = 'a.created_at'
+    }
+
+    // Validate orderDirection
+    const validDirection = orderDirection && orderDirection.toLowerCase() === 'asc' ? 'ASC' : 'DESC'
+    query += ` ORDER BY ${orderByClause} ${validDirection}`;
 
     // Get total count for pagination (before LIMIT/OFFSET)
     let countQuery = `SELECT COUNT(*) as total FROM accounts a
