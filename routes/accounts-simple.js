@@ -180,33 +180,16 @@ router.get('/stats', async (req, res) => {
   try {
     const { organization_id } = req.user;
 
-    // Try with deleted_at column first (newer schema)
-    let result;
-    try {
-      result = await db.query(`
-        SELECT
-          COUNT(*) as total_accounts,
-          COUNT(CASE WHEN status = 'active' THEN 1 END) as active_accounts,
-          COUNT(CASE WHEN status = 'trial' THEN 1 END) as trial_accounts,
-          COUNT(CASE WHEN is_trial = true THEN 1 END) as trial_count,
-          SUM(CASE WHEN status = 'active' THEN price ELSE 0 END) as total_revenue
-        FROM accounts
-        WHERE organization_id = $1 AND deleted_at IS NULL
-      `, [organization_id], organization_id);
-    } catch (error) {
-      // Fallback for older schema without deleted_at column
-      console.warn('Stats query with deleted_at failed, trying without it:', error.message);
-      result = await db.query(`
-        SELECT
-          COUNT(*) as total_accounts,
-          COUNT(CASE WHEN status = 'active' THEN 1 END) as active_accounts,
-          COUNT(CASE WHEN status = 'trial' THEN 1 END) as trial_accounts,
-          COALESCE(COUNT(CASE WHEN is_trial = true THEN 1 END), 0) as trial_count,
-          SUM(CASE WHEN status = 'active' THEN price ELSE 0 END) as total_revenue
-        FROM accounts
-        WHERE organization_id = $1
-      `, [organization_id], organization_id);
-    }
+    const result = await db.query(`
+      SELECT
+        COUNT(*) as total_accounts,
+        COUNT(CASE WHEN status = 'active' THEN 1 END) as active_accounts,
+        COUNT(CASE WHEN status = 'trial' THEN 1 END) as trial_accounts,
+        COUNT(CASE WHEN is_trial = true THEN 1 END) as trial_count,
+        SUM(CASE WHEN status = 'active' THEN price ELSE 0 END) as total_revenue
+      FROM accounts
+      WHERE organization_id = $1 AND deleted_at IS NULL
+    `, [organization_id], organization_id);
 
     res.json({
       success: true,
@@ -214,16 +197,9 @@ router.get('/stats', async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching account stats:', error);
-    // Return default stats instead of 500 error to prevent page crashes
-    res.json({
-      success: true,
-      stats: {
-        total_accounts: 0,
-        active_accounts: 0,
-        trial_accounts: 0,
-        trial_count: 0,
-        total_revenue: 0
-      }
+    res.status(500).json({
+      error: 'Failed to fetch account stats',
+      message: error.message
     });
   }
 });
