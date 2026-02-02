@@ -180,16 +180,33 @@ router.get('/stats', async (req, res) => {
   try {
     const { organization_id } = req.user;
 
-    const result = await db.query(`
-      SELECT
-        COUNT(*) as total_accounts,
-        COUNT(CASE WHEN account_type = 'active' THEN 1 END) as active_accounts,
-        COUNT(CASE WHEN account_type = 'trial' THEN 1 END) as trial_accounts,
-        COUNT(CASE WHEN is_trial = true THEN 1 END) as trial_count,
-        COALESCE(SUM(CASE WHEN account_type = 'active' THEN price ELSE 0 END), 0) as total_revenue
-      FROM accounts
-      WHERE organization_id = $1
-    `, [organization_id], organization_id);
+    // Try with deleted_at filter first (matches production behavior)
+    let result;
+    try {
+      result = await db.query(`
+        SELECT
+          COUNT(*) as total_accounts,
+          COUNT(CASE WHEN account_type = 'active' THEN 1 END) as active_accounts,
+          COUNT(CASE WHEN account_type = 'trial' THEN 1 END) as trial_accounts,
+          COUNT(CASE WHEN is_trial = true THEN 1 END) as trial_count,
+          COALESCE(SUM(CASE WHEN account_type = 'active' THEN price ELSE 0 END), 0) as total_revenue
+        FROM accounts
+        WHERE organization_id = $1 AND deleted_at IS NULL
+      `, [organization_id], organization_id);
+    } catch (error) {
+      // Fallback if deleted_at column doesn't exist
+      console.warn('Stats query with deleted_at failed, trying without it:', error.message);
+      result = await db.query(`
+        SELECT
+          COUNT(*) as total_accounts,
+          COUNT(CASE WHEN account_type = 'active' THEN 1 END) as active_accounts,
+          COUNT(CASE WHEN account_type = 'trial' THEN 1 END) as trial_accounts,
+          COUNT(CASE WHEN is_trial = true THEN 1 END) as trial_count,
+          COALESCE(SUM(CASE WHEN account_type = 'active' THEN price ELSE 0 END), 0) as total_revenue
+        FROM accounts
+        WHERE organization_id = $1
+      `, [organization_id], organization_id);
+    }
 
     res.json({
       success: true,
