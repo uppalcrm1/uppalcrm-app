@@ -308,13 +308,21 @@ const AccountsPage = () => {
   const fetchStats = React.useCallback(async () => {
     try {
       const response = await accountsAPI.getStats()
+      console.log('📊 Stats API Response:', response)
+
       setStats({
-        totalRevenue: response.stats?.total_revenue || 0,
-        totalAccounts: response.stats?.total_accounts || 0,
-        activeUsers: response.stats?.active_accounts || 0
+        totalRevenue: parseFloat(response.stats?.total_revenue ?? 0) || 0,
+        totalAccounts: parseInt(response.stats?.total_accounts ?? 0) || 0,
+        activeUsers: parseInt(response.stats?.active_accounts ?? 0) || 0
       })
     } catch (error) {
       console.error('Error fetching stats:', error)
+      // Set defaults on error
+      setStats({
+        totalRevenue: 0,
+        totalAccounts: 0,
+        activeUsers: 0
+      })
     }
   }, [])
 
