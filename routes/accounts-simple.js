@@ -96,15 +96,54 @@ router.get('/', async (req, res) => {
     }
 
     query += ` ORDER BY a.created_at DESC`;
+
+    // Get total count for pagination (before LIMIT/OFFSET)
+    let countQuery = `SELECT COUNT(*) as total FROM accounts a
+      LEFT JOIN contacts c ON a.contact_id = c.id
+      LEFT JOIN products p ON a.product_id = p.id
+      WHERE a.organization_id = $1`;
+
+    const countParams = [organization_id];
+
+    // Apply same filters to count query
+    if (includeDeleted === 'false' || includeDeleted === false) {
+      countQuery += ` AND a.deleted_at IS NULL`;
+    }
+    if (status) {
+      countQuery += ` AND a.status = $${countParams.length + 1}`;
+      countParams.push(status);
+    }
+    if (search && search.trim()) {
+      countQuery += ` AND (
+        a.account_name ILIKE $${countParams.length + 1} OR
+        a.mac_address ILIKE $${countParams.length + 1} OR
+        c.first_name ILIKE $${countParams.length + 1} OR
+        c.last_name ILIKE $${countParams.length + 1} OR
+        c.email ILIKE $${countParams.length + 1} OR
+        c.company ILIKE $${countParams.length + 1} OR
+        a.edition ILIKE $${countParams.length + 1}
+      )`;
+      countParams.push(`%${search}%`);
+    }
+
+    // Add pagination
     query += ` LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
     params.push(limit, offset);
 
-    const result = await db.query(query, params, organization_id);
+    const [result, countResult] = await Promise.all([
+      db.query(query, params, organization_id),
+      db.query(countQuery, countParams, organization_id)
+    ]);
+
+    const total = parseInt(countResult.rows[0]?.total || 0);
+    const totalPages = Math.ceil(total / limit);
 
     res.json({
       success: true,
       accounts: result.rows,
-      count: result.rows.length
+      count: result.rows.length,
+      total: total,
+      totalPages: totalPages
     });
   } catch (error) {
     console.error('Error fetching accounts:', error);
