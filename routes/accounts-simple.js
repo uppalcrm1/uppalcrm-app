@@ -183,12 +183,12 @@ router.get('/stats', async (req, res) => {
     const result = await db.query(`
       SELECT
         COUNT(*) as total_accounts,
-        COUNT(CASE WHEN account_type = 'active' THEN 1 END) as active_accounts,
-        COUNT(CASE WHEN account_type = 'trial' THEN 1 END) as trial_accounts,
+        COUNT(CASE WHEN status = 'active' THEN 1 END) as active_accounts,
+        COUNT(CASE WHEN status = 'trial' THEN 1 END) as trial_accounts,
         COUNT(CASE WHEN is_trial = true THEN 1 END) as trial_count,
-        COALESCE(SUM(CASE WHEN account_type = 'active' THEN price ELSE 0 END), 0) as total_revenue
+        SUM(CASE WHEN status = 'active' THEN price ELSE 0 END) as total_revenue
       FROM accounts
-      WHERE organization_id = $1
+      WHERE organization_id = $1 AND deleted_at IS NULL
     `, [organization_id], organization_id);
 
     res.json({
