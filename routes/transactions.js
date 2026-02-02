@@ -340,6 +340,10 @@ router.get('/', async (req, res) => {
         -- Product information
         p.name as product_name,
 
+        -- Created by user information
+        COALESCE(u.first_name || ' ' || u.last_name, 'Unknown') as created_by_name,
+        u.email as created_by_email,
+
         -- Generate Transaction ID: "Account Name - Term"
         CONCAT(
           COALESCE(a.account_name, 'Unknown'),
@@ -356,6 +360,7 @@ router.get('/', async (req, res) => {
       LEFT JOIN accounts a ON t.account_id = a.id
       LEFT JOIN contacts c ON t.contact_id = c.id
       LEFT JOIN products p ON t.product_id = p.id
+      LEFT JOIN users u ON t.created_by = u.id
       WHERE t.organization_id = $1
     `;
 
