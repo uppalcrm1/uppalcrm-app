@@ -118,6 +118,12 @@ const AccountsPage = () => {
   const [sortColumn, setSortColumn] = useState('created_date') // Default sort by created date
   const [sortDirection, setSortDirection] = useState('desc') // 'asc' or 'desc' - default newest first
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(50)
+  const [totalCount, setTotalCount] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
+
   // Debounce search - separate immediate input from debounced API calls
   const debouncedSearch = useDebouncedValue(searchTerm, 300)
 
@@ -151,6 +157,30 @@ const AccountsPage = () => {
       // Set new column with ascending order
       setSortColumn(columnKey)
       setSortDirection('asc')
+    }
+  }
+
+  // Pagination handlers
+  const handlePreviousPage = () => {
+    if (currentPage > 1) {
+      fetchAccounts(currentPage - 1, pageSize)
+    }
+  }
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      fetchAccounts(currentPage + 1, pageSize)
+    }
+  }
+
+  const handlePageSizeChange = (newSize) => {
+    setPageSize(newSize)
+    fetchAccounts(1, newSize)
+  }
+
+  const handleGoToPage = (page) => {
+    if (page >= 1 && page <= totalPages) {
+      fetchAccounts(page, pageSize)
     }
   }
 
@@ -255,10 +285,14 @@ const AccountsPage = () => {
   }, [accounts])
 
   // Fetch accounts function (moved outside useEffect to be callable)
-  const fetchAccounts = React.useCallback(async () => {
+  const fetchAccounts = React.useCallback(async (page = 1, size = pageSize) => {
     try {
       setLoading(true)
-      const params = {}
+      const offset = (page - 1) * size
+      const params = {
+        limit: size,
+        offset: offset
+      }
       if (debouncedSearch.trim()) {
         params.search = debouncedSearch
       }
@@ -272,17 +306,20 @@ const AccountsPage = () => {
       console.log('📥 Accounts data length:', accountsData.length)
       console.log('📥 First account:', accountsData[0]?.contact_name)
       setAccounts(accountsData)
+      setTotalCount(response.total || 0)
+      setTotalPages(response.totalPages || 0)
+      setCurrentPage(page)
     } catch (error) {
       console.error('Error fetching accounts:', error)
     } finally {
       setLoading(false)
     }
-  }, [showDeleted, debouncedSearch])
+  }, [debouncedSearch, pageSize])
 
-  // Fetch accounts when debouncedSearch or showDeleted changes
+  // Fetch accounts when debouncedSearch, pageSize, or showDeleted changes
   React.useEffect(() => {
-    fetchAccounts()
-  }, [fetchAccounts])
+    fetchAccounts(1, pageSize)
+  }, [fetchAccounts, pageSize])
 
   // Calculate statistics
   const stats = {
@@ -459,7 +496,8 @@ const AccountsPage = () => {
             <div className="flex items-center gap-2">
               <Users size={20} className="text-gray-700" />
               <span className="text-sm font-medium text-gray-700">
-                {displayAccounts.length} {displayAccounts.length === 1 ? 'Account' : 'Accounts'}
+                {totalCount} total {totalCount === 1 ? 'Account' : 'Accounts'}
+                {totalPages > 1 && <span className="text-gray-500"> • Showing {displayAccounts.length} per page</span>}
               </span>
             </div>
             <div className="flex items-center gap-2">
@@ -666,6 +704,79 @@ const AccountsPage = () => {
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Pagination Controls */}
+        {!loading && displayAccounts.length > 0 && totalPages > 1 && (
+          <div className="border-t border-gray-200 px-4 py-4 flex items-center justify-between bg-gray-50">
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-gray-700">Rows per page:</label>
+              <select
+                value={pageSize}
+                onChange={(e) => handlePageSizeChange(parseInt(e.target.value))}
+                className="input input-sm"
+              >
+                <option value="25">25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+                <option value="200">200</option>
+              </select>
+            </div>
+
+            <div className="text-sm text-gray-700">
+              Page <span className="font-medium">{currentPage}</span> of{' '}
+              <span className="font-medium">{totalPages}</span> ({' '}
+              <span className="font-medium">{totalCount}</span> total)
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handlePreviousPage}
+                disabled={currentPage === 1}
+                className="btn btn-sm btn-outline"
+              >
+                Previous
+              </button>
+
+              {/* Page number buttons */}
+              <div className="flex gap-1">
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum
+                  if (totalPages <= 5) {
+                    pageNum = i + 1
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1
+                  } else if (currentPage > totalPages - 3) {
+                    pageNum = totalPages - 4 + i
+                  } else {
+                    pageNum = currentPage - 2 + i
+                  }
+
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => handleGoToPage(pageNum)}
+                      className={`btn btn-sm ${
+                        currentPage === pageNum
+                          ? 'btn-primary'
+                          : 'btn-outline'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  )
+                })}
+              </div>
+
+              <button
+                onClick={handleNextPage}
+                disabled={currentPage === totalPages}
+                className="btn btn-sm btn-outline"
+              >
+                Next
+              </button>
+            </div>
           </div>
         )}
       </div>
