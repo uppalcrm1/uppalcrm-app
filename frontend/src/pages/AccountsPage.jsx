@@ -239,7 +239,7 @@ const AccountsPage = () => {
   // Use localAccounts for display (optimistic updates), fallback to accounts
   const displayAccounts = localAccounts.length > 0 ? localAccounts : accounts
 
-  // Apply status filter and sorting
+  // Apply status filter (sorting is now done server-side)
   const filteredAccounts = React.useMemo(() => {
     let filtered = displayAccounts
 
@@ -248,36 +248,8 @@ const AccountsPage = () => {
       filtered = filtered.filter(account => account.status === filterStatus)
     }
 
-    // Apply sorting
-    const sorted = [...filtered].sort((a, b) => {
-      let aValue, bValue
-
-      switch (sortColumn) {
-        case 'next_renewal':
-          // Sort by days_until_renewal (null values go to end)
-          aValue = a.days_until_renewal ?? Infinity
-          bValue = b.days_until_renewal ?? Infinity
-          break
-        case 'created_date':
-          aValue = new Date(a.created_at).getTime()
-          bValue = new Date(b.created_at).getTime()
-          break
-        case 'account_name':
-          aValue = (a.account_name || '').toLowerCase()
-          bValue = (b.account_name || '').toLowerCase()
-          break
-        default:
-          return 0
-      }
-
-      // Compare values
-      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1
-      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1
-      return 0
-    })
-
-    return sorted
-  }, [displayAccounts, filterStatus, sortColumn, sortDirection])
+    return filtered
+  }, [displayAccounts, filterStatus])
 
   // Initialize localAccounts when accounts changes
   React.useEffect(() => {
@@ -291,7 +263,9 @@ const AccountsPage = () => {
       const offset = (page - 1) * size
       const params = {
         limit: size,
-        offset: offset
+        offset: offset,
+        orderBy: sortColumn,
+        orderDirection: sortDirection
       }
       if (debouncedSearch.trim()) {
         params.search = debouncedSearch
@@ -314,12 +288,12 @@ const AccountsPage = () => {
     } finally {
       setLoading(false)
     }
-  }, [debouncedSearch, pageSize])
+  }, [debouncedSearch, pageSize, sortColumn, sortDirection])
 
-  // Fetch accounts when debouncedSearch, pageSize, or showDeleted changes
+  // Fetch accounts when sorting, search, or pageSize changes - reset to page 1
   React.useEffect(() => {
     fetchAccounts(1, pageSize)
-  }, [fetchAccounts, pageSize])
+  }, [fetchAccounts, pageSize, sortColumn, sortDirection])
 
   // Calculate statistics
   const stats = {
