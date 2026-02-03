@@ -161,11 +161,11 @@ class TwilioService {
   async createInteraction(organizationId, leadId, userId, type, description, outcome) {
     const query = `
       INSERT INTO lead_interactions (
-        lead_id, user_id, interaction_type, description, outcome, completed_at
-      ) VALUES ($1, $2, $3, $4, $5, NOW())
+        organization_id, lead_id, user_id, interaction_type, description, outcome, completed_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, NOW())
     `;
 
-    await db.query(query, [leadId, userId, type, description, outcome]);
+    await db.query(query, [organizationId, leadId, userId, type, description, outcome]);
   }
 
   /**
@@ -326,10 +326,10 @@ class TwilioService {
   async updateSMSStatus(messageSid, status, errorCode = null, errorMessage = null) {
     const query = `
       UPDATE sms_messages
-      SET twilio_status = $1,
+      SET twilio_status = $1::VARCHAR,
           error_code = $2,
           error_message = $3,
-          delivered_at = CASE WHEN $1 = 'delivered' THEN NOW() ELSE delivered_at END
+          delivered_at = CASE WHEN $1::VARCHAR = 'delivered' THEN NOW() ELSE delivered_at END
       WHERE twilio_sid = $4
       RETURNING *
     `;
