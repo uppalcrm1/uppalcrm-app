@@ -11,6 +11,16 @@ import { accountsAPI, productsAPI } from '../services/api'
 import toast from 'react-hot-toast'
 import { BILLING_TERMS } from '../constants/transactions'
 
+// Map billing_cycle strings to term numeric values
+const billingCycleToTermMap = {
+  'monthly': '1',
+  'quarterly': '3',
+  'semi-annual': '6',
+  'semi_annual': '6',
+  'annual': '12',
+  'biennial': '24'
+}
+
 const EditAccountModal = ({ isOpen, onClose, onSuccess, account }) => {
   const [formData, setFormData] = useState({
     account_name: '',
@@ -33,12 +43,17 @@ const EditAccountModal = ({ isOpen, onClose, onSuccess, account }) => {
   useEffect(() => {
     if (isOpen && account) {
       console.log('📋 Pre-populating form with account:', account)
+      // Convert billing_cycle to term if needed
+      const term = account.term
+        ? account.term.toString()
+        : (billingCycleToTermMap[account.billing_cycle] || '1')
+
       setFormData({
         account_name: account.account_name || '',
         edition: account.edition || '',
         device_name: account.device_name || '',
         mac_address: account.mac_address || '',
-        term: account.term?.toString() || '1',
+        term: term,
         price: account.price || '',
         license_status: account.license_status || 'pending',
         is_trial: account.is_trial || false,
