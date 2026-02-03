@@ -20,6 +20,7 @@ import CreateTransactionModal from '../components/CreateTransactionModal'
 import AccountSelectorModal from '../components/AccountSelectorModal'
 import { AccountActions } from '../components/accounts/AccountActions'
 import CreateAccountModal from '../components/CreateAccountModal'
+import EditAccountModal from '../components/EditAccountModal'
 import { accountsAPI } from '../services/api'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import toast from 'react-hot-toast'
@@ -111,6 +112,9 @@ const AccountsPage = () => {
   const [showCreateTransactionModal, setShowCreateTransactionModal] = useState(false)
   const [selectedAccountForTransaction, setSelectedAccountForTransaction] = useState(null)
   const [showCreateAccountModal, setShowCreateAccountModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [selectedAccountForEdit, setSelectedAccountForEdit] = useState(null)
+  const [loadingEditAccount, setLoadingEditAccount] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
   const [showDeleted, setShowDeleted] = useState(false)
@@ -381,6 +385,27 @@ const AccountsPage = () => {
     fetchAccounts() // Refresh the accounts list
     fetchStats() // Refresh organization-wide stats
     toast.success('Account created successfully')
+  }
+
+  const handleEditAccount = async (account) => {
+    setLoadingEditAccount(true)
+    try {
+      const response = await accountsAPI.getAccount(account.id)
+      setSelectedAccountForEdit(response.account)
+      setShowEditModal(true)
+    } catch (error) {
+      console.error('Error loading account for edit:', error)
+      toast.error('Failed to load account details')
+    } finally {
+      setLoadingEditAccount(false)
+    }
+  }
+
+  const handleAccountUpdated = () => {
+    setShowEditModal(false)
+    setSelectedAccountForEdit(null)
+    fetchAccounts() // Refresh the accounts list
+    fetchStats() // Refresh organization-wide stats
   }
 
   return (
@@ -691,6 +716,14 @@ const AccountsPage = () => {
                             >
                               <Eye size={16} />
                             </button>
+                            <button
+                              onClick={() => handleEditAccount(account)}
+                              disabled={loadingEditAccount}
+                              className="p-2 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg"
+                              title="Edit Account"
+                            >
+                              <Edit2 size={16} />
+                            </button>
                             <AccountActions
                               account={account}
                               onDelete={handleDeleteAccount}
@@ -812,6 +845,14 @@ const AccountsPage = () => {
         isOpen={showCreateAccountModal}
         onClose={() => setShowCreateAccountModal(false)}
         onSuccess={handleAccountCreated}
+      />
+
+      {/* Edit Account Modal */}
+      <EditAccountModal
+        isOpen={showEditModal}
+        account={selectedAccountForEdit}
+        onClose={() => { setShowEditModal(false); setSelectedAccountForEdit(null) }}
+        onSuccess={handleAccountUpdated}
       />
     </div>
   )

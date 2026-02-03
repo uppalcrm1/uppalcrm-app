@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, DollarSign, Plus,
-  User, FileText, Clock
+  User, FileText, Clock, Pencil
 } from 'lucide-react';
 import api from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -10,6 +10,7 @@ import AccountDetailsPanel from '../components/Account/AccountDetailsPanel';
 import AccountTransactionsList from '../components/Account/AccountTransactionsList';
 import AccountHistoryPanel from '../components/Account/AccountHistoryPanel';
 import CreateTransactionModal from '../components/CreateTransactionModal';
+import EditAccountModal from '../components/EditAccountModal';
 import { formatDateOnly } from '../utils/dateUtils';
 
 const AccountDetail = () => {
@@ -24,6 +25,7 @@ const AccountDetail = () => {
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('details');
   const [showCreateTransactionModal, setShowCreateTransactionModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
   // Fetch account details
@@ -119,6 +121,13 @@ const AccountDetail = () => {
 
             {/* Actions */}
             <div className="flex gap-2">
+              <button
+                onClick={() => setShowEditModal(true)}
+                className="inline-flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+              >
+                <Pencil size={16} className="mr-2" />
+                Edit Account
+              </button>
               <button
                 onClick={() => setShowCreateTransactionModal(true)}
                 className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -238,6 +247,17 @@ const AccountDetail = () => {
         account={account}
         onClose={() => setShowCreateTransactionModal(false)}
         onSuccess={() => setRefreshKey(prev => prev + 1)}
+      />
+
+      {/* Edit Account Modal */}
+      <EditAccountModal
+        isOpen={showEditModal}
+        account={account}
+        onClose={() => setShowEditModal(false)}
+        onSuccess={() => {
+          setShowEditModal(false)
+          setRefreshKey(prev => prev + 1)
+        }}
       />
     </div>
   );
