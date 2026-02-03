@@ -391,7 +391,7 @@ const AccountsPage = () => {
     setLoadingEditAccount(true)
     try {
       const response = await accountsAPI.getAccount(account.id)
-      setSelectedAccountForEdit(response)
+      setSelectedAccountForEdit(response.account)
       setShowEditModal(true)
     } catch (error) {
       console.error('Error loading account for edit:', error)

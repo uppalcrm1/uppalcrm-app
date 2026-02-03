@@ -32,6 +32,7 @@ const EditAccountModal = ({ isOpen, onClose, onSuccess, account }) => {
   // Pre-populate form data when account changes or modal opens
   useEffect(() => {
     if (isOpen && account) {
+      console.log('📋 Pre-populating form with account:', account)
       setFormData({
         account_name: account.account_name || '',
         edition: account.edition || '',
