@@ -73,7 +73,7 @@ router.get('/', async (req, res) => {
     }
 
     if (status) {
-      query += ` AND a.status = $${params.length + 1}`;
+      query += ` AND a.account_status = $${params.length + 1}`;
       params.push(status);
     }
 
@@ -124,7 +124,7 @@ router.get('/', async (req, res) => {
       countQuery += ` AND a.deleted_at IS NULL`;
     }
     if (status) {
-      countQuery += ` AND a.status = $${countParams.length + 1}`;
+      countQuery += ` AND a.account_status = $${countParams.length + 1}`;
       countParams.push(status);
     }
     if (search && search.trim()) {
@@ -182,10 +182,9 @@ router.get('/stats', async (req, res) => {
       result = await db.query(`
         SELECT
           COUNT(*) as total_accounts,
-          COUNT(CASE WHEN account_type = 'active' THEN 1 END) as active_accounts,
-          COUNT(CASE WHEN account_type = 'trial' THEN 1 END) as trial_accounts,
-          COUNT(CASE WHEN is_trial = true THEN 1 END) as trial_count,
-          COALESCE(SUM(CASE WHEN account_type = 'active' THEN price ELSE 0 END), 0) as total_revenue
+          COUNT(CASE WHEN account_status = 'active' THEN 1 END) as active_accounts,
+          COUNT(CASE WHEN account_status = 'on_hold' THEN 1 END) as trial_accounts,
+          COALESCE(SUM(CASE WHEN account_status = 'active' THEN price ELSE 0 END), 0) as total_revenue
         FROM accounts
         WHERE organization_id = $1 AND deleted_at IS NULL
       `, [organization_id], organization_id);
@@ -195,10 +194,9 @@ router.get('/stats', async (req, res) => {
       result = await db.query(`
         SELECT
           COUNT(*) as total_accounts,
-          COUNT(CASE WHEN account_type = 'active' THEN 1 END) as active_accounts,
-          COUNT(CASE WHEN account_type = 'trial' THEN 1 END) as trial_accounts,
-          COUNT(CASE WHEN is_trial = true THEN 1 END) as trial_count,
-          COALESCE(SUM(CASE WHEN account_type = 'active' THEN price ELSE 0 END), 0) as total_revenue
+          COUNT(CASE WHEN account_status = 'active' THEN 1 END) as active_accounts,
+          COUNT(CASE WHEN account_status = 'on_hold' THEN 1 END) as trial_accounts,
+          COALESCE(SUM(CASE WHEN account_status = 'active' THEN price ELSE 0 END), 0) as total_revenue
         FROM accounts
         WHERE organization_id = $1
       `, [organization_id], organization_id);
@@ -272,7 +270,7 @@ router.get('/:id/detail', async (req, res) => {
         a.id,
         a.account_name,
         a.edition,
-        a.license_status,
+        a.account_status,
         a.next_renewal_date
       FROM accounts a
       WHERE a.contact_id = $1 AND a.id != $2 AND a.organization_id = $3
@@ -361,9 +359,7 @@ router.post('/', async (req, res) => {
       mac_address,
       term = 1, // New standardized field (numeric months: 1, 3, 6, 12, 24)
       price = 0,
-      license_status = 'pending',
-      account_type = 'trial',
-      is_trial = false,
+      account_status = 'active',
       notes
     } = req.body;
 
@@ -398,11 +394,11 @@ router.post('/', async (req, res) => {
     // Create account
     const accountQuery = `
       INSERT INTO accounts (
-        organization_id, contact_id, account_name, account_type,
+        organization_id, contact_id, account_name,
         edition, device_name, mac_address,
-        license_key, license_status, billing_term_months, price, currency,
-        is_trial, notes, created_by
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+        license_key, account_status, billing_term_months, price, currency,
+        notes, created_by
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
       RETURNING *
     `;
 
@@ -410,16 +406,14 @@ router.post('/', async (req, res) => {
       organization_id,
       contact_id,
       account_name,
-      account_type,
       edition || null,
       device_name || null,
       mac_address || null,
       licenseKey,
-      license_status,
+      account_status,
       billingTermMonths,
       price,
       'USD',
-      is_trial,
       notes || null,
       user_id
     ], organization_id);
@@ -472,8 +466,7 @@ router.put('/:id', async (req, res) => {
     // This ensures data integrity and prevents accidental changes
     const allowedFields = [
       'account_name', 'edition', 'device_name', 'mac_address',
-      'price', 'license_status', 'account_type',
-      'is_trial', 'notes'
+      'price', 'account_status', 'notes'
     ];
 
     const setClause = [];

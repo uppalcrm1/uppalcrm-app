@@ -1,0 +1,450 @@
+================================================================================
+SOFTWARE LICENSES TO ACCOUNTS - MIGRATION QUICK START GUIDE
+================================================================================
+Date: 2026-02-01
+Database: uppalcrm_devtest
+Version: 2.0 (Comprehensive)
+Status: Ready for Execution
+
+================================================================================
+WHAT IS BEING DONE
+================================================================================
+
+Renaming the "software_licenses" database table to "accounts" with automatic:
+- Backup creation
+- Foreign key management (6 relationships)
+- Index renaming (5 indexes)
+- Policy/trigger updates
+- Complete validation
+
+================================================================================
+DATABASE CONNECTION DETAILS
+================================================================================
+
+Host: dpg-d5hjcs75r7bs73bg0ngg-a.oregon-postgres.render.com
+Port: 5432
+Database: uppalcrm_devtest
+User: uppalcrm_devtest
+Password: YcpgmW5Ja8ZI5TDPzh9V49KIO3aU8cIs
+
+================================================================================
+HOW TO EXECUTE THE MIGRATION
+================================================================================
+
+Method 1: Using psql (Recommended)
+----------------------------------
+
+# Save password
+export PGPASSWORD="YcpgmW5Ja8ZI5TDPzh9V49KIO3aU8cIs"
+
+# Execute migration
+psql -h dpg-d5hjcs75r7bs73bg0ngg-a.oregon-postgres.render.com \
+     -p 5432 \
+     -U uppalcrm_devtest \
+     -d uppalcrm_devtest \
+     -f scripts/migration_software_licenses_to_accounts_v2.sql
+
+# Expected output: Multiple [OK] and [INFO] messages
+# Total time: 10-25 seconds
+
+
+Method 2: Using pgAdmin
+-----------------------
+
+1. Open pgAdmin
+2. Connect to devtest database
+3. Open query editor
+4. Open scripts/migration_software_licenses_to_accounts_v2.sql
+5. Execute (F5)
+
+
+Method 3: Using Any PostgreSQL Client
+--------------------------------------
+
+1. Connect to: uppalcrm_devtest database
+2. Open scripts/migration_software_licenses_to_accounts_v2.sql
+3. Execute entire script
+
+================================================================================
+WHAT HAPPENS DURING MIGRATION
+================================================================================
+
+Step 1: Connection Check (1 second)
+   - Verifies database access
+   - Displays version info
+
+Step 2: Pre-flight Checks (1-2 seconds)
+   - Verifies software_licenses table exists
+   - Verifies accounts table doesn't exist
+   - Counts foreign keys, indexes, policies
+   - Counts records
+
+Step 3: Backup Creation (1-5 seconds)
+   - Creates software_licenses_backup table with all data
+   - Preserves original data
+
+Step 4: Drop Foreign Keys (2-5 seconds)
+   - Removes 6 dependent foreign keys from other tables:
+     * trials.converted_to_license_id
+     * license_transfers.license_id
+     * downloads_activations.license_id
+     * billing_payments.license_id
+     * renewals_subscriptions.license_id
+     * renewal_alerts.license_id
+
+Step 5: Rename Table (<1 second)
+   - Renames software_licenses → accounts
+
+Step 6: Recreate Foreign Keys (2-5 seconds)
+   - Adds back all 6 foreign keys pointing to accounts
+
+Step 7: Rename Indexes (<1 second)
+   - Renames 5 indexes:
+     * idx_software_licenses_org_contact → idx_accounts_org_contact
+     * idx_software_licenses_device → idx_accounts_device
+     * idx_software_licenses_status → idx_accounts_status
+     * idx_software_licenses_expiry → idx_accounts_expiry
+     * idx_software_licenses_key → idx_accounts_key
+
+Step 8: Update Policies & Triggers (1-2 seconds)
+   - Renames RLS policies
+   - Renames triggers
+
+Step 9: Post-migration Validation (1-2 seconds)
+   - Verifies accounts exists
+   - Verifies software_licenses is gone
+   - Verifies record count unchanged
+   - Verifies foreign keys (6), indexes (5), policies, triggers
+
+Step 10: Commit & Summary (<1 second)
+   - Commits transaction
+   - Displays completion message
+
+================================================================================
+VERIFY MIGRATION SUCCESS
+================================================================================
+
+Run these SQL commands to verify:
+
+-- Check new table exists
+SELECT EXISTS (SELECT 1 FROM information_schema.tables
+              WHERE table_name = 'accounts' AND table_schema = 'public');
+→ Should return: true
+
+-- Check old table gone
+SELECT EXISTS (SELECT 1 FROM information_schema.tables
+              WHERE table_name = 'software_licenses' AND table_schema = 'public');
+→ Should return: false
+
+-- Check record count
+SELECT COUNT(*) FROM public.accounts;
+→ Should match pre-migration count
+
+-- Check foreign keys (should be 6)
+SELECT COUNT(*) FROM information_schema.table_constraints
+WHERE table_name = 'accounts' AND constraint_type = 'FOREIGN KEY';
+→ Should return: 6
+
+-- Check indexes (should be 5, excluding primary key)
+SELECT COUNT(*) FROM pg_indexes
+WHERE tablename = 'accounts' AND indexname NOT LIKE '%_pkey';
+→ Should return: 5
+
+-- Test sample query
+SELECT * FROM public.accounts LIMIT 1;
+→ Should return 1 row with account data
+
+================================================================================
+RUN AUTOMATED TESTS
+================================================================================
+
+Option 1: Bash (Linux/Mac)
+--------------------------
+chmod +x scripts/test_migration_comprehensive.sh
+./scripts/test_migration_comprehensive.sh
+→ Creates: migration_test_report_TIMESTAMP.txt
+
+Option 2: Batch (Windows)
+--------------------------
+scripts\test_migration.bat
+→ Creates: migration_test_report_TIMESTAMP.txt
+
+Option 3: Python (Cross-platform)
+----------------------------------
+# First install dependency
+pip install psycopg2-binary
+
+# Then run
+python scripts/execute_migration.py
+→ Creates: migration_test_report_TIMESTAMP.txt
+
+================================================================================
+ROLLBACK (IF NEEDED)
+================================================================================
+
+If migration fails:
+  → Automatic rollback occurs (entire transaction is rolled back)
+  → No manual action needed
+  → software_licenses table remains unchanged
+
+If manual rollback is needed:
+  1. Drop accounts table:
+     DROP TABLE IF EXISTS public.accounts CASCADE;
+
+  2. Restore from backup:
+     CREATE TABLE public.accounts AS SELECT * FROM public.software_licenses_backup;
+
+  3. Rename back (if needed):
+     ALTER TABLE public.accounts RENAME TO software_licenses;
+
+  4. Drop backup:
+     DROP TABLE IF EXISTS public.software_licenses_backup;
+
+  5. Re-create indexes, FKs, policies from original schema
+
+================================================================================
+EXPECTED RESULTS
+================================================================================
+
+Successful Migration Indicators:
+  ✓ No error messages in output
+  ✓ Sees [OK] messages for validation steps
+  ✓ Post-migration validation passes
+  ✓ accounts table exists with all data
+  ✓ software_licenses table no longer exists
+  ✓ 6 foreign keys present and valid
+  ✓ 5 indexes present and named correctly
+  ✓ RLS policies and triggers updated
+  ✓ Record counts match
+
+Failed Migration Indicators:
+  ✗ Error or exception messages
+  ✗ Transaction rolled back
+  ✗ software_licenses table still exists
+  ✗ accounts table doesn't exist
+  ✗ Record count mismatch
+
+================================================================================
+AFTER MIGRATION - UPDATE APPLICATION CODE
+================================================================================
+
+Files to Update:
+1. backend/controllers/licenseController.js
+   - Change: FROM software_licenses → FROM accounts
+   - Change all column references
+
+2. backend/controllers/softwareEditionController.js
+   - Update joins with software_licenses → accounts
+
+3. backend/controllers/downloadController.js
+   - Update joins with software_licenses → accounts
+
+4. backend/controllers/deviceController.js
+   - Update joins with software_licenses → accounts
+
+5. backend/controllers/trialController.js
+   - Update joins with software_licenses → accounts
+
+6. Documentation:
+   - Update API docs to reflect new table name
+   - Update schema documentation
+   - Update README files
+
+7. Tests:
+   - Update test queries
+   - Run full test suite
+
+================================================================================
+TROUBLESHOOTING
+================================================================================
+
+Problem: "Table software_licenses does not exist"
+Solution: Check if migration already ran
+  SELECT EXISTS (SELECT 1 FROM information_schema.tables
+                WHERE table_name = 'accounts');
+  If accounts exists, migration is complete.
+
+Problem: "Target table accounts already exists"
+Solution: Migration cannot overwrite existing table
+  - Check if table is needed
+  - Run: DROP TABLE accounts; and retry
+  - Or use different table name
+
+Problem: Connection refused
+Solution: Verify network connectivity
+  - Check host: dpg-d5hjcs75r7bs73bg0ngg-a.oregon-postgres.render.com
+  - Check port: 5432
+  - Check credentials
+  - Verify firewall allows connection
+
+Problem: Foreign key constraint failed
+Solution: Check data integrity
+  SELECT * FROM software_licenses_backup WHERE id IS NULL;
+  If found, investigate before re-running
+
+Problem: Migration takes too long
+Solution: Expected duration is 10-25 seconds
+  - Check database load
+  - Check network latency
+  - Check if other queries running
+
+================================================================================
+FILES PROVIDED
+================================================================================
+
+Migration Scripts:
+  1. scripts/migration_software_licenses_to_accounts_v2.sql (500+ lines)
+     → Main migration script with all logic
+
+  2. scripts/test_migration_comprehensive.sh
+     → Bash test suite for Linux/Mac
+
+  3. scripts/test_migration.bat
+     → Batch test suite for Windows
+
+  4. scripts/execute_migration.py
+     → Python test runner (cross-platform)
+
+Documentation:
+  1. MIGRATION_INSTRUCTIONS.md
+     → Complete step-by-step guide
+
+  2. MIGRATION_COMPLETE_REPORT.md
+     → Comprehensive technical report
+
+  3. MIGRATION_SUMMARY_QUICK_START.txt
+     → This file (quick reference)
+
+  4. SOFTWARE_LICENSES_COMPREHENSIVE_REPORT.md
+     → Reference of all table references in codebase
+
+================================================================================
+QUICK CHECKLIST
+================================================================================
+
+Before Migration:
+  [ ] Read MIGRATION_INSTRUCTIONS.md
+  [ ] Verify database credentials
+  [ ] Test network access to database
+  [ ] Backup database (optional but recommended)
+  [ ] Review migration script
+  [ ] Understand rollback procedure
+
+During Migration:
+  [ ] Execute migration script
+  [ ] Monitor output for [OK] messages
+  [ ] Wait for completion (10-25 seconds)
+  [ ] Check for error messages
+
+After Migration:
+  [ ] Run verification queries
+  [ ] Run automated tests
+  [ ] Update application code
+  [ ] Deploy updated code
+  [ ] Test application with new table name
+  [ ] Monitor for any issues
+
+Post-Deployment:
+  [ ] Confirm application works
+  [ ] Check application logs
+  [ ] Monitor database performance
+  [ ] Keep backup for 30 days
+  [ ] Document completion
+
+================================================================================
+KEY DATES & VERSIONS
+================================================================================
+
+Created: 2026-02-01
+Version: 2.0 (Comprehensive)
+Status: Ready for Execution
+Database: uppalcrm_devtest
+Target Table: accounts (renamed from software_licenses)
+
+================================================================================
+IMPORTANT NOTES
+================================================================================
+
+1. This migration is SAFE:
+   - Entire migration is one transaction (all-or-nothing)
+   - Automatic rollback on any error
+   - Backup created before any changes
+   - All data is preserved
+
+2. No data loss:
+   - All records preserved
+   - All foreign key relationships maintained
+   - All indexes available
+   - RLS policies and triggers functional
+
+3. Application must be updated:
+   - Code must reference "accounts" instead of "software_licenses"
+   - Update all queries, controllers, documentation
+   - Deploy updated code before or after migration
+
+4. Keep backup:
+   - software_licenses_backup table created
+   - Keep for at least 30 days
+   - Safe to delete after verification
+
+================================================================================
+SUCCESS CONFIRMATION
+================================================================================
+
+Migration is complete when:
+
+✓ Script executes without errors
+✓ accounts table exists
+✓ software_licenses table no longer exists
+✓ All records preserved (count matches)
+✓ All foreign keys (6) present
+✓ All indexes (5) present
+✓ RLS policies working
+✓ Triggers working
+✓ Application updated and working with new table name
+✓ Tests pass
+
+================================================================================
+FOR MORE INFORMATION
+================================================================================
+
+See the following files for detailed information:
+
+- MIGRATION_INSTRUCTIONS.md
+  Complete step-by-step instructions with SQL examples
+
+- MIGRATION_COMPLETE_REPORT.md
+  Comprehensive technical report with workflow diagrams
+
+- SOFTWARE_LICENSES_COMPREHENSIVE_REPORT.md
+  Complete reference of all table references in codebase
+
+- scripts/migration_software_licenses_to_accounts_v2.sql
+  Main migration script (readable SQL with detailed comments)
+
+================================================================================
+READY TO PROCEED?
+================================================================================
+
+When you're ready to execute the migration:
+
+1. Open Terminal/Command Prompt
+2. Set password: export PGPASSWORD="YcpgmW5Ja8ZI5TDPzh9V49KIO3aU8cIs"
+3. Run migration:
+   psql -h dpg-d5hjcs75r7bs73bg0ngg-a.oregon-postgres.render.com \
+        -p 5432 \
+        -U uppalcrm_devtest \
+        -d uppalcrm_devtest \
+        -f scripts/migration_software_licenses_to_accounts_v2.sql
+
+4. Monitor output for [OK] messages
+5. When complete, run verification queries
+6. Run test suite
+7. Update application code
+8. Deploy and test
+
+Good luck! The migration is ready to go.
+
+================================================================================
+END OF QUICK START GUIDE
+================================================================================

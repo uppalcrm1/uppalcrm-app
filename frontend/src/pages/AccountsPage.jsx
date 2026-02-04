@@ -63,9 +63,12 @@ const SOFTWARE_EDITION_OPTIONS = [
 
 // Status options
 const STATUS_OPTIONS = [
+  { value: '', label: 'All' },
   { value: 'active', label: 'Active' },
-  { value: 'expiring_soon', label: 'Expiring Soon' },
-  { value: 'expired', label: 'Expired' }
+  { value: 'inactive', label: 'Inactive' },
+  { value: 'suspended', label: 'Suspended' },
+  { value: 'cancelled', label: 'Cancelled' },
+  { value: 'on_hold', label: 'On Hold' }
 ]
 
 // Billing cycle options
@@ -257,8 +260,8 @@ const AccountsPage = () => {
     let filtered = displayAccounts
 
     // Apply status filter (client-side only)
-    if (filterStatus !== 'all') {
-      filtered = filtered.filter(account => account.status === filterStatus)
+    if (filterStatus && filterStatus !== '') {
+      filtered = filtered.filter(account => account.account_status === filterStatus)
     }
 
     return filtered

@@ -21,7 +21,7 @@ const AccountDetailsPanel = ({ account }) => {
           </div>
           <div>
             <p className="text-sm text-gray-500">Status</p>
-            <p className="text-sm font-medium text-gray-900">{account.license_status}</p>
+            <p className="text-sm font-medium text-gray-900">{account.account_status}</p>
           </div>
           <div>
             <p className="text-sm text-gray-500">Product</p>
@@ -33,12 +33,6 @@ const AccountDetailsPanel = ({ account }) => {
               {formatDateOnly(account.created_at)}
             </p>
           </div>
-          {account.account_type && (
-            <div>
-              <p className="text-sm text-gray-500">Account Type</p>
-              <p className="text-sm font-medium text-gray-900 capitalize">{account.account_type}</p>
-            </div>
-          )}
         </div>
       </div>
 

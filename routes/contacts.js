@@ -117,8 +117,7 @@ const contactSchemas = {
     body: Joi.object({
       contact_id: Joi.string().guid({ version: 'uuidv4' }).required(),
       account_name: Joi.string().min(1).max(255).required(),
-      account_type: Joi.string().valid('business', 'individual', 'government', 'nonprofit').default('business'),
-      status: Joi.string().valid('active', 'inactive', 'suspended').default('active'),
+      account_status: Joi.string().valid('active', 'inactive', 'suspended', 'cancelled', 'on_hold').default('active'),
       billing_address: Joi.object({
         street: Joi.string().optional(),
         city: Joi.string().optional(),
@@ -775,9 +774,9 @@ router.post('/convert-from-lead/:leadId',
         const accountInsertResult = await query(
           `INSERT INTO accounts (
             organization_id, contact_id, account_name, edition,
-            device_name, mac_address, billing_term_months, account_type,
-            license_status, created_by
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            device_name, mac_address, billing_term_months,
+            account_status, created_by
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
           RETURNING *`,
           [
             req.organizationId,
@@ -787,7 +786,6 @@ router.post('/convert-from-lead/:leadId',
             accountData.deviceName,
             accountData.macAddress,
             billingTermMonths,
-            'active',
             'active',
             req.user.id
           ]
@@ -1048,8 +1046,7 @@ router.put('/:id/status',
         const accountInfo = {
           contact_id: req.params.id,
           account_name: `${contact.first_name} ${contact.last_name} Account`,
-          account_type: 'business',
-          status: 'active'
+          account_status: 'active'
         };
 
         account = await Contact.createAccount(accountInfo, req.organizationId, req.user.id);
