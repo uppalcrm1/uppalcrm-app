@@ -537,7 +537,14 @@ const AccountsPage = () => {
           </div>
         )}
 
-        {displayAccounts.length === 0 ? (
+        {loading ? (
+          // Loading state - show skeleton
+          <div className="space-y-4">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="h-16 bg-gray-200 rounded animate-pulse"></div>
+            ))}
+          </div>
+        ) : displayAccounts.length === 0 ? (
           <div className="text-center py-12">
             <CreditCard className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No accounts found</h3>
