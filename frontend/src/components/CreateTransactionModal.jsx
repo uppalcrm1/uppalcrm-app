@@ -23,6 +23,7 @@ import {
   BILLING_TERMS
 } from '../constants/transactions'
 import { formatDateOnly } from '../utils/dateUtils'
+import { formatBillingTerm, billingCycleToTerm } from '../utils/billingHelpers'
 
 const CreateTransactionModal = ({ account, onClose, onSuccess, isOpen }) => {
   // State for form data
@@ -54,21 +55,6 @@ const CreateTransactionModal = ({ account, onClose, onSuccess, isOpen }) => {
 
   const queryClient = useQueryClient()
 
-  // Helper function to map billing cycle to term
-  const mapBillingCycleToTerm = (cycle) => {
-    const mapping = {
-      'monthly': '1',
-      'quarterly': '3',
-      'semi-annual': '6',
-      'semi_annual': '6',
-      'annual': '12',
-      'yearly': '12',
-      'biennial': '24',
-      'bi-annual': '24'
-    }
-    return mapping[cycle?.toLowerCase()] || '1'
-  }
-
   // Auto-calculate amount from account price
   useEffect(() => {
     if (!isAmountOverridden && account?.price) {
@@ -79,15 +65,24 @@ const CreateTransactionModal = ({ account, onClose, onSuccess, isOpen }) => {
     }
   }, [account?.price, isAmountOverridden])
 
-  // Auto-fill term from account billing cycle
+  // Auto-fill term from account billing_term_months (clean field)
+  // Fallback to billing_cycle for backward compatibility
   useEffect(() => {
-    if (account?.billing_cycle) {
-      setFormData(prev => ({
-        ...prev,
-        term: mapBillingCycleToTerm(account.billing_cycle)
-      }))
+    let termValue = '1'
+
+    if (account?.billing_term_months) {
+      // Use clean field if available
+      termValue = account.billing_term_months.toString()
+    } else if (account?.billing_cycle) {
+      // Fallback to old field for backward compatibility
+      termValue = billingCycleToTerm(account.billing_cycle).toString()
     }
-  }, [account?.billing_cycle])
+
+    setFormData(prev => ({
+      ...prev,
+      term: termValue
+    }))
+  }, [account?.billing_term_months, account?.billing_cycle])
 
   // Calculate suggested expiry dates based on term and method
   useEffect(() => {
@@ -572,15 +567,21 @@ const CreateTransactionModal = ({ account, onClose, onSuccess, isOpen }) => {
                     <option value="">Select term</option>
                     {BILLING_TERMS.map(term => (
                       <option key={term.value} value={term.value}>
-                        {term.label}
+                        {formatBillingTerm(parseInt(term.value))}
                       </option>
                     ))}
                   </select>
-                  {account?.billing_cycle && (
+                  {(account?.billing_term_months || account?.billing_cycle) && (
                     <span className="text-xs text-gray-500 mt-1 flex items-center">
                       <Info size={12} className="mr-1" />
-                      Auto-filled from account billing cycle
+                      Auto-filled from account billing term
                     </span>
+                  )}
+                  {formData.term && (
+                    <p className="text-xs text-green-600 mt-1 flex items-center">
+                      <Check size={12} className="mr-1" />
+                      {formatBillingTerm(parseInt(formData.term))}
+                    </p>
                   )}
                   {errors.term && (
                     <p className="text-red-600 text-sm mt-1">{errors.term}</p>
