@@ -233,7 +233,34 @@ router.get('/:id/detail', async (req, res) => {
     // Query account with joined contact and product info
     const accountQuery = `
       SELECT
-        a.*,
+        a.id,
+        a.organization_id,
+        a.contact_id,
+        a.account_name,
+        a.account_type,
+        a.edition,
+        a.device_name,
+        a.mac_address,
+        a.device_registered_at,
+        a.license_key,
+        a.license_status,
+        a.price,
+        a.currency,
+        a.is_trial,
+        a.trial_start_date,
+        a.trial_end_date,
+        a.subscription_start_date,
+        a.subscription_end_date,
+        a.created_by,
+        a.created_at,
+        a.updated_at,
+        a.notes,
+        a.custom_fields,
+        a.product_id,
+        a.deleted_at,
+        a.deleted_by,
+        a.deletion_reason,
+        a.billing_term_months,
         c.id as contact_id,
         c.first_name,
         c.last_name,
@@ -245,7 +272,7 @@ router.get('/:id/detail', async (req, res) => {
         p.price as product_price,
         p.description as product_description,
         a.edition as edition_name,
-        -- Calculate next renewal date based on billing term (months)
+        -- Calculate next renewal date based on billing term (months) - DO NOT use stale next_renewal_date column
         CASE
           WHEN a.is_trial = true THEN a.trial_end_date
           WHEN a.billing_term_months = 1 THEN a.created_at + INTERVAL '1 month'
