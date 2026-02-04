@@ -453,9 +453,9 @@ router.post('/', async (req, res) => {
       INSERT INTO accounts (
         organization_id, contact_id, account_name, account_type,
         edition, device_name, mac_address,
-        license_key, license_status, billing_cycle, price, currency,
+        license_key, license_status, billing_cycle, billing_term_months, price, currency,
         is_trial, notes, created_by
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
       RETURNING *
     `;
 
@@ -469,7 +469,8 @@ router.post('/', async (req, res) => {
       mac_address || null,
       licenseKey,
       license_status,
-      finalBillingCycle, // Use converted billing_cycle
+      finalBillingCycle, // Keep for backward compatibility
+      billingTermMonths, // Now also insert the numeric value
       price,
       'USD',
       is_trial,
@@ -520,9 +521,12 @@ router.put('/:id', async (req, res) => {
     const updates = req.body;
 
     // Build dynamic update query
+    // NOTE: billing_cycle and billing_term_months are READ-ONLY
+    // These fields are only updated via transaction endpoints when payments are made
+    // This ensures data integrity and prevents accidental changes
     const allowedFields = [
       'account_name', 'edition', 'device_name', 'mac_address',
-      'billing_cycle', 'price', 'license_status', 'account_type',
+      'price', 'license_status', 'account_type',
       'is_trial', 'notes'
     ];
 

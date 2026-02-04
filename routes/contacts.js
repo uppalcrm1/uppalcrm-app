@@ -750,12 +750,34 @@ router.post('/convert-from-lead/:leadId',
 
       // Step 5: Create account if requested
       if (createAccount && accountData) {
+        // Convert term to billing_term_months
+        const termValue = accountData.term || 'Monthly';
+        let billingTermMonths = 1;
+
+        switch (termValue.toLowerCase()) {
+          case 'monthly':
+            billingTermMonths = 1;
+            break;
+          case 'quarterly':
+            billingTermMonths = 3;
+            break;
+          case 'semi-annual':
+          case 'semi_annual':
+            billingTermMonths = 6;
+            break;
+          case 'annual':
+            billingTermMonths = 12;
+            break;
+          default:
+            billingTermMonths = 1;
+        }
+
         const accountInsertResult = await query(
           `INSERT INTO accounts (
             organization_id, contact_id, account_name, edition,
-            device_name, mac_address, billing_cycle, account_type,
+            device_name, mac_address, billing_cycle, billing_term_months, account_type,
             license_status, created_by
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
           RETURNING *`,
           [
             req.organizationId,
@@ -764,7 +786,8 @@ router.post('/convert-from-lead/:leadId',
             accountData.product || 'Standard',
             accountData.deviceName,
             accountData.macAddress,
-            accountData.term || 'Monthly',
+            termValue,
+            billingTermMonths,
             'active',
             'active',
             req.user.id
