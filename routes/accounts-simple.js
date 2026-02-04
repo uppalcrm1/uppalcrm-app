@@ -42,12 +42,8 @@ router.get('/', async (req, res) => {
           ELSE a.price
         END as monthly_cost,
 
-        -- Calculate days until renewal
-        CASE
-          WHEN a.next_renewal_date IS NOT NULL THEN
-            EXTRACT(DAY FROM (a.next_renewal_date - CURRENT_DATE))
-          ELSE NULL
-        END as days_until_renewal,
+        -- Days until renewal (calculated from stored next_renewal_date)
+        EXTRACT(DAY FROM (a.next_renewal_date - CURRENT_DATE)) as days_until_renewal,
 
         -- Count total accounts for this contact (excluding deleted)
         (SELECT COUNT(*)
@@ -233,34 +229,7 @@ router.get('/:id/detail', async (req, res) => {
     // Query account with joined contact and product info
     const accountQuery = `
       SELECT
-        a.id,
-        a.organization_id,
-        a.contact_id,
-        a.account_name,
-        a.account_type,
-        a.edition,
-        a.device_name,
-        a.mac_address,
-        a.device_registered_at,
-        a.license_key,
-        a.license_status,
-        a.price,
-        a.currency,
-        a.is_trial,
-        a.trial_start_date,
-        a.trial_end_date,
-        a.subscription_start_date,
-        a.subscription_end_date,
-        a.created_by,
-        a.created_at,
-        a.updated_at,
-        a.notes,
-        a.custom_fields,
-        a.product_id,
-        a.deleted_at,
-        a.deleted_by,
-        a.deletion_reason,
-        a.billing_term_months,
+        a.*,
         c.id as contact_id,
         c.first_name,
         c.last_name,
@@ -272,24 +241,8 @@ router.get('/:id/detail', async (req, res) => {
         p.price as product_price,
         p.description as product_description,
         a.edition as edition_name,
-        -- Calculate next renewal date based on billing term (months) - DO NOT use stale next_renewal_date column
-        CASE
-          WHEN a.is_trial = true THEN a.trial_end_date
-          WHEN a.billing_term_months = 1 THEN a.created_at + INTERVAL '1 month'
-          WHEN a.billing_term_months = 3 THEN a.created_at + INTERVAL '3 months'
-          WHEN a.billing_term_months = 6 THEN a.created_at + INTERVAL '6 months'
-          WHEN a.billing_term_months = 12 THEN a.created_at + INTERVAL '12 months'
-          ELSE a.created_at + INTERVAL '1 month'
-        END as next_renewal_date,
-        -- Calculate days until renewal based on billing term (months)
-        CASE
-          WHEN a.is_trial = true THEN EXTRACT(DAY FROM (a.trial_end_date - NOW()))
-          WHEN a.billing_term_months = 1 THEN EXTRACT(DAY FROM ((a.created_at + INTERVAL '1 month') - NOW()))
-          WHEN a.billing_term_months = 3 THEN EXTRACT(DAY FROM ((a.created_at + INTERVAL '3 months') - NOW()))
-          WHEN a.billing_term_months = 6 THEN EXTRACT(DAY FROM ((a.created_at + INTERVAL '6 months') - NOW()))
-          WHEN a.billing_term_months = 12 THEN EXTRACT(DAY FROM ((a.created_at + INTERVAL '12 months') - NOW()))
-          ELSE EXTRACT(DAY FROM ((a.created_at + INTERVAL '1 month') - NOW()))
-        END as days_until_renewal,
+        -- Use stored next_renewal_date (set by transactions, not calculated here)
+        EXTRACT(DAY FROM (a.next_renewal_date - NOW())) as days_until_renewal,
         (SELECT COUNT(*) FROM accounts WHERE contact_id = a.contact_id AND organization_id = $2 AND deleted_at IS NULL) as total_accounts_for_contact
       FROM accounts a
       LEFT JOIN contacts c ON a.contact_id = c.id
@@ -320,14 +273,7 @@ router.get('/:id/detail', async (req, res) => {
         a.account_name,
         a.edition,
         a.license_status,
-        a.next_renewal_date,
-        CASE
-          WHEN a.billing_term_months = 1 THEN a.created_at + INTERVAL '1 month'
-          WHEN a.billing_term_months = 3 THEN a.created_at + INTERVAL '3 months'
-          WHEN a.billing_term_months = 6 THEN a.created_at + INTERVAL '6 months'
-          WHEN a.billing_term_months = 12 THEN a.created_at + INTERVAL '12 months'
-          ELSE a.created_at + INTERVAL '1 month'
-        END as calculated_next_renewal
+        a.next_renewal_date
       FROM accounts a
       WHERE a.contact_id = $1 AND a.id != $2 AND a.organization_id = $3
       ORDER BY a.created_at DESC
