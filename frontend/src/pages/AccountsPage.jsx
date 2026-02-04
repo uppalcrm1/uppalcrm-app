@@ -119,7 +119,7 @@ const AccountsPage = () => {
   const [selectedAccountForEdit, setSelectedAccountForEdit] = useState(null)
   const [loadingEditAccount, setLoadingEditAccount] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
-  const [filterStatus, setFilterStatus] = useState('all')
+  const [filterStatus, setFilterStatus] = useState('')
   const [showDeleted, setShowDeleted] = useState(false)
   const [loading, setLoading] = useState(false)
   const [sortColumn, setSortColumn] = useState('created_date') // Default sort by created date
