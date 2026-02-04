@@ -193,7 +193,7 @@ const CreateAccountModal = ({ isOpen, onClose, onSuccess }) => {
         term: formData.term, // Standardized: numeric months
         price: parseFloat(formData.price) || 0,
         license_status: formData.license_status,
-        account_type: formData.is_trial ? 'trial' : formData.account_type,
+        account_type: formData.is_trial ? 'trial' : formData.license_status,
         is_trial: formData.is_trial,
         notes: formData.notes?.trim() || null
       }
