@@ -171,12 +171,12 @@ exports.getAccounts = async (req, res) => {
         p.price as product_price,
         a.edition as edition_name,
 
-        -- Calculate monthly cost based on billing cycle
+        -- Calculate monthly cost based on billing term (months)
         CASE
-          WHEN a.billing_cycle = 'monthly' THEN a.price
-          WHEN a.billing_cycle = 'quarterly' THEN a.price / 3
-          WHEN a.billing_cycle = 'semi_annual' OR a.billing_cycle = 'semi-annual' THEN a.price / 6
-          WHEN a.billing_cycle = 'annual' THEN a.price / 12
+          WHEN a.billing_term_months = 1 THEN a.price
+          WHEN a.billing_term_months = 3 THEN a.price / 3
+          WHEN a.billing_term_months = 6 THEN a.price / 6
+          WHEN a.billing_term_months = 12 THEN a.price / 12
           ELSE a.price
         END as monthly_cost,
 

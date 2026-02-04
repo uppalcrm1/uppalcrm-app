@@ -23,7 +23,7 @@ import {
   BILLING_TERMS
 } from '../constants/transactions'
 import { formatDateOnly } from '../utils/dateUtils'
-import { formatBillingTerm, billingCycleToTerm } from '../utils/billingHelpers'
+import { formatBillingTerm } from '../utils/billingHelpers'
 
 const CreateTransactionModal = ({ account, onClose, onSuccess, isOpen }) => {
   // State for form data
@@ -65,24 +65,15 @@ const CreateTransactionModal = ({ account, onClose, onSuccess, isOpen }) => {
     }
   }, [account?.price, isAmountOverridden])
 
-  // Auto-fill term from account billing_term_months (clean field)
-  // Fallback to billing_cycle for backward compatibility
+  // Auto-fill term from account billing_term_months
   useEffect(() => {
-    let termValue = '1'
-
-    if (account?.billing_term_months) {
-      // Use clean field if available
-      termValue = account.billing_term_months.toString()
-    } else if (account?.billing_cycle) {
-      // Fallback to old field for backward compatibility
-      termValue = billingCycleToTerm(account.billing_cycle).toString()
-    }
+    const termValue = account?.billing_term_months?.toString() || '1'
 
     setFormData(prev => ({
       ...prev,
       term: termValue
     }))
-  }, [account?.billing_term_months, account?.billing_cycle])
+  }, [account?.billing_term_months])
 
   // Calculate suggested expiry dates based on term and method
   useEffect(() => {
@@ -571,7 +562,7 @@ const CreateTransactionModal = ({ account, onClose, onSuccess, isOpen }) => {
                       </option>
                     ))}
                   </select>
-                  {(account?.billing_term_months || account?.billing_cycle) && (
+                  {account?.billing_term_months && (
                     <span className="text-xs text-gray-500 mt-1 flex items-center">
                       <Info size={12} className="mr-1" />
                       Auto-filled from account billing term

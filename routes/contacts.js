@@ -775,9 +775,9 @@ router.post('/convert-from-lead/:leadId',
         const accountInsertResult = await query(
           `INSERT INTO accounts (
             organization_id, contact_id, account_name, edition,
-            device_name, mac_address, billing_cycle, billing_term_months, account_type,
+            device_name, mac_address, billing_term_months, account_type,
             license_status, created_by
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
           RETURNING *`,
           [
             req.organizationId,
@@ -786,7 +786,6 @@ router.post('/convert-from-lead/:leadId',
             accountData.product || 'Standard',
             accountData.deviceName,
             accountData.macAddress,
-            termValue,
             billingTermMonths,
             'active',
             'active',
@@ -1043,7 +1042,7 @@ router.put('/:id/status',
       // If status is "won" and accountData is provided, create an account
       let account = null;
       if (status === 'won' && accountData) {
-        const { edition_id, billing_cycle, price } = accountData;
+        const { edition_id, billing_term_months = 1, price } = accountData;
 
         // Create account
         const accountInfo = {
@@ -1061,7 +1060,7 @@ router.put('/:id/status',
             contact_id: req.params.id,
             edition_id,
             license_type: 'standard',
-            duration_months: billing_cycle === 'monthly' ? 1 : 12,
+            duration_months: billing_term_months,
             max_devices: 1,
             custom_features: { price }
           };
