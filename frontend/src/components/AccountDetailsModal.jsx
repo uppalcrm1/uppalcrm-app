@@ -2,11 +2,12 @@ import React, { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { X, CheckCircle, DollarSign, Calendar } from 'lucide-react'
 import { contactsAPI } from '../services/api'
+import { formatBillingTerm } from '../utils/billingHelpers'
 
 const AccountDetailsModal = ({ contactName, onClose, onSubmit, isLoading }) => {
   const [formData, setFormData] = useState({
     edition_id: '',
-    billing_cycle: 'monthly',
+    billing_term_months: 1,
     price: ''
   })
 
@@ -22,7 +23,7 @@ const AccountDetailsModal = ({ contactName, onClose, onSubmit, isLoading }) => {
     e.preventDefault()
     onSubmit({
       edition_id: formData.edition_id,
-      billing_cycle: formData.billing_cycle,
+      billing_term_months: formData.billing_term_months,
       price: parseFloat(formData.price)
     })
   }
@@ -87,35 +88,35 @@ const AccountDetailsModal = ({ contactName, onClose, onSubmit, isLoading }) => {
               )}
             </div>
 
-            {/* Billing Cycle */}
+            {/* Billing Term */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Billing Cycle <span className="text-red-500">*</span>
+                Billing Term <span className="text-red-500">*</span>
               </label>
               <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
-                  onClick={() => setFormData(prev => ({ ...prev, billing_cycle: 'monthly' }))}
+                  onClick={() => setFormData(prev => ({ ...prev, billing_term_months: 1 }))}
                   className={`py-2 px-4 rounded-lg border-2 transition-colors ${
-                    formData.billing_cycle === 'monthly'
+                    formData.billing_term_months === 1
                       ? 'border-primary-500 bg-primary-50 text-primary-700'
                       : 'border-gray-300 text-gray-700 hover:border-gray-400'
                   }`}
                 >
                   <Calendar size={16} className="mx-auto mb-1" />
-                  <div className="text-sm font-medium">Monthly</div>
+                  <div className="text-sm font-medium">{formatBillingTerm(1).split(' ')[0]}</div>
                 </button>
                 <button
                   type="button"
-                  onClick={() => setFormData(prev => ({ ...prev, billing_cycle: 'annual' }))}
+                  onClick={() => setFormData(prev => ({ ...prev, billing_term_months: 12 }))}
                   className={`py-2 px-4 rounded-lg border-2 transition-colors ${
-                    formData.billing_cycle === 'annual'
+                    formData.billing_term_months === 12
                       ? 'border-primary-500 bg-primary-50 text-primary-700'
                       : 'border-gray-300 text-gray-700 hover:border-gray-400'
                   }`}
                 >
                   <Calendar size={16} className="mx-auto mb-1" />
-                  <div className="text-sm font-medium">Annual</div>
+                  <div className="text-sm font-medium">{formatBillingTerm(12).split(' ')[0]}</div>
                 </button>
               </div>
             </div>

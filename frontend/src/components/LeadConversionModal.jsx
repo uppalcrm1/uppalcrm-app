@@ -4,6 +4,7 @@ import { X, UserCheck, CreditCard, Package, DollarSign } from 'lucide-react'
 import { productsAPI } from '../services/api'
 import LoadingSpinner from './LoadingSpinner'
 import { BILLING_TERMS } from '../constants/transactions'
+import { formatBillingTerm } from '../utils/billingHelpers'
 
 const LeadConversionModal = ({ lead, onClose, onConvert, isConverting }) => {
   const [createAccount, setCreateAccount] = useState(false)
@@ -229,7 +230,7 @@ const LeadConversionModal = ({ lead, onClose, onConvert, isConverting }) => {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Term
+                        Billing Term
                       </label>
                       <select
                         name="term"
@@ -239,10 +240,15 @@ const LeadConversionModal = ({ lead, onClose, onConvert, isConverting }) => {
                       >
                         {BILLING_TERMS.map(term => (
                           <option key={term.value} value={term.value}>
-                            {term.label}
+                            {formatBillingTerm(parseInt(term.value))}
                           </option>
                         ))}
                       </select>
+                      {formData.term && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          Selected: {formatBillingTerm(parseInt(formData.term))}
+                        </p>
+                      )}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">

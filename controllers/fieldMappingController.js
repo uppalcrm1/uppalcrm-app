@@ -363,16 +363,14 @@ exports.getEntityFields = async (req, res, next) => {
     } else if (normalizedType === 'accounts') {
       standardFields = [
         { name: 'account_name', type: 'text', label: 'Account Name', is_custom: false },
-        { name: 'account_type', type: 'select', label: 'Account Type', is_custom: false },
+        { name: 'account_status', type: 'select', label: 'Status', is_custom: false },
         { name: 'edition', type: 'text', label: 'Edition', is_custom: false },
         { name: 'device_name', type: 'text', label: 'Device Name', is_custom: false },
         { name: 'mac_address', type: 'text', label: 'MAC Address', is_custom: false },
         { name: 'license_key', type: 'text', label: 'License Key', is_custom: false },
-        { name: 'license_status', type: 'select', label: 'License Status', is_custom: false },
         { name: 'billing_cycle', type: 'select', label: 'Billing Cycle', is_custom: false },
         { name: 'price', type: 'number', label: 'Price', is_custom: false },
         { name: 'currency', type: 'select', label: 'Currency', is_custom: false },
-        { name: 'is_trial', type: 'boolean', label: 'Is Trial', is_custom: false },
         { name: 'notes', type: 'textarea', label: 'Notes', is_custom: false }
       ];
     } else if (normalizedType === 'transactions') {

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Building2, CreditCard, Monitor } from 'lucide-react';
 import { formatDateOnly } from '../../utils/dateUtils';
+import { formatBillingTerm } from '../../utils/billingHelpers';
 
 const AccountDetailsPanel = ({ account }) => {
   return (
@@ -20,7 +21,7 @@ const AccountDetailsPanel = ({ account }) => {
           </div>
           <div>
             <p className="text-sm text-gray-500">Status</p>
-            <p className="text-sm font-medium text-gray-900">{account.license_status}</p>
+            <p className="text-sm font-medium text-gray-900">{account.account_status}</p>
           </div>
           <div>
             <p className="text-sm text-gray-500">Product</p>
@@ -32,12 +33,6 @@ const AccountDetailsPanel = ({ account }) => {
               {formatDateOnly(account.created_at)}
             </p>
           </div>
-          {account.account_type && (
-            <div>
-              <p className="text-sm text-gray-500">Account Type</p>
-              <p className="text-sm font-medium text-gray-900 capitalize">{account.account_type}</p>
-            </div>
-          )}
         </div>
       </div>
 
@@ -72,7 +67,9 @@ const AccountDetailsPanel = ({ account }) => {
         <div className="p-6 grid grid-cols-2 gap-4">
           <div>
             <p className="text-sm text-gray-500">Billing Cycle</p>
-            <p className="text-sm font-medium text-gray-900 capitalize">{account.billing_cycle || 'N/A'}</p>
+            <p className="text-sm font-medium text-gray-900">
+              {account.billing_term_months ? formatBillingTerm(account.billing_term_months) : 'N/A'}
+            </p>
           </div>
           <div>
             <p className="text-sm text-gray-500">Price</p>

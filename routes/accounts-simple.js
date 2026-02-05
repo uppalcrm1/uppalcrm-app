@@ -33,21 +33,17 @@ router.get('/', async (req, res) => {
         p.price as product_price,
         a.edition as edition_name,
 
-        -- Calculate monthly cost based on billing cycle
+        -- Calculate monthly cost based on billing term (months)
         CASE
-          WHEN a.billing_cycle = 'monthly' THEN a.price
-          WHEN a.billing_cycle = 'quarterly' THEN a.price / 3
-          WHEN a.billing_cycle = 'semi_annual' OR a.billing_cycle = 'semi-annual' THEN a.price / 6
-          WHEN a.billing_cycle = 'annual' THEN a.price / 12
+          WHEN a.billing_term_months = 1 THEN a.price
+          WHEN a.billing_term_months = 3 THEN a.price / 3
+          WHEN a.billing_term_months = 6 THEN a.price / 6
+          WHEN a.billing_term_months = 12 THEN a.price / 12
           ELSE a.price
         END as monthly_cost,
 
-        -- Calculate days until renewal
-        CASE
-          WHEN a.next_renewal_date IS NOT NULL THEN
-            EXTRACT(DAY FROM (a.next_renewal_date - CURRENT_DATE))
-          ELSE NULL
-        END as days_until_renewal,
+        -- Days until renewal (calculated from stored next_renewal_date)
+        EXTRACT(DAY FROM (a.next_renewal_date - CURRENT_DATE)) as days_until_renewal,
 
         -- Count total accounts for this contact (excluding deleted)
         (SELECT COUNT(*)
@@ -77,7 +73,7 @@ router.get('/', async (req, res) => {
     }
 
     if (status) {
-      query += ` AND a.status = $${params.length + 1}`;
+      query += ` AND a.account_status = $${params.length + 1}`;
       params.push(status);
     }
 
@@ -128,7 +124,7 @@ router.get('/', async (req, res) => {
       countQuery += ` AND a.deleted_at IS NULL`;
     }
     if (status) {
-      countQuery += ` AND a.status = $${countParams.length + 1}`;
+      countQuery += ` AND a.account_status = $${countParams.length + 1}`;
       countParams.push(status);
     }
     if (search && search.trim()) {
@@ -186,10 +182,9 @@ router.get('/stats', async (req, res) => {
       result = await db.query(`
         SELECT
           COUNT(*) as total_accounts,
-          COUNT(CASE WHEN account_type = 'active' THEN 1 END) as active_accounts,
-          COUNT(CASE WHEN account_type = 'trial' THEN 1 END) as trial_accounts,
-          COUNT(CASE WHEN is_trial = true THEN 1 END) as trial_count,
-          COALESCE(SUM(CASE WHEN account_type = 'active' THEN price ELSE 0 END), 0) as total_revenue
+          COUNT(CASE WHEN account_status = 'active' THEN 1 END) as active_accounts,
+          COUNT(CASE WHEN account_status = 'on_hold' THEN 1 END) as trial_accounts,
+          COALESCE(SUM(CASE WHEN account_status = 'active' THEN price ELSE 0 END), 0) as total_revenue
         FROM accounts
         WHERE organization_id = $1 AND deleted_at IS NULL
       `, [organization_id], organization_id);
@@ -199,10 +194,9 @@ router.get('/stats', async (req, res) => {
       result = await db.query(`
         SELECT
           COUNT(*) as total_accounts,
-          COUNT(CASE WHEN account_type = 'active' THEN 1 END) as active_accounts,
-          COUNT(CASE WHEN account_type = 'trial' THEN 1 END) as trial_accounts,
-          COUNT(CASE WHEN is_trial = true THEN 1 END) as trial_count,
-          COALESCE(SUM(CASE WHEN account_type = 'active' THEN price ELSE 0 END), 0) as total_revenue
+          COUNT(CASE WHEN account_status = 'active' THEN 1 END) as active_accounts,
+          COUNT(CASE WHEN account_status = 'on_hold' THEN 1 END) as trial_accounts,
+          COALESCE(SUM(CASE WHEN account_status = 'active' THEN price ELSE 0 END), 0) as total_revenue
         FROM accounts
         WHERE organization_id = $1
       `, [organization_id], organization_id);
@@ -245,24 +239,8 @@ router.get('/:id/detail', async (req, res) => {
         p.price as product_price,
         p.description as product_description,
         a.edition as edition_name,
-        -- Calculate next renewal date
-        CASE
-          WHEN a.is_trial = true THEN a.trial_end_date
-          WHEN a.next_renewal_date IS NOT NULL THEN a.next_renewal_date
-          WHEN a.billing_cycle = 'monthly' THEN a.created_at + INTERVAL '1 month'
-          WHEN a.billing_cycle = 'quarterly' THEN a.created_at + INTERVAL '3 months'
-          WHEN a.billing_cycle = 'semi-annual' OR a.billing_cycle = 'semi_annual' THEN a.created_at + INTERVAL '6 months'
-          WHEN a.billing_cycle = 'annual' THEN a.created_at + INTERVAL '12 months'
-        END as next_renewal_date,
-        -- Calculate days until renewal
-        CASE
-          WHEN a.is_trial = true THEN EXTRACT(DAY FROM (a.trial_end_date - NOW()))
-          WHEN a.next_renewal_date IS NOT NULL THEN EXTRACT(DAY FROM (a.next_renewal_date - NOW()))
-          WHEN a.billing_cycle = 'monthly' THEN EXTRACT(DAY FROM ((a.created_at + INTERVAL '1 month') - NOW()))
-          WHEN a.billing_cycle = 'quarterly' THEN EXTRACT(DAY FROM ((a.created_at + INTERVAL '3 months') - NOW()))
-          WHEN a.billing_cycle = 'semi-annual' OR a.billing_cycle = 'semi_annual' THEN EXTRACT(DAY FROM ((a.created_at + INTERVAL '6 months') - NOW()))
-          WHEN a.billing_cycle = 'annual' THEN EXTRACT(DAY FROM ((a.created_at + INTERVAL '12 months') - NOW()))
-        END as days_until_renewal,
+        -- Use stored next_renewal_date (set by transactions, not calculated here)
+        EXTRACT(DAY FROM (a.next_renewal_date - NOW())) as days_until_renewal,
         (SELECT COUNT(*) FROM accounts WHERE contact_id = a.contact_id AND organization_id = $2 AND deleted_at IS NULL) as total_accounts_for_contact
       FROM accounts a
       LEFT JOIN contacts c ON a.contact_id = c.id
@@ -292,15 +270,8 @@ router.get('/:id/detail', async (req, res) => {
         a.id,
         a.account_name,
         a.edition,
-        a.license_status,
-        a.next_renewal_date,
-        CASE
-          WHEN a.next_renewal_date IS NOT NULL THEN a.next_renewal_date
-          WHEN a.billing_cycle = 'monthly' THEN a.created_at + INTERVAL '1 month'
-          WHEN a.billing_cycle = 'quarterly' THEN a.created_at + INTERVAL '3 months'
-          WHEN a.billing_cycle = 'semi-annual' OR a.billing_cycle = 'semi_annual' THEN a.created_at + INTERVAL '6 months'
-          WHEN a.billing_cycle = 'annual' THEN a.created_at + INTERVAL '12 months'
-        END as calculated_next_renewal
+        a.account_status,
+        a.next_renewal_date
       FROM accounts a
       WHERE a.contact_id = $1 AND a.id != $2 AND a.organization_id = $3
       ORDER BY a.created_at DESC
@@ -386,48 +357,20 @@ router.post('/', async (req, res) => {
       edition,
       device_name,
       mac_address,
-      billing_cycle, // Legacy field (string: 'monthly', 'quarterly', etc.)
-      term, // New standardized field (numeric months: 1, 3, 6, 12, 24)
+      term = 1, // New standardized field (numeric months: 1, 3, 6, 12, 24)
       price = 0,
-      license_status = 'pending',
-      account_type = 'trial',
-      is_trial = false,
+      account_status = 'active',
       notes
     } = req.body;
 
-    // Convert term (numeric) to billing_cycle (string) if term is provided
-    let finalBillingCycle = billing_cycle;
-    let billingTermMonths = null;
-
-    if (term) {
-      // Term provided as numeric months - convert to billing_cycle string
-      const termMap = {
-        '1': 'monthly',
-        '3': 'quarterly',
-        '6': 'semi-annual',
-        '12': 'annual',
-        '24': 'biennial'
-      };
-      finalBillingCycle = termMap[term.toString()] || 'monthly';
-      billingTermMonths = parseInt(term);
-    } else if (billing_cycle) {
-      // Legacy billing_cycle provided - convert to months
-      const cycleToMonths = {
-        'monthly': 1,
-        'quarterly': 3,
-        'semi-annual': 6,
-        'semi_annual': 6,
-        'annual': 12,
-        'biennial': 24
-      };
-      billingTermMonths = cycleToMonths[billing_cycle] || 1;
-    }
+    // Convert term to numeric months
+    const billingTermMonths = parseInt(term) || 1;
 
     // Validate required fields
-    if (!contact_id || !account_name || (!billing_cycle && !term)) {
+    if (!contact_id || !account_name) {
       return res.status(400).json({
         error: 'Missing required fields',
-        message: 'contact_id, account_name, and either term or billing_cycle are required'
+        message: 'contact_id and account_name are required'
       });
     }
 
@@ -451,11 +394,11 @@ router.post('/', async (req, res) => {
     // Create account
     const accountQuery = `
       INSERT INTO accounts (
-        organization_id, contact_id, account_name, account_type,
+        organization_id, contact_id, account_name,
         edition, device_name, mac_address,
-        license_key, license_status, billing_cycle, price, currency,
-        is_trial, notes, created_by
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+        license_key, account_status, billing_term_months, price, currency,
+        notes, created_by
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
       RETURNING *
     `;
 
@@ -463,16 +406,14 @@ router.post('/', async (req, res) => {
       organization_id,
       contact_id,
       account_name,
-      account_type,
       edition || null,
       device_name || null,
       mac_address || null,
       licenseKey,
-      license_status,
-      finalBillingCycle, // Use converted billing_cycle
+      account_status,
+      billingTermMonths,
       price,
       'USD',
-      is_trial,
       notes || null,
       user_id
     ], organization_id);
@@ -520,10 +461,12 @@ router.put('/:id', async (req, res) => {
     const updates = req.body;
 
     // Build dynamic update query
+    // NOTE: billing_term_months is READ-ONLY
+    // This field is only updated via transaction endpoints when payments are made
+    // This ensures data integrity and prevents accidental changes
     const allowedFields = [
       'account_name', 'edition', 'device_name', 'mac_address',
-      'billing_cycle', 'price', 'license_status', 'account_type',
-      'is_trial', 'notes'
+      'price', 'account_status', 'notes'
     ];
 
     const setClause = [];

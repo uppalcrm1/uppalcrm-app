@@ -10,16 +10,7 @@ import {
 import { accountsAPI, productsAPI } from '../services/api'
 import toast from 'react-hot-toast'
 import { BILLING_TERMS } from '../constants/transactions'
-
-// Map billing_cycle strings to term numeric values
-const billingCycleToTermMap = {
-  'monthly': '1',
-  'quarterly': '3',
-  'semi-annual': '6',
-  'semi_annual': '6',
-  'annual': '12',
-  'biennial': '24'
-}
+import { formatBillingTerm } from '../utils/billingHelpers'
 
 const EditAccountModal = ({ isOpen, onClose, onSuccess, account }) => {
   const [formData, setFormData] = useState({
@@ -29,8 +20,7 @@ const EditAccountModal = ({ isOpen, onClose, onSuccess, account }) => {
     mac_address: '',
     term: '1',
     price: '',
-    license_status: 'pending',
-    is_trial: false,
+    account_status: 'active',
     notes: ''
   })
 
@@ -43,10 +33,8 @@ const EditAccountModal = ({ isOpen, onClose, onSuccess, account }) => {
   useEffect(() => {
     if (isOpen && account) {
       console.log('📋 Pre-populating form with account:', account)
-      // Convert billing_cycle to term if needed
-      const term = account.term
-        ? account.term.toString()
-        : (billingCycleToTermMap[account.billing_cycle] || '1')
+      // Use billing_term_months (clean field) if available, fallback to term
+      const term = (account.billing_term_months || account.term || 1).toString()
 
       setFormData({
         account_name: account.account_name || '',
@@ -55,8 +43,7 @@ const EditAccountModal = ({ isOpen, onClose, onSuccess, account }) => {
         mac_address: account.mac_address || '',
         term: term,
         price: account.price || '',
-        license_status: account.license_status || 'pending',
-        is_trial: account.is_trial || false,
+        account_status: account.account_status || 'active',
         notes: account.notes || ''
       })
       setErrors({})
@@ -152,15 +139,15 @@ const EditAccountModal = ({ isOpen, onClose, onSuccess, account }) => {
 
     try {
       // Prepare account data - only editable fields
+      // Use billing_term_months for consistency with backend field naming
       const accountData = {
         account_name: formData.account_name.trim(),
         edition: formData.edition,
         device_name: formData.device_name?.trim() || null,
         mac_address: formData.mac_address?.trim() || null,
-        term: formData.term,
+        billing_term_months: parseInt(formData.term),
         price: parseFloat(formData.price) || 0,
-        license_status: formData.license_status,
-        is_trial: formData.is_trial,
+        account_status: formData.account_status,
         notes: formData.notes?.trim() || null
       }
 
@@ -310,10 +297,10 @@ const EditAccountModal = ({ isOpen, onClose, onSuccess, account }) => {
 
               {/* Right Column */}
               <div className="space-y-4">
-                {/* Term */}
+                {/* Billing Term */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Term
+                    Billing Term
                   </label>
                   <select
                     name="term"
@@ -323,10 +310,15 @@ const EditAccountModal = ({ isOpen, onClose, onSuccess, account }) => {
                   >
                     {BILLING_TERMS.map(term => (
                       <option key={term.value} value={term.value}>
-                        {term.label}
+                        {formatBillingTerm(parseInt(term.value))}
                       </option>
                     ))}
                   </select>
+                  {formData.term && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Selected: {formatBillingTerm(parseInt(formData.term))}
+                    </p>
+                  )}
                 </div>
 
                 {/* Price */}
@@ -349,37 +341,23 @@ const EditAccountModal = ({ isOpen, onClose, onSuccess, account }) => {
                   </div>
                 </div>
 
-                {/* License Status */}
+                {/* Account Status */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    License Status
+                    Account Status
                   </label>
                   <select
-                    name="license_status"
-                    value={formData.license_status}
+                    name="account_status"
+                    value={formData.account_status}
                     onChange={handleChange}
                     className="select"
                   >
-                    <option value="pending">Pending</option>
                     <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
                     <option value="suspended">Suspended</option>
-                    <option value="expired">Expired</option>
                     <option value="cancelled">Cancelled</option>
+                    <option value="on_hold">On Hold</option>
                   </select>
-                </div>
-
-                {/* Is Trial Checkbox */}
-                <div>
-                  <label className="flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      name="is_trial"
-                      checked={formData.is_trial}
-                      onChange={handleChange}
-                      className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                    />
-                    <span className="ml-2 text-sm text-gray-700">This is a trial account</span>
-                  </label>
                 </div>
               </div>
             </div>

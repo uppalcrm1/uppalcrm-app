@@ -112,6 +112,9 @@ const EngagementTracker = require('./jobs/engagementTracking');
 const app = express();
 const PORT = envConfig.port;
 
+// Version indicator for deployment verification
+const DEPLOYMENT_VERSION = '2026-02-05-fix-kpi-queries';
+
 // Trust proxy settings (for rate limiting and IP detection)
 app.set('trust proxy', 1);
 

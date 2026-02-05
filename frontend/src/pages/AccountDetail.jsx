@@ -59,12 +59,20 @@ const AccountDetail = () => {
 
   // Status color
   const getStatusColor = () => {
-    if (account?.license_status === 'active') {
-      return account.days_until_renewal > 30
-        ? 'bg-green-100 text-green-800'
-        : 'bg-yellow-100 text-yellow-800';
+    switch (account?.account_status) {
+      case 'active':
+        return 'bg-green-100 text-green-800';
+      case 'inactive':
+        return 'bg-gray-100 text-gray-800';
+      case 'on_hold':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'suspended':
+        return 'bg-orange-100 text-orange-800';
+      case 'cancelled':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
-    return 'bg-red-100 text-red-800';
   };
 
   if (loading) return <LoadingSpinner />;
@@ -102,7 +110,7 @@ const AccountDetail = () => {
                 </h1>
                 <div className="flex items-center gap-2 mt-2">
                   <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor()}`}>
-                    {account.license_status || 'Unknown'}
+                    {account.account_status || 'Unknown'}
                   </span>
                   {account.contact_name && (
                     <div className="flex items-center gap-1 text-sm text-gray-600">
@@ -230,7 +238,7 @@ const AccountDetail = () => {
                         {relAccount.account_name}
                       </p>
                       <p className="text-xs text-gray-500">
-                        {relAccount.edition} - {relAccount.license_status}
+                        {relAccount.edition} - {relAccount.account_status}
                       </p>
                     </button>
                   ))}
