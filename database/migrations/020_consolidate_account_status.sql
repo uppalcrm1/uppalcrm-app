@@ -8,7 +8,11 @@ BEGIN;
 ALTER TABLE accounts
 ADD COLUMN account_status VARCHAR(50) DEFAULT 'active';
 
--- Step 2: Migrate data from license_status to account_status
+-- Step 2: Drop dependent views
+DROP VIEW IF EXISTS active_accounts CASCADE;
+DROP VIEW IF EXISTS deleted_accounts CASCADE;
+
+-- Step 3: Migrate data from license_status to account_status
 -- Mapping: pending → on_hold, expired → inactive, active/suspended/cancelled stay same
 UPDATE accounts
 SET account_status = CASE
@@ -24,7 +28,7 @@ UPDATE accounts
 SET account_status = 'cancelled'
 WHERE deleted_at IS NOT NULL;
 
--- Step 3: Drop the old columns
+-- Step 4: Drop the old columns
 ALTER TABLE accounts DROP COLUMN license_status;
 ALTER TABLE accounts DROP COLUMN account_type;
 ALTER TABLE accounts DROP COLUMN is_trial;
