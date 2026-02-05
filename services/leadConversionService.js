@@ -389,8 +389,8 @@ exports.convertLeadWithMappings = async (
         `INSERT INTO accounts (
           organization_id, contact_id, account_name, edition,
           device_name, mac_address, billing_cycle, billing_term_months, price,
-          is_trial, account_type, license_status, created_by, product_id, custom_fields
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+          account_status, created_by, product_id, custom_fields
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
         RETURNING *`,
         [
           organizationId,
@@ -402,9 +402,7 @@ exports.convertLeadWithMappings = async (
           finalBillingCycle,
           billingTermMonths,
           accountData.price || 0,
-          accountData.isTrial || false,
-          accountData.isTrial ? 'trial' : 'active',
-          'pending',
+          'active',  // Set to active by default (was: accountData.isTrial ? 'trial' : 'active')
           userId,
           productId,
           { ...(lead.custom_fields || {}), ...accountData }
