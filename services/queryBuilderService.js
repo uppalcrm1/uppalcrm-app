@@ -121,7 +121,7 @@ const DATA_SOURCES = {
         ]
       },
       billing_term_months: { type: 'number', label: 'Billing Term (Months)', filterable: true, groupable: true, sortable: true },
-      license_status: {
+      account_status: {
         type: 'select',
         label: 'Status',
         filterable: true,
@@ -129,7 +129,9 @@ const DATA_SOURCES = {
         sortable: true,
         options: [
           { value: 'active', label: 'Active' },
-          { value: 'expired', label: 'Expired' },
+          { value: 'on_hold', label: 'On Hold' },
+          { value: 'inactive', label: 'Inactive' },
+          { value: 'suspended', label: 'Suspended' },
           { value: 'cancelled', label: 'Cancelled' }
         ]
       },
