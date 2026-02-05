@@ -18,17 +18,12 @@ import LoadingSpinner from './LoadingSpinner'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
 
-const ACCOUNT_TYPES = [
-  { value: 'business', label: 'Business' },
-  { value: 'individual', label: 'Individual' },
-  { value: 'government', label: 'Government' },
-  { value: 'nonprofit', label: 'Non-profit' }
-]
-
 const ACCOUNT_STATUSES = [
   { value: 'active', label: 'Active', color: 'green' },
   { value: 'inactive', label: 'Inactive', color: 'gray' },
-  { value: 'suspended', label: 'Suspended', color: 'red' }
+  { value: 'suspended', label: 'Suspended', color: 'red' },
+  { value: 'cancelled', label: 'Cancelled', color: 'red' },
+  { value: 'on_hold', label: 'On Hold', color: 'yellow' }
 ]
 
 const AccountManagement = ({ contactId }) => {
@@ -105,12 +100,11 @@ const AccountManagement = ({ contactId }) => {
                   </div>
                   <div>
                     <h4 className="font-semibold text-gray-900">{account.account_name}</h4>
-                    <p className="text-sm text-gray-600 capitalize">{account.account_type}</p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <span className={`badge badge-${getStatusBadgeColor(account.status)}`}>
-                    {ACCOUNT_STATUSES.find(s => s.value === account.status)?.label || account.status}
+                  <span className={`badge badge-${getStatusBadgeColor(account.account_status)}`}>
+                    {ACCOUNT_STATUSES.find(s => s.value === account.account_status)?.label || account.account_status}
                   </span>
                   <button
                     onClick={() => setSelectedAccount(account)}
@@ -223,8 +217,7 @@ const AddressDisplay = ({ address }) => {
 const CreateAccountModal = ({ onClose, onSubmit, isLoading }) => {
   const { register, handleSubmit, formState: { errors }, watch } = useForm({
     defaultValues: {
-      account_type: 'business',
-      status: 'active',
+      account_status: 'active',
       credit_limit: 0
     }
   })
@@ -259,20 +252,10 @@ const CreateAccountModal = ({ onClose, onSubmit, isLoading }) => {
                 )}
               </div>
 
-              {/* Account Type */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Account Type</label>
-                <select {...register('account_type')} className="select">
-                  {ACCOUNT_TYPES.map(type => (
-                    <option key={type.value} value={type.value}>{type.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Status */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-                <select {...register('status')} className="select">
+              {/* Account Status */}
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Account Status</label>
+                <select {...register('account_status')} className="select">
                   {ACCOUNT_STATUSES.map(status => (
                     <option key={status.value} value={status.value}>{status.label}</option>
                   ))}

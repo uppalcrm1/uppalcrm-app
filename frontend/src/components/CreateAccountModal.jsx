@@ -23,9 +23,7 @@ const CreateAccountModal = ({ isOpen, onClose, onSuccess }) => {
     mac_address: '',
     term: '1', // Standardized: numeric months (1 = Monthly)
     price: '',
-    license_status: 'pending',
-    account_type: 'trial',
-    is_trial: false,
+    account_status: 'active',
     notes: ''
   })
 
@@ -192,9 +190,7 @@ const CreateAccountModal = ({ isOpen, onClose, onSuccess }) => {
         mac_address: formData.mac_address?.trim() || null,
         term: formData.term, // Standardized: numeric months
         price: parseFloat(formData.price) || 0,
-        license_status: formData.license_status,
-        account_type: formData.is_trial ? 'trial' : formData.account_type,
-        is_trial: formData.is_trial,
+        account_status: formData.account_status,
         notes: formData.notes?.trim() || null
       }
 
@@ -216,9 +212,7 @@ const CreateAccountModal = ({ isOpen, onClose, onSuccess }) => {
         mac_address: '',
         term: '1', // Standardized: numeric months (1 = Monthly)
         price: '',
-        license_status: 'pending',
-        account_type: 'trial',
-        is_trial: false,
+        account_status: 'active',
         notes: ''
       })
     } catch (error) {
@@ -478,37 +472,23 @@ const CreateAccountModal = ({ isOpen, onClose, onSuccess }) => {
                   </div>
                 </div>
 
-                {/* License Status */}
+                {/* Account Status */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    License Status
+                    Account Status
                   </label>
                   <select
-                    name="license_status"
-                    value={formData.license_status}
+                    name="account_status"
+                    value={formData.account_status}
                     onChange={handleChange}
                     className="select"
                   >
-                    <option value="pending">Pending</option>
                     <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
                     <option value="suspended">Suspended</option>
-                    <option value="expired">Expired</option>
                     <option value="cancelled">Cancelled</option>
+                    <option value="on_hold">On Hold</option>
                   </select>
-                </div>
-
-                {/* Is Trial Checkbox */}
-                <div>
-                  <label className="flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      name="is_trial"
-                      checked={formData.is_trial}
-                      onChange={handleChange}
-                      className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                    />
-                    <span className="ml-2 text-sm text-gray-700">This is a trial account</span>
-                  </label>
                 </div>
               </div>
             </div>

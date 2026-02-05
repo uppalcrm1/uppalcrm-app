@@ -117,8 +117,7 @@ const contactSchemas = {
     body: Joi.object({
       contact_id: Joi.string().guid({ version: 'uuidv4' }).required(),
       account_name: Joi.string().min(1).max(255).required(),
-      account_type: Joi.string().valid('business', 'individual', 'government', 'nonprofit').default('business'),
-      status: Joi.string().valid('active', 'inactive', 'suspended').default('active'),
+      account_status: Joi.string().valid('active', 'inactive', 'suspended', 'cancelled', 'on_hold').default('active'),
       billing_address: Joi.object({
         street: Joi.string().optional(),
         city: Joi.string().optional(),
@@ -750,12 +749,34 @@ router.post('/convert-from-lead/:leadId',
 
       // Step 5: Create account if requested
       if (createAccount && accountData) {
+        // Convert term to billing_term_months
+        const termValue = accountData.term || 'Monthly';
+        let billingTermMonths = 1;
+
+        switch (termValue.toLowerCase()) {
+          case 'monthly':
+            billingTermMonths = 1;
+            break;
+          case 'quarterly':
+            billingTermMonths = 3;
+            break;
+          case 'semi-annual':
+          case 'semi_annual':
+            billingTermMonths = 6;
+            break;
+          case 'annual':
+            billingTermMonths = 12;
+            break;
+          default:
+            billingTermMonths = 1;
+        }
+
         const accountInsertResult = await query(
           `INSERT INTO accounts (
             organization_id, contact_id, account_name, edition,
-            device_name, mac_address, billing_cycle, account_type,
-            license_status, created_by
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            device_name, mac_address, billing_term_months,
+            account_status, created_by
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
           RETURNING *`,
           [
             req.organizationId,
@@ -764,8 +785,7 @@ router.post('/convert-from-lead/:leadId',
             accountData.product || 'Standard',
             accountData.deviceName,
             accountData.macAddress,
-            accountData.term || 'Monthly',
-            'active',
+            billingTermMonths,
             'active',
             req.user.id
           ]
@@ -1020,14 +1040,13 @@ router.put('/:id/status',
       // If status is "won" and accountData is provided, create an account
       let account = null;
       if (status === 'won' && accountData) {
-        const { edition_id, billing_cycle, price } = accountData;
+        const { edition_id, billing_term_months = 1, price } = accountData;
 
         // Create account
         const accountInfo = {
           contact_id: req.params.id,
           account_name: `${contact.first_name} ${contact.last_name} Account`,
-          account_type: 'business',
-          status: 'active'
+          account_status: 'active'
         };
 
         account = await Contact.createAccount(accountInfo, req.organizationId, req.user.id);
@@ -1038,7 +1057,7 @@ router.put('/:id/status',
             contact_id: req.params.id,
             edition_id,
             license_type: 'standard',
-            duration_months: billing_cycle === 'monthly' ? 1 : 12,
+            duration_months: billing_term_months,
             max_devices: 1,
             custom_features: { price }
           };

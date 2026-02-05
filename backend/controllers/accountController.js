@@ -21,7 +21,7 @@ exports.softDeleteAccount = async (req, res) => {
   try {
     // Verify account belongs to this organization and is not already deleted
     const accountCheck = await db.query(
-      `SELECT id, account_name, account_type FROM accounts
+      `SELECT id, account_name FROM accounts
        WHERE id = $1 AND organization_id = $2 AND deleted_at IS NULL`,
       [id, organizationId],
       organizationId
@@ -43,7 +43,7 @@ exports.softDeleteAccount = async (req, res) => {
          deleted_at = NOW(),
          deleted_by = $1,
          deletion_reason = $2,
-         account_type = 'cancelled',
+         account_status = 'cancelled',
          updated_at = NOW()
        WHERE id = $3`,
       [userId, reason || 'No reason provided', id],
@@ -110,7 +110,7 @@ exports.restoreAccount = async (req, res) => {
          deleted_at = NULL,
          deleted_by = NULL,
          deletion_reason = NULL,
-         account_type = 'active',
+         account_status = 'active',
          updated_at = NOW(),
          updated_by = $1
        WHERE id = $2`,
@@ -171,12 +171,12 @@ exports.getAccounts = async (req, res) => {
         p.price as product_price,
         a.edition as edition_name,
 
-        -- Calculate monthly cost based on billing cycle
+        -- Calculate monthly cost based on billing term (months)
         CASE
-          WHEN a.billing_cycle = 'monthly' THEN a.price
-          WHEN a.billing_cycle = 'quarterly' THEN a.price / 3
-          WHEN a.billing_cycle = 'semi_annual' OR a.billing_cycle = 'semi-annual' THEN a.price / 6
-          WHEN a.billing_cycle = 'annual' THEN a.price / 12
+          WHEN a.billing_term_months = 1 THEN a.price
+          WHEN a.billing_term_months = 3 THEN a.price / 3
+          WHEN a.billing_term_months = 6 THEN a.price / 6
+          WHEN a.billing_term_months = 12 THEN a.price / 12
           ELSE a.price
         END as monthly_cost,
 
@@ -224,7 +224,7 @@ exports.getAccounts = async (req, res) => {
     }
 
     if (status) {
-      query += ` AND a.account_type = $${params.length + 1}`;
+      query += ` AND a.account_status = $${params.length + 1}`;
       params.push(status);
     }
 
