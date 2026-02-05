@@ -18,8 +18,7 @@ const EditAccountModal = ({ isOpen, onClose, onSuccess, account }) => {
     edition: '',
     device_name: '',
     mac_address: '',
-    term: '1',
-    price: '',
+    // NOTE: term and price are READ-ONLY - only editable via transactions
     account_status: 'active',
     notes: ''
   })
@@ -33,16 +32,15 @@ const EditAccountModal = ({ isOpen, onClose, onSuccess, account }) => {
   useEffect(() => {
     if (isOpen && account) {
       console.log('📋 Pre-populating form with account:', account)
-      // Use billing_term_months (clean field) if available, fallback to term
-      const term = (account.billing_term_months || account.term || 1).toString()
+      // NOTE: term and price are NOT included in formData - they are READ-ONLY
+      // These fields can only be changed via Transactions
 
       setFormData({
         account_name: account.account_name || '',
         edition: account.edition || '',
         device_name: account.device_name || '',
         mac_address: account.mac_address || '',
-        term: term,
-        price: account.price || '',
+        // term and price excluded - READ-ONLY fields
         account_status: account.account_status || 'active',
         notes: account.notes || ''
       })
@@ -139,19 +137,19 @@ const EditAccountModal = ({ isOpen, onClose, onSuccess, account }) => {
 
     try {
       // Prepare account data - only editable fields
-      // Use billing_term_months for consistency with backend field naming
+      // NOTE: billing_term_months and price are READ-ONLY
+      // These can only be changed via Transactions
       const accountData = {
         account_name: formData.account_name.trim(),
         edition: formData.edition,
         device_name: formData.device_name?.trim() || null,
         mac_address: formData.mac_address?.trim() || null,
-        billing_term_months: parseInt(formData.term),
-        price: parseFloat(formData.price) || 0,
+        // billing_term_months and price intentionally excluded - READ-ONLY
         account_status: formData.account_status,
         notes: formData.notes?.trim() || null
       }
 
-      console.log('Updating account:', accountData)
+      console.log('Updating account (term & price READ-ONLY):', accountData)
 
       // Update account using the accounts API
       await accountsAPI.updateAccount(account.id, accountData)
@@ -297,48 +295,42 @@ const EditAccountModal = ({ isOpen, onClose, onSuccess, account }) => {
 
               {/* Right Column */}
               <div className="space-y-4">
-                {/* Billing Term */}
+                {/* Billing Term - READ-ONLY */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Billing Term
                   </label>
-                  <select
-                    name="term"
-                    value={formData.term}
-                    onChange={handleChange}
-                    className="select"
-                  >
-                    {BILLING_TERMS.map(term => (
-                      <option key={term.value} value={term.value}>
-                        {formatBillingTerm(parseInt(term.value))}
-                      </option>
-                    ))}
-                  </select>
-                  {formData.term && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      Selected: {formatBillingTerm(parseInt(formData.term))}
-                    </p>
-                  )}
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-900">
+                      {account?.billing_term_months
+                        ? formatBillingTerm(parseInt(account.billing_term_months))
+                        : 'Not set'}
+                    </span>
+                    <span className="text-xs text-blue-600 cursor-help" title="Edit via Transactions">
+                      ℹ️
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Read-only. Edit via Transactions to change billing term.
+                  </p>
                 </div>
 
-                {/* Price */}
+                {/* Price - READ-ONLY */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Price
                   </label>
-                  <div className="relative">
-                    <DollarSign className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                    <input
-                      type="number"
-                      name="price"
-                      value={formData.price}
-                      onChange={handleChange}
-                      min="0"
-                      step="0.01"
-                      className="input pl-10"
-                      placeholder="0.00"
-                    />
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-900">
+                      ${account?.price ? parseFloat(account.price).toFixed(2) : '0.00'}
+                    </span>
+                    <span className="text-xs text-blue-600 cursor-help" title="Edit via Transactions">
+                      ℹ️
+                    </span>
                   </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Read-only. Edit via Transactions to change price.
+                  </p>
                 </div>
 
                 {/* Account Status */}
@@ -375,6 +367,29 @@ const EditAccountModal = ({ isOpen, onClose, onSuccess, account }) => {
                 className="input"
                 placeholder="Add any additional information about this account..."
               />
+            </div>
+
+            {/* Info Banner - Financial Fields Read-Only */}
+            <div className="border-t border-gray-200 pt-6">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h4 className="text-sm font-semibold text-blue-900 mb-2 flex items-center">
+                  <Info size={16} className="mr-2" />
+                  Financial Fields Management
+                </h4>
+                <p className="text-sm text-blue-800 mb-3">
+                  Billing Term and Price are managed through Transactions only. This ensures all changes are tied to payment records.
+                </p>
+                <div className="space-y-2 text-sm text-blue-700">
+                  <p className="flex items-start">
+                    <span className="mr-2">→</span>
+                    <span><strong>To change billing term or price:</strong> Edit or create a transaction for this account</span>
+                  </p>
+                  <p className="flex items-start">
+                    <span className="mr-2">→</span>
+                    <span><strong>Changes will sync automatically:</strong> When you update a transaction, the account fields update instantly</span>
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
 
