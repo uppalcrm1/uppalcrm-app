@@ -40,7 +40,8 @@ const transactionSchemas = {
     status: Joi.string().valid('completed', 'pending', 'failed', 'refunded'),
     payment_date: Joi.date().iso(), // Allow updating payment date
     transaction_reference: Joi.string().max(255).allow('', null),
-    notes: Joi.string().allow('', null)
+    notes: Joi.string().allow('', null),
+    new_expiry_date: Joi.date().iso().allow(null) // Allow updating account expiry date
   })
 };
 
@@ -651,7 +652,15 @@ router.get('/accounts/:accountId', async (req, res) => {
 
 /**
  * PUT /api/transactions/:id
- * Update a transaction
+ * Update a transaction AND sync critical fields back to account
+ *
+ * When term or amount are edited, the corresponding account fields are updated:
+ * - term → account.billing_term_months
+ * - amount → account.price
+ * - payment_date → can optionally update account expiry if new_expiry_date provided
+ *
+ * This ensures data consistency: if a user corrects a mistake in a transaction,
+ * the account is automatically updated with the corrected values.
  */
 router.put('/:id', validate(transactionSchemas.update), async (req, res) => {
   const client = await db.pool.connect();
@@ -660,6 +669,7 @@ router.put('/:id', validate(transactionSchemas.update), async (req, res) => {
     const { id } = req.params;
     const { organization_id, id: user_id } = req.user;
     const updates = req.body;
+    const { new_expiry_date } = req.body; // Optional: update account expiry date
 
     await client.query('BEGIN');
 
@@ -667,10 +677,30 @@ router.put('/:id', validate(transactionSchemas.update), async (req, res) => {
     await client.query('SELECT set_config($1, $2, true)', ['app.current_user_id', user_id]);
     await client.query('SELECT set_config($1, $2, true)', ['app.current_organization_id', organization_id]);
 
-    // Build dynamic update query
+    // 1. Get current transaction to find associated account
+    const transactionResult = await client.query(`
+      SELECT account_id, term, amount FROM transactions
+      WHERE id = $1 AND organization_id = $2
+    `, [id, organization_id]);
+
+    if (transactionResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({
+        error: 'Transaction not found'
+      });
+    }
+
+    const currentTransaction = transactionResult.rows[0];
+    const account_id = currentTransaction.account_id;
+
+    // 2. Build dynamic update query for TRANSACTION
     const updateFields = [];
     const values = [];
     let paramCounter = 1;
+
+    // Track which fields are being changed (for account sync)
+    let termChanged = false;
+    let amountChanged = false;
 
     // Map API field names to database column names
     const fieldMapping = {
@@ -678,10 +708,22 @@ router.put('/:id', validate(transactionSchemas.update), async (req, res) => {
     };
 
     Object.keys(updates).forEach(key => {
+      // Skip new_expiry_date as it's only for account update, not transaction update
+      if (key === 'new_expiry_date') return;
+
       if (updates[key] !== undefined) {
         const dbColumnName = fieldMapping[key] || key; // Use mapped name or original
         updateFields.push(`${dbColumnName} = $${paramCounter}`);
         values.push(updates[key]);
+
+        // Track which fields changed
+        if (key === 'term' && updates[key] !== currentTransaction.term) {
+          termChanged = true;
+        }
+        if (key === 'amount' && updates[key] !== currentTransaction.amount) {
+          amountChanged = true;
+        }
+
         paramCounter++;
       }
     });
@@ -695,6 +737,7 @@ router.put('/:id', validate(transactionSchemas.update), async (req, res) => {
 
     values.push(id, organization_id);
 
+    // 3. Update TRANSACTION
     const result = await client.query(`
       UPDATE transactions
       SET ${updateFields.join(', ')}, updated_at = NOW()
@@ -709,12 +752,74 @@ router.put('/:id', validate(transactionSchemas.update), async (req, res) => {
       });
     }
 
+    const updatedTransaction = result.rows[0];
+
+    // 4. Sync critical fields to ACCOUNT if they changed
+    const accountUpdateFields = [];
+    const accountValues = [];
+    let accountParamCounter = 1;
+
+    // Sync billing_term_months if term changed
+    if (termChanged && updatedTransaction.term) {
+      accountUpdateFields.push(`billing_term_months = $${accountParamCounter}`);
+      accountValues.push(parseInt(updatedTransaction.term));
+      accountParamCounter++;
+    }
+
+    // Sync price if amount changed
+    if (amountChanged && updatedTransaction.amount) {
+      accountUpdateFields.push(`price = $${accountParamCounter}`);
+      accountValues.push(updatedTransaction.amount);
+      accountParamCounter++;
+    }
+
+    // Sync expiry date if provided
+    if (new_expiry_date) {
+      accountUpdateFields.push(`next_renewal_date = $${accountParamCounter}`);
+      accountValues.push(new_expiry_date);
+      accountParamCounter++;
+
+      accountUpdateFields.push(`subscription_end_date = $${accountParamCounter}`);
+      accountValues.push(new_expiry_date);
+      accountParamCounter++;
+    }
+
+    // Only update account if there are changes
+    let accountUpdateResult = null;
+    if (accountUpdateFields.length > 0) {
+      accountValues.push(account_id, organization_id);
+
+      accountUpdateResult = await client.query(`
+        UPDATE accounts
+        SET ${accountUpdateFields.join(', ')}, updated_at = NOW()
+        WHERE id = $${accountParamCounter} AND organization_id = $${accountParamCounter + 1}
+        RETURNING id, account_name, billing_term_months, price, next_renewal_date, subscription_end_date
+      `, accountValues);
+
+      if (accountUpdateResult.rows.length > 0) {
+        console.log(`✅ Account synced: ${accountUpdateResult.rows[0].account_name}`);
+        if (termChanged) {
+          console.log(`   - billing_term_months: ${accountUpdateResult.rows[0].billing_term_months}`);
+        }
+        if (amountChanged) {
+          console.log(`   - price: $${accountUpdateResult.rows[0].price}`);
+        }
+        if (new_expiry_date) {
+          console.log(`   - next_renewal_date: ${accountUpdateResult.rows[0].next_renewal_date}`);
+        }
+      }
+    }
+
     await client.query('COMMIT');
 
     res.json({
       success: true,
-      message: 'Transaction updated successfully',
-      transaction: result.rows[0]
+      message: accountUpdateResult?.rows.length > 0
+        ? 'Transaction updated and account synced successfully'
+        : 'Transaction updated successfully',
+      transaction: updatedTransaction,
+      account_synced: accountUpdateResult?.rows.length > 0,
+      updated_account: accountUpdateResult?.rows[0] || null
     });
   } catch (error) {
     await client.query('ROLLBACK');
