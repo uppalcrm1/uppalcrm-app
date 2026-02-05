@@ -5,7 +5,8 @@ import {
   DollarSign,
   Package,
   CheckCircle,
-  Loader
+  Loader,
+  Info
 } from 'lucide-react'
 import { accountsAPI, productsAPI } from '../services/api'
 import toast from 'react-hot-toast'
