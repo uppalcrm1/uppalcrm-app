@@ -1,13 +1,28 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
-import { io } from 'socket.io-client'
 import { useAuth } from './AuthContext'
+
+let io = null
+try {
+  const socketIO = require('socket.io-client')
+  io = socketIO.io || socketIO.default
+} catch (error) {
+  console.warn('socket.io-client module not found, WebSocket disabled:', error.message)
+}
 
 const WebSocketContext = createContext()
 
 export const useWebSocket = () => {
   const context = useContext(WebSocketContext)
   if (!context) {
-    throw new Error('useWebSocket must be used within a WebSocketProvider')
+    console.warn('useWebSocket must be used within a WebSocketProvider - returning dummy context')
+    // Return a dummy context to prevent errors
+    return {
+      isConnected: false,
+      connectionError: 'WebSocketProvider not found',
+      on: () => {},
+      off: () => {},
+      emit: () => console.warn('WebSocket not initialized')
+    }
   }
   return context
 }
@@ -38,23 +53,37 @@ export const WebSocketProvider = ({ children }) => {
       return
     }
 
+    // Check if socket.io-client is available
+    if (!io) {
+      console.warn('socket.io-client not available, WebSocket disabled')
+      setConnectionError('socket.io-client module not loaded')
+      return
+    }
+
     // Determine API URL
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3004'
 
     console.log(`🔌 Attempting WebSocket connection to ${API_URL}`)
 
     // Create socket connection with JWT authentication
-    const socket = io(API_URL, {
-      auth: {
-        token
-      },
-      transports: ['websocket', 'polling'],
-      reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      reconnectionAttempts: Infinity,
-      autoConnect: true
-    })
+    let socket
+    try {
+      socket = io(API_URL, {
+        auth: {
+          token
+        },
+        transports: ['websocket', 'polling'],
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        reconnectionAttempts: Infinity,
+        autoConnect: true
+      })
+    } catch (error) {
+      console.error('Failed to create WebSocket connection:', error)
+      setConnectionError(error.message)
+      return
+    }
 
     // Connection event handlers
     socket.on('connect', () => {
