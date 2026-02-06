@@ -2,7 +2,6 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { twilioAPI } from '../services/api'
 import toast from 'react-hot-toast'
 import { useAuth } from '../contexts/AuthContext'
-import { useWebSocket } from '../contexts/WebSocketContext'
 
 const CallContext = createContext()
 
@@ -17,12 +16,10 @@ export const useCall = () => {
 export const CallProvider = ({ children }) => {
   const auth = useAuth();
   const isAuthenticated = auth?.isAuthenticated || false;
-  const { isConnected: wsConnected, on: wsOn, off: wsOff } = useWebSocket();
   const [incomingCall, setIncomingCall] = useState(null)
   const [activeCall, setActiveCall] = useState(null)
   const [callHistory, setCallHistory] = useState([])
   const [missedCallCount, setMissedCallCount] = useState(0)
-  const [shouldPoll, setShouldPoll] = useState(false)
 
   // Fetch call history
   const fetchCallHistory = useCallback(async () => {
@@ -39,55 +36,10 @@ export const CallProvider = ({ children }) => {
     }
   }, [isAuthenticated])
 
-  // WebSocket listener for incoming calls
-  useEffect(() => {
-    if (!isAuthenticated) return;
-
-    // Listen for incoming call notifications via WebSocket
-    const handleIncomingCall = (callData) => {
-      console.log('📞 Incoming call received via WebSocket:', callData)
-      setIncomingCall(callData)
-      // Play notification sound
-      playNotificationSound()
-      // Request browser notification permission
-      if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification('Incoming Call', {
-          body: `Call from ${callData.callerName || callData.from}`,
-          icon: '/phone-icon.png'
-        })
-      }
-    }
-
-    // Listen for call-accepted notifications (when another agent accepts)
-    const handleCallAccepted = (event) => {
-      console.log('✅ Call accepted by another agent:', event)
-      if (incomingCall && incomingCall.callSid === event.callSid) {
-        // This call was accepted by another agent, clear it from our UI
-        console.log('Clearing incoming call - accepted by another agent')
-        setIncomingCall(null)
-      }
-    }
-
-    // Set up WebSocket listeners
-    wsOn('incoming-call', handleIncomingCall)
-    wsOn('call-accepted', handleCallAccepted)
-
-    // Return cleanup function
-    return () => {
-      wsOff('incoming-call', handleIncomingCall)
-      wsOff('call-accepted', handleCallAccepted)
-    }
-  }, [isAuthenticated, incomingCall, wsOn, wsOff])
-
-  // Fallback polling if WebSocket is unavailable
-  useEffect(() => {
-    // Enable polling only if WebSocket is not connected
-    setShouldPoll(!wsConnected && isAuthenticated)
-  }, [wsConnected, isAuthenticated])
-
+  // Poll for incoming calls
   useEffect(() => {
     const checkForIncomingCalls = async () => {
-      if (!isAuthenticated || !shouldPoll) return
+      if (!isAuthenticated) return
       const token = localStorage.getItem('authToken')
       if (!token) return
 
@@ -103,7 +55,6 @@ export const CallProvider = ({ children }) => {
         if (response.ok) {
           const data = await response.json()
           if (data.incomingCall && !incomingCall) {
-            console.log('📞 Incoming call received via polling (fallback)')
             setIncomingCall(data.incomingCall)
             // Play notification sound
             playNotificationSound()
@@ -121,18 +72,18 @@ export const CallProvider = ({ children }) => {
           }
         }
       } catch (error) {
-        // Silently fail - fallback polling
+        // Silently fail
       }
     }
 
-    // Only start polling if enabled
-    if (!shouldPoll) return;
+    // Only start polling if authenticated
+    if (!isAuthenticated) return;
 
-    // Poll every 10 seconds as fallback
+    // Poll every 10 seconds
     const interval = setInterval(checkForIncomingCalls, 10000)
 
     return () => clearInterval(interval)
-  }, [incomingCall, isAuthenticated, shouldPoll])
+  }, [incomingCall, isAuthenticated])
 
   // Play notification sound for incoming calls
   const playNotificationSound = () => {

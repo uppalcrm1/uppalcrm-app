@@ -3,7 +3,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { twilioAPI } from '../services/api';
 import { ToastContainer } from '../components/ToastNotification';
 import { useAuth } from '../contexts/AuthContext';
-import { useWebSocket } from '../contexts/WebSocketContext';
 
 const NotificationContext = createContext();
 
@@ -14,11 +13,9 @@ export function useNotifications() {
 export function NotificationProvider({ children }) {
   const auth = useAuth();
   const isAuthenticated = auth?.isAuthenticated || false;
-  const { isConnected: wsConnected, on: wsOn, off: wsOff } = useWebSocket();
   const [toasts, setToasts] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [browserPermission, setBrowserPermission] = useState('default');
-  const [shouldPollSMS, setShouldPollSMS] = useState(false);
   const lastMessageIdRef = useRef(null);
   const queryClient = useQueryClient();
 
@@ -38,67 +35,18 @@ export function NotificationProvider({ children }) {
     return 'denied';
   }, []);
 
-  // WebSocket listener for incoming SMS
-  useEffect(() => {
-    if (!isAuthenticated) return;
-
-    const handleIncomingSMS = (smsData) => {
-      console.log('💬 Incoming SMS received via WebSocket:', smsData);
-
-      // Show toast notification
-      addToast({
-        type: 'sms',
-        title: 'New SMS Message',
-        message: `From ${smsData.contactName || smsData.from}: ${smsData.body.substring(0, 50)}${smsData.body.length > 50 ? '...' : ''}`,
-        duration: 8000
-      });
-
-      // Show browser notification
-      if (browserPermission === 'granted') {
-        showBrowserNotification(
-          'New SMS Message',
-          `From ${smsData.contactName || smsData.from}`,
-          smsData.body
-        );
-      }
-
-      // Play notification sound
-      playNotificationSound();
-
-      // Increment unread count
-      setUnreadCount(prev => prev + 1);
-
-      // Invalidate conversations query to refresh UI
-      queryClient.invalidateQueries(['conversations']);
-    };
-
-    // Set up WebSocket listener
-    wsOn('incoming-sms', handleIncomingSMS);
-
-    // Return cleanup function
-    return () => {
-      wsOff('incoming-sms', handleIncomingSMS);
-    };
-  }, [isAuthenticated, browserPermission, queryClient, wsOn, wsOff, addToast, showBrowserNotification, playNotificationSound]);
-
-  // Fallback polling for SMS if WebSocket is unavailable
-  useEffect(() => {
-    // Enable polling only if WebSocket is not connected
-    setShouldPollSMS(!wsConnected && isAuthenticated);
-  }, [wsConnected, isAuthenticated]);
-
-  // Poll for new messages as fallback (only if WebSocket unavailable)
+  // Poll for new messages (only if authenticated)
   const { data: conversationsData } = useQuery({
     queryKey: ['notifications-check'],
     queryFn: twilioAPI.getConversations,
-    refetchInterval: shouldPollSMS ? 15000 : false, // Check every 15 seconds if polling enabled
+    refetchInterval: 15000, // Check every 15 seconds
     staleTime: 10000,
-    enabled: shouldPollSMS // Only run when polling is enabled (WebSocket unavailable)
+    enabled: isAuthenticated // Only run when authenticated
   });
 
-  // Check for new messages from polling and trigger notifications
+  // Check for new messages and trigger notifications
   useEffect(() => {
-    if (!shouldPollSMS || !conversationsData?.conversations) return;
+    if (!conversationsData?.conversations) return;
 
     const conversations = conversationsData.conversations;
     if (conversations.length === 0) return;
@@ -113,8 +61,6 @@ export function NotificationProvider({ children }) {
       lastMessageIdRef.current &&
       latestMessageTime > lastMessageIdRef.current
     ) {
-      console.log('💬 Incoming SMS received via polling (fallback)');
-
       // Show toast notification
       addToast({
         type: 'sms',
@@ -149,7 +95,7 @@ export function NotificationProvider({ children }) {
     ).length;
     setUnreadCount(recentInbound);
 
-  }, [conversationsData, browserPermission, queryClient, shouldPollSMS, addToast, showBrowserNotification, playNotificationSound]);
+  }, [conversationsData, browserPermission, queryClient];
 
   const addToast = useCallback((toast) => {
     const id = Date.now() + Math.random();
