@@ -36,7 +36,7 @@ export const CallProvider = ({ children }) => {
     }
   }, [isAuthenticated])
 
-  // Poll for incoming calls (simple polling approach)
+  // Poll for incoming calls
   useEffect(() => {
     const checkForIncomingCalls = async () => {
       if (!isAuthenticated) return
@@ -59,7 +59,7 @@ export const CallProvider = ({ children }) => {
             // Play notification sound
             playNotificationSound()
             // Request browser notification permission
-            if (Notification.permission === 'granted') {
+            if ('Notification' in window && Notification.permission === 'granted') {
               new Notification('Incoming Call', {
                 body: `Call from ${data.incomingCall.callerName || data.incomingCall.from}`,
                 icon: '/phone-icon.png'
@@ -72,7 +72,7 @@ export const CallProvider = ({ children }) => {
           }
         }
       } catch (error) {
-        // Silently fail - endpoint might not exist yet
+        // Silently fail
       }
     }
 

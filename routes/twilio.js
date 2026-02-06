@@ -687,7 +687,21 @@ router.delete('/templates/:id', authenticateToken, async (req, res) => {
  */
 router.post('/webhook/sms', async (req, res) => {
   try {
-    await twilioService.processIncomingSMS(req.body);
+    const result = await twilioService.processIncomingSMS(req.body);
+
+    // Emit real-time SMS notification via WebSocket
+    if (result && result.organizationId) {
+      const websocketService = require('../services/websocketService');
+      websocketService.emitIncomingSMS(result.organizationId, {
+        messageSid: req.body.MessageSid,
+        from: req.body.From,
+        to: req.body.To,
+        body: req.body.Body,
+        contactName: result.contactName || null,
+        leadId: result.leadId || null,
+        contactId: result.contactId || null
+      });
+    }
 
     // Respond with TwiML (required by Twilio)
     res.type('text/xml');
@@ -848,13 +862,20 @@ router.post('/webhook/voice', async (req, res) => {
       if (!global.incomingCalls) {
         global.incomingCalls = {};
       }
-      global.incomingCalls[cacheKey] = {
+      const incomingCallData = {
         callSid: CallSid,
         from: From,
         to: To,
         callerName: contactInfo ? `${contactInfo.first_name || ''} ${contactInfo.last_name || ''}`.trim() : null,
+        leadId: contactInfo?.type === 'lead' ? contactInfo.id : null,
+        contactId: contactInfo?.type === 'contact' ? contactInfo.id : null,
         timestamp: new Date().toISOString()
       };
+      global.incomingCalls[cacheKey] = incomingCallData;
+
+      // Emit real-time notification via WebSocket
+      const websocketService = require('../services/websocketService');
+      websocketService.emitIncomingCall(organizationId, incomingCallData);
 
       // Timeout: Hang up after 60 seconds if not answered
       setTimeout(async () => {
@@ -919,6 +940,7 @@ router.post('/incoming-calls/accept', authenticateToken, async (req, res) => {
   try {
     const { callSid } = req.body;
     const organizationId = req.organizationId;
+    const userId = req.userId;
 
     console.log(`Accepting incoming call: ${callSid}`);
 
@@ -937,6 +959,10 @@ router.post('/incoming-calls/accept', authenticateToken, async (req, res) => {
         delete global.incomingCalls[cacheKey];
       }
     }
+
+    // Emit call-accepted notification via WebSocket
+    const websocketService = require('../services/websocketService');
+    websocketService.emitCallAccepted(organizationId, callSid, userId);
 
     res.json({
       success: true,
