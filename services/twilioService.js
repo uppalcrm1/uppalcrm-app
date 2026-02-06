@@ -212,24 +212,27 @@ class TwilioService {
     // Find existing lead/contact by phone number
     let leadId = null;
     let contactId = null;
+    let contactName = null;
 
     // Check contacts first
     const contactQuery = `
-      SELECT id FROM contacts WHERE organization_id = $1 AND phone = $2 LIMIT 1
+      SELECT id, first_name, last_name FROM contacts WHERE organization_id = $1 AND phone = $2 LIMIT 1
     `;
     const contactResult = await db.query(contactQuery, [organizationId, From]);
 
     if (contactResult.rows.length > 0) {
       contactId = contactResult.rows[0].id;
+      contactName = `${contactResult.rows[0].first_name || ''} ${contactResult.rows[0].last_name || ''}`.trim();
     } else {
       // Check leads
       const leadQuery = `
-        SELECT id FROM leads WHERE organization_id = $1 AND phone = $2 LIMIT 1
+        SELECT id, first_name, last_name FROM leads WHERE organization_id = $1 AND phone = $2 LIMIT 1
       `;
       const leadResult = await db.query(leadQuery, [organizationId, From]);
 
       if (leadResult.rows.length > 0) {
         leadId = leadResult.rows[0].id;
+        contactName = `${leadResult.rows[0].first_name || ''} ${leadResult.rows[0].last_name || ''}`.trim();
       } else {
         // Create new lead from incoming SMS
         const createLeadQuery = `
@@ -239,6 +242,7 @@ class TwilioService {
         `;
         const newLead = await db.query(createLeadQuery, [organizationId, From]);
         leadId = newLead.rows[0].id;
+        contactName = 'SMS Lead';
         console.log('Created new lead from SMS:', leadId);
       }
     }
@@ -263,7 +267,14 @@ class TwilioService {
     // Check for auto-responses
     await this.checkAutoResponse(organizationId, Body, From, leadId);
 
-    return result.rows[0];
+    // Return SMS message data with organization info
+    return {
+      ...result.rows[0],
+      organizationId,
+      leadId,
+      contactId,
+      contactName
+    };
   }
 
   /**

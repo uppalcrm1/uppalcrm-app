@@ -7,6 +7,7 @@ import App from './App'
 import './index.css'
 import { AuthProvider } from './contexts/AuthContext'
 import { SuperAdminProvider } from './contexts/SuperAdminContext'
+import { WebSocketProvider } from './contexts/WebSocketContext'
 import { NotificationProvider } from './context/NotificationContext'
 import { CallProvider } from './context/CallContext'
 
@@ -27,26 +28,28 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <BrowserRouter>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <SuperAdminProvider>
-            <NotificationProvider>
-              <CallProvider>
-                <App />
-              </CallProvider>
-            </NotificationProvider>
-            <Toaster
-              position="top-right"
-              toastOptions={{
-                duration: 4000,
-                style: {
-                  background: '#fff',
-                  color: '#374151',
-                  borderRadius: '8px',
-                  border: '1px solid #e5e7eb',
-                  boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
-                },
-              }}
-            />
-          </SuperAdminProvider>
+          <WebSocketProvider>
+            <SuperAdminProvider>
+              <NotificationProvider>
+                <CallProvider>
+                  <App />
+                </CallProvider>
+              </NotificationProvider>
+              <Toaster
+                position="top-right"
+                toastOptions={{
+                  duration: 4000,
+                  style: {
+                    background: '#fff',
+                    color: '#374151',
+                    borderRadius: '8px',
+                    border: '1px solid #e5e7eb',
+                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                  },
+                }}
+              />
+            </SuperAdminProvider>
+          </WebSocketProvider>
         </AuthProvider>
       </QueryClientProvider>
     </BrowserRouter>

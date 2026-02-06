@@ -109,9 +109,60 @@ const envConfig = validateEnvironment();
 // Import background jobs
 const EngagementTracker = require('./jobs/engagementTracking');
 
+// WebSocket setup
+const http = require('http');
+const socketIO = require('socket.io');
+const socketAuth = require('./middleware/socketAuth');
+const websocketService = require('./services/websocketService');
+
 const app = express();
 const PORT = envConfig.port;
 
+// Wrap Express with HTTP server for WebSocket support
+const httpServer = http.createServer(app);
+
+// Initialize Socket.IO with CORS
+const io = socketIO(httpServer, {
+  cors: {
+    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    methods: ['GET', 'POST'],
+    credentials: true
+  },
+  transports: ['websocket', 'polling'],
+  connectionStateRecovery: {
+    maxDisconnectionDuration: 2 * 60 * 1000,
+    skipMiddlewares: true
+  }
+});
+
+// Register WebSocket authentication middleware
+io.use(socketAuth);
+
+// Initialize WebSocket service
+websocketService.initialize(io);
+
+// Handle WebSocket connections
+io.on('connection', (socket) => {
+  const room = `org:${socket.organizationId}`;
+
+  // Join user to organization room
+  socket.join(room);
+  websocketService.registerUser(socket.userId, socket.id);
+
+  console.log(`👤 User joined room ${room}`);
+
+  // Handle disconnect
+  socket.on('disconnect', () => {
+    websocketService.unregisterUser(socket.userId);
+    console.log(`👤 User ${socket.userId} disconnected from room ${room}`);
+  });
+});
+
+// Make io available to routes
+app.set('io', io);
+
+// Version indicator for deployment verification
+const DEPLOYMENT_VERSION = '2026-02-05-websocket-implementation';
 // Trust proxy settings (for rate limiting and IP detection)
 app.set('trust proxy', 1);
 
@@ -551,13 +602,14 @@ const startServer = async () => {
       console.error('⚠️  License field sync failed:', error.message);
     }
     
-    app.listen(PORT, () => {
+    httpServer.listen(PORT, () => {
       console.log(`🚀 UppalCRM Server running on port ${PORT}`);
       console.log(`📊 API Documentation: http://localhost:${PORT}/api`);
       console.log(`🏥 Health Check: http://localhost:${PORT}/health`);
       console.log(`🌐 Marketing Site: http://localhost:${PORT}`);
       console.log(`🔒 Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`👑 Super Admin: http://localhost:${PORT}/super-admin`);
+      console.log(`🔌 WebSocket: ws://localhost:${PORT}`);
 
       // Start scheduled billing jobs
       try {
