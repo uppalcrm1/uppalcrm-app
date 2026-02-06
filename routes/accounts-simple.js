@@ -461,12 +461,13 @@ router.put('/:id', async (req, res) => {
     const updates = req.body;
 
     // Build dynamic update query
-    // NOTE: billing_term_months is READ-ONLY
-    // This field is only updated via transaction endpoints when payments are made
+    // NOTE: billing_term_months and price are READ-ONLY (Financial fields)
+    // These fields are only updated via transaction endpoints when payments are made
     // This ensures data integrity and prevents accidental changes
+    // Users must create/edit transactions to change billing term or price
     const allowedFields = [
       'account_name', 'edition', 'device_name', 'mac_address',
-      'price', 'account_status', 'notes'
+      'account_status', 'notes'
     ];
 
     const setClause = [];
