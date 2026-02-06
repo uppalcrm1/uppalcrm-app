@@ -95,7 +95,7 @@ export function NotificationProvider({ children }) {
     ).length;
     setUnreadCount(recentInbound);
 
-  }, [conversationsData, browserPermission, queryClient];
+  }, [conversationsData, browserPermission, queryClient]);
 
   const addToast = useCallback((toast) => {
     const id = Date.now() + Math.random();
