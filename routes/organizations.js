@@ -131,6 +131,35 @@ router.put('/current',
 );
 
 /**
+ * GET /organizations/:id
+ * Get organization by ID (admin only)
+ */
+router.get('/:id',
+  requireAdmin,
+  validateUuidParam,
+  async (req, res) => {
+    try {
+      const organization = await Organization.findById(req.params.id);
+
+      if (!organization) {
+        return res.status(404).json({
+          error: 'Organization not found',
+          message: 'Organization does not exist'
+        });
+      }
+
+      res.json(organization.toJSON());
+    } catch (error) {
+      console.error('Get organization error:', error);
+      res.status(500).json({
+        error: 'Failed to retrieve organization',
+        message: 'Unable to get organization information'
+      });
+    }
+  }
+);
+
+/**
  * PATCH /organizations/:id
  * Update organization by ID (admin only)
  */

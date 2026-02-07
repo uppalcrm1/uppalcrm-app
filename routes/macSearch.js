@@ -181,15 +181,20 @@ router.post('/portal-credentials', authenticateToken, async (req, res) => {
   try {
     const { portalId, username, password } = req.body
     const organizationId = req.user.organization_id
+    const { query } = require('../database/connection')
 
     // Check if user is admin
-    const { data: user } = await req.supabase
-      .from('users')
-      .select('role')
-      .eq('id', req.user.id)
-      .single()
+    const userResult = await query(
+      `SELECT role FROM users WHERE id = $1 AND organization_id = $2`,
+      [req.user.id, organizationId]
+    )
 
-    if (user?.role !== 'admin' && user?.role !== 'super_admin') {
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+
+    const userRole = userResult.rows[0].role
+    if (userRole !== 'admin' && userRole !== 'super_admin') {
       return res.status(403).json({ error: 'Only admins can manage portal credentials' })
     }
 
@@ -199,16 +204,14 @@ router.post('/portal-credentials', authenticateToken, async (req, res) => {
     let encrypted = cipher.update(password, 'utf8', 'hex')
     encrypted += cipher.final('hex')
 
-    // Save to database
-    const { error } = await req.supabase.from('billing_portal_credentials').upsert({
-      organization_id: organizationId,
-      portal_id: portalId,
-      username: username,
-      password: encrypted,
-      updated_at: new Date().toISOString(),
-    })
-
-    if (error) throw error
+    // Save to database using UPSERT
+    await query(
+      `INSERT INTO billing_portal_credentials (organization_id, portal_id, username, password)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (organization_id, portal_id)
+       DO UPDATE SET username = $3, password = $4, updated_at = NOW()`,
+      [organizationId, portalId, username, encrypted]
+    )
 
     res.json({ success: true, message: 'Credentials saved successfully' })
   } catch (error) {
@@ -224,6 +227,7 @@ router.post('/portal-credentials', authenticateToken, async (req, res) => {
 router.get('/portals', authenticateToken, async (req, res) => {
   try {
     const organizationId = req.user.organization_id
+    const { query } = require('../database/connection')
 
     // Get list of enabled portals
     const enabledPortals = portalConfigs.portals.filter(p => p.enabled).map(p => ({
@@ -233,12 +237,13 @@ router.get('/portals', authenticateToken, async (req, res) => {
     }))
 
     // Check which ones have credentials configured
-    const { data: credentials } = await req.supabase
-      .from('billing_portal_credentials')
-      .select('portal_id')
-      .eq('organization_id', organizationId)
+    const result = await query(
+      `SELECT portal_id FROM billing_portal_credentials
+       WHERE organization_id = $1`,
+      [organizationId]
+    )
 
-    const configuredPortalIds = (credentials || []).map(c => c.portal_id)
+    const configuredPortalIds = (result.rows || []).map(c => c.portal_id)
 
     const portalsWithStatus = enabledPortals.map(p => ({
       ...p,
