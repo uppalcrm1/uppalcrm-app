@@ -57,6 +57,7 @@
     "node-cron": "^4.2.1",
     "node-fetch": "^3.3.2",
     "nodemailer": "^6.10.1",
+    "playwright": "^1.48.0",
     "pg": "^8.17.2",
     "socket.io": "^4.7.5",
     "twilio": "^5.10.5",
