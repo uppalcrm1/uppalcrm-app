@@ -1,6 +1,6 @@
 import React from 'react'
 import { AlertCircle } from 'lucide-react'
-import { useAuth } from '../hooks/useAuth'
+import { useAuth } from '../contexts/AuthContext'
 
 /**
  * FeatureGate Component - Hides features from organizations that don't have them enabled
