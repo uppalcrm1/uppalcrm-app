@@ -5,9 +5,9 @@
 
 const express = require('express')
 const router = express.Router()
-const { authenticateToken } = require('./middleware/auth')
-const MacAddressSearchService = require('./services/macAddressSearchService')
-const portalConfigs = require('./config/billingPortals')
+const { authenticateToken } = require('../middleware/auth')
+const MacAddressSearchService = require('../services/macAddressSearchService')
+const portalConfigs = require('../config/billingPortals')
 
 /**
  * POST /api/mac-search
