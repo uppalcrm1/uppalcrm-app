@@ -5,7 +5,7 @@
 
 const express = require('express')
 const router = express.Router()
-const { auth } = require('./middleware/auth')
+const { authenticateToken } = require('./middleware/auth')
 const MacAddressSearchService = require('./services/macAddressSearchService')
 const portalConfigs = require('./config/billingPortals')
 
@@ -13,7 +13,7 @@ const portalConfigs = require('./config/billingPortals')
  * POST /api/mac-search
  * Search for a MAC address across all configured portals
  */
-router.post('/search', auth, async (req, res) => {
+router.post('/search', authenticateToken, async (req, res) => {
   try {
     const { macAddress } = req.body
     const organizationId = req.user.organization_id
@@ -73,7 +73,7 @@ router.post('/search', auth, async (req, res) => {
  * POST /api/mac-search/quick
  * Quick search (non-blocking) - returns search ID for polling
  */
-router.post('/quick', auth, async (req, res) => {
+router.post('/quick', authenticateToken, async (req, res) => {
   try {
     const { macAddress } = req.body
     const organizationId = req.user.organization_id
@@ -118,7 +118,7 @@ router.post('/quick', auth, async (req, res) => {
  * GET /api/mac-search/results/:searchId
  * Get results of a quick search
  */
-router.get('/results/:searchId', auth, async (req, res) => {
+router.get('/results/:searchId', authenticateToken, async (req, res) => {
   try {
     const { searchId } = req.params
     const organizationId = req.user.organization_id
@@ -148,7 +148,7 @@ router.get('/results/:searchId', auth, async (req, res) => {
  * GET /api/mac-search/history
  * Get search history for organization
  */
-router.get('/history', auth, async (req, res) => {
+router.get('/history', authenticateToken, async (req, res) => {
   try {
     const organizationId = req.user.organization_id
     const { limit = 50, offset = 0 } = req.query
@@ -177,7 +177,7 @@ router.get('/history', auth, async (req, res) => {
  * POST /api/mac-search/portal-credentials
  * Save/update portal credentials for organization
  */
-router.post('/portal-credentials', auth, async (req, res) => {
+router.post('/portal-credentials', authenticateToken, async (req, res) => {
   try {
     const { portalId, username, password } = req.body
     const organizationId = req.user.organization_id
@@ -221,7 +221,7 @@ router.post('/portal-credentials', auth, async (req, res) => {
  * GET /api/mac-search/portals
  * Get list of available portals
  */
-router.get('/portals', auth, async (req, res) => {
+router.get('/portals', authenticateToken, async (req, res) => {
   try {
     const organizationId = req.user.organization_id
 
