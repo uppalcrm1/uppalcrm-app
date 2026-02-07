@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Settings, Save, AlertCircle, CheckCircle, Eye, EyeOff } from 'lucide-react'
-import axios from 'axios'
+import api from '../../services/api'
 import { useAuth } from '../../contexts/AuthContext'
 
 const MacSearchSettings = () => {
@@ -25,11 +25,11 @@ const MacSearchSettings = () => {
       setLoading(true)
 
       // Get feature status
-      const { data: orgData } = await axios.get(`/api/organizations/${user?.organization_id}`)
+      const { data: orgData } = await api.get(`/organizations/${user?.organization_id}`)
       setMacSearchEnabled(orgData.mac_search_enabled || false)
 
       // Get available portals
-      const { data: portalsData } = await axios.get('/api/mac-search/portals')
+      const { data: portalsData } = await api.get('/mac-search/portals')
       setPortals(portalsData.portals || [])
 
       // Initialize credentials state
@@ -50,7 +50,7 @@ const MacSearchSettings = () => {
 
   const handleToggleFeature = async (enabled) => {
     try {
-      await axios.patch(`/api/organizations/${user?.organization_id}`, {
+      await api.patch(`/organizations/${user?.organization_id}`, {
         mac_search_enabled: enabled,
       })
       setMacSearchEnabled(enabled)
@@ -89,7 +89,7 @@ const MacSearchSettings = () => {
         return
       }
 
-      await axios.post('/api/mac-search/portal-credentials', {
+      await api.post('/mac-search/portal-credentials', {
         portalId: portalId,
         username: cred.username,
         password: cred.password,
