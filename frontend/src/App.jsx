@@ -54,6 +54,9 @@ import TransactionCountByOwnerReportPage from './pages/TransactionCountByOwnerRe
 import TransactionsRevenueByOwnerReportPage from './pages/TransactionsRevenueByOwnerReportPage'
 import CustomDashboardsPage from './pages/CustomDashboardsPage'
 import DashboardBuilderPage from './pages/DashboardBuilderPage'
+import MacAddressSearch from './pages/MacAddressSearch'
+import MacSearchSettings from './components/admin/MacSearchSettings'
+import { FeatureGateWithError } from './components/FeatureGate'
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuth()
@@ -162,6 +165,24 @@ function App() {
         <Route path="admin/products" element={<AdminProducts />} />
         <Route path="admin/settings" element={<AdminSettings />} />
         <Route path="admin/ai-settings" element={<AdminAISettings />} />
+        <Route
+          path="admin/mac-search-settings"
+          element={
+            <FeatureGateWithError feature="mac_search_enabled">
+              <MacSearchSettings />
+            </FeatureGateWithError>
+          }
+        />
+
+        {/* MAC Address Search Routes */}
+        <Route
+          path="mac-search"
+          element={
+            <FeatureGateWithError feature="mac_search_enabled">
+              <MacAddressSearch />
+            </FeatureGateWithError>
+          }
+        />
       </Route>
 
       {/* Catch all route */}

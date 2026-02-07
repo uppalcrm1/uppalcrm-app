@@ -65,6 +65,7 @@ const reportingRoutes = require('./routes/reporting');
 const reportsRoutes = require('./routes/reports');
 const dashboardsRoutes = require('./routes/dashboards');
 const timezoneRoutes = require('./routes/timezone');
+const macSearchRoutes = require('./routes/macSearch');
 
 // Field Mapping System Routes
 const fieldMappingsRoutes = require('./routes/fieldMappings');
@@ -316,6 +317,9 @@ app.use('/api/organizations/current', rateLimiters.general, aiSettingsRoutes);
 
 // Custom Fields management routes
 app.use('/api/custom-fields', rateLimiters.general, customFieldsRoutes);
+
+// MAC Address Search routes
+app.use('/api/mac-search', rateLimiters.general, macSearchRoutes);
 
 // Product Field Customization routes
 app.use('/api/organizations/:organizationId/field-customization/product', rateLimiters.general, productFieldCustomizationRoutes);

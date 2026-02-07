@@ -27,6 +27,7 @@ import {
   CheckSquare,
   FileBarChart,
   LayoutGrid,
+  Scan,
 } from 'lucide-react'
 import LoadingSpinner from './LoadingSpinner'
 import IncomingCallNotification from './IncomingCallNotification'
@@ -254,6 +255,16 @@ const DashboardLayout = () => {
                         <Package size={16} className="mr-3" />
                         Products
                       </NavLink>
+                      {organization?.mac_search_enabled && (
+                        <NavLink
+                          to="/admin/mac-search-settings"
+                          className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                          onClick={() => setAdminMenuOpen(false)}
+                        >
+                          <Scan size={16} className="mr-3" />
+                          MAC Search Settings
+                        </NavLink>
+                      )}
                       <div className="border-t border-gray-200 my-2"></div>
                       <NavLink
                         to="/settings"
@@ -347,6 +358,22 @@ const DashboardLayout = () => {
                   </NavLink>
                 )
               })}
+              {/* MAC Address Search - Only show if feature enabled */}
+              {organization?.mac_search_enabled && (
+                <NavLink
+                  to="/mac-search"
+                  className={`
+                    flex items-center px-1 py-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors
+                    ${location.pathname === '/mac-search'
+                      ? 'border-primary-600 text-primary-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }
+                  `}
+                >
+                  <Search size={18} className="mr-2" />
+                  MAC Search
+                </NavLink>
+              )}
             </div>
           </div>
         </nav>
