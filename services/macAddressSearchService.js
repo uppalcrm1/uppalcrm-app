@@ -93,19 +93,24 @@ class MacAddressSearchService {
   async searchPortal(portalConfig, credentials, macAddress, timeout = 60000) {
     let page = null
     try {
+      console.log(`🔍 Starting search in ${portalConfig.name}...`)
       const browser = await this.initBrowser()
       page = await browser.newPage()
       page.setDefaultTimeout(timeout)
 
       // Navigate to login page
-      await page.goto(`${portalConfig.url}${portalConfig.loginPath}`)
+      const loginUrl = `${portalConfig.url}${portalConfig.loginPath}`
+      console.log(`📍 Navigating to: ${loginUrl}`)
+      await page.goto(loginUrl)
       await page.waitForLoadState('networkidle')
 
       // Login
+      console.log(`🔐 Logging in with username: ${credentials.username}`)
       await page.locator('input[type="text"]').first().fill(credentials.username)
       await page.locator('input[type="password"]').first().fill(credentials.password)
       await page.locator('button:has-text("Log In"), button[type="submit"]').click()
       await page.waitForLoadState('networkidle')
+      console.log(`✅ Login successful`)
 
       // Close modal if present
       if (await page.locator('#myModal, .modal').first().isVisible({ timeout: 1000 }).catch(() => false)) {
@@ -114,27 +119,35 @@ class MacAddressSearchService {
       }
 
       // Navigate to users list
-      await page.goto(`${portalConfig.url}${portalConfig.usersListPath}`)
+      const usersUrl = `${portalConfig.url}${portalConfig.usersListPath}`
+      console.log(`📋 Navigating to users list: ${usersUrl}`)
+      await page.goto(usersUrl)
       await page.waitForLoadState('networkidle')
       await page.waitForTimeout(1000)
 
       // Search for MAC address
+      console.log(`🔎 Searching for MAC: ${macAddress}`)
       const searchInputs = await page.locator('input[type="text"], input[placeholder*="search" i]').all()
       if (searchInputs.length > 0) {
         await searchInputs[0].fill(macAddress)
         await page.waitForLoadState('networkidle')
         await page.waitForTimeout(1000)
+        console.log(`✍️  Search input filled and submitted`)
+      } else {
+        console.warn(`⚠️  No search input found on page`)
       }
 
       // Extract results from table
       const results = []
       const rows = await page.locator(portalConfig.tableConfig.rowSelector).all()
+      console.log(`📊 Found ${rows.length} rows in table`)
 
       for (const row of rows) {
         const rowText = await row.textContent()
 
         // Check if this row contains the MAC address
         if (rowText && rowText.includes(macAddress)) {
+          console.log(`✨ Found matching MAC in row!`)
           const cells = await row.locator('td, [role="gridcell"]').all()
 
           const result = {
@@ -156,6 +169,8 @@ class MacAddressSearchService {
         }
       }
 
+      console.log(`📈 Search complete: Found ${results.length} matching MAC addresses`)
+
       return {
         success: true,
         portalName: portalConfig.name,
@@ -164,7 +179,8 @@ class MacAddressSearchService {
         error: null,
       }
     } catch (error) {
-      console.error(`Error searching portal ${portalConfig.name}:`, error)
+      console.error(`❌ Error searching portal ${portalConfig.name}:`, error.message)
+      console.error(`Stack trace:`, error.stack)
       return {
         success: false,
         portalName: portalConfig.name,
@@ -173,6 +189,7 @@ class MacAddressSearchService {
         error: error.message,
       }
     } finally {
+      console.log(`🧹 Cleaning up resources for ${portalConfig.name}`)
       if (page) {
         await page.close()
       }
