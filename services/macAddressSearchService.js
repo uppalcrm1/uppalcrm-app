@@ -7,8 +7,9 @@ const { chromium } = require('playwright')
 const crypto = require('crypto')
 
 class MacAddressSearchService {
-  constructor(supabase, portalConfigs) {
-    this.supabase = supabase
+  constructor(query, organizationId, portalConfigs) {
+    this.query = query
+    this.organizationId = organizationId
     this.portalConfigs = portalConfigs
     this.browser = null
   }
@@ -38,15 +39,33 @@ class MacAddressSearchService {
    */
   async getPortalCredentials(organizationId, portalId) {
     try {
-      const { data, error } = await this.supabase
-        .from('billing_portal_credentials')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .eq('portal_id', portalId)
-        .single()
+      const result = await this.query(
+        `SELECT * FROM billing_portal_credentials
+         WHERE organization_id = $1 AND portal_id = $2`,
+        [organizationId, portalId]
+      )
 
-      if (error) throw error
-      return data
+      if (result.rows.length === 0) return null
+
+      const credentials = result.rows[0]
+
+      // Decrypt password
+      if (credentials.password) {
+        const encryptionKey = process.env.ENCRYPTION_KEY || 'default-secret-key-do-not-use-in-production'
+        const key = crypto.createHash('sha256').update(encryptionKey).digest()
+
+        // Extract IV from encrypted data
+        const [ivHex, encryptedHex] = credentials.password.split(':')
+        if (ivHex && encryptedHex) {
+          const iv = Buffer.from(ivHex, 'hex')
+          const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv)
+          let decrypted = decipher.update(encryptedHex, 'hex', 'utf8')
+          decrypted += decipher.final('utf8')
+          credentials.password = decrypted
+        }
+      }
+
+      return credentials
     } catch (error) {
       console.error(`Error fetching credentials for portal ${portalId}:`, error)
       return null
@@ -176,21 +195,6 @@ class MacAddressSearchService {
       // Filter enabled portals
       const enabledPortals = this.portalConfigs.portals.filter(p => p.enabled)
 
-      // Check organization setting to see if feature is enabled
-      const { data: orgSettings } = await this.supabase
-        .from('organization_settings')
-        .select('mac_search_enabled')
-        .eq('id', organizationId)
-        .single()
-
-      if (orgSettings && !orgSettings.mac_search_enabled) {
-        return {
-          ...results,
-          status: 'disabled',
-          error: 'MAC search feature is not enabled for this organization',
-        }
-      }
-
       // Search each portal in parallel
       const searchPromises = enabledPortals.map(async (portal) => {
         const credentials = await this.getPortalCredentials(organizationId, portal.id)
@@ -244,15 +248,16 @@ class MacAddressSearchService {
    */
   async saveSearchHistory(organizationId, searchData) {
     try {
-      const { error } = await this.supabase.from('mac_search_history').insert({
-        organization_id: organizationId,
-        mac_address: searchData.macAddress,
-        results: searchData.portalResults,
-        total_found: searchData.totalFound,
-        searched_at: new Date().toISOString(),
-      })
-
-      if (error) throw error
+      await this.query(
+        `INSERT INTO mac_search_history (organization_id, mac_address, results, total_found, searched_at)
+         VALUES ($1, $2, $3, $4, NOW())`,
+        [
+          organizationId,
+          searchData.macAddress,
+          JSON.stringify(searchData.portalResults),
+          searchData.totalFound,
+        ]
+      )
       return true
     } catch (error) {
       console.error('Error saving search history:', error)

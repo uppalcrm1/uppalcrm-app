@@ -17,6 +17,7 @@ router.post('/search', authenticateToken, async (req, res) => {
   try {
     const { macAddress } = req.body
     const organizationId = req.user.organization_id
+    const { query } = require('../database/connection')
 
     // Validate MAC address format
     if (!macAddress || !/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/.test(macAddress)) {
@@ -26,13 +27,12 @@ router.post('/search', authenticateToken, async (req, res) => {
     }
 
     // Check if organization has feature enabled
-    const { data: org, error: orgError } = await req.supabase
-      .from('organizations')
-      .select('mac_search_enabled')
-      .eq('id', organizationId)
-      .single()
+    const orgResult = await query(
+      `SELECT mac_search_enabled FROM organizations WHERE id = $1`,
+      [organizationId]
+    )
 
-    if (orgError || !org?.mac_search_enabled) {
+    if (orgResult.rows.length === 0 || !orgResult.rows[0].mac_search_enabled) {
       return res.status(403).json({
         error: 'MAC search feature is not enabled for your organization',
       })
@@ -44,15 +44,12 @@ router.post('/search', authenticateToken, async (req, res) => {
     // Send search started response
     res.write(JSON.stringify({ status: 'searching', macAddress }) + '\n')
 
-    // Initialize search service
-    const searchService = new MacAddressSearchService(req.supabase, portalConfigs)
+    // Initialize search service (pass query function and db connection instead of supabase)
+    const searchService = new MacAddressSearchService(query, organizationId, portalConfigs)
 
     try {
       // Perform search
       const searchResults = await searchService.searchAcrossPortals(organizationId, macAddress)
-
-      // Save to history
-      await searchService.saveSearchHistory(organizationId, searchResults)
 
       // Send final results
       res.write(JSON.stringify(searchResults) + '\n')
@@ -77,6 +74,7 @@ router.post('/quick', authenticateToken, async (req, res) => {
   try {
     const { macAddress } = req.body
     const organizationId = req.user.organization_id
+    const { query } = require('../database/connection')
     const searchId = require('crypto').randomUUID()
 
     // Validate MAC address
@@ -87,17 +85,15 @@ router.post('/quick', authenticateToken, async (req, res) => {
     }
 
     // Start background search (don't await)
-    const searchService = new MacAddressSearchService(req.supabase, portalConfigs)
+    const searchService = new MacAddressSearchService(query, organizationId, portalConfigs)
 
     searchService.searchAcrossPortals(organizationId, macAddress).then(async (results) => {
       // Save results with search ID
-      await req.supabase.from('mac_search_results').insert({
-        search_id: searchId,
-        organization_id: organizationId,
-        mac_address: macAddress,
-        results: results,
-        completed_at: new Date().toISOString(),
-      })
+      await query(
+        `INSERT INTO mac_search_results (search_id, organization_id, mac_address, results, completed_at)
+         VALUES ($1, $2, $3, $4, NOW())`,
+        [searchId, organizationId, macAddress, JSON.stringify(results)]
+      )
 
       await searchService.closeBrowser()
     })
@@ -122,21 +118,22 @@ router.get('/results/:searchId', authenticateToken, async (req, res) => {
   try {
     const { searchId } = req.params
     const organizationId = req.user.organization_id
+    const { query } = require('../database/connection')
 
-    const { data, error } = await req.supabase
-      .from('mac_search_results')
-      .select('*')
-      .eq('search_id', searchId)
-      .eq('organization_id', organizationId)
-      .single()
+    const result = await query(
+      `SELECT * FROM mac_search_results
+       WHERE search_id = $1 AND organization_id = $2`,
+      [searchId, organizationId]
+    )
 
-    if (error || !data) {
+    if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Search results not found' })
     }
 
+    const data = result.rows[0]
     res.json({
       status: data.completed_at ? 'completed' : 'searching',
-      results: data.results,
+      results: typeof data.results === 'string' ? JSON.parse(data.results) : data.results,
     })
   } catch (error) {
     console.error('Error fetching search results:', error)
@@ -151,19 +148,19 @@ router.get('/results/:searchId', authenticateToken, async (req, res) => {
 router.get('/history', authenticateToken, async (req, res) => {
   try {
     const organizationId = req.user.organization_id
+    const { query } = require('../database/connection')
     const { limit = 50, offset = 0 } = req.query
 
-    const { data, error } = await req.supabase
-      .from('mac_search_history')
-      .select('*')
-      .eq('organization_id', organizationId)
-      .order('searched_at', { ascending: false })
-      .range(offset, offset + limit - 1)
-
-    if (error) throw error
+    const result = await query(
+      `SELECT * FROM mac_search_history
+       WHERE organization_id = $1
+       ORDER BY searched_at DESC
+       LIMIT $2 OFFSET $3`,
+      [organizationId, parseInt(limit), parseInt(offset)]
+    )
 
     res.json({
-      results: data || [],
+      results: result.rows || [],
       limit: parseInt(limit),
       offset: parseInt(offset),
     })
