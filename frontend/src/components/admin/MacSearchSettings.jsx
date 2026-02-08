@@ -16,6 +16,7 @@ const MacSearchSettings = () => {
   const [newPortalName, setNewPortalName] = useState('')
   const [newPortalUrl, setNewPortalUrl] = useState('')
   const [isAddingPortal, setIsAddingPortal] = useState(false)
+  const [editingPortalId, setEditingPortalId] = useState(null)
 
   // Fetch portals and current configuration
   useEffect(() => {
@@ -320,116 +321,236 @@ const MacSearchSettings = () => {
 
       {/* Portal Credentials */}
       {macSearchEnabled && (
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-gray-900">Portal Credentials</h3>
-          <p className="text-gray-600 text-sm">
-            Configure access credentials for each billing portal. Passwords are encrypted and never stored in plain text.
-          </p>
-
-          {portals.length === 0 ? (
-            <div className="bg-gray-50 rounded-lg p-6 text-center text-gray-600">
-              No portals available. Please contact your administrator to add portals.
-            </div>
-          ) : (
+        <div className="space-y-6">
+          {/* Configured Portals */}
+          {portals.filter(p => credentials[p.id]?.configured).length > 0 && (
             <div className="space-y-4">
-              {portals.map(portal => (
-                <div key={portal.id} className="bg-white rounded-lg shadow p-6">
-                  <div className="flex justify-between items-start">
-                    {/* Portal Info */}
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-gray-900">{portal.name}</h4>
-                      <p className="text-sm text-gray-600 mt-1">{portal.url}</p>
-                      {portal.isCustom && <p className="text-xs text-blue-600 mt-1">Custom Portal</p>}
-                      <div className="mt-3">
-                        {credentials[portal.id]?.configured ? (
-                          <span className="inline-flex items-center gap-1 px-3 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded-full">
-                            <CheckCircle size={14} />
-                            Configured
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-3 py-1 bg-yellow-100 text-yellow-800 text-xs font-semibold rounded-full">
-                            <AlertCircle size={14} />
-                            Not Configured
-                          </span>
+              <h3 className="text-lg font-semibold text-gray-900">Configured Portals</h3>
+              <div className="space-y-3">
+                {portals
+                  .filter(p => credentials[p.id]?.configured)
+                  .map(portal => (
+                    <div key={portal.id} className="bg-white rounded-lg shadow p-4 border-l-4 border-green-500">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-semibold text-gray-900">{portal.name}</h4>
+                            {portal.isCustom && (
+                              <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded">
+                                Custom
+                              </span>
+                            )}
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs font-semibold rounded-full">
+                              <CheckCircle size={12} />
+                              Active
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-600 mt-2">{portal.url}</p>
+                          <p className="text-sm text-gray-500 mt-1">Username: <span className="font-medium text-gray-700">{credentials[portal.id]?.username}</span></p>
+                        </div>
+                        <div className="flex gap-2 flex-shrink-0">
+                          <button
+                            onClick={() => setEditingPortalId(portal.id)}
+                            className="px-3 py-1.5 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          >
+                            Change Credentials
+                          </button>
+                          {portal.isCustom && (
+                            <button
+                              onClick={() => handleDeletePortal(portal.id, portal.name)}
+                              className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Delete portal"
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Edit credentials form for this portal */}
+                      {editingPortalId === portal.id && (
+                        <div className="mt-4 pt-4 border-t space-y-3">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Username
+                            </label>
+                            <input
+                              type="text"
+                              value={credentials[portal.id]?.username || ''}
+                              onChange={(e) =>
+                                handleCredentialChange(portal.id, 'username', e.target.value)
+                              }
+                              placeholder="Enter portal username"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Password
+                            </label>
+                            <div className="relative">
+                              <input
+                                type={showPasswords[portal.id] ? 'text' : 'password'}
+                                value={credentials[portal.id]?.password || ''}
+                                onChange={(e) =>
+                                  handleCredentialChange(portal.id, 'password', e.target.value)
+                                }
+                                placeholder="Enter new password"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                              />
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setShowPasswords(prev => ({
+                                    ...prev,
+                                    [portal.id]: !prev[portal.id],
+                                  }))
+                                }
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                              >
+                                {showPasswords[portal.id] ? (
+                                  <EyeOff size={18} />
+                                ) : (
+                                  <Eye size={18} />
+                                )}
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleSaveCredentials(portal.id)}
+                              disabled={saving}
+                              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition-colors text-sm font-medium"
+                            >
+                              <Save size={16} />
+                              {saving ? 'Saving...' : 'Update Credentials'}
+                            </button>
+                            <button
+                              onClick={() => setEditingPortalId(null)}
+                              className="flex-1 px-4 py-2 bg-gray-200 text-gray-900 rounded-lg hover:bg-gray-300 transition-colors text-sm font-medium"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+
+          {/* Unconfigured Portals */}
+          {portals.filter(p => !credentials[p.id]?.configured).length > 0 && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-gray-900">Unconfigured Portals</h3>
+              <p className="text-gray-600 text-sm">
+                Add credentials for these portals to enable MAC address searching
+              </p>
+              <div className="space-y-3">
+                {portals
+                  .filter(p => !credentials[p.id]?.configured)
+                  .map(portal => (
+                    <div key={portal.id} className="bg-white rounded-lg shadow p-4 border-l-4 border-yellow-500">
+                      <div className="flex items-start justify-between gap-4 mb-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-semibold text-gray-900">{portal.name}</h4>
+                            {portal.isCustom && (
+                              <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded">
+                                Custom
+                              </span>
+                            )}
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-yellow-100 text-yellow-700 text-xs font-semibold rounded-full">
+                              <AlertCircle size={12} />
+                              Pending
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-600 mt-2">{portal.url}</p>
+                        </div>
+                        {portal.isCustom && (
+                          <button
+                            onClick={() => handleDeletePortal(portal.id, portal.name)}
+                            className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0"
+                            title="Delete portal"
+                          >
+                            <Trash2 size={18} />
+                          </button>
                         )}
                       </div>
-                    </div>
 
-                    {/* Delete button for custom portals */}
-                    {portal.isCustom && (
-                      <button
-                        onClick={() => handleDeletePortal(portal.id, portal.name)}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Delete portal"
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    )}
-                  </div>
+                      {/* Credential entry form */}
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Username
+                          </label>
+                          <input
+                            type="text"
+                            value={credentials[portal.id]?.username || ''}
+                            onChange={(e) =>
+                              handleCredentialChange(portal.id, 'username', e.target.value)
+                            }
+                            placeholder="Enter portal username"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                          />
+                        </div>
 
-                  <div className="space-y-3 mt-4">
-                    {/* Username Field */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Username
-                      </label>
-                      <input
-                        type="text"
-                        value={credentials[portal.id]?.username || ''}
-                        onChange={(e) =>
-                          handleCredentialChange(portal.id, 'username', e.target.value)
-                        }
-                        placeholder="Enter portal username"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                      />
-                    </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Password
+                          </label>
+                          <div className="relative">
+                            <input
+                              type={showPasswords[portal.id] ? 'text' : 'password'}
+                              value={credentials[portal.id]?.password || ''}
+                              onChange={(e) =>
+                                handleCredentialChange(portal.id, 'password', e.target.value)
+                              }
+                              placeholder="Enter portal password"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                            />
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setShowPasswords(prev => ({
+                                  ...prev,
+                                  [portal.id]: !prev[portal.id],
+                                }))
+                              }
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                            >
+                              {showPasswords[portal.id] ? (
+                                <EyeOff size={18} />
+                              ) : (
+                                <Eye size={18} />
+                              )}
+                            </button>
+                          </div>
+                        </div>
 
-                    {/* Password Field */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Password
-                      </label>
-                      <div className="relative">
-                        <input
-                          type={showPasswords[portal.id] ? 'text' : 'password'}
-                          value={credentials[portal.id]?.password || ''}
-                          onChange={(e) =>
-                            handleCredentialChange(portal.id, 'password', e.target.value)
-                          }
-                          placeholder="Enter portal password"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                        />
                         <button
-                          type="button"
-                          onClick={() =>
-                            setShowPasswords(prev => ({
-                              ...prev,
-                              [portal.id]: !prev[portal.id],
-                            }))
-                          }
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                          onClick={() => handleSaveCredentials(portal.id)}
+                          disabled={saving}
+                          className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition-colors text-sm font-medium"
                         >
-                          {showPasswords[portal.id] ? (
-                            <EyeOff size={18} />
-                          ) : (
-                            <Eye size={18} />
-                          )}
+                          <Save size={16} />
+                          {saving ? 'Saving...' : 'Save Credentials'}
                         </button>
                       </div>
                     </div>
+                  ))}
+              </div>
+            </div>
+          )}
 
-                    {/* Save Button */}
-                    <button
-                      onClick={() => handleSaveCredentials(portal.id)}
-                      disabled={saving}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition-colors text-sm font-medium"
-                    >
-                      <Save size={16} />
-                      {saving ? 'Saving...' : 'Save Credentials'}
-                    </button>
-                  </div>
-                </div>
-              ))}
+          {/* Empty state */}
+          {portals.length === 0 && (
+            <div className="bg-gray-50 rounded-lg p-6 text-center text-gray-600">
+              <p className="font-medium mb-2">No portals configured yet</p>
+              <p className="text-sm">Add a custom billing portal using the "Add Custom Portal" section above</p>
             </div>
           )}
         </div>
