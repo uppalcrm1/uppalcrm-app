@@ -4,8 +4,8 @@
   "description": "Multi-tenant CRM for software licensing businesses",
   "main": "server.js",
   "scripts": {
-    "postinstall": "echo 'Installing Playwright browsers...' && npx playwright install chromium --with-deps || echo 'Playwright installation attempted'",
-    "build": "npm install --force && npx playwright install chromium --with-deps",
+    "postinstall": "node scripts/install-playwright.js",
+    "build": "npm install --force && node scripts/install-playwright.js",
     "start": "node scripts/ensure-playwright.js && node scripts/production-super-admin-setup.js && node server.js",
     "dev": "nodemon server.js",
     "migrate": "node scripts/migrate.js",
