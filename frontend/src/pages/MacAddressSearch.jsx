@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Search, Loader, CheckCircle, AlertCircle, Download } from 'lucide-react'
-import axios from 'axios'
+import api from '../services/api'
 
 const MacAddressSearch = () => {
   const [macAddress, setMacAddress] = useState('')
@@ -17,7 +17,7 @@ const MacAddressSearch = () => {
 
   const fetchSearchHistory = async () => {
     try {
-      const { data } = await axios.get('/api/mac-search/history')
+      const { data } = await api.get('/mac-search/history')
       setSearchHistory(data.results || [])
     } catch (err) {
       console.error('Error fetching history:', err)
@@ -41,7 +41,7 @@ const MacAddressSearch = () => {
     setSearching(true)
 
     try {
-      const { data } = await axios.post('/api/mac-search/search', {
+      const { data } = await api.post('/mac-search/search', {
         macAddress: macAddress,
       })
 
