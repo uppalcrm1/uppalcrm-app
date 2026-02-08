@@ -200,9 +200,15 @@ router.post('/portal-credentials', authenticateToken, async (req, res) => {
 
     // Encrypt password
     const crypto = require('crypto')
-    const cipher = crypto.createCipher('aes-256-cbc', process.env.ENCRYPTION_KEY || 'default-key')
+    const encryptionKey = process.env.ENCRYPTION_KEY || 'default-secret-key-do-not-use-in-production'
+    // Use first 32 bytes of key for AES-256
+    const key = crypto.createHash('sha256').update(encryptionKey).digest()
+    const iv = crypto.randomBytes(16)
+    const cipher = crypto.createCipheriv('aes-256-cbc', key, iv)
     let encrypted = cipher.update(password, 'utf8', 'hex')
     encrypted += cipher.final('hex')
+    // Prepend IV to encrypted data (IV is public, only key is secret)
+    encrypted = iv.toString('hex') + ':' + encrypted
 
     // Save to database using UPSERT
     await query(
