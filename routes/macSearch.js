@@ -228,36 +228,55 @@ router.post('/portal-credentials', authenticateToken, async (req, res) => {
 
 /**
  * GET /api/mac-search/portals
- * Get list of available portals
+ * Get list of available portals (default + custom)
  */
 router.get('/portals', authenticateToken, async (req, res) => {
   try {
     const organizationId = req.user.organization_id
     const { query } = require('../database/connection')
 
-    // Get list of enabled portals
+    // Get list of enabled default portals
     const enabledPortals = portalConfigs.portals.filter(p => p.enabled).map(p => ({
       id: p.id,
       name: p.name,
       url: p.url,
+      isCustom: false
     }))
 
+    // Get custom portals for this organization
+    const customPortalsResult = await query(
+      `SELECT id, name, url FROM custom_portals
+       WHERE organization_id = $1 AND is_active = true
+       ORDER BY created_at DESC`,
+      [organizationId]
+    )
+
+    const customPortals = (customPortalsResult.rows || []).map(p => ({
+      id: p.id,
+      name: p.name,
+      url: p.url,
+      isCustom: true
+    }))
+
+    // Combine both lists
+    const allPortals = [...enabledPortals, ...customPortals]
+
     // Check which ones have credentials configured and get username
-    const result = await query(
+    const credentialsResult = await query(
       `SELECT portal_id, username FROM billing_portal_credentials
        WHERE organization_id = $1`,
       [organizationId]
     )
 
     const credentialsByPortal = {}
-    result.rows.forEach(row => {
+    credentialsResult.rows.forEach(row => {
       credentialsByPortal[row.portal_id] = {
         configured: true,
         username: row.username
       }
     })
 
-    const portalsWithStatus = enabledPortals.map(p => ({
+    const portalsWithStatus = allPortals.map(p => ({
       ...p,
       configured: !!credentialsByPortal[p.id],
       username: credentialsByPortal[p.id]?.username || ''
@@ -266,10 +285,96 @@ router.get('/portals', authenticateToken, async (req, res) => {
     res.json({
       portals: portalsWithStatus,
       totalPortals: portalsWithStatus.length,
-      configuredPortals: configuredPortalIds.length,
+      configuredPortals: credentialsResult.rows.length,
     })
   } catch (error) {
     console.error('Error fetching portals:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+/**
+ * POST /api/mac-search/portals
+ * Create a custom portal (admin only)
+ */
+router.post('/portals', authenticateToken, async (req, res) => {
+  try {
+    const { name, url } = req.body
+    const organizationId = req.user.organization_id
+    const { query } = require('../database/connection')
+
+    // Validate input
+    if (!name || !url) {
+      return res.status(400).json({ error: 'Portal name and URL are required' })
+    }
+
+    // Check if user is admin
+    const userResult = await query(
+      `SELECT role FROM users WHERE id = $1 AND organization_id = $2`,
+      [req.user.id, organizationId]
+    )
+
+    if (userResult.rows.length === 0 || (userResult.rows[0].role !== 'admin' && userResult.rows[0].role !== 'super_admin')) {
+      return res.status(403).json({ error: 'Only admins can create portals' })
+    }
+
+    // Create custom portal
+    const result = await query(
+      `INSERT INTO custom_portals (organization_id, name, url, is_active)
+       VALUES ($1, $2, $3, true)
+       RETURNING id, name, url, created_at`,
+      [organizationId, name, url]
+    )
+
+    res.status(201).json({
+      message: 'Portal created successfully',
+      portal: result.rows[0]
+    })
+  } catch (error) {
+    console.error('Error creating portal:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+/**
+ * DELETE /api/mac-search/portals/:portalId
+ * Delete a custom portal (admin only)
+ */
+router.delete('/portals/:portalId', authenticateToken, async (req, res) => {
+  try {
+    const { portalId } = req.params
+    const organizationId = req.user.organization_id
+    const { query } = require('../database/connection')
+
+    // Check if user is admin
+    const userResult = await query(
+      `SELECT role FROM users WHERE id = $1 AND organization_id = $2`,
+      [req.user.id, organizationId]
+    )
+
+    if (userResult.rows.length === 0 || (userResult.rows[0].role !== 'admin' && userResult.rows[0].role !== 'super_admin')) {
+      return res.status(403).json({ error: 'Only admins can delete portals' })
+    }
+
+    // Verify portal belongs to this organization
+    const portalResult = await query(
+      `SELECT id FROM custom_portals WHERE id = $1 AND organization_id = $2`,
+      [portalId, organizationId]
+    )
+
+    if (portalResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Portal not found' })
+    }
+
+    // Soft delete the portal
+    await query(
+      `UPDATE custom_portals SET is_active = false WHERE id = $1`,
+      [portalId]
+    )
+
+    res.json({ message: 'Portal deleted successfully' })
+  } catch (error) {
+    console.error('Error deleting portal:', error)
     res.status(500).json({ error: error.message })
   }
 })
