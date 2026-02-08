@@ -1,6 +1,19 @@
 -- MAC Search Feature Tables
 -- Created: 2026-02-06
 
+-- Table: custom_portals
+-- Stores custom billing portals added by organizations
+CREATE TABLE IF NOT EXISTS custom_portals (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  name VARCHAR(255) NOT NULL,
+  url TEXT NOT NULL,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(organization_id, url)
+);
+
 -- Table: billing_portal_credentials
 -- Stores encrypted credentials for each billing portal per organization
 CREATE TABLE IF NOT EXISTS billing_portal_credentials (
@@ -42,6 +55,7 @@ ALTER TABLE organizations
 ADD COLUMN IF NOT EXISTS mac_search_enabled BOOLEAN DEFAULT FALSE;
 
 -- Create indexes for better query performance
+CREATE INDEX IF NOT EXISTS idx_custom_portals_org_id ON custom_portals(organization_id);
 CREATE INDEX IF NOT EXISTS idx_mac_search_history_org_id ON mac_search_history(organization_id);
 CREATE INDEX IF NOT EXISTS idx_mac_search_history_mac_address ON mac_search_history(mac_address);
 CREATE INDEX IF NOT EXISTS idx_mac_search_results_search_id ON mac_search_results(search_id);
