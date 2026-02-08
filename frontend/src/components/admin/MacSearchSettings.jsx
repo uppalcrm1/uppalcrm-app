@@ -32,10 +32,14 @@ const MacSearchSettings = () => {
       const { data: portalsData } = await api.get('/mac-search/portals')
       setPortals(portalsData.portals || [])
 
-      // Initialize credentials state
+      // Initialize credentials state with saved usernames
       const credState = {}
       portalsData.portals?.forEach(p => {
-        credState[p.id] = { username: '', password: '', configured: p.configured }
+        credState[p.id] = {
+          username: p.username || '',
+          password: '',
+          configured: p.configured
+        }
       })
       setCredentials(credState)
     } catch (error) {

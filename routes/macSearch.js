@@ -242,18 +242,25 @@ router.get('/portals', authenticateToken, async (req, res) => {
       url: p.url,
     }))
 
-    // Check which ones have credentials configured
+    // Check which ones have credentials configured and get username
     const result = await query(
-      `SELECT portal_id FROM billing_portal_credentials
+      `SELECT portal_id, username FROM billing_portal_credentials
        WHERE organization_id = $1`,
       [organizationId]
     )
 
-    const configuredPortalIds = (result.rows || []).map(c => c.portal_id)
+    const credentialsByPortal = {}
+    result.rows.forEach(row => {
+      credentialsByPortal[row.portal_id] = {
+        configured: true,
+        username: row.username
+      }
+    })
 
     const portalsWithStatus = enabledPortals.map(p => ({
       ...p,
-      configured: configuredPortalIds.includes(p.id),
+      configured: !!credentialsByPortal[p.id],
+      username: credentialsByPortal[p.id]?.username || ''
     }))
 
     res.json({
