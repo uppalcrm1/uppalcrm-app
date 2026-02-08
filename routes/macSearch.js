@@ -38,22 +38,18 @@ router.post('/search', authenticateToken, async (req, res) => {
       })
     }
 
-    // Start search (this can be long-running)
-    res.setHeader('Content-Type', 'application/json')
-
-    // Send search started response
-    res.write(JSON.stringify({ status: 'searching', macAddress }) + '\n')
-
-    // Initialize search service (pass query function and db connection instead of supabase)
+    // Initialize search service
     const searchService = new MacAddressSearchService(query, organizationId, portalConfigs)
 
     try {
       // Perform search
       const searchResults = await searchService.searchAcrossPortals(organizationId, macAddress)
 
+      // Save to history
+      await searchService.saveSearchHistory(organizationId, searchResults)
+
       // Send final results
-      res.write(JSON.stringify(searchResults) + '\n')
-      res.end()
+      res.json(searchResults)
     } finally {
       // Clean up browser
       await searchService.closeBrowser()
