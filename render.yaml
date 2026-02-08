@@ -8,7 +8,7 @@ services:
     name: uppalcrm-api-staging
     runtime: node
     plan: free
-    buildCommand: npm install --force && npx playwright install chromium --with-deps
+    buildCommand: node scripts/build-render.js
     startCommand: npm start
     healthCheckPath: /health
     branch: staging  # Deploy from staging branch
