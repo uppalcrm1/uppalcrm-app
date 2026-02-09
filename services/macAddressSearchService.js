@@ -88,6 +88,205 @@ class MacAddressSearchService {
   }
 
   /**
+   * Wait for login form to be visible and ready
+   */
+  async waitForLoginForm(page, timeout = 15000) {
+    const selectors = [
+      'input[type="text"], input[name*="username" i], input[id*="username" i]',
+      'input[placeholder*="username" i], input[placeholder*="email" i]',
+    ]
+
+    for (const selector of selectors) {
+      try {
+        console.log(`  🔍 Looking for selector: ${selector}`)
+        await page.waitForSelector(selector, { timeout: 3000 })
+        console.log(`  ✅ Found form element with selector: ${selector}`)
+        return true
+      } catch (e) {
+        console.log(`  ⚠️  Selector not found: ${selector}`)
+      }
+    }
+
+    // If no selector worked, log page content for debugging
+    console.log('❌ Login form not found! Logging page content for debugging:')
+    const pageContent = await page.content()
+    const inputs = await page.locator('input').count()
+    const buttons = await page.locator('button').count()
+    console.log(`  Found ${inputs} input fields and ${buttons} buttons on page`)
+
+    // Log first few input types
+    const inputTypes = await page.locator('input').all()
+    for (let i = 0; i < Math.min(3, inputTypes.length); i++) {
+      const type = await inputTypes[i].getAttribute('type')
+      const name = await inputTypes[i].getAttribute('name')
+      const id = await inputTypes[i].getAttribute('id')
+      console.log(`  Input ${i}: type=${type}, name=${name}, id=${id}`)
+    }
+
+    throw new Error('Login form not found on page')
+  }
+
+  /**
+   * Login to portal with retry logic and multiple selector attempts
+   */
+  async loginToPortal(page, credentials, maxRetries = 2) {
+    let lastError
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`  📝 Login attempt ${attempt}/${maxRetries}`)
+
+        // Try multiple selectors for username field
+        const usernameSelectors = [
+          'input[name*="username" i]',
+          'input[name*="email" i]',
+          'input[id*="username" i]',
+          'input[placeholder*="username" i]',
+          'input[placeholder*="email" i]',
+          'input[type="text"]', // Fallback
+        ]
+
+        let usernameFilled = false
+        for (const selector of usernameSelectors) {
+          try {
+            const element = page.locator(selector).first()
+            await element.waitFor({ state: 'visible', timeout: 5000 })
+            await element.fill(credentials.username)
+            console.log(`  ✅ Username filled using selector: ${selector}`)
+            usernameFilled = true
+            break
+          } catch (e) {
+            // Continue to next selector
+          }
+        }
+
+        if (!usernameFilled) {
+          throw new Error('Could not find or fill username field')
+        }
+
+        // Fill password field
+        const passwordSelectors = [
+          'input[name*="password" i]',
+          'input[id*="password" i]',
+          'input[placeholder*="password" i]',
+          'input[type="password"]',
+        ]
+
+        let passwordFilled = false
+        for (const selector of passwordSelectors) {
+          try {
+            const element = page.locator(selector).first()
+            await element.waitFor({ state: 'visible', timeout: 5000 })
+            await element.fill(credentials.password)
+            console.log(`  ✅ Password filled using selector: ${selector}`)
+            passwordFilled = true
+            break
+          } catch (e) {
+            // Continue to next selector
+          }
+        }
+
+        if (!passwordFilled) {
+          throw new Error('Could not find or fill password field')
+        }
+
+        // Click login button
+        const loginButtonSelectors = [
+          'button:has-text("Log In")',
+          'button:has-text("Login")',
+          'button:has-text("Sign In")',
+          'button[type="submit"]',
+          'input[type="submit"]',
+        ]
+
+        let buttonClicked = false
+        for (const selector of loginButtonSelectors) {
+          try {
+            const element = page.locator(selector).first()
+            await element.waitFor({ state: 'visible', timeout: 5000 })
+            await element.click()
+            console.log(`  ✅ Login button clicked using selector: ${selector}`)
+            buttonClicked = true
+            break
+          } catch (e) {
+            // Continue to next selector
+          }
+        }
+
+        if (!buttonClicked) {
+          throw new Error('Could not find or click login button')
+        }
+
+        // Wait for navigation after login (with shorter timeout)
+        await Promise.race([
+          page.waitForNavigation({ waitUntil: 'networkidle' }).catch(() => {}),
+          page.waitForTimeout(5000),
+        ])
+
+        // Verify we're logged in (check for common success indicators)
+        await page.waitForTimeout(2000)
+        const isLoggedIn = await this.verifyLogin(page)
+
+        if (isLoggedIn) {
+          console.log(`  ✅ Login verification successful`)
+          return true
+        } else {
+          throw new Error('Login verification failed')
+        }
+
+      } catch (error) {
+        lastError = error
+        console.log(`  ⚠️  Login attempt ${attempt} failed: ${error.message}`)
+
+        if (attempt < maxRetries) {
+          console.log(`  ⏳ Waiting 2 seconds before retry...`)
+          await page.waitForTimeout(2000)
+        }
+      }
+    }
+
+    throw new Error(`Login failed after ${maxRetries} attempts: ${lastError?.message}`)
+  }
+
+  /**
+   * Verify that login was successful
+   */
+  async verifyLogin(page) {
+    try {
+      // Check if we're still on login page
+      const url = page.url()
+      if (url.includes('/login') || url.includes('/signin')) {
+        console.log(`  📍 Still on login page: ${url}`)
+        return false
+      }
+
+      // Check for common logout/profile elements (signs of successful login)
+      const profileIndicators = [
+        'a:has-text("Logout")',
+        'a:has-text("Sign Out")',
+        'button:has-text("Logout")',
+        '[class*="profile"], [id*="profile"]',
+        '[class*="user-menu"], [id*="user-menu"]',
+      ]
+
+      for (const indicator of profileIndicators) {
+        const found = await page.locator(indicator).first().isVisible({ timeout: 2000 }).catch(() => false)
+        if (found) {
+          console.log(`  ✅ Found logout indicator: ${indicator}`)
+          return true
+        }
+      }
+
+      // If we're not on login page and made progress, consider it success
+      console.log(`  ℹ️  Login appears successful (not on login page)`)
+      return true
+    } catch (error) {
+      console.log(`  ⚠️  Could not verify login: ${error.message}`)
+      return true // Give benefit of doubt
+    }
+  }
+
+  /**
    * Search for MAC address in a single portal
    */
   async searchPortal(portalConfig, credentials, macAddress, timeout = 60000) {
@@ -101,21 +300,35 @@ class MacAddressSearchService {
       // Navigate to login page
       const loginUrl = `${portalConfig.url}${portalConfig.loginPath}`
       console.log(`📍 Navigating to: ${loginUrl}`)
-      await page.goto(loginUrl)
-      await page.waitForLoadState('networkidle')
+      await page.goto(loginUrl, { waitUntil: 'domcontentloaded', timeout: 30000 })
+      await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {
+        console.log('⚠️  Network idle timeout, continuing anyway...')
+      })
 
-      // Login
+      // Wait for login form to be ready
+      console.log(`⏳ Waiting for login form to be ready...`)
+      await this.waitForLoginForm(page, 10000)
+
+      // Login with retry logic
       console.log(`🔐 Logging in with username: ${credentials.username}`)
-      await page.locator('input[type="text"]').first().fill(credentials.username)
-      await page.locator('input[type="password"]').first().fill(credentials.password)
-      await page.locator('button:has-text("Log In"), button[type="submit"]').click()
-      await page.waitForLoadState('networkidle')
+      await this.loginToPortal(page, credentials)
+
       console.log(`✅ Login successful`)
 
       // Close modal if present
-      if (await page.locator('#myModal, .modal').first().isVisible({ timeout: 1000 }).catch(() => false)) {
-        await page.locator('button[data-dismiss="modal"], button.close').first().click()
-        await page.waitForTimeout(500)
+      try {
+        const modal = page.locator('#myModal, .modal, [role="dialog"]').first()
+        const isVisible = await modal.isVisible({ timeout: 2000 }).catch(() => false)
+        if (isVisible) {
+          console.log(`📭 Closing modal...`)
+          const closeButton = page.locator('button[data-dismiss="modal"], button.close, button[aria-label="Close"]').first()
+          await closeButton.click({ timeout: 2000 }).catch(() => {
+            console.log(`⚠️  Could not close modal with button`)
+          })
+          await page.waitForTimeout(1000)
+        }
+      } catch (e) {
+        console.log(`ℹ️  No modal to close`)
       }
 
       // Navigate to users list
@@ -179,19 +392,38 @@ class MacAddressSearchService {
         error: null,
       }
     } catch (error) {
-      console.error(`❌ Error searching portal ${portalConfig.name}:`, error.message)
-      console.error(`Stack trace:`, error.stack)
+      let errorMsg = error.message
+
+      // Provide more helpful error messages
+      if (error.message.includes('Timeout')) {
+        errorMsg = `Portal timeout: ${error.message}. The portal took too long to respond. Try increasing the timeout or check portal connectivity.`
+      } else if (error.message.includes('Login')) {
+        errorMsg = `Login failed: ${error.message}. Check credentials or verify the login page structure hasn't changed.`
+      } else if (error.message.includes('not found')) {
+        errorMsg = `Element not found: ${error.message}. The portal page structure may have changed.`
+      } else if (error.message.includes('Navigation')) {
+        errorMsg = `Navigation failed: ${error.message}. The portal may be unreachable.`
+      }
+
+      console.error(`❌ Error searching portal ${portalConfig.name}: ${errorMsg}`)
+      console.error(`Full error:`, error.message)
+
       return {
         success: false,
         portalName: portalConfig.name,
         found: false,
         results: [],
-        error: error.message,
+        error: errorMsg,
+        errorType: error.name,
       }
     } finally {
       console.log(`🧹 Cleaning up resources for ${portalConfig.name}`)
       if (page) {
-        await page.close()
+        try {
+          await page.close()
+        } catch (e) {
+          console.log(`⚠️  Error closing page:`, e.message)
+        }
       }
     }
   }
