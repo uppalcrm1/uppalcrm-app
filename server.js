@@ -1,4 +1,61 @@
 // ============================================
+// PLAYWRIGHT BROWSER CHECK - MUST RUN FIRST
+// ============================================
+console.log('🎭 Checking Playwright browsers at startup...');
+const fs = require('fs');
+const path = require('path');
+const { spawnSync } = require('child_process');
+
+function checkAndInstallPlaywright() {
+  const playwrightPath = '/opt/render/.cache/ms-playwright';
+  let browserFound = false;
+
+  try {
+    if (fs.existsSync(playwrightPath)) {
+      const files = fs.readdirSync(playwrightPath);
+      const chromiumDirs = files.filter(f => f.includes('chromium'));
+
+      for (const dir of chromiumDirs) {
+        const execPath = path.join(playwrightPath, dir, 'chrome-headless-shell-linux64', 'chrome-headless-shell');
+        if (fs.existsSync(execPath)) {
+          console.log('✅ Playwright chromium executable found');
+          browserFound = true;
+          break;
+        }
+      }
+
+      if (!browserFound && chromiumDirs.length > 0) {
+        console.log('⚠️  Chromium directory exists but executable missing - installing...');
+      }
+    }
+  } catch (e) {
+    console.log('📁 Playwright cache check error:', e.message);
+  }
+
+  if (!browserFound) {
+    console.log('🎭 Installing Playwright chromium (this may take 2-3 minutes)...');
+    try {
+      const result = spawnSync('npx', ['playwright', 'install', 'chromium', '--with-deps'], {
+        stdio: 'inherit',
+        timeout: 600000
+      });
+
+      if (result.status === 0) {
+        console.log('✅ Playwright installation completed');
+      } else {
+        console.log('⚠️  Playwright installation may have issues, continuing...');
+      }
+    } catch (e) {
+      console.log('⚠️  Playwright installation error:', e.message);
+    }
+  }
+}
+
+// Run the check
+checkAndInstallPlaywright();
+console.log('✅ Playwright check complete, starting server...\n');
+
+// ============================================
 // LOG FILTER - Add at the very top of your server file
 // ============================================
 const originalConsoleLog = console.log;
