@@ -109,21 +109,65 @@ class MacAddressSearchService {
 
     // If no selector worked, log page content for debugging
     console.log('❌ Login form not found! Logging page content for debugging:')
-    const pageContent = await page.content()
-    const inputs = await page.locator('input').count()
-    const buttons = await page.locator('button').count()
-    console.log(`  Found ${inputs} input fields and ${buttons} buttons on page`)
-
-    // Log first few input types
-    const inputTypes = await page.locator('input').all()
-    for (let i = 0; i < Math.min(3, inputTypes.length); i++) {
-      const type = await inputTypes[i].getAttribute('type')
-      const name = await inputTypes[i].getAttribute('name')
-      const id = await inputTypes[i].getAttribute('id')
-      console.log(`  Input ${i}: type=${type}, name=${name}, id=${id}`)
-    }
+    await this.debugPageStructure(page)
 
     throw new Error('Login form not found on page')
+  }
+
+  /**
+   * Debug page structure - helps identify why login form can't be found
+   */
+  async debugPageStructure(page) {
+    try {
+      const inputs = await page.locator('input').count()
+      const buttons = await page.locator('button').count()
+      const forms = await page.locator('form').count()
+
+      console.log(`\n📊 PAGE STRUCTURE DEBUG:`)
+      console.log(`  Current URL: ${page.url()}`)
+      console.log(`  Page title: ${await page.title()}`)
+      console.log(`  Found ${forms} form(s), ${inputs} input field(s), ${buttons} button(s)`)
+
+      // Log all input details
+      if (inputs > 0) {
+        console.log(`\n  📝 INPUT FIELDS FOUND:`)
+        const inputElements = await page.locator('input').all()
+        for (let i = 0; i < Math.min(10, inputElements.length); i++) {
+          const type = await inputElements[i].getAttribute('type')
+          const name = await inputElements[i].getAttribute('name')
+          const id = await inputElements[i].getAttribute('id')
+          const placeholder = await inputElements[i].getAttribute('placeholder')
+          const cls = await inputElements[i].getAttribute('class')
+          console.log(`    [${i}] type="${type}" name="${name}" id="${id}" placeholder="${placeholder}" class="${cls}"`)
+        }
+      }
+
+      // Log all button details
+      if (buttons > 0) {
+        console.log(`\n  🔘 BUTTONS FOUND:`)
+        const buttonElements = await page.locator('button').all()
+        for (let i = 0; i < Math.min(5, buttonElements.length); i++) {
+          const text = await buttonElements[i].textContent()
+          const type = await buttonElements[i].getAttribute('type')
+          const name = await buttonElements[i].getAttribute('name')
+          const cls = await buttonElements[i].getAttribute('class')
+          console.log(`    [${i}] text="${text.trim()}" type="${type}" name="${name}" class="${cls}"`)
+        }
+      }
+
+      // Take screenshot for visual inspection
+      const screenshotPath = `/tmp/ditto-login-debug-${Date.now()}.png`
+      await page.screenshot({ path: screenshotPath })
+      console.log(`\n  📸 Screenshot saved to: ${screenshotPath}`)
+
+      // Log page source snippet
+      const bodyText = await page.locator('body').textContent()
+      const snippet = bodyText.substring(0, 500)
+      console.log(`\n  📄 Page content snippet:\n${snippet}...`)
+
+    } catch (error) {
+      console.log(`  ⚠️  Could not debug page structure: ${error.message}`)
+    }
   }
 
   /**
