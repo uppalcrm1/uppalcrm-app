@@ -41,9 +41,7 @@ const MacAddressSearch = () => {
     setSearching(true)
 
     try {
-      const { data } = await api.post('/mac-search/search', {
-        macAddress: macAddress,
-      })
+      const { data } = await api.get(`/mac-search/${macAddress}`)
 
       setResults(data)
       // Refresh history

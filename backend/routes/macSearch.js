@@ -10,12 +10,12 @@ const MacAddressSearchService = require('../services/macAddressSearchService')
 const portalConfigs = require('../config/billingPortals')
 
 /**
- * POST /api/mac-search
+ * GET /api/mac-search/:macAddress
  * Search for a MAC address across all configured portals
  */
-router.post('/search', auth, async (req, res) => {
+router.get('/:macAddress', auth, async (req, res) => {
   try {
-    const { macAddress } = req.body
+    const { macAddress } = req.params
     const organizationId = req.user.organization_id
 
     // Validate MAC address format
