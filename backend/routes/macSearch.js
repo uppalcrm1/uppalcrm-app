@@ -1,6 +1,9 @@
 /**
  * MAC Address Search Routes
  * Endpoints for searching MAC addresses across billing portals
+ *
+ * IMPORTANT: Route order matters! More specific routes must come before generic parameters.
+ * Generic /:macAddress route is at the end to avoid matching /history, /portals, etc.
  */
 
 const express = require('express')
@@ -8,66 +11,6 @@ const router = express.Router()
 const { auth } = require('../middleware/auth')
 const MacAddressSearchService = require('../services/macAddressSearchService')
 const portalConfigs = require('../config/billingPortals')
-
-/**
- * GET /api/mac-search/:macAddress
- * Search for a MAC address across all configured portals
- */
-router.get('/:macAddress', auth, async (req, res) => {
-  try {
-    const { macAddress } = req.params
-    const organizationId = req.user.organization_id
-
-    // Validate MAC address format
-    if (!macAddress || !/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/.test(macAddress)) {
-      return res.status(400).json({
-        error: 'Invalid MAC address format. Expected format: 00:1A:79:B2:5A:58',
-      })
-    }
-
-    // Check if organization has feature enabled
-    const { data: org, error: orgError } = await req.supabase
-      .from('organizations')
-      .select('mac_search_enabled')
-      .eq('id', organizationId)
-      .single()
-
-    if (orgError || !org?.mac_search_enabled) {
-      return res.status(403).json({
-        error: 'MAC search feature is not enabled for your organization',
-      })
-    }
-
-    // Start search (this can be long-running)
-    res.setHeader('Content-Type', 'application/json')
-
-    // Send search started response
-    res.write(JSON.stringify({ status: 'searching', macAddress }) + '\n')
-
-    // Initialize search service
-    const searchService = new MacAddressSearchService(req.supabase, portalConfigs)
-
-    try {
-      // Perform search
-      const searchResults = await searchService.searchAcrossPortals(organizationId, macAddress)
-
-      // Save to history
-      await searchService.saveSearchHistory(organizationId, searchResults)
-
-      // Send final results
-      res.write(JSON.stringify(searchResults) + '\n')
-      res.end()
-    } finally {
-      // Clean up browser
-      await searchService.closeBrowser()
-    }
-  } catch (error) {
-    console.error('MAC search error:', error)
-    res.status(500).json({
-      error: 'Search failed: ' + error.message,
-    })
-  }
-})
 
 /**
  * POST /api/mac-search/quick
@@ -253,6 +196,69 @@ router.get('/portals', auth, async (req, res) => {
   } catch (error) {
     console.error('Error fetching portals:', error)
     res.status(500).json({ error: error.message })
+  }
+})
+
+/**
+ * GET /api/mac-search/:macAddress
+ * Search for a MAC address across all configured portals
+ *
+ * IMPORTANT: This route MUST be last because :macAddress is a generic parameter
+ * that would match /history, /portals, /results, etc. if it came first!
+ */
+router.get('/:macAddress', auth, async (req, res) => {
+  try {
+    const { macAddress } = req.params
+    const organizationId = req.user.organization_id
+
+    // Validate MAC address format
+    if (!macAddress || !/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/.test(macAddress)) {
+      return res.status(400).json({
+        error: 'Invalid MAC address format. Expected format: 00:1A:79:B2:5A:58',
+      })
+    }
+
+    // Check if organization has feature enabled
+    const { data: org, error: orgError } = await req.supabase
+      .from('organizations')
+      .select('mac_search_enabled')
+      .eq('id', organizationId)
+      .single()
+
+    if (orgError || !org?.mac_search_enabled) {
+      return res.status(403).json({
+        error: 'MAC search feature is not enabled for your organization',
+      })
+    }
+
+    // Start search (this can be long-running)
+    res.setHeader('Content-Type', 'application/json')
+
+    // Send search started response
+    res.write(JSON.stringify({ status: 'searching', macAddress }) + '\n')
+
+    // Initialize search service
+    const searchService = new MacAddressSearchService(req.supabase, portalConfigs)
+
+    try {
+      // Perform search
+      const searchResults = await searchService.searchAcrossPortals(organizationId, macAddress)
+
+      // Save to history
+      await searchService.saveSearchHistory(organizationId, searchResults)
+
+      // Send final results
+      res.write(JSON.stringify(searchResults) + '\n')
+      res.end()
+    } finally {
+      // Clean up browser
+      await searchService.closeBrowser()
+    }
+  } catch (error) {
+    console.error('MAC search error:', error)
+    res.status(500).json({
+      error: 'Search failed: ' + error.message,
+    })
   }
 })
 
