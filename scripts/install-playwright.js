@@ -61,8 +61,8 @@ function installPlaywright() {
   log(`Installing Playwright (attempt ${retryCount}/${MAX_RETRIES})...`, 'play');
 
   try {
-    // Try with --with-deps first
-    const result = spawnSync('npx', ['playwright', 'install', 'chromium', '--with-deps'], {
+    // Render doesn't support sudo for --with-deps, use plain install
+    const result = spawnSync('npx', ['playwright', 'install', 'chromium'], {
       stdio: 'inherit',
       timeout: 600000 // 10 minutes per attempt
     });

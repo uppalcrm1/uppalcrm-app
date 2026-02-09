@@ -35,7 +35,8 @@ function checkAndInstallPlaywright() {
   if (!browserFound) {
     console.log('🎭 Installing Playwright chromium (this may take 2-3 minutes)...');
     try {
-      const result = spawnSync('npx', ['playwright', 'install', 'chromium', '--with-deps'], {
+      // Try without --with-deps first (Render doesn't support sudo)
+      const result = spawnSync('npx', ['playwright', 'install', 'chromium'], {
         stdio: 'inherit',
         timeout: 600000
       });
@@ -83,7 +84,7 @@ console.log = function(...args) {
 
 const express = require('express');
 const cors = require('cors');
-const path = require('path');
+// const path is already required above in Playwright check
 const { version } = require('./package.json');
 const { testConnection } = require('./database/connection');
 const { 
