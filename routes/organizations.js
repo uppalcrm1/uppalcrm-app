@@ -131,6 +131,68 @@ router.put('/current',
 );
 
 /**
+ * GET /organizations/:id
+ * Get organization by ID (admin only)
+ */
+router.get('/:id',
+  requireAdmin,
+  validateUuidParam,
+  async (req, res) => {
+    try {
+      const organization = await Organization.findById(req.params.id);
+
+      if (!organization) {
+        return res.status(404).json({
+          error: 'Organization not found',
+          message: 'Organization does not exist'
+        });
+      }
+
+      res.json(organization.toJSON());
+    } catch (error) {
+      console.error('Get organization error:', error);
+      res.status(500).json({
+        error: 'Failed to retrieve organization',
+        message: 'Unable to get organization information'
+      });
+    }
+  }
+);
+
+/**
+ * PATCH /organizations/:id
+ * Update organization by ID (admin only)
+ */
+router.patch('/:id',
+  requireAdmin,
+  validateUuidParam,
+  async (req, res) => {
+    try {
+      // Allow updating organization settings including feature flags
+      const organization = await Organization.update(req.params.id, req.body);
+
+      if (!organization) {
+        return res.status(404).json({
+          error: 'Organization not found',
+          message: 'Organization does not exist'
+        });
+      }
+
+      res.json({
+        message: 'Organization updated successfully',
+        organization: organization.toJSON()
+      });
+    } catch (error) {
+      console.error('Update organization error:', error);
+      res.status(500).json({
+        error: 'Organization update failed',
+        message: 'Unable to update organization'
+      });
+    }
+  }
+);
+
+/**
  * GET /organizations/current/stats
  * Get organization statistics (admin only)
  */
