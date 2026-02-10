@@ -29,6 +29,8 @@ class Organization {
     this.next_billing_date = data.next_billing_date;
     this.monthly_cost = data.monthly_cost || 0;
     this.notes = data.notes;
+    // Feature flags
+    this.mac_search_enabled = data.mac_search_enabled || false;
   }
 
   /**
@@ -172,7 +174,7 @@ class Organization {
    * @returns {Organization|null} Updated organization
    */
   static async update(id, updates) {
-    const allowedFields = ['name', 'domain', 'settings', 'subscription_plan', 'max_users'];
+    const allowedFields = ['name', 'domain', 'settings', 'subscription_plan', 'max_users', 'mac_search_enabled'];
     const updateFields = Object.keys(updates).filter(key => allowedFields.includes(key));
 
     if (updateFields.length === 0) {
@@ -738,7 +740,9 @@ class Organization {
       last_payment_date: this.last_payment_date,
       next_billing_date: this.next_billing_date,
       monthly_cost: this.monthly_cost,
-      notes: this.notes
+      notes: this.notes,
+      // Feature flags
+      mac_search_enabled: this.mac_search_enabled
     };
   }
 }

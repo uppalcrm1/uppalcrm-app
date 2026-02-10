@@ -39,6 +39,11 @@ if (API_TARGET.includes('localhost')) {
   console.log('🌐 Production mode: No proxy needed, frontend will use environment API URL');
 }
 
+// Health check endpoint for Render
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok' });
+});
+
 // Serve static files from dist directory
 app.use(express.static(path.join(__dirname, 'dist')));
 
