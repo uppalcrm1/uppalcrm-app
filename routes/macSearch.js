@@ -372,4 +372,57 @@ router.delete('/portals/:portalId', authenticateToken, async (req, res) => {
   }
 })
 
+/**
+ * GET /api/mac-search/:macAddress
+ * Search for a MAC address using URL path parameter
+ */
+router.get('/:macAddress', authenticateToken, async (req, res) => {
+  try {
+    const { macAddress } = req.params
+    const organizationId = req.user.organization_id
+    const { query } = require('../database/connection')
+
+    // Validate MAC address format
+    if (!macAddress || !/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/.test(macAddress)) {
+      return res.status(400).json({
+        error: 'Invalid MAC address format. Expected format: 00:1A:79:B2:5A:58',
+      })
+    }
+
+    // Check if organization has feature enabled
+    const orgResult = await query(
+      `SELECT mac_search_enabled FROM organizations WHERE id = $1`,
+      [organizationId]
+    )
+
+    if (orgResult.rows.length === 0 || !orgResult.rows[0].mac_search_enabled) {
+      return res.status(403).json({
+        error: 'MAC search feature is not enabled for your organization',
+      })
+    }
+
+    // Initialize search service
+    const searchService = new MacAddressSearchService(query, organizationId, portalConfigs)
+
+    try {
+      // Perform search
+      const searchResults = await searchService.searchAcrossPortals(organizationId, macAddress)
+
+      // Save to history
+      await searchService.saveSearchHistory(organizationId, searchResults)
+
+      // Send results
+      res.json(searchResults)
+    } finally {
+      // Clean up browser
+      await searchService.closeBrowser()
+    }
+  } catch (error) {
+    console.error('MAC search error:', error)
+    res.status(500).json({
+      error: 'Search failed: ' + error.message,
+    })
+  }
+})
+
 module.exports = router
