@@ -41,7 +41,10 @@ const MacAddressSearch = () => {
     setSearching(true)
 
     try {
-      const { data } = await api.get(`/mac-search/${macAddress}`)
+      // Increase timeout to 120 seconds for browser automation searches
+      const { data } = await api.get(`/mac-search/${macAddress}`, {
+        timeout: 120000
+      })
 
       setResults(data)
       // Refresh history
