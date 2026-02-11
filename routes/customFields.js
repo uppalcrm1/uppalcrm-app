@@ -1491,7 +1491,7 @@ router.put('/default/:fieldName', async (req, res) => {
 
       // Check that all 4 system default values are still present
       for (const defaultVal of defaultValues) {
-        const found = field_options.find(opt => opt.value === defaultVal && opt.is_default === true);
+        const found = field_options.find(opt => opt.value === defaultVal);
         if (!found) {
           const labelMap = {1: '1 Month', 3: '3 Months', 6: '6 Months', 12: '1 Year'};
           errors.push(`System default "${labelMap[defaultVal]}" (${defaultVal} months) cannot be removed. You can only disable it.`);
