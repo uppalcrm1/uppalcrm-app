@@ -1070,6 +1070,25 @@ const AdminFields = () => {
                         placeholder="Option label"
                         className="input flex-1"
                       />
+                      {/* Special numeric input for 'term' field in transactions */}
+                      {editingField?.field_name === 'term' && activeTab === 'transactions' && (
+                        <input
+                          type="number"
+                          value={typeof option.value === 'number' ? option.value : ''}
+                          onChange={(e) => {
+                            const newOptions = [...formData.field_options]
+                            newOptions[index] = {
+                              ...formData.field_options[index],
+                              value: e.target.value === '' ? '' : parseInt(e.target.value, 10)
+                            }
+                            handleInputChange('field_options', newOptions)
+                          }}
+                          placeholder="Months (1-60)"
+                          min="1"
+                          max="60"
+                          className="input w-24"
+                        />
+                      )}
                       <button
                         onClick={() => {
                           const newOptions = formData.field_options.filter((_, i) => i !== index)
