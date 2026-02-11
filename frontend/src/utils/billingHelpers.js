@@ -63,6 +63,9 @@ export const loadTermOptions = async () => {
  * @returns {Array} Array of term option objects
  */
 export const getTermOptions = () => {
+  if (!termOptionsCache && !fetchPromise) {
+    loadTermOptions(); // trigger background fetch
+  }
   return termOptionsCache || DEFAULT_TERM_OPTIONS;
 };
 
@@ -111,3 +114,6 @@ export const getShortBillingTerm = (months) => {
 export const formatBillingTermDisplay = (months, format = 'full') => {
   return formatBillingTerm(months);
 };
+
+// Auto-load term options on first import
+loadTermOptions();
