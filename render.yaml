@@ -15,8 +15,8 @@ services:
     envVars:
       - key: NODE_ENV
         value: staging
-      - key: DATABASE_URL
-        value: "postgres://placeholder"
+      # DATABASE_URL should be set as a secret environment variable in Render dashboard
+      # Do not include a default/placeholder value here
       - key: JWT_SECRET
         generateValue: true
       - key: JWT_REFRESH_SECRET
