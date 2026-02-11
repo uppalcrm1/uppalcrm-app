@@ -40,7 +40,7 @@ export const loadTermOptions = async () => {
 
       if (termField && termField.field_options && Array.isArray(termField.field_options)) {
         termOptionsCache = termField.field_options.sort((a, b) =>
-          (a.sort_order || 0) - (b.sort_order || 0)
+          (a.value || 0) - (b.value || 0)
         );
       } else {
         termOptionsCache = DEFAULT_TERM_OPTIONS;
