@@ -33,6 +33,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import api from '../../services/api'
+import { clearTermOptionsCache } from '../../utils/billingHelpers'
 
 // Phase 1b: CSS Animations
 const animationStyles = `
@@ -325,6 +326,8 @@ const AdminFields = () => {
         // Auto-hide success message after 5 seconds
         setTimeout(() => setSuccessMessage(null), 5000)
       }
+      // Clear billing term options cache so other pages pick up changes
+      clearTermOptionsCache()
       resetForm()
     } catch (err) {
       console.error('Error saving field:', err)
@@ -601,8 +604,8 @@ const AdminFields = () => {
   ]
 
   const filteredFields = allFields.filter(field =>
-    field.field_label.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    field.field_name.toLowerCase().includes(searchQuery.toLowerCase())
+    (field.field_label || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (field.field_name || '').toLowerCase().includes(searchQuery.toLowerCase())
   )
 
   const needsOptions = ['select', 'multiselect', 'radio'].includes(formData.field_type)
