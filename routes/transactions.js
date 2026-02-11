@@ -313,6 +313,27 @@ router.get('/', async (req, res) => {
 
     console.log('📥 [Transactions GET] Received query:', { status, contact_id, search, limit, offset });
 
+    // STEP 1: Load billing term options for this organization
+    let termOptions = [];
+    try {
+      const termConfigResult = await db.query(`
+        SELECT field_options FROM default_field_configurations
+        WHERE organization_id = $1 AND field_name = 'term' AND entity_type = 'transactions'
+      `, [organization_id]);
+
+      if (termConfigResult.rows.length > 0 && termConfigResult.rows[0].field_options) {
+        termOptions = termConfigResult.rows[0].field_options;
+      }
+    } catch (err) {
+      console.error('Failed to load term options, using defaults:', err);
+      termOptions = [
+        {"label": "1 Month", "value": 1},
+        {"label": "3 Months", "value": 3},
+        {"label": "6 Months", "value": 6},
+        {"label": "1 Year", "value": 12}
+      ];
+    }
+
     let query = `
       SELECT
         t.id,
@@ -343,20 +364,7 @@ router.get('/', async (req, res) => {
 
         -- Created by user information
         COALESCE(u.first_name || ' ' || u.last_name, 'Unknown') as created_by_name,
-        u.email as created_by_email,
-
-        -- Generate Transaction ID: "Account Name - Term"
-        CONCAT(
-          COALESCE(a.account_name, 'Unknown'),
-          ' - ',
-          CASE
-            WHEN LOWER(t.term) = 'monthly' OR t.term = '1' THEN '1 month'
-            WHEN LOWER(t.term) = 'quarterly' OR t.term = '3' THEN '3 months'
-            WHEN LOWER(t.term) = 'semi-annual' OR LOWER(t.term) = 'semi_annual' OR t.term = '6' THEN '6 months'
-            WHEN LOWER(t.term) = 'annual' OR LOWER(t.term) = 'yearly' OR t.term = '12' THEN '1 year'
-            ELSE COALESCE(t.term, 'Unknown')
-          END
-        ) as transaction_id
+        u.email as created_by_email
       FROM transactions t
       LEFT JOIN accounts a ON t.account_id = a.id
       LEFT JOIN contacts c ON t.contact_id = c.id
@@ -433,10 +441,45 @@ router.get('/', async (req, res) => {
     const countResult = await db.query(countQuery, countParams);
     const totalCount = parseInt(countResult.rows[0].total_count, 10);
 
+    // STEP 3: Build transaction_id from term options lookup
+    const transactions = result.rows.map(row => {
+      // Try to match term value to find the label
+      let termLabel = row.term || 'Unknown';
+
+      // First, try parsing as integer for direct option matching
+      const termValue = parseInt(row.term);
+      if (!isNaN(termValue)) {
+        const termOption = termOptions.find(opt => opt.value === termValue);
+        if (termOption) {
+          termLabel = termOption.label;
+        }
+      } else {
+        // Backward compatibility: handle legacy text values
+        const legacyMappings = {
+          'monthly': 'Monthly',
+          'quarterly': 'Quarterly',
+          'semi-annual': 'Semi-Annual',
+          'semi_annual': 'Semi-Annual',
+          'annual': 'Annual',
+          'yearly': 'Annual'
+        };
+
+        const normalizedTerm = row.term.toLowerCase();
+        if (legacyMappings[normalizedTerm]) {
+          termLabel = legacyMappings[normalizedTerm];
+        }
+      }
+
+      return {
+        ...row,
+        transaction_id: `${row.account_name || 'Unknown'} - ${termLabel}`
+      };
+    });
+
     res.json({
       success: true,
-      transactions: result.rows,
-      count: result.rows.length,
+      transactions: transactions,
+      count: transactions.length,
       total: totalCount,
       limit: parseInt(limit, 10),
       offset: parseInt(offset, 10),

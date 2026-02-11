@@ -4,6 +4,7 @@ import { productsAPI } from '../../services/api'
 import toast from 'react-hot-toast'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import axios from 'axios'
+import { getTermOptions } from '../../utils/billingHelpers'
 
 const AdminProducts = () => {
   const [products, setProducts] = useState([])
@@ -243,12 +244,13 @@ const AdminProducts = () => {
     return field ? field.is_required === true : false
   }
 
-  const billingCycleOptions = [
-    { value: 'monthly', label: 'Monthly' },
-    { value: 'quarterly', label: 'Quarterly' },
-    { value: 'semi-annual', label: 'Semi-Annual' },
-    { value: 'annual', label: 'Annual' }
-  ]
+  // Build billing cycle options from term config
+  // Maps integer months_value to text keys for backward compatibility with existing product data
+  const monthsToKey = { 1: 'monthly', 3: 'quarterly', 6: 'semi-annual', 12: 'annual' };
+  const billingCycleOptions = getTermOptions().map(opt => ({
+    value: monthsToKey[opt.value] || `${opt.value}_months`,
+    label: opt.label
+  }));
 
   const colorOptions = [
     'blue', 'green', 'purple', 'yellow', 'red', 'pink', 'indigo', 'gray'
@@ -345,11 +347,14 @@ const AdminProducts = () => {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex flex-wrap gap-1">
-                      {product.allowed_billing_cycles?.map((cycle) => (
-                        <span key={cycle} className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-700">
-                          {cycle}
-                        </span>
-                      ))}
+                      {product.allowed_billing_cycles?.map((cycle) => {
+                        const matchedOption = billingCycleOptions.find(opt => opt.value === cycle);
+                        return (
+                          <span key={cycle} className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-700">
+                            {matchedOption ? matchedOption.label : cycle}
+                          </span>
+                        );
+                      })}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">

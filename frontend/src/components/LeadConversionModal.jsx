@@ -3,8 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { X, UserCheck, CreditCard, Package, DollarSign } from 'lucide-react'
 import { productsAPI } from '../services/api'
 import LoadingSpinner from './LoadingSpinner'
-import { BILLING_TERMS } from '../constants/transactions'
-import { formatBillingTerm } from '../utils/billingHelpers'
+import { formatBillingTerm, getTermOptions } from '../utils/billingHelpers'
 
 const LeadConversionModal = ({ lead, onClose, onConvert, isConverting }) => {
   const [createAccount, setCreateAccount] = useState(false)
@@ -238,9 +237,9 @@ const LeadConversionModal = ({ lead, onClose, onConvert, isConverting }) => {
                         onChange={handleInputChange}
                         className="select w-full"
                       >
-                        {BILLING_TERMS.map(term => (
-                          <option key={term.value} value={term.value}>
-                            {formatBillingTerm(parseInt(term.value))}
+                        {getTermOptions().map(opt => (
+                          <option key={opt.value} value={String(opt.value)}>
+                            {opt.label}
                           </option>
                         ))}
                       </select>

@@ -10,7 +10,6 @@ import {
 } from 'lucide-react'
 import { accountsAPI, productsAPI } from '../services/api'
 import toast from 'react-hot-toast'
-import { BILLING_TERMS } from '../constants/transactions'
 import { formatBillingTerm } from '../utils/billingHelpers'
 
 const EditAccountModal = ({ isOpen, onClose, onSuccess, account }) => {

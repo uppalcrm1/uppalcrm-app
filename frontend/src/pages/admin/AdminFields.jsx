@@ -1058,7 +1058,13 @@ const AdminFields = () => {
                         value={option.label}
                         onChange={(e) => {
                           const newOptions = [...formData.field_options]
-                          newOptions[index] = { value: e.target.value.toLowerCase().replace(/\s+/g, '_'), label: e.target.value }
+                          newOptions[index] = {
+                            ...formData.field_options[index],
+                            label: e.target.value,
+                            ...(formData.field_options[index].value === undefined || formData.field_options[index].value === ''
+                              ? { value: e.target.value.toLowerCase().replace(/\s+/g, '_') }
+                              : {})
+                          }
                           handleInputChange('field_options', newOptions)
                         }}
                         placeholder="Option label"

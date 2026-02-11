@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { X, CheckCircle, DollarSign, Calendar } from 'lucide-react'
 import { contactsAPI } from '../services/api'
-import { formatBillingTerm } from '../utils/billingHelpers'
+import { formatBillingTerm, getTermOptions } from '../utils/billingHelpers'
 
 const AccountDetailsModal = ({ contactName, onClose, onSubmit, isLoading }) => {
   const [formData, setFormData] = useState({
@@ -93,32 +93,18 @@ const AccountDetailsModal = ({ contactName, onClose, onSubmit, isLoading }) => {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Billing Term <span className="text-red-500">*</span>
               </label>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setFormData(prev => ({ ...prev, billing_term_months: 1 }))}
-                  className={`py-2 px-4 rounded-lg border-2 transition-colors ${
-                    formData.billing_term_months === 1
-                      ? 'border-primary-500 bg-primary-50 text-primary-700'
-                      : 'border-gray-300 text-gray-700 hover:border-gray-400'
-                  }`}
-                >
-                  <Calendar size={16} className="mx-auto mb-1" />
-                  <div className="text-sm font-medium">{formatBillingTerm(1).split(' ')[0]}</div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFormData(prev => ({ ...prev, billing_term_months: 12 }))}
-                  className={`py-2 px-4 rounded-lg border-2 transition-colors ${
-                    formData.billing_term_months === 12
-                      ? 'border-primary-500 bg-primary-50 text-primary-700'
-                      : 'border-gray-300 text-gray-700 hover:border-gray-400'
-                  }`}
-                >
-                  <Calendar size={16} className="mx-auto mb-1" />
-                  <div className="text-sm font-medium">{formatBillingTerm(12).split(' ')[0]}</div>
-                </button>
-              </div>
+              <select
+                value={formData.billing_term_months}
+                onChange={(e) => setFormData(prev => ({ ...prev, billing_term_months: parseInt(e.target.value) }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                required
+              >
+                {getTermOptions().map(opt => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {/* Price */}

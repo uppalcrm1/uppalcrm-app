@@ -35,10 +35,8 @@ router.get('/', async (req, res) => {
 
         -- Calculate monthly cost based on billing term (months)
         CASE
-          WHEN a.billing_term_months = 1 THEN a.price
-          WHEN a.billing_term_months = 3 THEN a.price / 3
-          WHEN a.billing_term_months = 6 THEN a.price / 6
-          WHEN a.billing_term_months = 12 THEN a.price / 12
+          WHEN a.billing_term_months IS NOT NULL AND a.billing_term_months > 0
+            THEN a.price / a.billing_term_months
           ELSE a.price
         END as monthly_cost,
 

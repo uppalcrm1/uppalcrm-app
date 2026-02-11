@@ -19,11 +19,10 @@ import { transactionsAPI } from '../services/api'
 import api from '../services/api'
 import toast from 'react-hot-toast'
 import {
-  PAYMENT_METHODS,
-  BILLING_TERMS
+  PAYMENT_METHODS
 } from '../constants/transactions'
 import { formatDateOnly } from '../utils/dateUtils'
-import { formatBillingTerm } from '../utils/billingHelpers'
+import { formatBillingTerm, getTermOptions } from '../utils/billingHelpers'
 
 const CreateTransactionModal = ({ account, onClose, onSuccess, isOpen }) => {
   // State for form data
@@ -556,9 +555,9 @@ const CreateTransactionModal = ({ account, onClose, onSuccess, isOpen }) => {
                     className={`select ${errors.term ? 'border-red-500' : ''}`}
                   >
                     <option value="">Select term</option>
-                    {BILLING_TERMS.map(term => (
-                      <option key={term.value} value={term.value}>
-                        {formatBillingTerm(parseInt(term.value))}
+                    {getTermOptions().map(opt => (
+                      <option key={opt.value} value={String(opt.value)}>
+                        {opt.label}
                       </option>
                     ))}
                   </select>

@@ -12,7 +12,7 @@ import {
 } from 'lucide-react'
 import { accountsAPI, contactsAPI, productsAPI } from '../services/api'
 import toast from 'react-hot-toast'
-import { BILLING_TERMS } from '../constants/transactions'
+import { getTermOptions } from '../utils/billingHelpers'
 
 const CreateAccountModal = ({ isOpen, onClose, onSuccess }) => {
   const [formData, setFormData] = useState({
@@ -441,9 +441,9 @@ const CreateAccountModal = ({ isOpen, onClose, onSuccess }) => {
                     required
                     className={`select ${errors.term ? 'border-red-500' : ''}`}
                   >
-                    {BILLING_TERMS.map(term => (
-                      <option key={term.value} value={term.value}>
-                        {term.label}
+                    {getTermOptions().map(opt => (
+                      <option key={opt.value} value={String(opt.value)}>
+                        {opt.label}
                       </option>
                     ))}
                   </select>

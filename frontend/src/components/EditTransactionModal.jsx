@@ -18,11 +18,10 @@ import { transactionsAPI, accountsAPI } from '../services/api'
 import api from '../services/api'
 import toast from 'react-hot-toast'
 import {
-  PAYMENT_METHODS,
-  BILLING_TERMS
+  PAYMENT_METHODS
 } from '../constants/transactions'
 import { formatDateOnly } from '../utils/dateUtils'
-import { formatBillingTerm } from '../utils/billingHelpers'
+import { formatBillingTerm, getTermOptions } from '../utils/billingHelpers'
 
 // Helper function to format date for input field (YYYY-MM-DD)
 const formatDateForInput = (dateValue) => {
@@ -537,9 +536,9 @@ const EditTransactionModal = ({ transaction, onClose, onSuccess, isOpen }) => {
                     className={`select ${errors.term ? 'border-red-500' : ''}`}
                   >
                     <option value="">Select term</option>
-                    {BILLING_TERMS.map(term => (
-                      <option key={term.value} value={term.value}>
-                        {term.label}
+                    {getTermOptions().map(opt => (
+                      <option key={opt.value} value={String(opt.value)}>
+                        {opt.label}
                       </option>
                     ))}
                   </select>

@@ -52,28 +52,14 @@ export const TRANSACTION_STATUSES = [
 ];
 
 // Billing Terms
-export const BILLING_TERMS = [
-  { value: '1', label: 'Monthly (1 month)' },
-  { value: '3', label: 'Quarterly (3 months)' },
-  { value: '6', label: 'Semi-Annual (6 months)' },
-  { value: '12', label: 'Annual (12 months)' },
-  { value: '24', label: 'Biennial (2 years)' }
-];
+// DEPRECATED: Billing term options are now loaded from default_field_configurations table
+// Use getTermOptions() from utils/billingHelpers to get billing term configuration
+// Keeping for backward compatibility during migration
+export const BILLING_TERMS = [];
 
-/**
- * Format billing term number to human-readable string
- * @param {string|number} term - The term value (1, 3, 6, or 12)
- * @returns {string} Formatted term string
- */
+// DEPRECATED: Use formatBillingTerm from utils/billingHelpers instead
 export const formatBillingTerm = (term) => {
-  const termMap = {
-    '1': '1 month',
-    '3': '3 months',
-    '6': '6 months',
-    '12': '1 year',
-    '24': '2 years'
-  };
-  return termMap[String(term)] || term;
+  return String(term);
 };
 
 /**

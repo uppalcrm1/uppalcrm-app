@@ -4,7 +4,7 @@ import { X, CheckCircle2, User, Building2, CreditCard, Info, Search } from 'luci
 import { contactsAPI, usersAPI, productsAPI } from '../services/api';
 import LoadingSpinner from './LoadingSpinner';
 import api from '../services/api';
-import { BILLING_TERMS } from '../constants/transactions';
+import { getTermOptions } from '../utils/billingHelpers';
 
 const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
   console.log('🎯 ConvertLeadModal Version: 2.0 - Tab-Based Workflow - Build:', new Date().toISOString());
@@ -592,9 +592,9 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
                         onChange={(e) => setAccountForm({ ...accountForm, term: e.target.value })}
                         className="select h-9"
                       >
-                        {BILLING_TERMS.map(term => (
-                          <option key={term.value} value={term.value}>
-                            {term.label}
+                        {getTermOptions().map(opt => (
+                          <option key={opt.value} value={String(opt.value)}>
+                            {opt.label}
                           </option>
                         ))}
                       </select>
@@ -758,9 +758,9 @@ const ConvertLeadModal = ({ lead, onClose, onSubmit, isLoading }) => {
                         onChange={(e) => setTransactionForm({ ...transactionForm, term: e.target.value })}
                         className="select h-9"
                       >
-                        {BILLING_TERMS.map(term => (
-                          <option key={term.value} value={term.value}>
-                            {term.label}
+                        {getTermOptions().map(opt => (
+                          <option key={opt.value} value={String(opt.value)}>
+                            {opt.label}
                           </option>
                         ))}
                       </select>

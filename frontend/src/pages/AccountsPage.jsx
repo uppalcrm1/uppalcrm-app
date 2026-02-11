@@ -71,14 +71,6 @@ const STATUS_OPTIONS = [
   { value: 'on_hold', label: 'On Hold' }
 ]
 
-// Billing cycle options
-const BILLING_CYCLE_OPTIONS = [
-  { value: 'monthly', label: 'Monthly' },
-  { value: 'quarterly', label: 'Quarterly' },
-  { value: 'semi-annual', label: 'Semi-Annual' },
-  { value: 'annual', label: 'Annual' }
-]
-
 // Helper function to format dates (using timezone-safe utility)
 const formatDate = (dateString) => {
   return formatDateOnly(dateString, {

@@ -33,10 +33,8 @@ async function migrateNextRenewalDates() {
       SET next_renewal_date = (
         CASE
           WHEN is_trial = true AND trial_end_date IS NOT NULL THEN trial_end_date
-          WHEN billing_term_months = 1 THEN created_at + INTERVAL '1 month'
-          WHEN billing_term_months = 3 THEN created_at + INTERVAL '3 months'
-          WHEN billing_term_months = 6 THEN created_at + INTERVAL '6 months'
-          WHEN billing_term_months = 12 THEN created_at + INTERVAL '12 months'
+          WHEN billing_term_months IS NOT NULL AND billing_term_months > 0
+            THEN created_at + (billing_term_months * INTERVAL '1 month')
           ELSE created_at + INTERVAL '1 month'
         END
       )

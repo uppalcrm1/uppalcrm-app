@@ -65,7 +65,9 @@
       "Bash(git -C \"C:\\\\Users\\\\uppal\\\\uppal-crm-project\" log --all --pretty=\"%H %s\")",
       "Bash(git -C \"C:\\\\Users\\\\uppal\\\\uppal-crm-project\" log --all --reverse --pretty=\"%H %s\" -- \"database/contact-management-schema.sql\")",
       "Bash(git -C \"C:\\\\Users\\\\uppal\\\\uppal-crm-project\" log --all -p -- \"database/contact-management-schema.sql\")",
-      "Bash(git -C \"C:\\\\Users\\\\uppal\\\\uppal-crm-project\" log --all -p)"
+      "Bash(git -C \"C:\\\\Users\\\\uppal\\\\uppal-crm-project\" log --all -p)",
+      "Bash(curl:*)",
+      "Bash(npm test:*)"
     ],
     "deny": [],
     "ask": []

@@ -806,7 +806,12 @@ router.get('/', async (req, res) => {
           type: 'select',
           required: true,
           editable: true,
-          options: ['1', '3', '6', '12']
+          options: [
+            {"label": "1 Month",  "value": 1,  "is_default": true, "sort_order": 1},
+            {"label": "3 Months", "value": 3,  "is_default": true, "sort_order": 2},
+            {"label": "6 Months", "value": 6,  "is_default": true, "sort_order": 3},
+            {"label": "1 Year",   "value": 12, "is_default": true, "sort_order": 4}
+          ]
         },
         source: {
           label: 'Source',
@@ -1379,7 +1384,12 @@ router.put('/default/:fieldName', async (req, res) => {
           type: 'select',
           required: true,
           editable: true,
-          options: ['1', '3', '6', '12']
+          options: [
+            {"label": "1 Month",  "value": 1,  "is_default": true, "sort_order": 1},
+            {"label": "3 Months", "value": 3,  "is_default": true, "sort_order": 2},
+            {"label": "6 Months", "value": 6,  "is_default": true, "sort_order": 3},
+            {"label": "1 Year",   "value": 12, "is_default": true, "sort_order": 4}
+          ]
         },
         source: {
           label: 'Source',
@@ -1447,6 +1457,52 @@ router.put('/default/:fieldName', async (req, res) => {
     if (field_options && fieldDefault.type === 'select') {
       if (!Array.isArray(field_options) || field_options.length < 2 || field_options.length > 20) {
         return res.status(400).json({ error: 'Select fields must have 2-20 options' });
+      }
+    }
+
+    // VALIDATION CHECKPOINT 5: Term field specific validation
+    if (fieldName === 'term' && entity_type === 'transactions' && field_options) {
+      const errors = [];
+
+      // Get the system defaults to know which values are protected
+      const defaultValues = [1, 3, 6, 12];
+
+      // Check each option has required properties
+      for (let i = 0; i < field_options.length; i++) {
+        const opt = field_options[i];
+
+        if (!opt.label || opt.label.trim() === '') {
+          errors.push(`Option ${i + 1}: Display label is required`);
+        }
+
+        if (opt.value === undefined || opt.value === null || opt.value === '') {
+          errors.push(`Option ${i + 1}: Months value is required`);
+        } else if (!Number.isInteger(opt.value) || opt.value < 1 || opt.value > 60) {
+          errors.push(`Option ${i + 1}: Months value must be a whole number between 1 and 60`);
+        }
+      }
+
+      // Check for duplicate months values
+      const monthsValues = field_options.map(opt => opt.value).filter(v => Number.isInteger(v));
+      const uniqueValues = new Set(monthsValues);
+      if (uniqueValues.size !== monthsValues.length) {
+        errors.push('Each billing term must have a unique months value. Two terms cannot have the same number of months.');
+      }
+
+      // Check that all 4 system default values are still present
+      for (const defaultVal of defaultValues) {
+        const found = field_options.find(opt => opt.value === defaultVal && opt.is_default === true);
+        if (!found) {
+          const labelMap = {1: '1 Month', 3: '3 Months', 6: '6 Months', 12: '1 Year'};
+          errors.push(`System default "${labelMap[defaultVal]}" (${defaultVal} months) cannot be removed. You can only disable it.`);
+        }
+      }
+
+      if (errors.length > 0) {
+        return res.status(400).json({
+          error: 'Invalid billing term configuration',
+          details: errors
+        });
       }
     }
 
