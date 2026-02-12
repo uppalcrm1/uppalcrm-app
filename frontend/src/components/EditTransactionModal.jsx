@@ -46,7 +46,7 @@ const formatDateForInput = (dateValue) => {
   return new Date().toISOString().split('T')[0]
 }
 
-// Helper function to normalize term value to match BILLING_TERMS options
+// Helper function to normalize term value to match billing term options from getTermOptions()
 const normalizeTermValue = (termValue) => {
   if (!termValue) return ''
 

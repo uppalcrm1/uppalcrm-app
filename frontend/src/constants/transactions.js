@@ -52,9 +52,11 @@ export const TRANSACTION_STATUSES = [
 ];
 
 // Billing Terms
-// DEPRECATED: Billing term options are now loaded from default_field_configurations table
-// Use getTermOptions() from utils/billingHelpers to get billing term configuration
-// Keeping for backward compatibility during migration
+// DEPRECATED (Phase 1-3 billing term scalability, Feb 2026):
+// Billing term options are now dynamically configurable per organization.
+// Use getTermOptions() from utils/billingHelpers to get billing term configuration.
+// Use formatBillingTerm() from utils/billingHelpers to format display labels.
+// This empty array is kept only to prevent import errors in any remaining references.
 export const BILLING_TERMS = [];
 
 // DEPRECATED: Use formatBillingTerm from utils/billingHelpers instead
