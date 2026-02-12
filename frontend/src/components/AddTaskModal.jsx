@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { X, Calendar, AlertCircle } from 'lucide-react';
 
-const AddTaskModal = ({ leadId, task, onClose, api }) => {
+const AddTaskModal = ({ leadId, contactId, accountId, task, onClose, api }) => {
   const queryClient = useQueryClient();
   const isEditing = !!task;
 
@@ -10,7 +10,10 @@ const AddTaskModal = ({ leadId, task, onClose, api }) => {
     subject: task?.subject || '',
     description: task?.description || '',
     scheduled_at: task?.scheduled_at ? task.scheduled_at.slice(0, 16) : '',
-    priority: task?.priority || 'medium'
+    priority: task?.priority || 'medium',
+    lead_id: task?.lead_id || leadId || null,
+    contact_id: task?.contact_id || contactId || null,
+    account_id: task?.account_id || accountId || null
   });
 
   const [errors, setErrors] = useState({});
@@ -19,13 +22,30 @@ const AddTaskModal = ({ leadId, task, onClose, api }) => {
   const saveMutation = useMutation({
     mutationFn: async (data) => {
       if (isEditing) {
-        return api.updateTask(leadId, task.id, data);
+        // For editing, use the lead-based endpoint if leadId exists
+        if (formData.lead_id) {
+          return api.updateTask(formData.lead_id, task.id, data);
+        } else {
+          // If no lead_id, we would need a general update endpoint
+          // For now, throw error asking to use lead-based creation
+          throw new Error('Cannot edit task without a lead ID');
+        }
       } else {
-        return api.createTask(leadId, data);
+        // For creation, use lead-based endpoint if leadId provided
+        // Otherwise use general task creation endpoint
+        if (formData.lead_id) {
+          return api.createTask(formData.lead_id, data);
+        } else {
+          return api.taskAPI.createGeneralTask(data);
+        }
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['tasks', leadId]);
+      // Invalidate relevant queries
+      if (formData.lead_id) {
+        queryClient.invalidateQueries(['tasks', formData.lead_id]);
+      }
+      queryClient.invalidateQueries(['tasks']);
       queryClient.invalidateQueries(['leads']);
       onClose();
     },
@@ -45,6 +65,11 @@ const AddTaskModal = ({ leadId, task, onClose, api }) => {
       newErrors.scheduled_at = 'Due date is required';
     }
 
+    // Validate that at least one entity is selected
+    if (!formData.lead_id && !formData.contact_id && !formData.account_id) {
+      newErrors.entity = 'Task must be linked to at least one entity (Lead, Contact, or Account)';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -57,8 +82,13 @@ const AddTaskModal = ({ leadId, task, onClose, api }) => {
     }
 
     const submitData = {
-      ...formData,
-      scheduled_at: new Date(formData.scheduled_at).toISOString()
+      subject: formData.subject,
+      description: formData.description,
+      priority: formData.priority,
+      scheduled_at: new Date(formData.scheduled_at).toISOString(),
+      ...(formData.lead_id && { lead_id: formData.lead_id }),
+      ...(formData.contact_id && { contact_id: formData.contact_id }),
+      ...(formData.account_id && { account_id: formData.account_id })
     };
 
     saveMutation.mutate(submitData);
@@ -195,6 +225,76 @@ const AddTaskModal = ({ leadId, task, onClose, api }) => {
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Entity Selection */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-3">
+              Link to Entity *
+              <span className="text-xs font-normal text-gray-500 ml-1">(at least one required)</span>
+            </label>
+
+            {/* Selected Entities - Show as chips */}
+            {(formData.lead_id || formData.contact_id || formData.account_id) && (
+              <div className="mb-3 flex flex-wrap gap-2">
+                {formData.lead_id && (
+                  <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-50 border border-blue-200 rounded-full">
+                    <span className="text-sm text-blue-700">📌 Lead</span>
+                    <button
+                      type="button"
+                      onClick={() => handleChange('lead_id', null)}
+                      className="text-blue-500 hover:text-blue-700"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+                {formData.contact_id && (
+                  <div className="inline-flex items-center gap-2 px-3 py-1 bg-green-50 border border-green-200 rounded-full">
+                    <span className="text-sm text-green-700">👤 Contact</span>
+                    <button
+                      type="button"
+                      onClick={() => handleChange('contact_id', null)}
+                      className="text-green-500 hover:text-green-700"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+                {formData.account_id && (
+                  <div className="inline-flex items-center gap-2 px-3 py-1 bg-purple-50 border border-purple-200 rounded-full">
+                    <span className="text-sm text-purple-700">📊 Account</span>
+                    <button
+                      type="button"
+                      onClick={() => handleChange('account_id', null)}
+                      className="text-purple-500 hover:text-purple-700"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Entity Selection Info */}
+            <p className="text-xs text-gray-500 mb-2">
+              Select one or more entities to link this task to:
+            </p>
+
+            {/* Note: Entity selectors would require async data fetching */}
+            {/* For now, show a message that entity linking is set via props */}
+            {!leadId && !contactId && !accountId && (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700">
+                💡 Tip: Open this modal from a Lead, Contact, or Account detail page to auto-link the task.
+              </div>
+            )}
+
+            {errors.entity && (
+              <p className="text-sm text-red-600 mt-2 flex items-center gap-1">
+                <AlertCircle className="w-4 h-4" />
+                {errors.entity}
+              </p>
+            )}
           </div>
 
           {/* Error Message */}
