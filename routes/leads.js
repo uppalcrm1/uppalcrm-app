@@ -1753,11 +1753,13 @@ router.post('/', validateLeadDynamic(false), async (req, res) => {
 
         await db.query(`
           INSERT INTO lead_interactions (
-            lead_id, user_id, organization_id, interaction_type, subject, description,
-            scheduled_at, status, priority, created_by
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            lead_id, contact_id, account_id, user_id, organization_id, interaction_type, subject, description,
+            scheduled_at, status, priority, created_by, created_at, updated_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW())
         `, [
           createdLead.id,
+          null, // contact_id
+          null, // account_id
           taskUserId,
           req.organizationId,
           'task',
@@ -1772,6 +1774,7 @@ router.post('/', validateLeadDynamic(false), async (req, res) => {
         console.log('✅ Follow-up task created successfully');
       } catch (taskError) {
         console.error('⚠️ Failed to create follow-up task (non-blocking):', taskError.message);
+        console.error('Task creation error details:', taskError);
       }
     }
 
@@ -1902,11 +1905,13 @@ router.put('/:id',
 
             await db.query(`
               INSERT INTO lead_interactions (
-                lead_id, user_id, organization_id, interaction_type, subject, description,
-                scheduled_at, status, priority, created_by
-              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                lead_id, contact_id, account_id, user_id, organization_id, interaction_type, subject, description,
+                scheduled_at, status, priority, created_by, created_at, updated_at
+              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW())
             `, [
               req.params.id,
+              null, // contact_id
+              null, // account_id
               taskUserId,
               req.organizationId,
               'task',
@@ -1921,6 +1926,7 @@ router.put('/:id',
             console.log('✅ Follow-up task created successfully');
           } catch (taskError) {
             console.error('⚠️ Failed to create follow-up task (non-blocking):', taskError.message);
+            console.error('Task creation error details:', taskError);
           }
         } else {
           console.log('ℹ️ Next follow-up date unchanged, skipping task creation');
