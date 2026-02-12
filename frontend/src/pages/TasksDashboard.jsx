@@ -15,7 +15,7 @@ import {
   ListTodo,
   XCircle
 } from 'lucide-react'
-import { leadsAPI, taskAPI } from '../services/api'
+import { taskAPI } from '../services/api'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -37,13 +37,13 @@ const TasksDashboard = () => {
   // Fetch users for filter dropdowns
   const { data: usersData } = useQuery({
     queryKey: ['organizationUsers'],
-    queryFn: () => leadsAPI.getOrganizationUsers()
+    queryFn: () => taskAPI.getOrganizationUsers()
   })
 
   // Fetch all tasks
   const { data: tasksData, isLoading, error } = useQuery({
     queryKey: ['allTasks', assignedToFilter, leadOwnerFilter, statusFilter, priorityFilter, sortBy, sortOrder],
-    queryFn: () => leadsAPI.getAllTasks({
+    queryFn: () => taskAPI.getAllTasks({
       assigned_to: assignedToFilter !== 'all' ? assignedToFilter : undefined,
       lead_owner: leadOwnerFilter !== 'all' ? leadOwnerFilter : undefined,
       status: statusFilter !== 'all' ? statusFilter : undefined,
