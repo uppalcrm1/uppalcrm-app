@@ -408,4 +408,61 @@ router.post('/', async (req, res) => {
   }
 });
 
+/**
+ * PATCH /api/tasks/:taskId/complete
+ * Mark a task as completed (works for tasks without leads)
+ *
+ * Body:
+ * - outcome: string (optional - notes on task completion)
+ */
+router.patch('/:taskId/complete', async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const { outcome = '' } = req.body;
+    const organizationId = req.organizationId;
+    const userId = req.user?.id;
+
+    // Verify task exists and belongs to organization
+    const taskResult = await db.query(
+      'SELECT * FROM lead_interactions WHERE id = $1 AND organization_id = $2 AND interaction_type = $3',
+      [taskId, organizationId, 'task']
+    );
+
+    if (taskResult.rows.length === 0) {
+      return res.status(404).json({
+        error: 'Not found',
+        message: 'Task not found'
+      });
+    }
+
+    const task = taskResult.rows[0];
+
+    // Update task to completed
+    const updateResult = await db.query(
+      `UPDATE lead_interactions
+       SET status = $1, completed_at = NOW(), outcome = $2
+       WHERE id = $3
+       RETURNING *`,
+      ['completed', outcome, taskId]
+    );
+
+    console.log('✅ Task completed successfully:', {
+      taskId,
+      completedAt: updateResult.rows[0].completed_at
+    });
+
+    res.json({
+      message: 'Task completed successfully',
+      task: updateResult.rows[0]
+    });
+
+  } catch (error) {
+    console.error('❌ Error completing task:', error);
+    res.status(500).json({
+      error: 'Failed to complete task',
+      message: error.message
+    });
+  }
+});
+
 module.exports = router;

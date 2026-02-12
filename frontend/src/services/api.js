@@ -1139,6 +1139,12 @@ export const taskAPI = {
     return response.data
   },
 
+  // Complete a task (works for tasks without leads - contact/account only tasks)
+  completeGeneralTask: async (taskId, data = {}) => {
+    const response = await api.patch(`/tasks/${taskId}/complete`, data)
+    return response.data
+  },
+
   // Get all tasks with optional filtering and pagination
   getOrganizationTasks: async (params = {}) => {
     const response = await api.get('/tasks', { params })
