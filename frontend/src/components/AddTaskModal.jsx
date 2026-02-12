@@ -2,15 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { X, Calendar, AlertCircle } from 'lucide-react';
 
-const AddTaskModal = ({ leadId, contactId, accountId, task, onClose, api }) => {
+const AddTaskModal = ({ leadId, contactId, accountId, task, onClose, api, defaultValues }) => {
   const queryClient = useQueryClient();
   const isEditing = !!task;
 
   const [formData, setFormData] = useState({
-    subject: task?.subject || '',
-    description: task?.description || '',
-    scheduled_at: task?.scheduled_at ? task.scheduled_at.slice(0, 16) : '',
-    priority: task?.priority || 'medium',
+    subject: task?.subject || defaultValues?.subject || '',
+    description: task?.description || defaultValues?.description || '',
+    scheduled_at: task?.scheduled_at
+      ? task.scheduled_at.slice(0, 16)
+      : defaultValues?.scheduled_at
+        ? defaultValues.scheduled_at.slice(0, 16)
+        : '',
+    priority: task?.priority || defaultValues?.priority || 'medium',
     lead_id: task?.lead_id || leadId || null,
     contact_id: task?.contact_id || contactId || null,
     account_id: task?.account_id || accountId || null
