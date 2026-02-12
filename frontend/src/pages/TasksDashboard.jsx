@@ -56,7 +56,15 @@ const TasksDashboard = () => {
 
   // Complete task mutation
   const completeTaskMutation = useMutation({
-    mutationFn: ({ leadId, taskId }) => taskAPI.completeTask(leadId, taskId),
+    mutationFn: ({ leadId, taskId }) => {
+      // Use completeGeneralTask for tasks without leads (contact/account only)
+      // Use completeTask for lead-specific tasks
+      if (leadId) {
+        return taskAPI.completeTask(leadId, taskId)
+      } else {
+        return taskAPI.completeGeneralTask(taskId)
+      }
+    },
     onMutate: async ({ taskId }) => {
       // Cancel outgoing refetches
       await queryClient.cancelQueries({ queryKey: ['allTasks'] })
