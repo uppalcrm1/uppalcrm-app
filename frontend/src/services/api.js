@@ -1131,6 +1131,24 @@ export const taskAPI = {
   getAllTasks: async (params = {}) => {
     const response = await api.get('/tasks/all', { params })
     return response.data
+  },
+
+  // Create a general task (can link to lead, contact, account, or any combination)
+  createGeneralTask: async (data) => {
+    const response = await api.post('/tasks', data)
+    return response.data
+  },
+
+  // Get all tasks with optional filtering and pagination
+  getOrganizationTasks: async (params = {}) => {
+    const response = await api.get('/tasks', { params })
+    return response.data
+  },
+
+  // Get task statistics
+  getTaskStats: async () => {
+    const response = await api.get('/tasks/stats')
+    return response.data
   }
 }
 
