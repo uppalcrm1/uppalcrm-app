@@ -3,7 +3,6 @@ const { authenticateToken, validateOrganizationContext } = require('../middlewar
 const { validate, schemas } = require('../middleware/validation');
 const Joi = require('joi');
 const db = require('../database/connection');
-const { v4: uuidv4 } = require('uuid');
 
 const router = express.Router();
 
@@ -359,16 +358,14 @@ router.post('/', async (req, res) => {
     // Insert task
     const insertQuery = `
       INSERT INTO lead_interactions (
-        id, lead_id, contact_id, account_id, user_id, organization_id,
+        lead_id, contact_id, account_id, user_id, organization_id,
         interaction_type, subject, description, scheduled_at, status,
-        priority, created_by, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())
+        priority, created_by
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
       RETURNING *
     `;
 
-    const taskId = uuidv4();
     const result = await db.query(insertQuery, [
-      taskId,
       lead_id || null,
       contact_id || null,
       account_id || null,
@@ -384,7 +381,7 @@ router.post('/', async (req, res) => {
     ]);
 
     console.log('✅ Task created successfully:', {
-      taskId,
+      taskId: result.rows[0]?.id,
       lead_id: lead_id || 'none',
       contact_id: contact_id || 'none',
       account_id: account_id || 'none'
