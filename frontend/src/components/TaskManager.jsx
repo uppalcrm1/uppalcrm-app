@@ -80,6 +80,38 @@ const PriorityBadge = ({ priority }) => {
   );
 };
 
+// Entity badge component - shows which entities task is linked to
+const EntityBadges = ({ task }) => {
+  const entities = [];
+
+  if (task.lead_name) {
+    entities.push({ icon: '📌', label: task.lead_name, color: 'bg-blue-50 text-blue-700 border-blue-200' });
+  }
+  if (task.contact_name) {
+    entities.push({ icon: '👤', label: task.contact_name, color: 'bg-green-50 text-green-700 border-green-200' });
+  }
+  if (task.account_name) {
+    entities.push({ icon: '📊', label: task.account_name, color: 'bg-purple-50 text-purple-700 border-purple-200' });
+  }
+
+  if (entities.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap gap-2 mt-2">
+      {entities.map((entity, idx) => (
+        <span
+          key={idx}
+          className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium border ${entity.color}`}
+          title={`Linked to ${entity.label}`}
+        >
+          <span>{entity.icon}</span>
+          <span className="truncate max-w-[120px]">{entity.label}</span>
+        </span>
+      ))}
+    </div>
+  );
+};
+
 // Due date badge component
 const DueDateBadge = ({ scheduledAt }) => {
   if (!scheduledAt) return null;
@@ -174,12 +206,15 @@ const TaskCard = ({ task, onComplete, onEdit, onDelete }) => {
             )}
           </div>
 
+          {/* Entity links */}
+          <EntityBadges task={task} />
+
           {/* Description toggle */}
           {task.description && (
             <>
               <button
                 onClick={() => setShowDescription(!showDescription)}
-                className="text-sm text-blue-600 hover:text-blue-800 mb-1"
+                className="text-sm text-blue-600 hover:text-blue-800 mb-1 mt-2"
               >
                 {showDescription ? 'Hide details' : 'Show details'}
               </button>
@@ -212,11 +247,14 @@ const TaskCard = ({ task, onComplete, onEdit, onDelete }) => {
 };
 
 // Main TaskManager component
-const TaskManager = ({ leadId }) => {
+const TaskManager = ({ leadId, contactId, accountId }) => {
   const [filter, setFilter] = useState('all'); // all, pending, completed, overdue
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const queryClient = useQueryClient();
+
+  // Build a unique key for this task manager instance
+  const instanceKey = `${leadId || 'none'}-${contactId || 'none'}-${accountId || 'none'}`;
 
   // Fetch tasks
   const { data, isLoading, error } = useQuery({
@@ -375,6 +413,8 @@ const TaskManager = ({ leadId }) => {
       {showAddModal && (
         <AddTaskModal
           leadId={leadId}
+          contactId={contactId}
+          accountId={accountId}
           task={editingTask}
           onClose={() => {
             setShowAddModal(false);
