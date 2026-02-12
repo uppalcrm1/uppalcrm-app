@@ -12,7 +12,8 @@ import {
   AlertCircle,
   CheckCircle,
   Clock,
-  Filter
+  Filter,
+  ClipboardList
 } from 'lucide-react'
 import ColumnSelector from '../components/ColumnSelector'
 import InlineEditCell from '../components/InlineEditCell'
@@ -21,7 +22,8 @@ import AccountSelectorModal from '../components/AccountSelectorModal'
 import { AccountActions } from '../components/accounts/AccountActions'
 import CreateAccountModal from '../components/CreateAccountModal'
 import EditAccountModal from '../components/EditAccountModal'
-import { accountsAPI } from '../services/api'
+import AddTaskModal from '../components/AddTaskModal'
+import { accountsAPI, taskAPI } from '../services/api'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import toast from 'react-hot-toast'
 import { formatDateOnly } from '../utils/dateUtils'
@@ -110,6 +112,8 @@ const AccountsPage = () => {
   const [showEditModal, setShowEditModal] = useState(false)
   const [selectedAccountForEdit, setSelectedAccountForEdit] = useState(null)
   const [loadingEditAccount, setLoadingEditAccount] = useState(false)
+  const [showTaskModal, setShowTaskModal] = useState(false)
+  const [selectedAccountForTask, setSelectedAccountForTask] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const [showDeleted, setShowDeleted] = useState(false)
@@ -352,6 +356,18 @@ const AccountsPage = () => {
     }
   }
 
+  const getDaysUntilRenewal = (account) => {
+    // Use days_until_renewal if present, fall back to days_until_expiry
+    const days = account.days_until_renewal ?? account.days_until_expiry
+    if (days != null) return Math.round(days)
+    // Fallback: compute from next_renewal_date
+    if (account.next_renewal_date) {
+      const diff = new Date(account.next_renewal_date) - new Date()
+      return Math.round(diff / (1000 * 60 * 60 * 24))
+    }
+    return null
+  }
+
   const handleRecordPayment = (account) => {
     setSelectedAccount(account)
     setShowPaymentModal(true)
@@ -401,6 +417,49 @@ const AccountsPage = () => {
     setSelectedAccountForEdit(null)
     fetchAccounts() // Refresh the accounts list
     fetchStats() // Refresh organization-wide stats
+  }
+
+  const handleCreateTask = (account) => {
+    const contactFirstName = account.first_name || ''
+    const contactLastName = account.last_name || ''
+    const accountName = account.account_name || 'Unnamed Account'
+
+    // Priority calculation
+    const days = getDaysUntilRenewal(account)
+    let priority = 'low'
+    if (days != null) {
+      if (days <= 14) priority = 'high'
+      else if (days <= 30) priority = 'medium'
+    }
+
+    // Scheduled date: 7 days before renewal, or today if renewal is ≤ 7 days away
+    let scheduledAt = ''
+    if (account.next_renewal_date) {
+      const renewal = new Date(account.next_renewal_date)
+      const scheduled = new Date(renewal)
+      scheduled.setDate(scheduled.getDate() - 7)
+      const today = new Date()
+      const target = scheduled < today ? today : scheduled
+      // Format for datetime-local input (YYYY-MM-DDTHH:mm)
+      target.setMinutes(target.getMinutes() - target.getTimezoneOffset())
+      scheduledAt = target.toISOString().slice(0, 16)
+    }
+
+    // Format renewal date for description
+    const renewalDisplay = account.next_renewal_date
+      ? formatDate(account.next_renewal_date)
+      : 'unknown date'
+
+    setSelectedAccountForTask({
+      account,
+      defaultValues: {
+        subject: `Renewal: ${contactFirstName} ${contactLastName} - ${accountName}`.trim(),
+        description: `Account renewal due on ${renewalDisplay}.`,
+        priority,
+        scheduled_at: scheduledAt
+      }
+    })
+    setShowTaskModal(true)
   }
 
   return (
@@ -697,6 +756,21 @@ const AccountsPage = () => {
                       {visibleColumns.actions && (
                         <td className="py-4 px-4">
                           <div className="flex items-center gap-2">
+                            {/* Create Task button with optional active-task badge */}
+                            <div className="relative inline-flex">
+                              <button
+                                onClick={() => handleCreateTask(account)}
+                                className="p-2 text-gray-600 hover:text-orange-600 hover:bg-orange-50 rounded-lg"
+                                title="Create Renewal Task"
+                              >
+                                <ClipboardList size={16} />
+                              </button>
+                              {account.active_task_count > 0 && (
+                                <span className="absolute -top-1 -right-1 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white bg-orange-500 rounded-full">
+                                  {account.active_task_count}
+                                </span>
+                              )}
+                            </div>
                             <button
                               onClick={() => handleCreateTransaction(account)}
                               className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
@@ -856,6 +930,21 @@ const AccountsPage = () => {
         onClose={() => { setShowEditModal(false); setSelectedAccountForEdit(null) }}
         onSuccess={handleAccountUpdated}
       />
+
+      {/* Create Task Modal */}
+      {showTaskModal && selectedAccountForTask && (
+        <AddTaskModal
+          contactId={selectedAccountForTask.account.contact_id}
+          accountId={selectedAccountForTask.account.id}
+          onClose={() => {
+            setShowTaskModal(false)
+            setSelectedAccountForTask(null)
+            fetchAccounts() // refresh active_task_count badges
+          }}
+          api={taskAPI}
+          defaultValues={selectedAccountForTask.defaultValues}
+        />
+      )}
     </div>
   )
 }

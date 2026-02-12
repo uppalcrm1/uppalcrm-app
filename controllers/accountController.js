@@ -121,7 +121,9 @@ class AccountController {
           -- Total accounts for this contact
           (SELECT COUNT(*) FROM accounts WHERE contact_id = a.contact_id AND organization_id = a.organization_id) as total_accounts_for_contact,
           -- Transaction count for THIS account
-          (SELECT COUNT(*) FROM transactions WHERE account_id = a.id AND organization_id = a.organization_id) as transaction_count
+          (SELECT COUNT(*) FROM transactions WHERE account_id = a.id AND organization_id = a.organization_id) as transaction_count,
+          -- Active task count for this account
+          (SELECT COUNT(*) FROM lead_interactions WHERE account_id = a.id AND interaction_type = 'task' AND status != 'completed') as active_task_count
         FROM accounts a
         JOIN contacts c ON a.contact_id = c.id
         WHERE ${whereClause}
