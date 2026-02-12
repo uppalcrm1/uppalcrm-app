@@ -40,7 +40,7 @@ const AddTaskModal = ({ leadId, contactId, accountId, task, onClose, api, defaul
         if (formData.lead_id) {
           return api.createTask(formData.lead_id, data);
         } else {
-          return api.taskAPI.createGeneralTask(data);
+          return api.createGeneralTask(data);
         }
       }
     },
