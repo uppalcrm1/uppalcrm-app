@@ -1164,7 +1164,9 @@ router.post('/:leadId/tasks',
         description,
         scheduled_at,
         priority = 'medium',
-        assigned_to
+        assigned_to,
+        contact_id,
+        account_id
       } = req.body;
       const organizationId = req.organizationId;
       const userId = req.user.id;
@@ -1179,6 +1181,28 @@ router.post('/:leadId/tasks',
         return res.status(404).json({ error: 'Lead not found' });
       }
 
+      // Verify contact if provided
+      if (contact_id) {
+        const contactCheck = await db.query(
+          'SELECT id FROM contacts WHERE id = $1 AND organization_id = $2',
+          [contact_id, organizationId]
+        );
+        if (contactCheck.rows.length === 0) {
+          return res.status(404).json({ error: 'Contact not found' });
+        }
+      }
+
+      // Verify account if provided
+      if (account_id) {
+        const accountCheck = await db.query(
+          'SELECT id FROM accounts WHERE id = $1 AND organization_id = $2',
+          [account_id, organizationId]
+        );
+        if (accountCheck.rows.length === 0) {
+          return res.status(404).json({ error: 'Account not found' });
+        }
+      }
+
       // Use assigned_to from request, or fallback to lead owner, or current user
       const taskAssignee = assigned_to || leadCheck.rows[0].assigned_to || userId;
 
@@ -1189,20 +1213,22 @@ router.post('/:leadId/tasks',
 
       const insertQuery = `
         INSERT INTO lead_interactions (
-          lead_id, user_id, organization_id, interaction_type,
-          subject, description, scheduled_at, status, priority, created_by
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          lead_id, contact_id, account_id, user_id, organization_id, interaction_type,
+          subject, description, scheduled_at, status, priority, created_by, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW())
         RETURNING *
       `;
 
       const result = await db.query(insertQuery, [
         leadId,
+        contact_id || null,
+        account_id || null,
         taskAssignee,
         organizationId,
         'task',
         subject,
         description || '',
-        scheduled_at,
+        scheduled_at || null,
         status,
         priority,
         userId
@@ -1214,7 +1240,16 @@ router.post('/:leadId/tasks',
       });
     } catch (error) {
       console.error('Error creating task:', error);
-      res.status(500).json({ error: 'Failed to create task' });
+      console.error('Error details:', {
+        message: error.message,
+        code: error.code,
+        detail: error.detail
+      });
+      res.status(500).json({
+        error: 'Failed to create task',
+        message: error.message,
+        details: process.env.NODE_ENV === 'development' ? error.detail : undefined
+      });
     }
   }
 );

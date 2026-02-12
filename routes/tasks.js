@@ -3,6 +3,7 @@ const { authenticateToken, validateOrganizationContext } = require('../middlewar
 const { validate, schemas } = require('../middleware/validation');
 const Joi = require('joi');
 const db = require('../database/connection');
+const { v4: uuidv4 } = require('uuid');
 
 const router = express.Router();
 
@@ -130,6 +131,8 @@ router.get('/',
           li.subject,
           li.description,
           li.lead_id,
+          li.contact_id,
+          li.account_id,
           li.user_id as assigned_to,
           li.status,
           li.priority,
@@ -141,12 +144,18 @@ router.get('/',
           -- Lead information
           l.first_name || ' ' || l.last_name as lead_name,
           l.assigned_to as lead_owner_id,
+          -- Contact information
+          c.first_name || ' ' || c.last_name as contact_name,
+          -- Account information
+          a.name as account_name,
           -- Lead owner information
           lead_owner.first_name || ' ' || lead_owner.last_name as lead_owner_name,
           -- Assigned user information
           assigned_user.first_name || ' ' || assigned_user.last_name as assigned_to_name
         FROM lead_interactions li
         LEFT JOIN leads l ON li.lead_id = l.id
+        LEFT JOIN contacts c ON li.contact_id = c.id
+        LEFT JOIN accounts a ON li.account_id = a.id
         LEFT JOIN users lead_owner ON l.assigned_to = lead_owner.id
         LEFT JOIN users assigned_user ON li.user_id = assigned_user.id
         WHERE ${whereClause}
@@ -247,6 +256,157 @@ router.get('/stats', async (req, res) => {
     res.status(500).json({
       error: 'Failed to fetch task statistics',
       message: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/tasks
+ * Create a new task (can link to lead, contact, account, or none)
+ *
+ * Body:
+ * - subject: string (required)
+ * - description: string (optional)
+ * - lead_id: UUID (optional - for lead-specific tasks)
+ * - contact_id: UUID (optional - for contact-specific tasks)
+ * - account_id: UUID (optional - for account-specific tasks)
+ * - scheduled_at: timestamp (optional)
+ * - priority: 'low' | 'medium' | 'high' (default: 'medium')
+ * - assigned_to: UUID (optional - defaults to current user)
+ */
+router.post('/', async (req, res) => {
+  try {
+    const organizationId = req.organizationId;
+    const userId = req.user?.id;
+
+    const {
+      subject,
+      description = '',
+      lead_id,
+      contact_id,
+      account_id,
+      scheduled_at,
+      priority = 'medium',
+      assigned_to
+    } = req.body;
+
+    // Validate required fields
+    if (!subject || !subject.trim()) {
+      return res.status(400).json({
+        error: 'Validation error',
+        message: 'Task subject is required'
+      });
+    }
+
+    // At least one entity (lead, contact, or account) should be linked
+    if (!lead_id && !contact_id && !account_id) {
+      return res.status(400).json({
+        error: 'Validation error',
+        message: 'Task must be linked to at least one entity (lead, contact, or account)'
+      });
+    }
+
+    // Verify entities belong to the organization
+    const verificationChecks = [];
+
+    if (lead_id) {
+      verificationChecks.push(
+        db.query(
+          'SELECT id FROM leads WHERE id = $1 AND organization_id = $2',
+          [lead_id, organizationId]
+        )
+      );
+    }
+
+    if (contact_id) {
+      verificationChecks.push(
+        db.query(
+          'SELECT id FROM contacts WHERE id = $1 AND organization_id = $2',
+          [contact_id, organizationId]
+        )
+      );
+    }
+
+    if (account_id) {
+      verificationChecks.push(
+        db.query(
+          'SELECT id FROM accounts WHERE id = $1 AND organization_id = $2',
+          [account_id, organizationId]
+        )
+      );
+    }
+
+    if (verificationChecks.length > 0) {
+      const results = await Promise.all(verificationChecks);
+      const hasValidEntities = results.some(r => r.rows.length > 0);
+
+      if (!hasValidEntities) {
+        return res.status(404).json({
+          error: 'Not found',
+          message: 'One or more linked entities not found in this organization'
+        });
+      }
+    }
+
+    // Determine status based on scheduled date
+    const status = scheduled_at && new Date(scheduled_at) > new Date()
+      ? 'scheduled'
+      : 'pending';
+
+    // Task assignee defaults to current user
+    const taskAssignee = assigned_to || userId;
+
+    // Insert task
+    const insertQuery = `
+      INSERT INTO lead_interactions (
+        id, lead_id, contact_id, account_id, user_id, organization_id,
+        interaction_type, subject, description, scheduled_at, status,
+        priority, created_by, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())
+      RETURNING *
+    `;
+
+    const taskId = uuidv4();
+    const result = await db.query(insertQuery, [
+      taskId,
+      lead_id || null,
+      contact_id || null,
+      account_id || null,
+      taskAssignee,
+      organizationId,
+      'task',
+      subject.trim(),
+      description.trim(),
+      scheduled_at || null,
+      status,
+      priority,
+      userId
+    ]);
+
+    console.log('✅ Task created successfully:', {
+      taskId,
+      lead_id: lead_id || 'none',
+      contact_id: contact_id || 'none',
+      account_id: account_id || 'none'
+    });
+
+    res.status(201).json({
+      message: 'Task created successfully',
+      task: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error('❌ Error creating task:', error);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      detail: error.detail
+    });
+
+    res.status(500).json({
+      error: 'Failed to create task',
+      message: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.detail : undefined
     });
   }
 });
