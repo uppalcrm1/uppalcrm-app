@@ -146,7 +146,7 @@ router.get('/',
           -- Contact information
           c.first_name || ' ' || c.last_name as contact_name,
           -- Account information
-          a.name as account_name,
+          a.account_name,
           -- Lead owner information
           lead_owner.first_name || ' ' || lead_owner.last_name as lead_owner_name,
           -- Assigned user information
