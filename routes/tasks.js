@@ -31,6 +31,7 @@ const getAllTasksSchema = Joi.object({
   lead_owner: Joi.string().uuid().optional(),
   status: Joi.string().valid('scheduled', 'completed', 'cancelled', 'pending', 'overdue').optional(),
   priority: Joi.string().valid('low', 'medium', 'high').optional(),
+  type: Joi.string().valid('all', 'renewal', 'lead').default('all').optional(),
   sort_by: Joi.string().valid('scheduled_at', 'priority', 'created_at').default('scheduled_at'),
   sort_order: Joi.string().valid('asc', 'desc', 'ASC', 'DESC').default('asc'),
   limit: Joi.number().integer().min(1).max(1000).default(100),
@@ -47,6 +48,7 @@ router.get('/',
         lead_owner,
         status,
         priority,
+        type = 'all',
         sort_by = 'scheduled_at',
         sort_order = 'asc',
         limit = 100,
@@ -98,6 +100,13 @@ router.get('/',
         paramIndex++;
       }
 
+      // Filter by type
+      if (type === 'renewal') {
+        whereConditions.push(`li.account_id IS NOT NULL`);
+      } else if (type === 'lead') {
+        whereConditions.push(`li.lead_id IS NOT NULL`);
+      }
+
       const whereClause = whereConditions.join(' AND ');
 
       // Build ORDER BY clause
@@ -146,7 +155,7 @@ router.get('/',
           -- Contact information
           c.first_name || ' ' || c.last_name as contact_name,
           -- Account information
-          a.name as account_name,
+          a.account_name,
           -- Lead owner information
           lead_owner.first_name || ' ' || lead_owner.last_name as lead_owner_name,
           -- Assigned user information
@@ -173,7 +182,8 @@ router.get('/',
           COUNT(*) as total,
           COUNT(*) FILTER (WHERE status IN ('scheduled', 'pending')) as pending,
           COUNT(*) FILTER (WHERE status = 'completed') as completed,
-          COUNT(*) FILTER (WHERE status IN ('scheduled', 'pending') AND scheduled_at < NOW()) as overdue
+          COUNT(*) FILTER (WHERE status IN ('scheduled', 'pending') AND scheduled_at < NOW()) as overdue,
+          COUNT(*) FILTER (WHERE account_id IS NOT NULL AND status IN ('scheduled', 'pending')) as renewal_pending
         FROM lead_interactions
         WHERE interaction_type = 'task' AND organization_id = $1
       `;
@@ -183,7 +193,8 @@ router.get('/',
         total: parseInt(statsResult.rows[0].total) || 0,
         pending: parseInt(statsResult.rows[0].pending) || 0,
         completed: parseInt(statsResult.rows[0].completed) || 0,
-        overdue: parseInt(statsResult.rows[0].overdue) || 0
+        overdue: parseInt(statsResult.rows[0].overdue) || 0,
+        renewal_pending: parseInt(statsResult.rows[0].renewal_pending) || 0
       };
 
       console.log('✅ Tasks fetched successfully:', { count: result.rows.length, stats });
@@ -404,6 +415,63 @@ router.post('/', async (req, res) => {
       error: 'Failed to create task',
       message: error.message,
       details: process.env.NODE_ENV === 'development' ? error.detail : undefined
+    });
+  }
+});
+
+/**
+ * PATCH /api/tasks/:taskId/complete
+ * Mark a task as completed (works for tasks without leads)
+ *
+ * Body:
+ * - outcome: string (optional - notes on task completion)
+ */
+router.patch('/:taskId/complete', async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const { outcome = '' } = req.body;
+    const organizationId = req.organizationId;
+    const userId = req.user?.id;
+
+    // Verify task exists and belongs to organization
+    const taskResult = await db.query(
+      'SELECT * FROM lead_interactions WHERE id = $1 AND organization_id = $2 AND interaction_type = $3',
+      [taskId, organizationId, 'task']
+    );
+
+    if (taskResult.rows.length === 0) {
+      return res.status(404).json({
+        error: 'Not found',
+        message: 'Task not found'
+      });
+    }
+
+    const task = taskResult.rows[0];
+
+    // Update task to completed
+    const updateResult = await db.query(
+      `UPDATE lead_interactions
+       SET status = $1, completed_at = NOW(), outcome = $2
+       WHERE id = $3
+       RETURNING *`,
+      ['completed', outcome, taskId]
+    );
+
+    console.log('✅ Task completed successfully:', {
+      taskId,
+      completedAt: updateResult.rows[0].completed_at
+    });
+
+    res.json({
+      message: 'Task completed successfully',
+      task: updateResult.rows[0]
+    });
+
+  } catch (error) {
+    console.error('❌ Error completing task:', error);
+    res.status(500).json({
+      error: 'Failed to complete task',
+      message: error.message
     });
   }
 });
