@@ -29,6 +29,7 @@ const TasksDashboard = () => {
   const [leadOwnerFilter, setLeadOwnerFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('pending')
   const [priorityFilter, setPriorityFilter] = useState('all')
+  const [typeFilter, setTypeFilter] = useState('all')
 
   // Sort states
   const [sortBy, setSortBy] = useState('scheduled_at')
@@ -42,12 +43,13 @@ const TasksDashboard = () => {
 
   // Fetch all tasks
   const { data: tasksData, isLoading, error } = useQuery({
-    queryKey: ['allTasks', assignedToFilter, leadOwnerFilter, statusFilter, priorityFilter, sortBy, sortOrder],
+    queryKey: ['allTasks', assignedToFilter, leadOwnerFilter, statusFilter, priorityFilter, typeFilter, sortBy, sortOrder],
     queryFn: () => taskAPI.getAllTasks({
       assigned_to: assignedToFilter !== 'all' ? assignedToFilter : undefined,
       lead_owner: leadOwnerFilter !== 'all' ? leadOwnerFilter : undefined,
       status: statusFilter !== 'all' ? statusFilter : undefined,
       priority: priorityFilter !== 'all' ? priorityFilter : undefined,
+      type: typeFilter !== 'all' ? typeFilter : undefined,
       sort_by: sortBy,
       sort_order: sortOrder
     }),
@@ -107,22 +109,11 @@ const TasksDashboard = () => {
 
   // Calculate statistics
   const stats = useMemo(() => {
-    if (!tasksData?.tasks) {
-      return { total: 0, pending: 0, completed: 0, overdue: 0 }
+    if (!tasksData?.stats) {
+      return { total: 0, pending: 0, completed: 0, overdue: 0, renewal_pending: 0 }
     }
 
-    const now = new Date()
-    const tasks = tasksData.tasks
-
-    return {
-      total: tasks.length,
-      pending: tasks.filter(t => t.status === 'scheduled' || t.status === 'pending').length,
-      completed: tasks.filter(t => t.status === 'completed').length,
-      overdue: tasks.filter(t => {
-        const scheduledDate = new Date(t.scheduled_at)
-        return (t.status === 'scheduled' || t.status === 'pending') && scheduledDate < now
-      }).length
-    }
+    return tasksData.stats
   }, [tasksData])
 
   // Filter and sort tasks
@@ -257,7 +248,7 @@ const TasksDashboard = () => {
           </div>
 
           {/* Statistics Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mt-6">
             <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200">
               <div className="flex items-center justify-between">
                 <div>
@@ -297,6 +288,16 @@ const TasksDashboard = () => {
                 <AlertCircle className="text-red-500" size={32} />
               </div>
             </div>
+
+            <div className="bg-gradient-to-br from-teal-50 to-teal-100 rounded-lg p-4 border border-teal-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-teal-600">Renewal Tasks</p>
+                  <p className="text-3xl font-bold text-teal-900 mt-1">{stats.renewal_pending}</p>
+                </div>
+                <TrendingUp className="text-teal-500" size={32} />
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -333,6 +334,17 @@ const TasksDashboard = () => {
             <option value="high">High</option>
             <option value="medium">Medium</option>
             <option value="low">Low</option>
+          </select>
+
+          {/* Type Filter */}
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="all">All Tasks</option>
+            <option value="renewal">Renewal Tasks</option>
+            <option value="lead">Lead Tasks</option>
           </select>
 
           {/* Assigned To Filter */}
@@ -420,6 +432,12 @@ const TasksDashboard = () => {
                       Lead
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Contact
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Account
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Lead Owner
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -474,8 +492,27 @@ const TasksDashboard = () => {
                             {task.lead_name || 'View Lead'}
                           </button>
                         ) : (
-                          <span className="text-sm text-gray-400">No lead</span>
+                          <span className="text-sm text-gray-400">—</span>
                         )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {task.contact_id ? (
+                          <span className="text-sm font-medium text-gray-900">{task.contact_name}</span>
+                        ) : (
+                          <span className="text-sm text-gray-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          {task.account_id && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-teal-100 text-teal-700">
+                              Renewal
+                            </span>
+                          )}
+                          <span className="text-sm font-medium text-gray-900">
+                            {task.account_name || (task.account_id ? '—' : '—')}
+                          </span>
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-2">
