@@ -1129,7 +1129,7 @@ export const taskAPI = {
 
   // Get all tasks across organization with filters
   getAllTasks: async (params = {}) => {
-    const response = await api.get('/tasks/all', { params })
+    const response = await api.get('/tasks', { params })
     return response.data
   },
 
