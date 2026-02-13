@@ -31,6 +31,7 @@ const getAllTasksSchema = Joi.object({
   lead_owner: Joi.string().uuid().optional(),
   status: Joi.string().valid('scheduled', 'completed', 'cancelled', 'pending', 'overdue').optional(),
   priority: Joi.string().valid('low', 'medium', 'high').optional(),
+  type: Joi.string().valid('all', 'renewal', 'lead').default('all').optional(),
   sort_by: Joi.string().valid('scheduled_at', 'priority', 'created_at').default('scheduled_at'),
   sort_order: Joi.string().valid('asc', 'desc', 'ASC', 'DESC').default('asc'),
   limit: Joi.number().integer().min(1).max(1000).default(100),
@@ -47,6 +48,7 @@ router.get('/',
         lead_owner,
         status,
         priority,
+        type = 'all',
         sort_by = 'scheduled_at',
         sort_order = 'asc',
         limit = 100,
@@ -96,6 +98,13 @@ router.get('/',
         whereConditions.push(`li.priority = $${paramIndex}`);
         queryParams.push(priority);
         paramIndex++;
+      }
+
+      // Filter by type
+      if (type === 'renewal') {
+        whereConditions.push(`li.account_id IS NOT NULL`);
+      } else if (type === 'lead') {
+        whereConditions.push(`li.lead_id IS NOT NULL`);
       }
 
       const whereClause = whereConditions.join(' AND ');
@@ -173,7 +182,8 @@ router.get('/',
           COUNT(*) as total,
           COUNT(*) FILTER (WHERE status IN ('scheduled', 'pending')) as pending,
           COUNT(*) FILTER (WHERE status = 'completed') as completed,
-          COUNT(*) FILTER (WHERE status IN ('scheduled', 'pending') AND scheduled_at < NOW()) as overdue
+          COUNT(*) FILTER (WHERE status IN ('scheduled', 'pending') AND scheduled_at < NOW()) as overdue,
+          COUNT(*) FILTER (WHERE account_id IS NOT NULL AND status IN ('scheduled', 'pending')) as renewal_pending
         FROM lead_interactions
         WHERE interaction_type = 'task' AND organization_id = $1
       `;
@@ -183,7 +193,8 @@ router.get('/',
         total: parseInt(statsResult.rows[0].total) || 0,
         pending: parseInt(statsResult.rows[0].pending) || 0,
         completed: parseInt(statsResult.rows[0].completed) || 0,
-        overdue: parseInt(statsResult.rows[0].overdue) || 0
+        overdue: parseInt(statsResult.rows[0].overdue) || 0,
+        renewal_pending: parseInt(statsResult.rows[0].renewal_pending) || 0
       };
 
       console.log('✅ Tasks fetched successfully:', { count: result.rows.length, stats });
