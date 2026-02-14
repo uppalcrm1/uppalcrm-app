@@ -28,6 +28,7 @@ import {
   FileBarChart,
   LayoutGrid,
   Scan,
+  Zap,
 } from 'lucide-react'
 import LoadingSpinner from './LoadingSpinner'
 import IncomingCallNotification from './IncomingCallNotification'
@@ -265,6 +266,14 @@ const DashboardLayout = () => {
                           MAC Search Settings
                         </NavLink>
                       )}
+                      <NavLink
+                        to="/workflow-rules"
+                        className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                        onClick={() => setAdminMenuOpen(false)}
+                      >
+                        <Zap size={16} className="mr-3" />
+                        Workflow Rules
+                      </NavLink>
                       <div className="border-t border-gray-200 my-2"></div>
                       <NavLink
                         to="/settings"

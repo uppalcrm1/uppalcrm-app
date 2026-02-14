@@ -1400,4 +1400,57 @@ export const fieldMappingAPI = {
   }
 }
 
+// Workflow Rules API
+export const workflowAPI = {
+  // Get all workflow rules
+  getRules: async () => {
+    const response = await api.get('/workflow-rules')
+    return response.data
+  },
+
+  // Get a single workflow rule
+  getRule: async (id) => {
+    const response = await api.get(`/workflow-rules/${id}`)
+    return response.data
+  },
+
+  // Create a new workflow rule
+  createRule: async (data) => {
+    const response = await api.post('/workflow-rules', data)
+    return response.data
+  },
+
+  // Update a workflow rule
+  updateRule: async (id, data) => {
+    const response = await api.put(`/workflow-rules/${id}`, data)
+    return response.data
+  },
+
+  // Delete a workflow rule
+  deleteRule: async (id) => {
+    const response = await api.delete(`/workflow-rules/${id}`)
+    return response.data
+  },
+
+  // Execute a specific rule immediately
+  executeRule: async (id) => {
+    const response = await api.post(`/workflow-rules/${id}/execute`)
+    return response.data
+  },
+
+  // Execute all enabled rules immediately
+  executeAll: async () => {
+    const response = await api.post('/workflow-rules/execute-all')
+    return response.data
+  },
+
+  // Get execution logs for a rule
+  getRuleLogs: async (id, page = 1) => {
+    const response = await api.get(`/workflow-rules/${id}/logs`, {
+      params: { page, limit: 10 }
+    })
+    return response.data
+  }
+}
+
 export default api
