@@ -122,9 +122,9 @@ const WorkflowRuleModal = ({ rule, onClose, onSave }) => {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+        <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between flex-shrink-0">
           <h2 className="text-xl font-semibold text-gray-900">
             {isEditing ? 'Edit Workflow Rule' : 'Create Workflow Rule'}
           </h2>
@@ -137,7 +137,7 @@ const WorkflowRuleModal = ({ rule, onClose, onSave }) => {
         </div>
 
         {/* Tabs */}
-        <div className="border-b border-gray-200 px-6">
+        <div className="border-b border-gray-200 px-6 flex-shrink-0">
           <div className="flex gap-8">
             {[
               { id: 1, label: 'Basic Info' },
@@ -160,8 +160,9 @@ const WorkflowRuleModal = ({ rule, onClose, onSave }) => {
           </div>
         </div>
 
-        {/* Content */}
-        <form onSubmit={handleSubmit} className="p-6">
+        {/* Scrollable Content Area */}
+        <div className="flex-1 overflow-y-auto">
+          <form id="workflow-form" onSubmit={handleSubmit} className="p-6">
           {/* Tab 1: Basic Info */}
           {activeTab === 1 && (
             <div className="space-y-6">
@@ -394,34 +395,36 @@ const WorkflowRuleModal = ({ rule, onClose, onSave }) => {
               </div>
             </div>
           )}
+          </form>
+        </div>
 
-          {/* Form Actions */}
-          <div className="mt-8 flex gap-3 justify-end border-t border-gray-200 pt-6">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded-lg text-gray-900 hover:bg-gray-50 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={saveMutation.isPending}
-              className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {saveMutation.isPending ? (
-                <>
-                  <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
-                  Saving...
-                </>
-              ) : isEditing ? (
-                'Update Rule'
-              ) : (
-                'Create Rule'
-              )}
-            </button>
-          </div>
-        </form>
+        {/* Form Actions Footer */}
+        <div className="border-t border-gray-200 px-6 py-4 flex gap-3 justify-end flex-shrink-0 bg-white">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 border border-gray-300 rounded-lg text-gray-900 hover:bg-gray-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            form="workflow-form"
+            disabled={saveMutation.isPending}
+            className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {saveMutation.isPending ? (
+              <>
+                <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                Saving...
+              </>
+            ) : isEditing ? (
+              'Update Rule'
+            ) : (
+              'Create Rule'
+            )}
+          </button>
+        </div>
       </div>
     </div>
   )
