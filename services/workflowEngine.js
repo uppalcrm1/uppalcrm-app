@@ -135,7 +135,20 @@ async function executeRule(ruleId, organizationId, triggeredBy = null) {
     if (rule.entity_type === 'account' && rule.trigger_type === 'renewal_within_days') {
       const days = rule.trigger_conditions.days || 14;
 
-      // Build the query
+      // STEP 3a: Count total records matching trigger conditions (before duplicate prevention)
+      const countQuery = `
+        SELECT COUNT(*) as count
+        FROM accounts a
+        WHERE a.organization_id = $1
+          AND a.next_renewal_date IS NOT NULL
+          AND a.next_renewal_date >= CURRENT_DATE
+          AND a.next_renewal_date <= CURRENT_DATE + INTERVAL '1 day' * $2
+      `;
+
+      const countResult = await db.query(countQuery, [organizationId, days], organizationId);
+      summary.recordsEvaluated = parseInt(countResult.rows[0].count) || 0;
+
+      // STEP 3b: Get matching records with duplicate prevention applied
       let matchQuery = `
         SELECT
           a.id as account_id,
@@ -174,20 +187,23 @@ async function executeRule(ruleId, organizationId, triggeredBy = null) {
       );
 
       matchingRecords = matchResult.rows;
-      summary.recordsEvaluated = matchingRecords.length;
+    }
+
+    summary.recordsMatched = matchingRecords.length;
+
+    // Calculate records skipped due to duplicate prevention
+    if (rule.prevent_duplicates && summary.recordsEvaluated > 0) {
+      summary.recordsSkippedDuplicate = summary.recordsEvaluated - summary.recordsMatched;
     }
 
     // If no matching records, log and return
     if (matchingRecords.length === 0) {
-      summary.recordsMatched = 0;
       summary.tasksCreated = 0;
 
       // Log execution
       await logExecution(rule, summary, triggeredBy, 'manual');
       return summary;
     }
-
-    summary.recordsMatched = matchingRecords.length;
 
     // ========================================================================
     // STEP 4: Create tasks for each matching record
