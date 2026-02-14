@@ -686,6 +686,17 @@ const startServer = async () => {
       } catch (error) {
         console.error('❌ Failed to start billing jobs:', error.message);
       }
+
+      // Start workflow rules cron job (production & staging only)
+      if (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging') {
+        try {
+          const { startWorkflowCron } = require('./services/workflowCron');
+          startWorkflowCron();
+          console.log('✅ Workflow cron job started successfully');
+        } catch (error) {
+          console.error('❌ Failed to start workflow cron job:', error.message);
+        }
+      }
     });
   } catch (error) {
     console.error('Failed to start server:', error);
