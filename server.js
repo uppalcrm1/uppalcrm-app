@@ -128,6 +128,9 @@ const macSearchRoutes = require('./routes/macSearch');
 // Field Mapping System Routes
 const fieldMappingsRoutes = require('./routes/fieldMappings');
 
+// Workflow Rules Routes
+const workflowRulesRoutes = require('./routes/workflowRules');
+
 // Import scheduled jobs
 const scheduledJobs = require('./services/scheduledJobs');
 
@@ -378,6 +381,9 @@ app.use('/api/custom-fields', rateLimiters.general, customFieldsRoutes);
 
 // MAC Address Search routes
 app.use('/api/mac-search', rateLimiters.general, macSearchRoutes);
+
+// Workflow Rules routes
+app.use('/api/workflow-rules', rateLimiters.general, workflowRulesRoutes);
 
 // Product Field Customization routes
 app.use('/api/organizations/:organizationId/field-customization/product', rateLimiters.general, productFieldCustomizationRoutes);
