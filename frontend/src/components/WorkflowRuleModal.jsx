@@ -74,7 +74,21 @@ const WorkflowRuleModal = ({ rule, onClose, onSave }) => {
       return
     }
 
-    saveMutation.mutate(formData)
+    // Transform field names from snake_case to camelCase for API
+    const apiData = {
+      name: formData.name,
+      description: formData.description,
+      entityType: formData.entity_type,
+      triggerType: formData.trigger_type,
+      triggerConditions: formData.trigger_conditions,
+      actionType: formData.action_type,
+      actionConfig: formData.action_config,
+      runMode: formData.run_mode,
+      preventDuplicates: formData.prevent_duplicates,
+      isEnabled: formData.is_enabled
+    }
+
+    saveMutation.mutate(apiData)
   }
 
   const handleInputChange = (e) => {
