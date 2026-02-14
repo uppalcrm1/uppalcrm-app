@@ -74,18 +74,32 @@ const WorkflowRuleModal = ({ rule, onClose, onSave }) => {
       return
     }
 
+    // Ensure action_config has all required fields with proper types
+    const cleanActionConfig = {
+      subject_template: formData.action_config?.subject_template || '',
+      description_template: formData.action_config?.description_template || '',
+      priority: formData.action_config?.priority || 'medium',
+      days_before_due: parseInt(formData.action_config?.days_before_due) || 0,
+      assign_to: formData.action_config?.assign_to || null
+    }
+
+    // Ensure trigger_conditions has proper types
+    const cleanTriggerConditions = {
+      days: parseInt(formData.trigger_conditions?.days) || 14
+    }
+
     // Transform field names from snake_case to camelCase for API
     const apiData = {
       name: formData.name,
       description: formData.description,
       entityType: formData.entity_type,
       triggerType: formData.trigger_type,
-      triggerConditions: formData.trigger_conditions,
+      triggerConditions: cleanTriggerConditions,
       actionType: formData.action_type,
-      actionConfig: formData.action_config,
+      actionConfig: cleanActionConfig,
       runMode: formData.run_mode,
-      preventDuplicates: formData.prevent_duplicates,
-      isEnabled: formData.is_enabled
+      preventDuplicates: Boolean(formData.prevent_duplicates),
+      isEnabled: Boolean(formData.is_enabled)
     }
 
     saveMutation.mutate(apiData)
