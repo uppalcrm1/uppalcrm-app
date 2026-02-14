@@ -294,10 +294,10 @@ const WorkflowRuleModal = ({ rule, onClose, onSave }) => {
                   name="subject_template"
                   value={formData.action_config?.subject_template || ''}
                   onChange={handleActionConfigChange}
-                  placeholder="e.g., Renewal Reminder - {{account_name}}"
+                  placeholder="e.g., Renewal Reminder - {account_name}"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 />
-                <p className="text-xs text-gray-500 mt-2">Available variables: {{account_name}}, {{renewal_date}}, {{days_remaining}}</p>
+                <p className="text-xs text-gray-500 mt-2">Variables (use double braces): account_name, renewal_date, days_remaining</p>
               </div>
 
               <div>
@@ -308,11 +308,11 @@ const WorkflowRuleModal = ({ rule, onClose, onSave }) => {
                   name="description_template"
                   value={formData.action_config?.description_template || ''}
                   onChange={handleActionConfigChange}
-                  placeholder="e.g., Follow up on renewal for {{account_name}} - {{renewal_date}}"
+                  placeholder="e.g., Follow up on renewal for {account_name} - {renewal_date}"
                   rows="3"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 />
-                <p className="text-xs text-gray-500 mt-2">Available variables: {{account_name}}, {{renewal_date}}, {{days_remaining}}</p>
+                <p className="text-xs text-gray-500 mt-2">Variables (use double braces): account_name, renewal_date, days_remaining</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
