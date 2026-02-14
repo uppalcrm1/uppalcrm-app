@@ -56,6 +56,7 @@ import CustomDashboardsPage from './pages/CustomDashboardsPage'
 import DashboardBuilderPage from './pages/DashboardBuilderPage'
 import MacAddressSearch from './pages/MacAddressSearch'
 import MacSearchSettings from './components/admin/MacSearchSettings'
+import WorkflowRulesPage from './pages/WorkflowRulesPage'
 import { FeatureGateWithError } from './components/FeatureGate'
 
 const ProtectedRoute = ({ children }) => {
@@ -183,6 +184,9 @@ function App() {
             </FeatureGateWithError>
           }
         />
+
+        {/* Workflow Rules Route */}
+        <Route path="workflow-rules" element={<WorkflowRulesPage />} />
       </Route>
 
       {/* Catch all route */}

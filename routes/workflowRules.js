@@ -365,7 +365,7 @@ router.put('/:id', async (req, res) => {
     const query = `
       UPDATE workflow_rules
       SET ${updateFields.join(', ')}, updated_at = NOW()
-      WHERE id = $${paramIndex + 1} AND organization_id = $${paramIndex + 2}
+      WHERE id = $${paramIndex} AND organization_id = $${paramIndex + 1}
       RETURNING *
     `;
 
