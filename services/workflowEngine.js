@@ -209,7 +209,7 @@ async function executeRule(ruleId, organizationId, triggeredBy = null) {
     // STEP 4: Create tasks for each matching record
     // ========================================================================
     const actionConfig = rule.action_config || {};
-    let skippedCount = 0;
+    let taskCreationErrors = 0;
 
     for (const record of matchingRecords) {
       try {
@@ -312,11 +312,18 @@ async function executeRule(ruleId, organizationId, triggeredBy = null) {
         // Log error but continue processing other records
         console.error(`Error creating task for account ${record.account_id}:`, error.message);
         summary.status = 'partial_failure';
-        skippedCount++;
+        taskCreationErrors++;
+        summary.details.push({
+          account_id: record.account_id,
+          error: error.message,
+          status: 'failed'
+        });
       }
     }
 
-    summary.recordsSkippedDuplicate = skippedCount;
+    // NOTE: recordsSkippedDuplicate was already calculated on line 196
+    // DO NOT overwrite it with taskCreationErrors count
+    // Task creation errors are tracked separately in summary.details
 
     // ========================================================================
     // STEP 5: Log the execution
