@@ -23,14 +23,25 @@ const WorkflowRulesPage = () => {
   // Toggle rule enabled status
   const toggleRuleMutation = useMutation({
     mutationFn: async (rule) => {
-      return workflowAPI.updateRule(rule.id, {
-        ...rule,
-        is_enabled: !rule.is_enabled
-      })
+      // Transform camelCase to camelCase for API (API expects camelCase)
+      const updateData = {
+        name: rule.name,
+        description: rule.description,
+        entityType: rule.entityType,
+        triggerType: rule.triggerType,
+        triggerConditions: rule.triggerConditions,
+        actionType: rule.actionType,
+        actionConfig: rule.actionConfig,
+        runMode: rule.runMode,
+        preventDuplicates: rule.preventDuplicates,
+        isEnabled: !rule.isEnabled  // Toggle the value
+      }
+      return workflowAPI.updateRule(rule.id, updateData)
     },
-    onSuccess: () => {
+    onSuccess: (response, variables) => {
       queryClient.invalidateQueries({ queryKey: ['workflowRules'] })
-      toast.success('Rule updated')
+      const newState = !variables.isEnabled
+      toast.success(newState ? 'Rule enabled' : 'Rule disabled')
     },
     onError: (error) => {
       console.error('Error toggling rule:', error)
@@ -100,22 +111,23 @@ const WorkflowRulesPage = () => {
   }
 
   const formatTriggerInfo = (rule) => {
-    if (rule.trigger_type === 'renewal_within_days') {
-      const days = rule.trigger_conditions?.days || 0
+    if (rule.triggerType === 'renewal_within_days') {
+      const days = rule.triggerConditions?.days || 0
       return `Account renewal within ${days} days`
     }
-    return rule.trigger_type
+    return rule.triggerType
   }
 
   const formatActionInfo = (rule) => {
-    const actionConfig = rule.action_config || {}
-    const subject = actionConfig.subject_template || ''
-    return subject.substring(0, 50) + (subject.length > 50 ? '...' : '')
+    const actionConfig = rule.actionConfig || {}
+    const priority = actionConfig.priority || 'medium'
+    const daysBefore = actionConfig.days_before_due || 0
+    return `Create task • Priority: ${priority} • Due: ${daysBefore} days before`
   }
 
   const formatRunMode = (mode) => {
     const modeMap = {
-      'manual_and_auto': 'Manual & Auto',
+      'manual_and_auto': 'Manual + Auto',
       'manual_only': 'Manual Only',
       'auto_only': 'Auto Only'
     }
@@ -123,8 +135,8 @@ const WorkflowRulesPage = () => {
   }
 
   const formatLastRun = (rule) => {
-    if (!rule.last_run_at) return 'Never'
-    const date = new Date(rule.last_run_at)
+    if (!rule.lastRunAt) return 'Never'
+    const date = new Date(rule.lastRunAt)
     return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   }
 
@@ -208,8 +220,9 @@ const WorkflowRulesPage = () => {
                         onClick={() => toggleRuleMutation.mutate(rule)}
                         disabled={toggleRuleMutation.isPending}
                         className="p-1 hover:bg-gray-100 rounded transition-colors"
+                        title={rule.isEnabled ? 'Click to disable rule' : 'Click to enable rule'}
                       >
-                        {rule.is_enabled ? (
+                        {rule.isEnabled ? (
                           <ToggleRight className="h-6 w-6 text-green-600" />
                         ) : (
                           <ToggleLeft className="h-6 w-6 text-gray-400" />
@@ -235,7 +248,7 @@ const WorkflowRulesPage = () => {
                         <p className="text-gray-500 font-medium">Run Mode</p>
                         <p className="text-gray-900">
                           <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
-                            {formatRunMode(rule.run_mode)}
+                            {formatRunMode(rule.runMode)}
                           </span>
                         </p>
                       </div>
@@ -245,7 +258,7 @@ const WorkflowRulesPage = () => {
                       </div>
                     </div>
 
-                    {rule.prevent_duplicates && (
+                    {rule.preventDuplicates && (
                       <div className="text-xs bg-green-50 text-green-700 px-2 py-1 rounded inline-block">
                         ✓ Duplicate prevention enabled
                       </div>
