@@ -169,20 +169,20 @@ async function executeRule(ruleId, organizationId, triggeredBy = null) {
       `;
 
       // Add duplicate prevention if enabled
+      // Check for ANY pending task on the account, regardless of which rule created it
       if (rule.prevent_duplicates) {
         matchQuery += `
           AND NOT EXISTS (
             SELECT 1 FROM lead_interactions
             WHERE account_id = a.id
             AND interaction_type = 'task'
-            AND status IN ('pending', 'in_progress')
-            AND activity_metadata->>'rule_id' = $3
+            AND status NOT IN ('completed', 'cancelled')
           )
         `;
       }
 
       const matchResult = await db.query(matchQuery,
-        rule.prevent_duplicates ? [organizationId, days, ruleId] : [organizationId, days],
+        [organizationId, days],
         organizationId
       );
 
