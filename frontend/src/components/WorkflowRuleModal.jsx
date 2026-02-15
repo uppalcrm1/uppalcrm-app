@@ -13,20 +13,20 @@ const WorkflowRuleModal = ({ rule, onClose, onSave }) => {
   const [formData, setFormData] = useState({
     name: rule?.name || '',
     description: rule?.description || '',
-    entity_type: rule?.entity_type || 'account',
-    trigger_type: rule?.trigger_type || 'renewal_within_days',
-    trigger_conditions: rule?.trigger_conditions || { days: 14 },
-    action_type: rule?.action_type || 'create_task',
-    action_config: rule?.action_config || {
+    entity_type: rule?.entityType || 'account',
+    trigger_type: rule?.triggerType || 'renewal_within_days',
+    trigger_conditions: rule?.triggerConditions || { days: 14 },
+    action_type: rule?.actionType || 'create_task',
+    action_config: rule?.actionConfig || {
       subject_template: 'Renewal Reminder - {{account_name}}',
       description_template: 'Follow up on renewal for {{account_name}} - {{renewal_date}} ({{days_remaining}} days)',
       priority: 'high',
       days_before_due: 14,
       assign_to: null
     },
-    run_mode: rule?.run_mode || 'manual_and_auto',
-    prevent_duplicates: rule?.prevent_duplicates !== false,
-    is_enabled: rule?.is_enabled !== false
+    run_mode: rule?.runMode || 'manual_and_auto',
+    prevent_duplicates: rule?.preventDuplicates !== false,
+    is_enabled: rule?.isEnabled !== false
   })
 
   // Save mutation
