@@ -575,6 +575,8 @@ const leadSchemas = {
       assigned_to: Joi.string().guid({ version: 'uuidv4' }).allow('').optional(),
       source: Joi.string().allow('').optional(),
       search: Joi.string().min(1).max(100).allow('').optional(),
+      dateFrom: Joi.string().isoDate().allow('').optional(),
+      dateTo: Joi.string().isoDate().allow('').optional(),
       sort: Joi.string().valid('created_at', 'updated_at', 'first_name', 'last_name', 'company', 'value', 'status').default('created_at'),
       order: Joi.string().valid('asc', 'desc').default('desc')
     })
@@ -672,6 +674,8 @@ router.get('/',
         assigned_to,
         source,
         search,
+        dateFrom,
+        dateTo,
         sort = 'created_at',
         order = 'desc'
       } = req.query;
@@ -682,7 +686,9 @@ router.get('/',
         priority: priority && priority.trim() !== '' ? priority : undefined,
         assigned_to: assigned_to && assigned_to.trim() !== '' ? assigned_to : undefined,
         source: source && source.trim() !== '' ? source : undefined,
-        search: search && search.trim() !== '' ? search : undefined
+        search: search && search.trim() !== '' ? search : undefined,
+        dateFrom: dateFrom && dateFrom.trim() !== '' ? dateFrom : undefined,
+        dateTo: dateTo && dateTo.trim() !== '' ? dateTo : undefined
       };
 
       const offset = (page - 1) * limit;
@@ -731,6 +737,18 @@ router.get('/',
           company ILIKE $${paramIndex}
         )`);
         queryParams.push(`%${filters.search}%`);
+        paramIndex++;
+      }
+
+      if (filters.dateFrom) {
+        whereConditions.push(`created_at >= $${paramIndex}`);
+        queryParams.push(filters.dateFrom);
+        paramIndex++;
+      }
+
+      if (filters.dateTo) {
+        whereConditions.push(`created_at <= $${paramIndex}`);
+        queryParams.push(filters.dateTo);
         paramIndex++;
       }
 
