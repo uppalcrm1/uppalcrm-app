@@ -104,14 +104,14 @@ const schemas = {
 
   updateCurrentOrganization: {
     body: Joi.object({
-      name: Joi.string().min(2).max(255).optional(),
-      description: Joi.string().max(1000).optional(),
-      slug: Joi.string().max(255).optional(),
-      domain: Joi.string().domain().optional(),
+      name: Joi.string().min(2).max(255).allow('').optional(),
+      description: Joi.string().max(1000).allow('').optional(),
+      slug: Joi.string().max(255).allow('').optional(),
+      domain: Joi.string().domain().allow('').optional(),
       settings: Joi.object().optional(),
       subscription_plan: Joi.string().valid('starter', 'professional', 'business', 'enterprise').optional(),
       max_users: Joi.number().integer().min(1).max(10000).optional(),
-      timezone: Joi.string().max(50).optional()
+      timezone: Joi.string().max(50).allow('').optional()
     })
   },
 
