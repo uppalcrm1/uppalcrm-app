@@ -142,10 +142,29 @@ const SettingsPage = () => {
   )
 }
 
+// Timezone options grouped by region
+const TIMEZONE_OPTIONS = [
+  { label: 'Eastern Time', value: 'America/New_York' },
+  { label: 'Central Time', value: 'America/Chicago' },
+  { label: 'Mountain Time', value: 'America/Denver' },
+  { label: 'Pacific Time', value: 'America/Los_Angeles' },
+  { label: 'Eastern - Canada', value: 'America/Toronto' },
+  { label: 'Pacific - Canada', value: 'America/Vancouver' },
+  { label: 'GMT/BST', value: 'Europe/London' },
+  { label: 'Central European', value: 'Europe/Paris' },
+  { label: 'Central European', value: 'Europe/Berlin' },
+  { label: 'India', value: 'Asia/Kolkata' },
+  { label: 'Gulf', value: 'Asia/Dubai' },
+  { label: 'Singapore', value: 'Asia/Singapore' },
+  { label: 'Japan', value: 'Asia/Tokyo' },
+  { label: 'Eastern Australia', value: 'Australia/Sydney' },
+  { label: 'Eastern Australia', value: 'Australia/Melbourne' },
+]
+
 // Organization Settings Component
 const OrganizationSettings = ({ organization }) => {
   const { register, handleSubmit, formState: { errors } } = useForm({
-    defaultValues: organization || {}
+    defaultValues: organization || { timezone: 'America/New_York' }
   })
 
   const updateMutation = useMutation({
@@ -197,6 +216,22 @@ const OrganizationSettings = ({ organization }) => {
               className="input"
               placeholder="Tell us about your organization..."
             />
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Business Timezone</label>
+            <select
+              {...register('timezone')}
+              className="input"
+            >
+              <option value="">Select a timezone...</option>
+              {TIMEZONE_OPTIONS.map((tz) => (
+                <option key={tz.value} value={tz.value}>
+                  {tz.label} ({tz.value})
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-500 mt-1">Used for workflow rules, scheduled tasks, and reports</p>
           </div>
         </div>
 
