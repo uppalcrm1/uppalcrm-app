@@ -178,7 +178,13 @@ const OrganizationSettings = ({ organization }) => {
   })
 
   const onSubmit = (data) => {
-    updateMutation.mutate(data)
+    // Only send fields that we manage in the form
+    const updateData = {
+      name: data.name,
+      description: data.description,
+      timezone: data.timezone
+    }
+    updateMutation.mutate(updateData)
   }
 
   return (
