@@ -13,9 +13,10 @@ import {
   Calendar,
   TrendingUp,
   ListTodo,
-  XCircle
+  XCircle,
+  Zap
 } from 'lucide-react'
-import { taskAPI } from '../services/api'
+import { taskAPI, workflowAPI } from '../services/api'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -34,6 +35,9 @@ const TasksDashboard = () => {
   // Sort states
   const [sortBy, setSortBy] = useState('scheduled_at')
   const [sortOrder, setSortOrder] = useState('asc')
+
+  // Workflow rules state
+  const [isRunningRules, setIsRunningRules] = useState(false)
 
   // Fetch users for filter dropdowns
   const { data: usersData } = useQuery({
@@ -187,6 +191,42 @@ const TasksDashboard = () => {
     })
   }
 
+  const handleRunWorkflowRules = async () => {
+    const confirmed = window.confirm(
+      'This will run all enabled workflow rules and create tasks for matching accounts. Continue?'
+    )
+    if (!confirmed) return
+
+    setIsRunningRules(true)
+    try {
+      const result = await workflowAPI.executeAll()
+
+      if (result.overallStatus === 'no_rules') {
+        alert('No workflow rules configured. Go to the Workflow Rules page to create one.')
+        return
+      }
+
+      const created = result.totalTasksCreated || 0
+      const rules = result.rulesExecuted || 0
+      if (created > 0) {
+        alert(`Created ${created} task${created !== 1 ? 's' : ''} across ${rules} rule${rules !== 1 ? 's' : ''}.`)
+      } else {
+        alert('No new tasks needed. All matching accounts already have tasks.')
+      }
+
+      queryClient.invalidateQueries(['allTasks'])
+    } catch (err) {
+      const msg = err?.response?.data?.message || err.message || 'Unknown error'
+      if (msg.toLowerCase().includes('no') && msg.toLowerCase().includes('rule')) {
+        alert('No workflow rules configured. Go to the Workflow Rules page to create one.')
+      } else {
+        alert(`Failed to run workflow rules: ${msg}`)
+      }
+    } finally {
+      setIsRunningRules(false)
+    }
+  }
+
   const getPriorityColor = (priority) => {
     switch (priority) {
       case 'high':
@@ -245,6 +285,14 @@ const TasksDashboard = () => {
               </h1>
               <p className="text-gray-600 mt-1">Manage and track all tasks across your organization</p>
             </div>
+            <button
+              onClick={handleRunWorkflowRules}
+              disabled={isRunningRules}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <Zap size={16} />
+              {isRunningRules ? 'Running...' : 'Run Workflow Rules'}
+            </button>
           </div>
 
           {/* Statistics Cards */}
