@@ -2,9 +2,10 @@ const express = require('express');
 const Organization = require('../models/Organization');
 const Lead = require('../models/Lead');
 const Contact = require('../models/Contact');
-const { 
-  validateUpdateOrganization, 
-  validateUuidParam 
+const {
+  validateUpdateOrganization,
+  validateUpdateCurrentOrganization,
+  validateUuidParam
 } = require('../middleware/validation');
 const { 
   authenticateToken, 
@@ -104,7 +105,7 @@ router.get('/current/trial-info',
  */
 router.put('/current',
   requireAdmin,
-  validateUpdateOrganization,
+  validateUpdateCurrentOrganization,
   async (req, res) => {
     try {
       const organization = await Organization.update(req.organizationId, req.body);

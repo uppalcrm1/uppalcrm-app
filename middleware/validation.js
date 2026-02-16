@@ -102,6 +102,19 @@ const schemas = {
     })
   },
 
+  updateCurrentOrganization: {
+    body: Joi.object({
+      name: Joi.string().min(2).max(255).optional(),
+      description: Joi.string().max(1000).optional(),
+      slug: Joi.string().max(255).optional(),
+      domain: Joi.string().domain().optional(),
+      settings: Joi.object().optional(),
+      subscription_plan: Joi.string().valid('starter', 'professional', 'business', 'enterprise').optional(),
+      max_users: Joi.number().integer().min(1).max(10000).optional(),
+      timezone: Joi.string().max(50).optional()
+    })
+  },
+
   // User schemas
   createUser: {
     body: Joi.object({
@@ -191,6 +204,11 @@ const validateCreateOrganization = validate(schemas.createOrganization);
  * Validation middleware for updating organization
  */
 const validateUpdateOrganization = validate(schemas.updateOrganization);
+
+/**
+ * Validation middleware for updating current organization
+ */
+const validateUpdateCurrentOrganization = validate(schemas.updateCurrentOrganization);
 
 /**
  * Validation middleware for creating user
@@ -294,6 +312,7 @@ module.exports = {
   schemas,
   validateCreateOrganization,
   validateUpdateOrganization,
+  validateUpdateCurrentOrganization,
   validateCreateUser,
   validateUpdateUser,
   validateChangePassword,
