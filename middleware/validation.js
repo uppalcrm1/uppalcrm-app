@@ -94,7 +94,8 @@ const schemas = {
       domain: Joi.string().domain().optional(),
       settings: Joi.object().optional(),
       subscription_plan: Joi.string().valid('starter', 'professional', 'business', 'enterprise').optional(),
-      max_users: Joi.number().integer().min(1).max(10000).optional()
+      max_users: Joi.number().integer().min(1).max(10000).optional(),
+      timezone: Joi.string().max(50).optional()
     }),
     params: Joi.object({
       id: Joi.string().guid({ version: 'uuidv4' }).required()

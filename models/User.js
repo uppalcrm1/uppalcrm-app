@@ -449,38 +449,6 @@ class User {
   }
 
   /**
-   * Update user
-   * @param {string} id - User ID
-   * @param {Object} updates - Fields to update
-   * @param {string} organizationId - Organization ID
-   * @returns {User|null} Updated user
-   */
-  static async update(id, updates, organizationId) {
-    const allowedFields = ['first_name', 'last_name', 'role', 'permissions', 'email_verified'];
-    const updateFields = Object.keys(updates).filter(key => allowedFields.includes(key));
-    
-    if (updateFields.length === 0) {
-      throw new Error('No valid fields to update');
-    }
-
-    const setClause = updateFields.map((field, index) => `${field} = $${index + 3}`).join(', ');
-    const values = [id, organizationId, ...updateFields.map(field => updates[field])];
-
-    const result = await query(`
-      UPDATE users 
-      SET ${setClause}, updated_at = NOW()
-      WHERE id = $1 AND organization_id = $2 AND is_active = true
-      RETURNING *
-    `, values, organizationId);
-
-    if (result.rows.length === 0) {
-      return null;
-    }
-
-    return new User(result.rows[0]);
-  }
-
-  /**
    * Change user password
    * @param {string} id - User ID
    * @param {string} newPassword - New password

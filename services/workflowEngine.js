@@ -40,18 +40,23 @@ function formatDate(date) {
 }
 
 /**
- * Calculate days remaining until a date
- * @param {Date|string} date
+ * Calculate days remaining until a date, using the org's local timezone.
+ * Uses Intl.DateTimeFormat (Node.js built-in) which handles DST automatically.
+ * @param {Date|string} date - Target date
+ * @param {string} orgTimezone - IANA timezone string (e.g. 'America/New_York')
  * @returns {number} Days remaining (can be negative)
  */
-function daysUntil(date) {
+function daysUntil(date, orgTimezone = 'America/New_York') {
   if (!date) return 0;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  // Get "today" as a date string in the org's local timezone (handles DST)
+  const todayStr = new Intl.DateTimeFormat('en-CA', {
+    timeZone: orgTimezone,
+    year: 'numeric', month: '2-digit', day: '2-digit'
+  }).format(new Date()); // returns "YYYY-MM-DD"
+  const today = new Date(todayStr + 'T00:00:00');
   const targetDate = new Date(date);
   targetDate.setHours(0, 0, 0, 0);
-  const diff = targetDate - today;
-  return Math.ceil(diff / (1000 * 60 * 60 * 24));
+  return Math.ceil((targetDate - today) / (1000 * 60 * 60 * 24));
 }
 
 /**
@@ -128,6 +133,18 @@ async function executeRule(ruleId, organizationId, triggeredBy = null) {
     }
 
     // ========================================================================
+    // STEP 2b: Load org timezone for timezone-aware date calculations
+    // Org timezone is the "business timezone" — renewal dates and due dates
+    // should be evaluated relative to the business's local time, not UTC.
+    // ========================================================================
+    const orgTzResult = await db.query(
+      `SELECT COALESCE(timezone, 'America/New_York') as timezone FROM organizations WHERE id = $1`,
+      [organizationId],
+      organizationId
+    );
+    const orgTimezone = orgTzResult.rows[0]?.timezone || 'America/New_York';
+
+    // ========================================================================
     // STEP 3: Find matching records based on entity_type and trigger_type
     // ========================================================================
     let matchingRecords = [];
@@ -136,16 +153,17 @@ async function executeRule(ruleId, organizationId, triggeredBy = null) {
       const days = rule.trigger_conditions.days || 14;
 
       // STEP 3a: Count total records matching trigger conditions (before duplicate prevention)
+      // Uses org timezone via PostgreSQL AT TIME ZONE so "today" is the org's local date, not UTC.
       const countQuery = `
         SELECT COUNT(*) as count
         FROM accounts a
         WHERE a.organization_id = $1
           AND a.next_renewal_date IS NOT NULL
-          AND a.next_renewal_date >= CURRENT_DATE
-          AND a.next_renewal_date <= CURRENT_DATE + INTERVAL '1 day' * $2
+          AND a.next_renewal_date >= (CURRENT_TIMESTAMP AT TIME ZONE $3)::DATE
+          AND a.next_renewal_date <= (CURRENT_TIMESTAMP AT TIME ZONE $3)::DATE + INTERVAL '1 day' * $2
       `;
 
-      const countResult = await db.query(countQuery, [organizationId, days], organizationId);
+      const countResult = await db.query(countQuery, [organizationId, days, orgTimezone], organizationId);
       summary.recordsEvaluated = parseInt(countResult.rows[0].count) || 0;
 
       // STEP 3b: Get matching records with duplicate prevention applied
@@ -164,8 +182,8 @@ async function executeRule(ruleId, organizationId, triggeredBy = null) {
         JOIN contacts c ON a.contact_id = c.id
         WHERE a.organization_id = $1
           AND a.next_renewal_date IS NOT NULL
-          AND a.next_renewal_date >= CURRENT_DATE
-          AND a.next_renewal_date <= CURRENT_DATE + INTERVAL '1 day' * $2
+          AND a.next_renewal_date >= (CURRENT_TIMESTAMP AT TIME ZONE $3)::DATE
+          AND a.next_renewal_date <= (CURRENT_TIMESTAMP AT TIME ZONE $3)::DATE + INTERVAL '1 day' * $2
       `;
 
       // Add duplicate prevention if enabled
@@ -182,7 +200,7 @@ async function executeRule(ruleId, organizationId, triggeredBy = null) {
       }
 
       const matchResult = await db.query(matchQuery,
-        [organizationId, days],
+        [organizationId, days, orgTimezone],
         organizationId
       );
 
@@ -214,7 +232,7 @@ async function executeRule(ruleId, organizationId, triggeredBy = null) {
     for (const record of matchingRecords) {
       try {
         // Prepare template variables
-        const daysRemaining = daysUntil(record.next_renewal_date);
+        const daysRemaining = daysUntil(record.next_renewal_date, orgTimezone);
         const renewalDate = formatDate(record.next_renewal_date);
         const contactName = `${record.first_name || ''} ${record.last_name || ''}`.trim();
 
@@ -236,7 +254,9 @@ async function executeRule(ruleId, organizationId, triggeredBy = null) {
         // Determine priority
         const priority = determinePriority(actionConfig.priority, daysRemaining);
 
-        // Determine assigned user based on strategy
+        // Determine assigned user based on strategy.
+        // Falls back to account owner (record.assigned_to) when no strategy resolves a user —
+        // this covers cron runs (triggeredBy=null) and rules without assignee_strategy set.
         let assignedUserId = triggeredBy;
         if (actionConfig.assignee_strategy === 'account_owner' && record.assigned_to) {
           assignedUserId = record.assigned_to;
@@ -244,6 +264,10 @@ async function executeRule(ruleId, organizationId, triggeredBy = null) {
           assignedUserId = actionConfig.assignee_user_id;
         } else if (actionConfig.assignee_strategy === 'triggering_user') {
           assignedUserId = triggeredBy;
+        }
+        // Final fallback: use account owner if still unresolved (required — user_id is NOT NULL)
+        if (!assignedUserId && record.assigned_to) {
+          assignedUserId = record.assigned_to;
         }
 
         // Calculate scheduled_at

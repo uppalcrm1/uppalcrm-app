@@ -31,6 +31,8 @@ class Organization {
     this.notes = data.notes;
     // Feature flags
     this.mac_search_enabled = data.mac_search_enabled || false;
+    // Timezone — "business timezone" for workflow rules, cron, reports, and date calculations
+    this.timezone = data.timezone || 'America/New_York';
   }
 
   /**
@@ -174,7 +176,7 @@ class Organization {
    * @returns {Organization|null} Updated organization
    */
   static async update(id, updates) {
-    const allowedFields = ['name', 'domain', 'settings', 'subscription_plan', 'max_users', 'mac_search_enabled'];
+    const allowedFields = ['name', 'domain', 'settings', 'subscription_plan', 'max_users', 'mac_search_enabled', 'timezone'];
     const updateFields = Object.keys(updates).filter(key => allowedFields.includes(key));
 
     if (updateFields.length === 0) {
@@ -742,7 +744,9 @@ class Organization {
       monthly_cost: this.monthly_cost,
       notes: this.notes,
       // Feature flags
-      mac_search_enabled: this.mac_search_enabled
+      mac_search_enabled: this.mac_search_enabled,
+      // Timezone
+      timezone: this.timezone
     };
   }
 }
