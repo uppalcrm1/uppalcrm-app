@@ -115,5 +115,6 @@ export const formatBillingTermDisplay = (months, format = 'full') => {
   return formatBillingTerm(months);
 };
 
-// Auto-load term options on first import
-loadTermOptions();
+// Auto-load disabled - term options will be loaded on-demand when first needed
+// This prevents unnecessary 401 errors on unauthenticated pages like /super-admin/login
+// loadTermOptions();
