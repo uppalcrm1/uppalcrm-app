@@ -84,7 +84,7 @@ api.interceptors.response.use(
   (error) => {
     const message = error.response?.data?.message || error.message || 'An error occurred'
     const details = error.response?.data?.details
-    const isSupedAdminRoute = error.config?.url?.includes('/api/super-admin')
+    const isSuperAdminRoute = error.config?.url?.includes('/api/super-admin')
 
     // Log validation errors with full details for debugging
     if (error.response?.status === 400 && details) {
@@ -109,11 +109,11 @@ api.interceptors.response.use(
       }
     } else if (error.response?.status === 401) {
       // Don't interfere with super admin authentication
-      if (!isSupedAdminRoute) {
+      if (!isSuperAdminRoute) {
         // Don't show error or redirect for auth check requests (like /auth/me)
         // or if we're already on the login page
         const isAuthCheckRequest = error.config?.url?.includes('/auth/me')
-        const isOnLoginPage = window.location.pathname === '/login' || window.location.pathname === '/register'
+        const isOnLoginPage = window.location.pathname === '/login' || window.location.pathname === '/register' || window.location.pathname === '/super-admin/login'
         const isTwilioCall = error.config?.url?.includes('/twilio')
 
         // Don't clear auth or show errors if on login page or for Twilio calls when not authenticated
