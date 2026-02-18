@@ -1090,6 +1090,114 @@ router.get('/organizations/:id', platformAuth, async (req, res) => {
   }
 });
 
+// PUT /api/platform/organizations/:id/license - Update organization license (max_users)
+router.put('/organizations/:id/license', platformAuth, async (req, res) => {
+  const { query: dbQuery } = require('../database/connection');
+
+  try {
+    const organizationId = req.params.id;
+    const { max_users } = req.body;
+
+    console.log(`📋 Updating license for organization: ${organizationId}`);
+    console.log(`   Requested max_users: ${max_users}`);
+
+    // Validate max_users is provided
+    if (max_users === undefined || max_users === null) {
+      return res.status(400).json({
+        error: 'max_users is required'
+      });
+    }
+
+    // Validate max_users is a positive integer
+    const maxUsersNum = parseInt(max_users);
+    if (isNaN(maxUsersNum) || maxUsersNum <= 0) {
+      return res.status(400).json({
+        error: 'max_users must be a positive integer'
+      });
+    }
+
+    // Fetch organization with current active user count
+    console.log('Step 1: Fetching organization and active user count...');
+    const orgResult = await dbQuery(`
+      SELECT
+        o.*,
+        COUNT(DISTINCT CASE WHEN u.is_active = true THEN u.id END) as active_users
+      FROM organizations o
+      LEFT JOIN users u ON u.organization_id = o.id
+      WHERE o.id = $1
+      GROUP BY o.id
+    `, [organizationId]);
+
+    if (orgResult.rows.length === 0) {
+      console.log('❌ Organization not found');
+      return res.status(404).json({ error: 'Organization not found' });
+    }
+
+    const org = orgResult.rows[0];
+    const activeUserCount = parseInt(org.active_users) || 0;
+
+    console.log(`✅ Found organization: ${org.name}`);
+    console.log(`   Current active users: ${activeUserCount}`);
+    console.log(`   Current max_users: ${org.max_users}`);
+    console.log(`   Requested max_users: ${maxUsersNum}`);
+
+    // Validate max_users is >= current active user count
+    if (maxUsersNum < activeUserCount) {
+      console.log(`❌ Cannot set max_users below current active user count`);
+      return res.status(400).json({
+        error: `max_users cannot be less than current active user count (${activeUserCount})`,
+        current_active_users: activeUserCount,
+        requested_max_users: maxUsersNum
+      });
+    }
+
+    // Update max_users
+    console.log('Step 2: Updating max_users...');
+    const updateResult = await dbQuery(`
+      UPDATE organizations
+      SET max_users = $1, updated_at = NOW()
+      WHERE id = $2
+      RETURNING id, name, slug, max_users, updated_at
+    `, [maxUsersNum, organizationId]);
+
+    if (updateResult.rows.length === 0) {
+      throw new Error('Failed to update organization');
+    }
+
+    const updatedOrg = updateResult.rows[0];
+    console.log(`✅ Organization updated: max_users = ${maxUsersNum}`);
+
+    // Build response with active user count
+    const response = {
+      message: 'License updated successfully',
+      organization: {
+        id: updatedOrg.id,
+        name: updatedOrg.name,
+        slug: updatedOrg.slug,
+        max_users: updatedOrg.max_users,
+        current_active_users: activeUserCount,
+        updated_at: updatedOrg.updated_at
+      }
+    };
+
+    console.log('✅ Successfully updated license, sending response...');
+    res.json(response);
+
+  } catch (error) {
+    console.error('❌ Error updating organization license:', error);
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      code: error.code
+    });
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
+
 // DELETE /api/platform/organizations/:id - Delete organization
 router.delete('/organizations/:id', platformAuth, async (req, res) => {
   try {
