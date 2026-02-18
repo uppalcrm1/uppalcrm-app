@@ -536,43 +536,6 @@ export default function SuperAdminOrganizations() {
           <h1 className="text-2xl font-bold text-gray-900">Paid Organizations <span className="text-xs text-green-600 font-normal">(v1.0.2)</span></h1>
           <p className="text-gray-600">Organizations that have upgraded from trial to paid subscriptions</p>
         </div>
-
-        {stats.trial === 0 && stats.total > 0 && (
-          <button
-            onClick={async () => {
-              console.log('🔧 Fix Trial Data button clicked');
-              try {
-                console.log('📤 Calling fixTrialDataMutation...');
-                const result = await fixTrialDataMutation.mutateAsync();
-                console.log('✅ Success:', result);
-                console.log('📊 Before state:', result.before_state);
-                console.log('📊 Updated orgs:', result.organizations);
-                if (result.updated_count === 0) {
-                  toast.error('No organizations were updated. Check console for current state.');
-                } else {
-                  toast.success(`Updated ${result.updated_count} organizations!`);
-                }
-              } catch (error) {
-                console.error('❌ Error:', error);
-                toast.error(error.message || 'Failed to fix trial data');
-              }
-            }}
-            disabled={fixTrialDataMutation.isPending}
-            className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            {fixTrialDataMutation.isPending ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Fixing...
-              </>
-            ) : (
-              <>
-                <RefreshCw className="h-4 w-4" />
-                Fix Trial Data
-              </>
-            )}
-          </button>
-        )}
       </div>
 
       {/* Stats */}
