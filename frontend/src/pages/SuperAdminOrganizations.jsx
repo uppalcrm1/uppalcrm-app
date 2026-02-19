@@ -25,15 +25,12 @@ import {
   Eye
 } from 'lucide-react';
 
-function OrganizationCard({ organization }) {
+function OrganizationCard({ organization, onEditLicense }) {
   const navigate = useNavigate();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showConvertConfirm, setShowConvertConfirm] = useState(false);
   const [showLicenseModal, setShowLicenseModal] = useState(false);
-  const [licenseAction, setLicenseAction] = useState('add'); // 'add' or 'remove' or 'set'
-  const [licenseQuantity, setLicenseQuantity] = useState(1);
   const [newMaxUsers, setNewMaxUsers] = useState(organization.max_users || 5);
-  const [updatingLicenses, setUpdatingLicenses] = useState(false);
   const deleteMutation = useDeleteOrganization();
   const extendTrialMutation = useExtendTrial();
   const convertToPaidMutation = useConvertToPaid();
@@ -116,6 +113,17 @@ function OrganizationCard({ organization }) {
             title="View details"
           >
             <Eye className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => {
+              setNewMaxUsers(organization.max_users || 5);
+              setShowLicenseModal(true);
+              onEditLicense(organization);
+            }}
+            className="p-2 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+            title="Edit license"
+          >
+            <Users className="h-4 w-4" />
           </button>
           <button
             onClick={() => setShowDeleteConfirm(true)}
@@ -320,6 +328,107 @@ function OrganizationCard({ organization }) {
           </div>
         </div>
       )}
+
+      {/* License Edit Modal */}
+      {showLicenseModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                <Users className="h-5 w-5 text-blue-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Edit License</h3>
+                <p className="text-sm text-gray-500">Update max users for {organization.name}</p>
+              </div>
+            </div>
+
+            <div className="mb-6">
+              <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 mb-4">
+                <p className="text-xs text-gray-600">Organization</p>
+                <p className="text-sm font-semibold text-gray-900">{organization.name}</p>
+              </div>
+
+              <div className="bg-blue-50 p-3 rounded-lg border border-blue-200 mb-4">
+                <p className="text-xs text-blue-600">Current Active Users</p>
+                <p className="text-lg font-bold text-blue-900">{organization.active_user_count}</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Max Users
+                </label>
+                <input
+                  type="number"
+                  min={organization.active_user_count}
+                  value={newMaxUsers}
+                  onChange={(e) => setNewMaxUsers(parseInt(e.target.value) || 0)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+                {newMaxUsers < organization.active_user_count && (
+                  <p className="text-sm text-red-600 mt-2">
+                    ❌ Cannot set max users below current active users ({organization.active_user_count})
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={async () => {
+                  if (newMaxUsers < organization.active_user_count) {
+                    toast.error(`Max users cannot be less than ${organization.active_user_count} active users`);
+                    return;
+                  }
+                  try {
+                    const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3004/api';
+                    const token = localStorage.getItem('superAdminToken');
+
+                    const response = await fetch(
+                      `${API_BASE_URL}/platform/organizations/${organization.id}/license`,
+                      {
+                        method: 'PUT',
+                        headers: {
+                          'Authorization': `Bearer ${token}`,
+                          'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ max_users: newMaxUsers })
+                      }
+                    );
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                      toast.success(`License updated: ${newMaxUsers} users`);
+                      setShowLicenseModal(false);
+                      onEditLicense(null);
+                      window.dispatchEvent(new CustomEvent('refetch-organizations'));
+                    } else {
+                      toast.error(data.error || 'Failed to update license');
+                    }
+                  } catch (error) {
+                    console.error('Error updating license:', error);
+                    toast.error('Failed to update license');
+                  }
+                }}
+                disabled={newMaxUsers < organization.active_user_count}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+              >
+                Save License
+              </button>
+              <button
+                onClick={() => {
+                  setShowLicenseModal(false);
+                  onEditLicense(null);
+                }}
+                className="flex-1 px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -327,8 +436,16 @@ function OrganizationCard({ organization }) {
 export default function SuperAdminOrganizations() {
   const [searchTerm, setSearchTerm] = useState('');
   const [syncingLicenses, setSyncingLicenses] = useState(false);
+  const [selectedOrg, setSelectedOrg] = useState(null);
   const { data, isLoading, error, refetch } = useSuperAdminOrganizations();
   const fixTrialDataMutation = useFixTrialData();
+
+  // Listen for organization refetch requests from child components
+  React.useEffect(() => {
+    const handleRefetch = () => refetch();
+    window.addEventListener('refetch-organizations', handleRefetch);
+    return () => window.removeEventListener('refetch-organizations', handleRefetch);
+  }, [refetch]);
 
   const organizations = data?.organizations || [];
 
@@ -419,43 +536,6 @@ export default function SuperAdminOrganizations() {
           <h1 className="text-2xl font-bold text-gray-900">Paid Organizations <span className="text-xs text-green-600 font-normal">(v1.0.2)</span></h1>
           <p className="text-gray-600">Organizations that have upgraded from trial to paid subscriptions</p>
         </div>
-
-        {stats.trial === 0 && stats.total > 0 && (
-          <button
-            onClick={async () => {
-              console.log('🔧 Fix Trial Data button clicked');
-              try {
-                console.log('📤 Calling fixTrialDataMutation...');
-                const result = await fixTrialDataMutation.mutateAsync();
-                console.log('✅ Success:', result);
-                console.log('📊 Before state:', result.before_state);
-                console.log('📊 Updated orgs:', result.organizations);
-                if (result.updated_count === 0) {
-                  toast.error('No organizations were updated. Check console for current state.');
-                } else {
-                  toast.success(`Updated ${result.updated_count} organizations!`);
-                }
-              } catch (error) {
-                console.error('❌ Error:', error);
-                toast.error(error.message || 'Failed to fix trial data');
-              }
-            }}
-            disabled={fixTrialDataMutation.isPending}
-            className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            {fixTrialDataMutation.isPending ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Fixing...
-              </>
-            ) : (
-              <>
-                <RefreshCw className="h-4 w-4" />
-                Fix Trial Data
-              </>
-            )}
-          </button>
-        )}
       </div>
 
       {/* Stats */}
@@ -538,7 +618,7 @@ export default function SuperAdminOrganizations() {
           </div>
         ) : (
           filteredOrganizations.map(org => (
-            <OrganizationCard key={org.id} organization={org} />
+            <OrganizationCard key={org.id} organization={org} onEditLicense={setSelectedOrg} />
           ))
         )}
       </div>

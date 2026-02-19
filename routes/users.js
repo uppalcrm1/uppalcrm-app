@@ -198,33 +198,13 @@ router.post('/',
 
       console.log(`📊 User creation check: ${currentUserCount} active users, max_users: ${currentMaxUsers}`);
 
-      // Check if we need to auto-increment max_users
-      let newMaxUsers = currentMaxUsers;
+      // Enforce license limit - only Super Admin can increase max_users
       if (currentUserCount >= currentMaxUsers) {
-        // Auto-increment max_users to accommodate new user
-        newMaxUsers = currentUserCount + 1;
-
-        console.log(`🔄 Auto-incrementing max_users: ${currentMaxUsers} → ${newMaxUsers}`);
-
-        await dbQuery(`
-          UPDATE organizations
-          SET max_users = $1, updated_at = NOW()
-          WHERE id = $2
-        `, [newMaxUsers, req.organizationId]);
-
-        // Update subscription price if exists
-        const pricePerUser = 15;
-        const newMonthlyPrice = newMaxUsers * pricePerUser;
-
-        await dbQuery(`
-          UPDATE organization_subscriptions
-          SET updated_at = NOW()
-          WHERE organization_id = $1
-        `, [req.organizationId]).catch(() => {
-          console.log('No subscription record to update');
+        await dbQuery('ROLLBACK');
+        return res.status(403).json({
+          error: 'License limit reached',
+          message: `Your organization has reached its maximum of ${currentMaxUsers} users. Please contact your platform administrator to purchase additional licenses.`
         });
-
-        console.log(`💰 Updated pricing: ${currentMaxUsers} users × $${pricePerUser} = $${currentMaxUsers * pricePerUser} → ${newMaxUsers} users × $${pricePerUser} = $${newMonthlyPrice}`);
       }
 
       // Generate temporary password if not provided (for invitation-based creation)
@@ -316,7 +296,7 @@ router.post('/',
           max_users: finalMaxUsers,
           current_users: actualUsers,
           remaining_seats: finalMaxUsers - actualUsers,
-          auto_incremented: newMaxUsers > currentMaxUsers
+          auto_incremented: false
         }
       });
     } catch (error) {
