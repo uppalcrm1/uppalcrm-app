@@ -18,6 +18,13 @@ const UserManagementSystem = () => {
   const [showBulkActions, setShowBulkActions] = useState(false);
   const [showResetPassword, setShowResetPassword] = useState(null);
   const [editingUser, setEditingUser] = useState(null);
+  const [editUserData, setEditUserData] = useState({
+    first_name: '',
+    last_name: '',
+    email: '',
+    role: ''
+  });
+  const [editUserEmailError, setEditUserEmailError] = useState('');
   const [showAuditLog, setShowAuditLog] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -174,6 +181,53 @@ const UserManagementSystem = () => {
 
     // Proceed with user creation
     createUserMutation.mutate(newUser);
+  };
+
+  const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const openEditUserModal = (user) => {
+    setEditingUser(user.id);
+    setEditUserData({
+      first_name: user.first_name || '',
+      last_name: user.last_name || '',
+      email: user.email || '',
+      role: user.role || 'user'
+    });
+    setEditUserEmailError('');
+  };
+
+  const handleEditUserChange = (field, value) => {
+    setEditUserData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+    if (field === 'email') {
+      setEditUserEmailError('');
+    }
+  };
+
+  const handleSaveEditUser = () => {
+    if (!editUserData.email) {
+      setEditUserEmailError('Email is required');
+      return;
+    }
+
+    if (!validateEmail(editUserData.email)) {
+      setEditUserEmailError('Please enter a valid email address');
+      return;
+    }
+
+    updateUserMutation.mutate({
+      id: editingUser,
+      first_name: editUserData.first_name,
+      last_name: editUserData.last_name,
+      email: editUserData.email,
+      role: editUserData.role
+    });
+    setEditingUser(null);
   };
 
   const handleUpgradeAndAddUser = async () => {
@@ -652,44 +706,19 @@ const UserManagementSystem = () => {
                       </div>
                     </td>
                     <td className="p-4">
-                      {editingUser === user.id ? (
-                        <div className="flex items-center gap-2">
-                          <select
-                            value={user.role}
-                            onChange={(e) => handleUpdateUser(user.id, { role: e.target.value })}
-                            className="border rounded px-2 py-1 text-sm"
-                          >
-                            <option value="user">Standard User</option>
-                            <option value="admin">Administrator</option>
-                          </select>
-                          <button
-                            onClick={() => setEditingUser(null)}
-                            className="text-gray-500 hover:text-gray-700"
-                          >
-                            <X size={16} />
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            user.role === 'admin' 
-                              ? 'bg-purple-100 text-purple-800' 
-                              : 'bg-blue-100 text-blue-800'
-                          }`}>
-                            {user.role === 'admin' ? (
-                              <><Shield size={12} className="inline mr-1" />Administrator</>
-                            ) : (
-                              'Standard User'
-                            )}
-                          </span>
-                          <button
-                            onClick={() => setEditingUser(user.id)}
-                            className="text-gray-400 hover:text-blue-600"
-                          >
-                            <Edit size={14} />
-                          </button>
-                        </div>
-                      )}
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          user.role === 'admin'
+                            ? 'bg-purple-100 text-purple-800'
+                            : 'bg-blue-100 text-blue-800'
+                        }`}>
+                          {user.role === 'admin' ? (
+                            <><Shield size={12} className="inline mr-1" />Administrator</>
+                          ) : (
+                            'Standard User'
+                          )}
+                        </span>
+                      </div>
                     </td>
                     <td className="p-4">
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(user.status)}`}>
@@ -709,6 +738,13 @@ const UserManagementSystem = () => {
                     <td className="p-4">
                       <div className="flex items-center gap-2">
                         <button
+                          onClick={() => openEditUserModal(user)}
+                          className="text-blue-600 hover:text-blue-800 p-1"
+                          title="Edit User"
+                        >
+                          <Edit size={16} />
+                        </button>
+                        <button
                           onClick={() => setShowResetPassword(user.id)}
                           className="text-blue-600 hover:text-blue-800 p-1"
                           title="Reset Password"
@@ -716,8 +752,8 @@ const UserManagementSystem = () => {
                           <Key size={16} />
                         </button>
                         <button
-                          onClick={() => handleUpdateUser(user.id, { 
-                            status: user.status === 'active' ? 'inactive' : 'active' 
+                          onClick={() => handleUpdateUser(user.id, {
+                            status: user.status === 'active' ? 'inactive' : 'active'
                           })}
                           className={`p-1 ${user.status === 'active' ? 'text-red-600 hover:text-red-800' : 'text-green-600 hover:text-green-800'}`}
                           title={user.status === 'active' ? 'Deactivate User' : 'Activate User'}
@@ -942,6 +978,129 @@ const UserManagementSystem = () => {
                       Add License & Create User
                     </>
                   )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit User Modal */}
+        {editingUser && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-xl max-w-md w-full p-6">
+              <h3 className="text-xl font-semibold mb-1">Edit User</h3>
+              <p className="text-gray-600 text-sm mb-6">
+                Update details for {editUserData.first_name} {editUserData.last_name}
+              </p>
+
+              <div className="space-y-4 mb-6">
+                {/* First Name */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    First Name
+                  </label>
+                  <input
+                    type="text"
+                    value={editUserData.first_name}
+                    onChange={(e) => handleEditUserChange('first_name', e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Enter first name"
+                  />
+                </div>
+
+                {/* Last Name */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Last Name
+                  </label>
+                  <input
+                    type="text"
+                    value={editUserData.last_name}
+                    onChange={(e) => handleEditUserChange('last_name', e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Enter last name"
+                  />
+                </div>
+
+                {/* Email */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Email Address
+                  </label>
+                  <input
+                    type="email"
+                    value={editUserData.email}
+                    onChange={(e) => handleEditUserChange('email', e.target.value)}
+                    className={`w-full border rounded-lg px-3 py-2 focus:ring-2 focus:border-blue-500 ${
+                      editUserEmailError
+                        ? 'border-red-500 focus:ring-red-500'
+                        : 'border-gray-300 focus:ring-blue-500'
+                    }`}
+                    placeholder="Enter email address"
+                  />
+                  {editUserEmailError && (
+                    <p className="text-red-600 text-sm mt-1">{editUserEmailError}</p>
+                  )}
+                </div>
+
+                {/* Role Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                    Role
+                  </label>
+                  <div className="space-y-3">
+                    <label className="flex items-start gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50" style={{ borderColor: editUserData.role === 'user' ? '#3b82f6' : '#d1d5db' }}>
+                      <input
+                        type="radio"
+                        name="role"
+                        value="user"
+                        checked={editUserData.role === 'user'}
+                        onChange={(e) => handleEditUserChange('role', e.target.value)}
+                        className="mt-1 text-blue-600 focus:ring-blue-500"
+                      />
+                      <div className="flex-1">
+                        <p className="font-medium text-gray-900">Standard User</p>
+                        <p className="text-xs text-gray-600">Can access and manage accounts, leads, and interactions</p>
+                      </div>
+                    </label>
+
+                    <label className="flex items-start gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50" style={{ borderColor: editUserData.role === 'admin' ? '#3b82f6' : '#d1d5db' }}>
+                      <input
+                        type="radio"
+                        name="role"
+                        value="admin"
+                        checked={editUserData.role === 'admin'}
+                        onChange={(e) => handleEditUserChange('role', e.target.value)}
+                        className="mt-1 text-blue-600 focus:ring-blue-500"
+                      />
+                      <div className="flex-1">
+                        <p className="font-medium text-gray-900">Administrator</p>
+                        <p className="text-xs text-gray-600">Full access to all features and user management</p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setEditingUser(null)}
+                  className="flex-1 border border-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-50"
+                  disabled={updateUserMutation.isPending}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveEditUser}
+                  disabled={updateUserMutation.isPending}
+                  className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {updateUserMutation.isPending ? (
+                    <RefreshCw size={16} className="animate-spin" />
+                  ) : (
+                    <Check size={16} />
+                  )}
+                  {updateUserMutation.isPending ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
             </div>
