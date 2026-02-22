@@ -177,68 +177,64 @@ router.post('/',
   validateCreateUser,
   // checkLicenseLimit,
   async (req, res) => {
-    const { query: dbQuery } = require('../database/connection');
+    const { query: dbQuery, transaction } = require('../database/connection');
     const crypto = require('crypto');
 
     try {
-      // Start transaction
-      await dbQuery('BEGIN');
+      // Use proper transaction handling
+      const { user, finalMaxUsers, actualUsers, userData } = await transaction(async (client) => {
+        // Get current org state
+        const orgResult = await client.query(`
+          SELECT id, max_users,
+            (SELECT COUNT(*) FROM users WHERE organization_id = $1 AND is_active = true) as current_user_count
+          FROM organizations
+          WHERE id = $1
+        `, [req.organizationId]);
 
-      // Get current org state
-      const orgResult = await dbQuery(`
-        SELECT id, max_users,
-          (SELECT COUNT(*) FROM users WHERE organization_id = $1 AND is_active = true) as current_user_count
-        FROM organizations
-        WHERE id = $1
-      `, [req.organizationId]);
+        const org = orgResult.rows[0];
+        const currentUserCount = parseInt(org.current_user_count);
+        const currentMaxUsers = org.max_users;
 
-      const org = orgResult.rows[0];
-      const currentUserCount = parseInt(org.current_user_count);
-      const currentMaxUsers = org.max_users;
+        console.log(`📊 User creation check: ${currentUserCount} active users, max_users: ${currentMaxUsers}`);
 
-      console.log(`📊 User creation check: ${currentUserCount} active users, max_users: ${currentMaxUsers}`);
+        // Enforce license limit - only Super Admin can increase max_users
+        if (currentUserCount >= currentMaxUsers) {
+          throw new Error(`License limit exceeded: ${currentUserCount} users already at max of ${currentMaxUsers}`);
+        }
 
-      // Enforce license limit - only Super Admin can increase max_users
-      if (currentUserCount >= currentMaxUsers) {
-        await dbQuery('ROLLBACK');
-        return res.status(403).json({
-          error: 'License limit reached',
-          message: `Your organization has reached its maximum of ${currentMaxUsers} users. Please contact your platform administrator to purchase additional licenses.`
-        });
-      }
+        // Generate temporary password if not provided (for invitation-based creation)
+        const userData = { ...req.body };
+        if (!userData.password) {
+          // Generate a secure random password
+          userData.password = crypto.randomBytes(16).toString('hex');
+          userData.is_first_login = true;
+          console.log('🔑 Generated temporary password for invitation-based user creation');
+        }
 
-      // Generate temporary password if not provided (for invitation-based creation)
-      const userData = { ...req.body };
-      if (!userData.password) {
-        // Generate a secure random password
-        userData.password = crypto.randomBytes(16).toString('hex');
-        userData.is_first_login = true;
-        console.log('🔑 Generated temporary password for invitation-based user creation');
-      }
+        // Create the user
+        const user = await User.create(userData, req.organizationId, req.user.id);
 
-      // Create the user
-      const user = await User.create(userData, req.organizationId, req.user.id);
+        // Verify final state
+        const verifyResult = await client.query(`
+          SELECT
+            max_users,
+            (SELECT COUNT(*) FROM users WHERE organization_id = $1 AND is_active = true) as actual_user_count
+          FROM organizations
+          WHERE id = $1
+        `, [req.organizationId]);
 
-      // Verify final state
-      const verifyResult = await dbQuery(`
-        SELECT
-          max_users,
-          (SELECT COUNT(*) FROM users WHERE organization_id = $1 AND is_active = true) as actual_user_count
-        FROM organizations
-        WHERE id = $1
-      `, [req.organizationId]);
+        const finalState = verifyResult.rows[0];
+        const actualUsers = parseInt(finalState.actual_user_count);
+        const finalMaxUsers = finalState.max_users;
 
-      const finalState = verifyResult.rows[0];
-      const actualUsers = parseInt(finalState.actual_user_count);
-      const finalMaxUsers = finalState.max_users;
+        if (actualUsers > finalMaxUsers) {
+          throw new Error(`Data sync error: ${actualUsers} users but max_users is ${finalMaxUsers}`);
+        }
 
-      if (actualUsers > finalMaxUsers) {
-        throw new Error(`Data sync error: ${actualUsers} users but max_users is ${finalMaxUsers}`);
-      }
+        console.log(`✅ Verification passed: ${actualUsers} users <= ${finalMaxUsers} max_users`);
 
-      console.log(`✅ Verification passed: ${actualUsers} users <= ${finalMaxUsers} max_users`);
-
-      await dbQuery('COMMIT');
+        return { user, finalMaxUsers, actualUsers, userData };
+      }, req.organizationId);
 
       // ========================================================================
       // ORGANIZATION-LEVEL EMAIL: Send team member invitation
@@ -300,7 +296,6 @@ router.post('/',
         }
       });
     } catch (error) {
-      await dbQuery('ROLLBACK');
       console.error('❌ Create user error:', error);
 
       if (error.message.includes('already exists')) {
