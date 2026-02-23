@@ -151,6 +151,16 @@ const schemas = {
     })
   },
 
+  // For admin resetting another user's password
+  resetPassword: {
+    body: Joi.object({
+      new_password: Joi.string().min(8).required()
+    }),
+    params: Joi.object({
+      id: Joi.string().guid({ version: 'uuidv4' }).required()
+    })
+  },
+
   // Authentication schemas
   login: {
     body: Joi.object({
@@ -224,6 +234,11 @@ const validateUpdateUser = validate(schemas.updateUser);
  * Validation middleware for changing password
  */
 const validateChangePassword = validate(schemas.changePassword);
+
+/**
+ * Validation middleware for admin resetting password
+ */
+const validateResetPassword = validate(schemas.resetPassword);
 
 /**
  * Validation middleware for login
@@ -316,6 +331,7 @@ module.exports = {
   validateCreateUser,
   validateUpdateUser,
   validateChangePassword,
+  validateResetPassword,
   validateLogin,
   validateRegister,
   validateUuidParam,

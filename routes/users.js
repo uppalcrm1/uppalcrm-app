@@ -2,10 +2,11 @@ const express = require('express');
 const User = require('../models/User');
 const Organization = require('../models/Organization');
 // const { checkLicenseLimit } = require('../controllers/licenseController');
-const { 
-  validateCreateUser, 
-  validateUpdateUser, 
-  validateChangePassword, 
+const {
+  validateCreateUser,
+  validateUpdateUser,
+  validateChangePassword,
+  validateResetPassword,
   validateUuidParam,
   validateListUsers
 } = require('../middleware/validation');
@@ -363,11 +364,11 @@ router.put('/:id',
 
 /**
  * PUT /users/:id/password
- * Change user password
+ * Change user password (both user self-change and admin reset)
  */
 router.put('/:id/password',
   validateUuidParam,
-  validateChangePassword,
+  validateResetPassword,  // Use flexible validation that only requires new_password
   canManageUsers,
   async (req, res) => {
     try {
@@ -376,9 +377,16 @@ router.put('/:id/password',
 
       // If user is changing their own password, verify current password
       if (targetUserId === req.user.id) {
+        if (!current_password) {
+          return res.status(400).json({
+            error: 'Invalid request',
+            message: 'Current password is required when changing your own password'
+          });
+        }
+
         const user = await User.findById(targetUserId, req.organizationId);
         const bcrypt = require('bcryptjs');
-        
+
         if (!user || !(await bcrypt.compare(current_password, user.password_hash))) {
           return res.status(400).json({
             error: 'Invalid password',
@@ -388,7 +396,7 @@ router.put('/:id/password',
       }
 
       const success = await User.changePassword(targetUserId, new_password, req.organizationId);
-      
+
       if (!success) {
         return res.status(404).json({
           error: 'User not found',
