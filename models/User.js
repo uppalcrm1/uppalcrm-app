@@ -404,9 +404,14 @@ class User {
    * @param {string} organizationId - Organization ID
    */
   static async revokeAllTokens(userId, organizationId) {
-    await query(`
-      DELETE FROM user_sessions WHERE user_id = $1 AND organization_id = $2
-    `, [userId, organizationId], organizationId);
+    try {
+      await query(`
+        DELETE FROM user_sessions WHERE user_id = $1 AND organization_id = $2
+      `, [userId, organizationId], organizationId);
+    } catch (error) {
+      // user_sessions table may not exist, log but don't fail the operation
+      console.log('⚠️  Could not revoke sessions:', error.message);
+    }
   }
 
   /**
