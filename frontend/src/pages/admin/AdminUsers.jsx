@@ -29,6 +29,15 @@ const AdminUsers = () => {
   const [showEditModal, setShowEditModal] = useState(false)
   const [selectedUser, setSelectedUser] = useState(null)
 
+  // Edit User Form State
+  const [editUserData, setEditUserData] = useState({
+    first_name: '',
+    last_name: '',
+    email: '',
+    role: ''
+  })
+  const [editUserEmailError, setEditUserEmailError] = useState('')
+
   // Add User Form State
   const [formData, setFormData] = useState({
     first_name: '',
@@ -211,12 +220,78 @@ const AdminUsers = () => {
   const handleEditUser = (user) => {
     console.log('✏️ Opening edit modal for user:', user.id, user.email)
     setSelectedUser(user)
+    setEditUserData({
+      first_name: user.first_name || '',
+      last_name: user.last_name || '',
+      email: user.email || '',
+      role: user.role || 'user'
+    })
+    setEditUserEmailError('')
     setShowEditModal(true)
   }
 
   const handleCloseEditModal = () => {
     setShowEditModal(false)
     setSelectedUser(null)
+  }
+
+  const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    return emailRegex.test(email)
+  }
+
+  const handleEditUserChange = (field, value) => {
+    setEditUserData(prev => ({
+      ...prev,
+      [field]: value
+    }))
+    if (field === 'email') {
+      setEditUserEmailError('')
+    }
+  }
+
+  const handleSaveEditUser = async () => {
+    if (!selectedUser) return
+
+    // Validate email
+    if (!editUserData.email) {
+      setEditUserEmailError('Email is required')
+      return
+    }
+
+    if (!validateEmail(editUserData.email)) {
+      setEditUserEmailError('Please enter a valid email address')
+      return
+    }
+
+    try {
+      console.log('📤 Updating user:', selectedUser.id)
+
+      const loadingToast = toast.loading(`Updating ${editUserData.first_name} ${editUserData.last_name}...`)
+
+      await usersAPI.updateUser(selectedUser.id, {
+        first_name: editUserData.first_name,
+        last_name: editUserData.last_name,
+        email: editUserData.email,
+        role: editUserData.role
+      })
+
+      console.log('✅ User updated successfully')
+
+      toast.dismiss(loadingToast)
+      toast.success('User updated successfully')
+
+      // Refresh the user list and stats
+      await fetchUsers()
+      await fetchStats()
+
+      // Close modal
+      handleCloseEditModal()
+    } catch (error) {
+      console.error('❌ Error updating user:', error)
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to update user'
+      toast.error(errorMessage)
+    }
   }
 
   const handleUpdateUser = async (updatedRole) => {
@@ -763,9 +838,9 @@ const AdminUsers = () => {
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Edit User Role</h3>
+                  <h3 className="text-lg font-semibold text-gray-900">Edit User</h3>
                   <p className="text-sm text-gray-600 mt-1">
-                    Update role for {selectedUser.first_name} {selectedUser.last_name}
+                    Update details for {editUserData.first_name} {editUserData.last_name}
                   </p>
                 </div>
                 <button
@@ -777,107 +852,123 @@ const AdminUsers = () => {
                 </button>
               </div>
 
-              {/* User Info */}
-              <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                <div className="flex items-center">
-                  <div className="w-12 h-12 bg-primary-600 rounded-full flex items-center justify-center text-white font-medium">
-                    {selectedUser.first_name?.[0]}{selectedUser.last_name?.[0]}
-                  </div>
-                  <div className="ml-3">
-                    <p className="font-medium text-gray-900">
-                      {selectedUser.first_name} {selectedUser.last_name}
-                    </p>
-                    <p className="text-sm text-gray-600">{selectedUser.email}</p>
+              <div className="space-y-4 mb-6">
+                {/* First Name */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    First Name
+                  </label>
+                  <input
+                    type="text"
+                    value={editUserData.first_name}
+                    onChange={(e) => handleEditUserChange('first_name', e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Enter first name"
+                  />
+                </div>
+
+                {/* Last Name */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Last Name
+                  </label>
+                  <input
+                    type="text"
+                    value={editUserData.last_name}
+                    onChange={(e) => handleEditUserChange('last_name', e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Enter last name"
+                  />
+                </div>
+
+                {/* Email */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Email Address
+                  </label>
+                  <input
+                    type="email"
+                    value={editUserData.email}
+                    onChange={(e) => handleEditUserChange('email', e.target.value)}
+                    className={`w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:border-transparent ${
+                      editUserEmailError
+                        ? 'border-red-500 focus:ring-red-500'
+                        : 'border-gray-300 focus:ring-blue-500'
+                    }`}
+                    placeholder="Enter email address"
+                  />
+                  {editUserEmailError && (
+                    <p className="text-red-600 text-sm mt-1">{editUserEmailError}</p>
+                  )}
+                </div>
+
+                {/* Role Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                    Role
+                  </label>
+                  <div className="space-y-2">
+                    <label className="flex items-start gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50" style={{ borderColor: editUserData.role === 'admin' ? '#3b82f6' : '#d1d5db' }}>
+                      <input
+                        type="radio"
+                        name="role"
+                        value="admin"
+                        checked={editUserData.role === 'admin'}
+                        onChange={(e) => handleEditUserChange('role', e.target.value)}
+                        className="mt-1"
+                      />
+                      <div className="flex-1">
+                        <p className="font-medium text-gray-900">Admin</p>
+                        <p className="text-xs text-gray-600">Full system access and configuration</p>
+                      </div>
+                    </label>
+
+                    <label className="flex items-start gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50" style={{ borderColor: editUserData.role === 'manager' ? '#3b82f6' : '#d1d5db' }}>
+                      <input
+                        type="radio"
+                        name="role"
+                        value="manager"
+                        checked={editUserData.role === 'manager'}
+                        onChange={(e) => handleEditUserChange('role', e.target.value)}
+                        className="mt-1"
+                      />
+                      <div className="flex-1">
+                        <p className="font-medium text-gray-900">Manager</p>
+                        <p className="text-xs text-gray-600">User permissions plus team management</p>
+                      </div>
+                    </label>
+
+                    <label className="flex items-start gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50" style={{ borderColor: editUserData.role === 'user' ? '#3b82f6' : '#d1d5db' }}>
+                      <input
+                        type="radio"
+                        name="role"
+                        value="user"
+                        checked={editUserData.role === 'user'}
+                        onChange={(e) => handleEditUserChange('role', e.target.value)}
+                        className="mt-1"
+                      />
+                      <div className="flex-1">
+                        <p className="font-medium text-gray-900">User</p>
+                        <p className="text-xs text-gray-600">Standard access to leads and contacts</p>
+                      </div>
+                    </label>
                   </div>
                 </div>
               </div>
 
-              {/* Role Selection */}
-              <div className="space-y-3 mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Select New Role
-                </label>
-
-                <button
-                  onClick={() => handleUpdateUser('admin')}
-                  className={`w-full text-left p-4 rounded-lg border-2 transition-colors ${
-                    selectedUser.role === 'admin'
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-200 hover:border-blue-300'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="flex items-center">
-                        <Shield size={16} className="mr-2 text-blue-600" />
-                        <span className="font-medium text-gray-900">Admin</span>
-                      </div>
-                      <p className="text-sm text-gray-600 mt-1">
-                        Full system access and configuration
-                      </p>
-                    </div>
-                    {selectedUser.role === 'admin' && (
-                      <CheckCircle size={20} className="text-blue-600" />
-                    )}
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => handleUpdateUser('manager')}
-                  className={`w-full text-left p-4 rounded-lg border-2 transition-colors ${
-                    selectedUser.role === 'manager'
-                      ? 'border-purple-500 bg-purple-50'
-                      : 'border-gray-200 hover:border-purple-300'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="flex items-center">
-                        <Users size={16} className="mr-2 text-purple-600" />
-                        <span className="font-medium text-gray-900">Manager</span>
-                      </div>
-                      <p className="text-sm text-gray-600 mt-1">
-                        User permissions plus team management
-                      </p>
-                    </div>
-                    {selectedUser.role === 'manager' && (
-                      <CheckCircle size={20} className="text-purple-600" />
-                    )}
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => handleUpdateUser('user')}
-                  className={`w-full text-left p-4 rounded-lg border-2 transition-colors ${
-                    selectedUser.role === 'user'
-                      ? 'border-gray-500 bg-gray-50'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="flex items-center">
-                        <Users size={16} className="mr-2 text-gray-600" />
-                        <span className="font-medium text-gray-900">User</span>
-                      </div>
-                      <p className="text-sm text-gray-600 mt-1">
-                        Standard access to leads and contacts
-                      </p>
-                    </div>
-                    {selectedUser.role === 'user' && (
-                      <CheckCircle size={20} className="text-gray-600" />
-                    )}
-                  </div>
-                </button>
-              </div>
-
-              {/* Cancel Button */}
-              <div className="flex justify-end pt-4 border-t border-gray-200">
+              {/* Buttons */}
+              <div className="flex gap-3 pt-4 border-t border-gray-200">
                 <button
                   onClick={handleCloseEditModal}
-                  className="btn btn-outline"
+                  className="flex-1 border border-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-50 font-medium"
                 >
                   Cancel
+                </button>
+                <button
+                  onClick={handleSaveEditUser}
+                  className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 font-medium"
+                >
+                  Save Changes
                 </button>
               </div>
             </div>
