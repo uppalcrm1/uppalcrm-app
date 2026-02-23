@@ -14,7 +14,10 @@ import {
   CheckCircle,
   XCircle,
   Filter,
-  AlertCircle
+  AlertCircle,
+  Key,
+  Eye,
+  EyeOff
 } from 'lucide-react'
 
 const AdminUsers = () => {
@@ -37,6 +40,18 @@ const AdminUsers = () => {
     role: ''
   })
   const [editUserEmailError, setEditUserEmailError] = useState('')
+
+  // Reset Password Form State
+  const [showResetPasswordModal, setShowResetPasswordModal] = useState(false)
+  const [selectedUserForReset, setSelectedUserForReset] = useState(null)
+  const [resetPasswordData, setResetPasswordData] = useState({
+    newPassword: '',
+    confirmPassword: ''
+  })
+  const [resetPasswordErrors, setResetPasswordErrors] = useState({})
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [isResettingPassword, setIsResettingPassword] = useState(false)
 
   // Add User Form State
   const [formData, setFormData] = useState({
@@ -238,6 +253,82 @@ const AdminUsers = () => {
   const validateEmail = (email) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     return emailRegex.test(email)
+  }
+
+  const validatePassword = (password) => {
+    const hasMinLength = password.length >= 8
+    const hasUppercase = /[A-Z]/.test(password)
+    const hasLowercase = /[a-z]/.test(password)
+    const hasNumber = /\d/.test(password)
+    const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)
+
+    return {
+      isValid: hasMinLength && hasUppercase && hasLowercase && hasNumber && hasSpecialChar,
+      hasMinLength,
+      hasUppercase,
+      hasLowercase,
+      hasNumber,
+      hasSpecialChar
+    }
+  }
+
+  const handleOpenResetPassword = (user) => {
+    console.log('🔑 Opening reset password modal for user:', user.id, user.email)
+    setSelectedUserForReset(user)
+    setResetPasswordData({ newPassword: '', confirmPassword: '' })
+    setResetPasswordErrors({})
+    setShowNewPassword(false)
+    setShowConfirmPassword(false)
+    setShowResetPasswordModal(true)
+  }
+
+  const handleCloseResetPassword = () => {
+    setShowResetPasswordModal(false)
+    setSelectedUserForReset(null)
+    setResetPasswordData({ newPassword: '', confirmPassword: '' })
+    setResetPasswordErrors({})
+  }
+
+  const handleResetPassword = async () => {
+    if (!selectedUserForReset) return
+
+    const errors = {}
+
+    // Validate passwords match
+    if (resetPasswordData.newPassword !== resetPasswordData.confirmPassword) {
+      errors.confirmPassword = 'Passwords do not match'
+    }
+
+    // Validate password requirements
+    const passwordValidation = validatePassword(resetPasswordData.newPassword)
+    if (!passwordValidation.isValid) {
+      errors.newPassword = 'Password does not meet requirements'
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setResetPasswordErrors(errors)
+      return
+    }
+
+    try {
+      setIsResettingPassword(true)
+      console.log('📤 Resetting password for user:', selectedUserForReset.id)
+
+      await usersAPI.updateUser(selectedUserForReset.id, {
+        new_password: resetPasswordData.newPassword
+      })
+
+      console.log('✅ Password reset successfully')
+      toast.success(`Password reset successfully for ${selectedUserForReset.first_name} ${selectedUserForReset.last_name}`)
+
+      handleCloseResetPassword()
+    } catch (error) {
+      console.error('❌ Error resetting password:', error)
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to reset password'
+      toast.error(errorMessage)
+    } finally {
+      setIsResettingPassword(false)
+    }
   }
 
   const handleEditUserChange = (field, value) => {
@@ -616,6 +707,13 @@ const AdminUsers = () => {
                               <Edit2 size={14} />
                             </button>
                             <button
+                              onClick={() => handleOpenResetPassword(user)}
+                              className="btn btn-sm btn-outline text-blue-600 hover:bg-blue-50"
+                              title="Reset password"
+                            >
+                              <Key size={14} />
+                            </button>
+                            <button
                               onClick={() => handleDeleteUser(user)}
                               className="btn btn-sm btn-outline text-red-600 hover:bg-red-50"
                               title="Delete user"
@@ -625,7 +723,7 @@ const AdminUsers = () => {
                           </>
                         )}
                         {user.id === currentUser?.id && (
-                          <button 
+                          <button
                             onClick={() => handleEditUser(user)}
                             className="btn btn-sm btn-outline"
                             title="Edit your profile"
@@ -969,6 +1067,154 @@ const AdminUsers = () => {
                   className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 font-medium"
                 >
                   Save Changes
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reset Password Modal */}
+      {showResetPasswordModal && selectedUserForReset && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Reset Password</h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Set a new password for {selectedUserForReset.first_name} {selectedUserForReset.last_name}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCloseResetPassword}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <XCircle size={20} />
+                </button>
+              </div>
+
+              {/* User Info */}
+              <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                <div className="flex items-center">
+                  <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white font-medium">
+                    {selectedUserForReset.first_name?.[0]}{selectedUserForReset.last_name?.[0]}
+                  </div>
+                  <div className="ml-3">
+                    <p className="font-medium text-gray-900">
+                      {selectedUserForReset.first_name} {selectedUserForReset.last_name}
+                    </p>
+                    <p className="text-sm text-gray-600">{selectedUserForReset.email}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4 mb-6">
+                {/* New Password */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    New Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showNewPassword ? 'text' : 'password'}
+                      value={resetPasswordData.newPassword}
+                      onChange={(e) => {
+                        setResetPasswordData(prev => ({ ...prev, newPassword: e.target.value }))
+                        setResetPasswordErrors(prev => ({ ...prev, newPassword: '' }))
+                      }}
+                      className={`w-full border rounded-lg px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:border-transparent ${
+                        resetPasswordErrors.newPassword
+                          ? 'border-red-500 focus:ring-red-500'
+                          : 'border-gray-300 focus:ring-blue-500'
+                      }`}
+                      placeholder="Enter new password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                    >
+                      {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                  {resetPasswordErrors.newPassword && (
+                    <p className="text-red-600 text-sm mt-1">{resetPasswordErrors.newPassword}</p>
+                  )}
+                </div>
+
+                {/* Confirm Password */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Confirm Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      value={resetPasswordData.confirmPassword}
+                      onChange={(e) => {
+                        setResetPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))
+                        setResetPasswordErrors(prev => ({ ...prev, confirmPassword: '' }))
+                      }}
+                      className={`w-full border rounded-lg px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:border-transparent ${
+                        resetPasswordErrors.confirmPassword
+                          ? 'border-red-500 focus:ring-red-500'
+                          : 'border-gray-300 focus:ring-blue-500'
+                      }`}
+                      placeholder="Confirm new password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                    >
+                      {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                  {resetPasswordErrors.confirmPassword && (
+                    <p className="text-red-600 text-sm mt-1">{resetPasswordErrors.confirmPassword}</p>
+                  )}
+                </div>
+
+                {/* Password Requirements */}
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <p className="text-sm font-medium text-blue-900 mb-2">Password requirements:</p>
+                  <ul className="text-xs text-blue-800 space-y-1">
+                    <li>• Minimum 8 characters</li>
+                    <li>• Must include uppercase letter (A-Z)</li>
+                    <li>• Must include lowercase letter (a-z)</li>
+                    <li>• Must include number (0-9)</li>
+                    <li>• Must include special character (!@#$%^&*)</li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* Buttons */}
+              <div className="flex gap-3 pt-4 border-t border-gray-200">
+                <button
+                  onClick={handleCloseResetPassword}
+                  disabled={isResettingPassword}
+                  className="flex-1 border border-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-50 font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleResetPassword}
+                  disabled={isResettingPassword}
+                  className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {isResettingPassword ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Resetting...
+                    </>
+                  ) : (
+                    <>
+                      <Key size={16} />
+                      Reset Password
+                    </>
+                  )}
                 </button>
               </div>
             </div>
