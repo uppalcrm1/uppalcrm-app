@@ -314,9 +314,7 @@ const AdminUsers = () => {
       setIsResettingPassword(true)
       console.log('📤 Resetting password for user:', selectedUserForReset.id)
 
-      await usersAPI.updateUser(selectedUserForReset.id, {
-        new_password: resetPasswordData.newPassword
-      })
+      await usersAPI.resetPassword(selectedUserForReset.id, resetPasswordData.newPassword)
 
       console.log('✅ Password reset successfully')
       toast.success(`Password reset successfully for ${selectedUserForReset.first_name} ${selectedUserForReset.last_name}`)
