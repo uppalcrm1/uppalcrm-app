@@ -981,6 +981,12 @@ export const twilioAPI = {
     return response.data
   },
 
+  // Send WhatsApp message
+  sendWhatsApp: async (whatsappData) => {
+    const response = await api.post('/twilio/whatsapp/send', whatsappData)
+    return response.data
+  },
+
   // Get SMS history
   getSMSHistory: async (params = {}) => {
     const response = await api.get('/twilio/sms', { params })

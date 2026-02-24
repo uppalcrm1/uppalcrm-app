@@ -12,7 +12,9 @@ import {
   Search,
   CheckCircle,
   AlertCircle,
-  Info
+  Info,
+  MessageCircle,
+  MessageSquare
 } from 'lucide-react'
 import api from '../../services/api'
 import LoadingSpinner from '../LoadingSpinner'
@@ -114,6 +116,10 @@ const LeadActivityTimeline = ({ leadId, refreshKey }) => {
         return <FileText {...iconProps} />
       case 'task':
         return <CheckCircle {...iconProps} />
+      case 'sms':
+        return <MessageSquare {...iconProps} />
+      case 'whatsapp':
+        return <MessageCircle {...iconProps} />
       default:
         return <Info {...iconProps} />
     }
@@ -152,9 +158,21 @@ const LeadActivityTimeline = ({ leadId, refreshKey }) => {
         return 'bg-gray-500'
       case 'task':
         return 'bg-orange-500'
+      case 'sms':
+        return 'bg-blue-500'
+      case 'whatsapp':
+        return 'whatsapp'
       default:
         return 'bg-gray-400'
     }
+  }
+
+  const getActivityColorStyle = (type, eventType) => {
+    const color = getActivityColor(type, eventType)
+    if (color === 'whatsapp') {
+      return { backgroundColor: '#25D366' }
+    }
+    return {}
   }
 
   const getPriorityIcon = (priority) => {
@@ -197,6 +215,15 @@ const LeadActivityTimeline = ({ leadId, refreshKey }) => {
     return `${mins}m`
   }
 
+  const getActivityLabel = (interaction_type, direction) => {
+    if (interaction_type === 'sms') {
+      return direction === 'inbound' ? 'SMS received' : 'SMS sent'
+    } else if (interaction_type === 'whatsapp') {
+      return direction === 'inbound' ? 'WhatsApp received' : 'WhatsApp sent'
+    }
+    return interaction_type
+  }
+
   if (loading && activities.length === 0) {
     return <LoadingSpinner />
   }
@@ -229,6 +256,8 @@ const LeadActivityTimeline = ({ leadId, refreshKey }) => {
               <option value="email">Emails</option>
               <option value="call">Calls</option>
               <option value="meeting">Meetings</option>
+              <option value="sms">SMS</option>
+              <option value="whatsapp">WhatsApp</option>
               <option value="note">Notes</option>
               <option value="task">Tasks</option>
             </select>
@@ -273,7 +302,10 @@ const LeadActivityTimeline = ({ leadId, refreshKey }) => {
                         <div className="relative flex items-start space-x-3">
                           {/* Activity Icon */}
                           <div className={`relative px-1`}>
-                            <div className={`h-10 w-10 rounded-full ${getActivityColor(activity.interaction_type, activity.event_type)} flex items-center justify-center ring-8 ring-white`}>
+                            <div
+                              className={`h-10 w-10 rounded-full ${getActivityColor(activity.interaction_type, activity.event_type)} flex items-center justify-center ring-8 ring-white`}
+                              style={getActivityColor(activity.interaction_type, activity.event_type) === 'whatsapp' ? { backgroundColor: '#25D366' } : {}}
+                            >
                               {getActivityIcon(activity.interaction_type, activity.event_type)}
                             </div>
                           </div>
@@ -289,7 +321,7 @@ const LeadActivityTimeline = ({ leadId, refreshKey }) => {
                               {activity.event_description ? (
                                 <span>{activity.event_description}</span>
                               ) : (
-                                <span className="capitalize">{activity.interaction_type}</span>
+                                <span className="capitalize">{getActivityLabel(activity.interaction_type, activity.direction)}</span>
                               )}
                               {activity.interaction_type === 'task' && activity.priority && (
                                 <span className="ml-1">

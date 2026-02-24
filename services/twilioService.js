@@ -84,6 +84,85 @@ class TwilioService {
   }
 
   /**
+   * Send WhatsApp message
+   */
+  async sendWhatsApp({ organizationId, toNumber, body, leadId = null, contactId = null, userId }) {
+    try {
+      const { client, phoneNumber } = await this.getClient(organizationId);
+
+      // Get WhatsApp number from config, fallback to sandbox
+      const configQuery = `
+        SELECT whatsapp_number FROM twilio_config
+        WHERE organization_id = $1 AND is_active = true
+      `;
+      const configResult = await db.query(configQuery, [organizationId]);
+      const whatsappNumber = configResult.rows[0]?.whatsapp_number || '+14155238886'; // Sandbox fallback
+
+      // Add whatsapp: prefix to both numbers if not already present
+      const fromNumber = whatsappNumber.startsWith('whatsapp:') ? whatsappNumber : `whatsapp:${whatsappNumber}`;
+      const toPhoneNumber = toNumber.startsWith('whatsapp:') ? toNumber : `whatsapp:${toNumber}`;
+
+      console.log('📱 Sending WhatsApp message:', { from: fromNumber, to: toPhoneNumber });
+
+      // Send via Twilio
+      const message = await client.messages.create({
+        body,
+        from: fromNumber,
+        to: toPhoneNumber,
+        statusCallback: `${API_BASE_URL}/api/twilio/webhook/whatsapp-status`
+      });
+
+      // Save to database with channel='whatsapp'
+      const insertQuery = `
+        INSERT INTO sms_messages (
+          organization_id, lead_id, contact_id, user_id,
+          direction, from_number, to_number, body, channel,
+          twilio_sid, twilio_status, sent_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
+        RETURNING *
+      `;
+
+      const result = await db.query(insertQuery, [
+        organizationId, leadId, contactId, userId,
+        'outbound', whatsappNumber, toNumber, body, 'whatsapp',
+        message.sid, message.status
+      ]);
+
+      // Create interaction record
+      if (leadId) {
+        const interactionQuery = `
+          INSERT INTO lead_interactions (
+            organization_id, lead_id, contact_id, user_id, interaction_type,
+            description, outcome, completed_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+        `;
+        await db.query(interactionQuery, [
+          organizationId, leadId, contactId, userId, 'whatsapp',
+          `Outbound WhatsApp: ${body}`, 'sent'
+        ]);
+      } else if (contactId) {
+        // Create interaction for contact if no lead
+        const interactionQuery = `
+          INSERT INTO lead_interactions (
+            organization_id, contact_id, user_id, interaction_type,
+            description, outcome, completed_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, NOW())
+        `;
+        await db.query(interactionQuery, [
+          organizationId, contactId, userId, 'whatsapp',
+          `Outbound WhatsApp: ${body}`, 'sent'
+        ]);
+      }
+
+      console.log('✅ WhatsApp message sent successfully:', message.sid);
+      return result.rows[0];
+    } catch (error) {
+      console.error('Error sending WhatsApp:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Make phone call
    */
   async makeCall({ organizationId, to, leadId = null, contactId = null, userId, conferenceId = null }) {
@@ -388,6 +467,147 @@ class TwilioService {
       });
       throw error;
     }
+  }
+
+  /**
+   * Process incoming WhatsApp message
+   */
+  async processIncomingWhatsApp(data) {
+    const { From, To, Body, MessageSid, NumMedia } = data;
+
+    console.log('Processing incoming WhatsApp message:', { From, To, MessageSid, NumMedia });
+
+    // Strip 'whatsapp:' prefix from phone numbers
+    const fromPhone = From.replace(/^whatsapp:/, '');
+    const toPhone = To.replace(/^whatsapp:/, '');
+
+    // Collect all media URLs
+    const mediaUrls = [];
+    const numMedia = parseInt(NumMedia || 0);
+    for (let i = 0; i < numMedia; i++) {
+      const mediaUrl = data[`MediaUrl${i}`];
+      if (mediaUrl) {
+        mediaUrls.push(mediaUrl);
+      }
+    }
+
+    if (mediaUrls.length > 0) {
+      console.log('WhatsApp media received:', mediaUrls);
+    }
+
+    // Normalize phone number (remove any non-digit characters except +)
+    const normalizedTo = toPhone.replace(/[^\d+]/g, '');
+
+    // Find organization by phone number (flexible matching)
+    const orgQuery = `
+      SELECT organization_id FROM twilio_config
+      WHERE whatsapp_number = $1
+         OR phone_number = $1
+         OR phone_number = $2
+         OR REPLACE(REPLACE(phone_number, '-', ''), ' ', '') = $2
+    `;
+    const orgResult = await db.query(orgQuery, [toPhone, normalizedTo]);
+
+    if (orgResult.rows.length === 0) {
+      console.error('No organization found for WhatsApp number:', toPhone);
+      return;
+    }
+
+    const organizationId = orgResult.rows[0].organization_id;
+
+    // Find existing lead/contact by phone number
+    let leadId = null;
+    let contactId = null;
+    let contactName = null;
+
+    // Check contacts first
+    const contactQuery = `
+      SELECT id, first_name, last_name FROM contacts
+      WHERE organization_id = $1 AND phone = $2
+      LIMIT 1
+    `;
+    const contactResult = await db.query(contactQuery, [organizationId, fromPhone]);
+
+    if (contactResult.rows.length > 0) {
+      contactId = contactResult.rows[0].id;
+      contactName = `${contactResult.rows[0].first_name || ''} ${contactResult.rows[0].last_name || ''}`.trim();
+    } else {
+      // Check leads
+      const leadQuery = `
+        SELECT id, first_name, last_name FROM leads
+        WHERE organization_id = $1 AND phone = $2
+        LIMIT 1
+      `;
+      const leadResult = await db.query(leadQuery, [organizationId, fromPhone]);
+
+      if (leadResult.rows.length > 0) {
+        leadId = leadResult.rows[0].id;
+        contactName = `${leadResult.rows[0].first_name || ''} ${leadResult.rows[0].last_name || ''}`.trim();
+      } else {
+        // Create new lead from incoming WhatsApp
+        const createLeadQuery = `
+          INSERT INTO leads (organization_id, phone, source, status, last_contact_date, first_name)
+          VALUES ($1, $2, 'WhatsApp', 'new', NOW(), 'WhatsApp Lead')
+          RETURNING id
+        `;
+        const newLead = await db.query(createLeadQuery, [organizationId, fromPhone]);
+        leadId = newLead.rows[0].id;
+        contactName = 'WhatsApp Lead';
+        console.log('Created new lead from WhatsApp:', leadId);
+      }
+    }
+
+    // Save WhatsApp message
+    const insertQuery = `
+      INSERT INTO sms_messages (
+        organization_id, lead_id, contact_id,
+        direction, from_number, to_number, body, channel,
+        twilio_sid, twilio_status, num_media, media_urls,
+        created_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())
+      RETURNING *
+    `;
+
+    const result = await db.query(insertQuery, [
+      organizationId, leadId, contactId,
+      'inbound', fromPhone, toPhone, Body, 'whatsapp',
+      MessageSid, 'received', numMedia, mediaUrls.length > 0 ? JSON.stringify(mediaUrls) : null
+    ]);
+
+    // Create interaction record
+    if (leadId) {
+      const interactionQuery = `
+        INSERT INTO lead_interactions (
+          organization_id, lead_id, contact_id, interaction_type,
+          description, outcome, completed_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, NOW())
+      `;
+      await db.query(interactionQuery, [
+        organizationId, leadId, contactId, 'whatsapp',
+        `Inbound WhatsApp: ${Body}`, 'received'
+      ]);
+    } else if (contactId) {
+      // Create interaction for contact if no lead
+      const interactionQuery = `
+        INSERT INTO lead_interactions (
+          organization_id, contact_id, interaction_type,
+          description, outcome, completed_at
+        ) VALUES ($1, $2, $3, $4, $5, NOW())
+      `;
+      await db.query(interactionQuery, [
+        organizationId, contactId, 'whatsapp',
+        `Inbound WhatsApp: ${Body}`, 'received'
+      ]);
+    }
+
+    // Return WhatsApp message data with organization info
+    return {
+      ...result.rows[0],
+      organizationId,
+      leadId,
+      contactId,
+      contactName
+    };
   }
 }
 
