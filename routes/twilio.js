@@ -1394,15 +1394,17 @@ router.get('/stats', authenticateToken, async (req, res) => {
   try {
     const organizationId = req.organizationId;
 
-    // SMS stats
+    // SMS and WhatsApp stats (combined, but including channel breakdown)
     const smsQuery = `
       SELECT
-        COUNT(*) as total_sms,
+        COUNT(*) FILTER (WHERE channel = 'sms') as total_sms,
+        COUNT(*) FILTER (WHERE channel = 'whatsapp') as total_whatsapp,
         COUNT(*) FILTER (WHERE direction = 'outbound') as sent,
         COUNT(*) FILTER (WHERE direction = 'inbound') as received,
         COUNT(*) FILTER (WHERE twilio_status = 'delivered') as delivered,
         COUNT(*) FILTER (WHERE twilio_status = 'failed') as failed,
-        SUM(cost) as total_sms_cost
+        SUM(cost) FILTER (WHERE channel = 'sms') as total_sms_cost,
+        SUM(cost) FILTER (WHERE channel = 'whatsapp') as total_whatsapp_cost
       FROM sms_messages
       WHERE organization_id = $1
     `;
