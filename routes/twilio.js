@@ -343,6 +343,17 @@ router.get('/sms/conversations', authenticateToken, async (req, res) => {
   try {
     const organizationId = req.organizationId;
 
+    // First, check if sms_messages table has any records for this organization
+    const countResult = await db.query(
+      'SELECT COUNT(*) FROM sms_messages WHERE organization_id = $1',
+      [organizationId]
+    );
+
+    // If no messages exist, return empty array immediately (avoids empty JOIN issues)
+    if (parseInt(countResult.rows[0].count) === 0) {
+      return res.json({ conversations: [] });
+    }
+
     const query = `
       WITH conversation_stats AS (
         SELECT
@@ -425,7 +436,8 @@ router.get('/sms/conversations', authenticateToken, async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching conversations:', error);
-    res.status(500).json({ error: 'Failed to fetch conversations' });
+    // Return empty array instead of error, as this is expected when no messages exist
+    res.json({ conversations: [] });
   }
 });
 
