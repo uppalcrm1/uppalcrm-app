@@ -1388,13 +1388,21 @@ router.post('/webhook/call-status', async (req, res) => {
 });
 
 /**
- * Get SMS/Call Statistics
+ * Get SMS/WhatsApp/Call Statistics
+ *
+ * Returns statistics for SMS, WhatsApp, and phone calls:
+ * - SMS stats include separate counts for total_sms and total_whatsapp
+ * - Sent/received counts are combined for both channels
+ * - Cost is the sum of all SMS and WhatsApp messaging costs
+ * - Returns 0 for all counts if no messages/calls exist
+ * - Cost returns null (converted to 0 by frontend) if no activity
  */
 router.get('/stats', authenticateToken, async (req, res) => {
   try {
     const organizationId = req.organizationId;
 
-    // SMS and WhatsApp stats (combined, but including channel breakdown)
+    // SMS and WhatsApp stats (combined and channel breakdown)
+    // Note: channel column defaults to 'sms' for backward compatibility
     const smsQuery = `
       SELECT
         COUNT(*) FILTER (WHERE channel = 'sms') as total_sms,
@@ -1403,8 +1411,7 @@ router.get('/stats', authenticateToken, async (req, res) => {
         COUNT(*) FILTER (WHERE direction = 'inbound') as received,
         COUNT(*) FILTER (WHERE twilio_status = 'delivered') as delivered,
         COUNT(*) FILTER (WHERE twilio_status = 'failed') as failed,
-        SUM(cost) FILTER (WHERE channel = 'sms') as total_sms_cost,
-        SUM(cost) FILTER (WHERE channel = 'whatsapp') as total_whatsapp_cost
+        SUM(cost) as total_sms_cost
       FROM sms_messages
       WHERE organization_id = $1
     `;
@@ -1427,12 +1434,46 @@ router.get('/stats', authenticateToken, async (req, res) => {
     const callResult = await db.query(callQuery, [organizationId]);
 
     res.json({
-      sms: smsResult.rows[0],
-      calls: callResult.rows[0]
+      sms: smsResult.rows[0] || {
+        total_sms: 0,
+        total_whatsapp: 0,
+        sent: 0,
+        received: 0,
+        delivered: 0,
+        failed: 0,
+        total_sms_cost: null
+      },
+      calls: callResult.rows[0] || {
+        total_calls: 0,
+        outbound: 0,
+        inbound: 0,
+        answered: 0,
+        total_duration: null,
+        total_call_cost: null
+      }
     });
   } catch (error) {
     console.error('Error fetching stats:', error);
-    res.status(500).json({ error: 'Failed to fetch statistics' });
+    // Return empty stats instead of error for better UX
+    res.json({
+      sms: {
+        total_sms: 0,
+        total_whatsapp: 0,
+        sent: 0,
+        received: 0,
+        delivered: 0,
+        failed: 0,
+        total_sms_cost: null
+      },
+      calls: {
+        total_calls: 0,
+        outbound: 0,
+        inbound: 0,
+        answered: 0,
+        total_duration: null,
+        total_call_cost: null
+      }
+    });
   }
 });
 
