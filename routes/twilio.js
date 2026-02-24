@@ -17,6 +17,13 @@ const sendSMSSchema = Joi.object({
   templateId: Joi.string().uuid().optional().allow(null, '')
 });
 
+const sendWhatsAppSchema = Joi.object({
+  to_number: Joi.string().required(),
+  message: Joi.string().required().max(4096),
+  lead_id: Joi.string().uuid().optional().allow(null, ''),
+  contact_id: Joi.string().uuid().optional().allow(null, '')
+});
+
 const makeCallSchema = Joi.object({
   to: Joi.string().required(),
   leadId: Joi.string().uuid().optional().allow(null, ''),
@@ -215,12 +222,45 @@ router.post('/sms/send', authenticateToken, async (req, res) => {
 });
 
 /**
- * Get SMS history
+ * Send WhatsApp message
+ */
+router.post('/whatsapp/send', authenticateToken, async (req, res) => {
+  try {
+    const { error } = sendWhatsAppSchema.validate(req.body);
+    if (error) {
+      return res.status(400).json({ error: error.details[0].message });
+    }
+
+    const { to_number, message, lead_id, contact_id } = req.body;
+    const organizationId = req.organizationId;
+    const userId = req.userId;
+
+    const whatsappMessage = await twilioService.sendWhatsApp({
+      organizationId,
+      toNumber: to_number,
+      body: message,
+      leadId: lead_id,
+      contactId: contact_id,
+      userId
+    });
+
+    res.json({
+      message: 'WhatsApp message sent successfully',
+      data: whatsappMessage
+    });
+  } catch (error) {
+    console.error('Error sending WhatsApp:', error);
+    res.status(500).json({ error: error.message || 'Failed to send WhatsApp message' });
+  }
+});
+
+/**
+ * Get SMS/WhatsApp history (with channel filtering)
  */
 router.get('/sms', authenticateToken, async (req, res) => {
   try {
     const organizationId = req.organizationId;
-    const { leadId, contactId, direction, limit = 50, offset = 0 } = req.query;
+    const { leadId, contactId, direction, channel = 'all', limit = 50, offset = 0 } = req.query;
 
     let query = `
       SELECT
@@ -259,6 +299,13 @@ router.get('/sms', authenticateToken, async (req, res) => {
       params.push(direction);
     }
 
+    // Add channel filter (default: all)
+    if (channel && channel !== 'all') {
+      paramCount++;
+      query += ` AND sm.channel = $${paramCount}`;
+      params.push(channel);
+    }
+
     query += ` ORDER BY sm.created_at DESC LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}`;
     params.push(limit, offset);
 
@@ -271,6 +318,7 @@ router.get('/sms', authenticateToken, async (req, res) => {
     if (leadId) countQuery += ` AND lead_id = $${countParams.push(leadId)}`;
     if (contactId) countQuery += ` AND contact_id = $${countParams.push(contactId)}`;
     if (direction) countQuery += ` AND direction = $${countParams.push(direction)}`;
+    if (channel && channel !== 'all') countQuery += ` AND channel = $${countParams.push(channel)}`;
 
     const countResult = await db.query(countQuery, countParams);
 
@@ -283,13 +331,13 @@ router.get('/sms', authenticateToken, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error fetching SMS history:', error);
-    res.status(500).json({ error: 'Failed to fetch SMS history' });
+    console.error('Error fetching SMS/WhatsApp history:', error);
+    res.status(500).json({ error: 'Failed to fetch message history' });
   }
 });
 
 /**
- * Get SMS conversations (grouped by phone number)
+ * Get SMS/WhatsApp conversations (grouped by phone number, includes all channels)
  */
 router.get('/sms/conversations', authenticateToken, async (req, res) => {
   try {
@@ -305,7 +353,9 @@ router.get('/sms/conversations', authenticateToken, async (req, res) => {
           MAX(created_at) as last_message_at,
           COUNT(*) as message_count,
           COUNT(*) FILTER (WHERE direction = 'inbound') as inbound_count,
-          COUNT(*) FILTER (WHERE direction = 'outbound') as outbound_count
+          COUNT(*) FILTER (WHERE direction = 'outbound') as outbound_count,
+          COUNT(*) FILTER (WHERE channel = 'sms') as sms_count,
+          COUNT(*) FILTER (WHERE channel = 'whatsapp') as whatsapp_count
         FROM sms_messages
         WHERE organization_id = $1
         GROUP BY CASE WHEN direction = 'outbound' THEN to_number ELSE from_number END
@@ -317,6 +367,7 @@ router.get('/sms/conversations', authenticateToken, async (req, res) => {
           CASE WHEN direction = 'outbound' THEN to_number ELSE from_number END as phone_number,
           body as last_message,
           direction as last_direction,
+          channel as last_channel,
           lead_id,
           contact_id
         FROM sms_messages
@@ -331,8 +382,11 @@ router.get('/sms/conversations', authenticateToken, async (req, res) => {
         cs.message_count,
         cs.inbound_count,
         cs.outbound_count,
+        cs.sms_count,
+        cs.whatsapp_count,
         lm.last_message,
         lm.last_direction,
+        lm.last_channel,
         lm.lead_id,
         lm.contact_id,
         l.first_name as lead_first_name,
@@ -355,8 +409,11 @@ router.get('/sms/conversations', authenticateToken, async (req, res) => {
         messageCount: parseInt(row.message_count),
         inboundCount: parseInt(row.inbound_count),
         outboundCount: parseInt(row.outbound_count),
+        smsCount: parseInt(row.sms_count),
+        whatsappCount: parseInt(row.whatsapp_count),
         lastMessage: row.last_message,
         lastDirection: row.last_direction,
+        lastChannel: row.last_channel || 'sms', // Default to sms if null (backward compatibility)
         leadId: row.lead_id,
         contactId: row.contact_id,
         contactName: row.contact_first_name
@@ -373,15 +430,15 @@ router.get('/sms/conversations', authenticateToken, async (req, res) => {
 });
 
 /**
- * Get messages for a specific conversation (by phone number)
+ * Get messages for a specific conversation (by phone number, with channel filtering)
  */
 router.get('/sms/conversation/:phoneNumber', authenticateToken, async (req, res) => {
   try {
     const organizationId = req.organizationId;
     const { phoneNumber } = req.params;
-    const { limit = 100, offset = 0 } = req.query;
+    const { channel = 'all', limit = 100, offset = 0 } = req.query;
 
-    const query = `
+    let query = `
       SELECT
         sm.*,
         l.first_name as lead_first_name,
@@ -396,11 +453,20 @@ router.get('/sms/conversation/:phoneNumber', authenticateToken, async (req, res)
       LEFT JOIN users u ON sm.user_id = u.id
       WHERE sm.organization_id = $1
         AND (sm.to_number = $2 OR sm.from_number = $2)
-      ORDER BY sm.created_at ASC
-      LIMIT $3 OFFSET $4
     `;
 
-    const result = await db.query(query, [organizationId, phoneNumber, limit, offset]);
+    const params = [organizationId, phoneNumber];
+
+    // Add channel filter (default: all)
+    if (channel && channel !== 'all') {
+      query += ` AND sm.channel = $3`;
+      params.push(channel);
+    }
+
+    query += ` ORDER BY sm.created_at ASC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+    params.push(limit, offset);
+
+    const result = await db.query(query, params);
 
     // Get contact/lead info for this conversation
     let contactInfo = null;
@@ -421,9 +487,28 @@ router.get('/sms/conversation/:phoneNumber', authenticateToken, async (req, res)
       }
     }
 
+    // Calculate channel breakdown for this conversation
+    const statsQuery = `
+      SELECT
+        COUNT(*) as total_count,
+        COUNT(*) FILTER (WHERE channel = 'sms') as sms_count,
+        COUNT(*) FILTER (WHERE channel = 'whatsapp') as whatsapp_count
+      FROM sms_messages
+      WHERE organization_id = $1
+        AND (to_number = $2 OR from_number = $2)
+    `;
+    const statsResult = await db.query(statsQuery, [organizationId, phoneNumber]);
+    const stats = statsResult.rows[0];
+
     res.json({
       phoneNumber,
       contactInfo,
+      channelFilter: channel,
+      stats: {
+        totalMessages: parseInt(stats.total_count),
+        smsCount: parseInt(stats.sms_count),
+        whatsappCount: parseInt(stats.whatsapp_count)
+      },
       messages: result.rows,
       pagination: {
         limit: parseInt(limit),
@@ -709,6 +794,37 @@ router.post('/webhook/sms', async (req, res) => {
   } catch (error) {
     console.error('Error processing incoming SMS:', error);
     res.status(500).send('Error processing SMS');
+  }
+});
+
+/**
+ * Twilio Webhooks - Incoming WhatsApp
+ */
+router.post('/webhook/whatsapp', async (req, res) => {
+  try {
+    const result = await twilioService.processIncomingWhatsApp(req.body);
+
+    // Emit real-time WhatsApp notification via WebSocket
+    if (result && result.organizationId) {
+      const websocketService = require('../services/websocketService');
+      websocketService.emitIncomingSMS(result.organizationId, {
+        messageSid: req.body.MessageSid,
+        from: req.body.From.replace(/^whatsapp:/, ''),
+        to: req.body.To.replace(/^whatsapp:/, ''),
+        body: req.body.Body,
+        channel: 'whatsapp',
+        contactName: result.contactName || null,
+        leadId: result.leadId || null,
+        contactId: result.contactId || null
+      });
+    }
+
+    // Respond with TwiML (required by Twilio)
+    res.type('text/xml');
+    res.send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+  } catch (error) {
+    console.error('Error processing incoming WhatsApp:', error);
+    res.status(500).send('Error processing WhatsApp');
   }
 });
 

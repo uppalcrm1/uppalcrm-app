@@ -3,12 +3,14 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useFieldVisibility } from '../hooks/useFieldVisibility';
 import {
   ArrowLeft, Mail, Phone, Copy, ChevronDown, ChevronUp,
-  MessageSquare, Edit, MoreVertical, Calendar, CheckCircle2,
+  MessageSquare, MessageCircle, Edit, MoreVertical, Calendar, CheckCircle2,
   CalendarClock, Plus, ClipboardList, Laptop, DollarSign, TrendingUp
 } from 'lucide-react';
 import { contactsAPI, transactionsAPI } from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ContactForm from '../components/ContactForm';
+import SendSMSModal from '../components/SendSMSModal';
+import SendWhatsAppModal from '../components/SendWhatsAppModal';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 
@@ -26,6 +28,8 @@ const ContactDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showSMSModal, setShowSMSModal] = useState(false);
+  const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
 
   // Use field visibility hook for all field configuration
   const { isFieldVisible, getVisibleFields } = useFieldVisibility('contacts');
@@ -204,9 +208,24 @@ const ContactDetailPage = () => {
 
             {/* Right: Action buttons */}
             <div className="flex items-center gap-3">
-              <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2 text-sm font-medium">
+              <button
+                onClick={() => setShowSMSModal(true)}
+                disabled={!contact.phone}
+                className="px-4 py-2 border border-blue-300 rounded-lg hover:bg-blue-50 flex items-center gap-2 text-sm font-medium text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                title={contact.phone ? 'Send SMS' : 'No phone number available'}
+              >
                 <MessageSquare size={16} />
-                Message
+                SMS
+              </button>
+              <button
+                onClick={() => setShowWhatsAppModal(true)}
+                disabled={!contact.phone}
+                className="px-4 py-2 border rounded-lg hover:opacity-90 flex items-center gap-2 text-sm font-medium text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ backgroundColor: contact.phone ? '#25D366' : '#cccccc', borderColor: '#25D366' }}
+                title={contact.phone ? 'Send WhatsApp' : 'No phone number available'}
+              >
+                <MessageCircle size={16} />
+                WhatsApp
               </button>
               <button
                 onClick={() => setShowEditModal(true)}
@@ -629,6 +648,30 @@ const ContactDetailPage = () => {
           contact={contact}
           onClose={() => setShowEditModal(false)}
           onSubmit={handleUpdateContact}
+        />
+      )}
+
+      {/* Send SMS Modal */}
+      {showSMSModal && contact && (
+        <SendSMSModal
+          onClose={() => setShowSMSModal(false)}
+          onSuccess={() => {
+            fetchInteractions();
+          }}
+          defaultTo={contact.phone}
+          contactId={id}
+        />
+      )}
+
+      {/* Send WhatsApp Modal */}
+      {showWhatsAppModal && contact && (
+        <SendWhatsAppModal
+          onClose={() => setShowWhatsAppModal(false)}
+          onSuccess={() => {
+            fetchInteractions();
+          }}
+          defaultTo={contact.phone}
+          contactId={id}
         />
       )}
     </div>

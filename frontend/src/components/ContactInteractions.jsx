@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Plus,
   MessageSquare,
+  MessageCircle,
   Phone,
   Video,
   FileText,
@@ -26,6 +27,8 @@ const INTERACTION_TYPES = [
   { value: 'email', label: 'Email', icon: MessageSquare, color: 'blue' },
   { value: 'call', label: 'Call', icon: Phone, color: 'green' },
   { value: 'meeting', label: 'Meeting', icon: Video, color: 'purple' },
+  { value: 'sms', label: 'SMS', icon: MessageSquare, color: 'blue' },
+  { value: 'whatsapp', label: 'WhatsApp', icon: MessageCircle, color: 'emerald' },
   { value: 'note', label: 'Note', icon: FileText, color: 'gray' },
   { value: 'support_ticket', label: 'Support Ticket', icon: HeadphonesIcon, color: 'orange' }
 ]
@@ -133,6 +136,26 @@ const ContactInteractions = ({ contactId }) => {
     return config ? config.color : 'gray'
   }
 
+  const getInteractionStyleProps = (type) => {
+    if (type === 'whatsapp') {
+      return {
+        bgColor: '#25D366',
+        textColor: '#ffffff',
+        badgeClass: 'bg-green-100 text-green-800'
+      }
+    }
+    // Return class names for standard Tailwind colors
+    const colorMap = {
+      'email': { bg: 'bg-blue-100', text: 'text-blue-600', badge: 'badge-blue' },
+      'call': { bg: 'bg-green-100', text: 'text-green-600', badge: 'badge-green' },
+      'meeting': { bg: 'bg-purple-100', text: 'text-purple-600', badge: 'badge-purple' },
+      'sms': { bg: 'bg-blue-100', text: 'text-blue-600', badge: 'badge-blue' },
+      'note': { bg: 'bg-gray-100', text: 'text-gray-600', badge: 'badge-gray' },
+      'support_ticket': { bg: 'bg-orange-100', text: 'text-orange-600', badge: 'badge-orange' }
+    }
+    return colorMap[type] || { bg: 'bg-gray-100', text: 'text-gray-600', badge: 'badge-gray' }
+  }
+
   if (error) {
     return (
       <div className="text-center py-8">
@@ -154,7 +177,7 @@ const ContactInteractions = ({ contactId }) => {
   return (
     <div className="space-y-6">
       {/* Stats Overview */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
         <div className="bg-gray-50 rounded-lg p-4 text-center">
           <div className="text-2xl font-bold text-gray-900">{stats.total_interactions || 0}</div>
           <div className="text-sm text-gray-600">Total</div>
@@ -171,9 +194,13 @@ const ContactInteractions = ({ contactId }) => {
           <div className="text-2xl font-bold text-purple-900">{stats.meetings || 0}</div>
           <div className="text-sm text-purple-600">Meetings</div>
         </div>
-        <div className="bg-orange-50 rounded-lg p-4 text-center">
-          <div className="text-2xl font-bold text-orange-900">{stats.support_tickets || 0}</div>
-          <div className="text-sm text-orange-600">Support</div>
+        <div className="bg-blue-50 rounded-lg p-4 text-center">
+          <div className="text-2xl font-bold text-blue-900">{stats.sms || 0}</div>
+          <div className="text-sm text-blue-600">SMS</div>
+        </div>
+        <div className="rounded-lg p-4 text-center text-white" style={{ backgroundColor: '#25D366' }}>
+          <div className="text-2xl font-bold">{stats.whatsapp || 0}</div>
+          <div className="text-sm">WhatsApp</div>
         </div>
         <div className="bg-gray-50 rounded-lg p-4 text-center">
           <div className="text-2xl font-bold text-gray-900">{stats.notes || 0}</div>
@@ -263,9 +290,15 @@ const ContactInteractions = ({ contactId }) => {
                   <div className="flex items-start space-x-4 flex-1">
                     {/* Type & Direction Icons */}
                     <div className="flex items-center space-x-2">
-                      <div className={`p-2 bg-${getInteractionColor(interaction.interaction_type)}-100 rounded-lg`}>
-                        <TypeIcon className={`h-5 w-5 text-${getInteractionColor(interaction.interaction_type)}-600`} />
-                      </div>
+                      {interaction.interaction_type === 'whatsapp' ? (
+                        <div className="p-2 rounded-lg" style={{ backgroundColor: '#25D366' }}>
+                          <TypeIcon className="h-5 w-5 text-white" />
+                        </div>
+                      ) : (
+                        <div className={`p-2 bg-${getInteractionColor(interaction.interaction_type)}-100 rounded-lg`}>
+                          <TypeIcon className={`h-5 w-5 text-${getInteractionColor(interaction.interaction_type)}-600`} />
+                        </div>
+                      )}
                       <div className={`p-1 bg-${getDirectionColor(interaction.direction)}-100 rounded`}>
                         <DirectionIcon className={`h-3 w-3 text-${getDirectionColor(interaction.direction)}-600`} />
                       </div>
@@ -277,9 +310,15 @@ const ContactInteractions = ({ contactId }) => {
                         <h4 className="font-medium text-gray-900">
                           {interaction.subject || `${interaction.interaction_type.charAt(0).toUpperCase() + interaction.interaction_type.slice(1)} ${interaction.direction}`}
                         </h4>
-                        <span className={`badge badge-sm badge-${getInteractionColor(interaction.interaction_type)}`}>
-                          {interaction.interaction_type}
-                        </span>
+                        {interaction.interaction_type === 'whatsapp' ? (
+                          <span className="badge badge-sm text-white" style={{ backgroundColor: '#25D366' }}>
+                            {interaction.interaction_type}
+                          </span>
+                        ) : (
+                          <span className={`badge badge-sm badge-${getInteractionColor(interaction.interaction_type)}`}>
+                            {interaction.interaction_type}
+                          </span>
+                        )}
                         <span className={`badge badge-sm badge-${getDirectionColor(interaction.direction)}`}>
                           {interaction.direction}
                         </span>

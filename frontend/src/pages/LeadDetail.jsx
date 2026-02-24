@@ -19,7 +19,8 @@ import {
   Plus,
   User,
   FileText,
-  CheckSquare
+  CheckSquare,
+  MessageCircle
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import api from '../services/api'
@@ -32,6 +33,7 @@ import DuplicateAlert from '../components/Lead/DuplicateAlert'
 import DynamicLeadForm from '../components/DynamicLeadForm'
 import ConvertLeadModal from '../components/ConvertLeadModal'
 import TaskManager from '../components/TaskManager'
+import SendWhatsAppModal from '../components/SendWhatsAppModal'
 import { useFieldVisibility } from '../hooks/useFieldVisibility'
 
 const LeadDetail = () => {
@@ -49,6 +51,7 @@ const LeadDetail = () => {
   const [showAddActivity, setShowAddActivity] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showConversionModal, setShowConversionModal] = useState(false)
+  const [showWhatsAppModal, setShowWhatsAppModal] = useState(false)
   const [isConverting, setIsConverting] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
 
@@ -261,6 +264,17 @@ const LeadDetail = () => {
               >
                 <Edit size={16} />
                 Edit
+              </button>
+
+              <button
+                onClick={() => setShowWhatsAppModal(true)}
+                disabled={!lead?.phone}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-white text-white border rounded-lg font-medium text-sm hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ backgroundColor: lead?.phone ? '#25D366' : '#cccccc' }}
+                title={lead?.phone ? 'Send WhatsApp message' : 'No phone number available'}
+              >
+                <MessageCircle size={16} />
+                WhatsApp
               </button>
 
               <button
@@ -504,6 +518,18 @@ const LeadDetail = () => {
           onClose={() => setShowConversionModal(false)}
           onSubmit={handleConversionSubmit}
           isLoading={isConverting}
+        />
+      )}
+
+      {/* Send WhatsApp Modal */}
+      {showWhatsAppModal && lead && (
+        <SendWhatsAppModal
+          onClose={() => setShowWhatsAppModal(false)}
+          onSuccess={() => {
+            setRefreshKey(prev => prev + 1)
+          }}
+          defaultTo={lead.phone}
+          leadId={id}
         />
       )}
 
