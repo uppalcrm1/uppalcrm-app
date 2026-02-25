@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { MessageSquare, Phone, Send, Settings, PhoneCall } from 'lucide-react';
+import { MessageSquare, MessageCircle, Phone, Send, Settings, PhoneCall, ChevronDown } from 'lucide-react';
 import { twilioAPI } from '../services/api';
+import { useTwilioConfig } from '../hooks/useTwilioConfig';
 import { useNotifications } from '../context/NotificationContext';
 import SendSMSModal from '../components/SendSMSModal';
+import SendWhatsAppModal from '../components/SendWhatsAppModal';
 import ConversationList from '../components/ConversationList';
 import ConversationView from '../components/ConversationView';
 import CallHistoryList from '../components/CallHistoryList';
@@ -14,6 +16,8 @@ import LoadingSpinner from '../components/LoadingSpinner';
 const CommunicationsPage = () => {
   const [activeTab, setActiveTab] = useState('sms');
   const [showSendSMS, setShowSendSMS] = useState(false);
+  const [showSendWhatsApp, setShowSendWhatsApp] = useState(false);
+  const [showMessageMenu, setShowMessageMenu] = useState(false);
   const [showConfig, setShowConfig] = useState(false);
   const [showDialpad, setShowDialpad] = useState(false);
   const [dialpadNumber, setDialpadNumber] = useState('');
@@ -21,6 +25,7 @@ const CommunicationsPage = () => {
   const [selectedPhone, setSelectedPhone] = useState(null);
   const queryClient = useQueryClient();
   const { clearUnread } = useNotifications();
+  const { whatsappEnabled } = useTwilioConfig();
 
   // Clear unread count when viewing Communications page
   useEffect(() => {
@@ -54,18 +59,30 @@ const CommunicationsPage = () => {
     enabled: config?.configured
   });
 
-  // Get conversations
-  const { data: conversationsData, isLoading: conversationsLoading } = useQuery({
-    queryKey: ['conversations'],
-    queryFn: twilioAPI.getConversations,
+  // Get SMS conversations
+  const { data: smsConversationsData, isLoading: smsConversationsLoading } = useQuery({
+    queryKey: ['conversations', 'sms'],
+    queryFn: () => twilioAPI.getConversations({ channel: 'sms' }),
     enabled: config?.configured && activeTab === 'sms',
     refetchInterval: 30000 // Refresh every 30 seconds
   });
 
-  // Get selected conversation messages
+  // Get WhatsApp conversations
+  const { data: whatsappConversationsData, isLoading: whatsappConversationsLoading } = useQuery({
+    queryKey: ['conversations', 'whatsapp'],
+    queryFn: () => twilioAPI.getConversations({ channel: 'whatsapp' }),
+    enabled: config?.configured && activeTab === 'whatsapp',
+    refetchInterval: 30000 // Refresh every 30 seconds
+  });
+
+  // Determine which conversations to show based on active tab
+  const conversationsData = activeTab === 'sms' ? smsConversationsData : whatsappConversationsData;
+  const conversationsLoading = activeTab === 'sms' ? smsConversationsLoading : whatsappConversationsLoading;
+
+  // Get selected conversation messages (with channel filter)
   const { data: conversationData, isLoading: conversationLoading } = useQuery({
-    queryKey: ['conversation', selectedPhone],
-    queryFn: () => twilioAPI.getConversation(selectedPhone),
+    queryKey: ['conversation', selectedPhone, activeTab],
+    queryFn: () => twilioAPI.getConversation(selectedPhone, { channel: activeTab === 'sms' ? 'sms' : 'whatsapp' }),
     enabled: !!selectedPhone,
     refetchInterval: 10000 // Refresh every 10 seconds when viewing
   });
@@ -113,7 +130,7 @@ const CommunicationsPage = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Communications</h1>
-          <p className="text-gray-600">Manage SMS messages and phone calls</p>
+          <p className="text-gray-600">Manage SMS, WhatsApp messages and phone calls</p>
         </div>
         <div className="flex gap-3">
           <button
@@ -130,19 +147,54 @@ const CommunicationsPage = () => {
             <PhoneCall className="w-4 h-4 inline mr-2" />
             New Call
           </button>
-          <button
-            onClick={() => setShowSendSMS(true)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            <Send className="w-4 h-4 inline mr-2" />
-            New Message
-          </button>
+          <div className="relative">
+            <button
+              onClick={() => setShowMessageMenu(!showMessageMenu)}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+            >
+              <Send className="w-4 h-4" />
+              New Message
+              <ChevronDown className="w-4 h-4" />
+            </button>
+            {showMessageMenu && (
+              <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg z-10 border border-gray-200">
+                <button
+                  onClick={() => {
+                    setShowSendSMS(true);
+                    setShowMessageMenu(false);
+                  }}
+                  className={`w-full text-left px-4 py-3 hover:bg-gray-50 flex items-center gap-2 ${whatsappEnabled ? 'border-b border-gray-100' : ''}`}
+                >
+                  <MessageSquare className="w-4 h-4 text-blue-600" />
+                  <div>
+                    <p className="font-medium text-gray-900">Send SMS</p>
+                    <p className="text-xs text-gray-500">Send a text message</p>
+                  </div>
+                </button>
+                {whatsappEnabled && (
+                  <button
+                    onClick={() => {
+                      setShowSendWhatsApp(true);
+                      setShowMessageMenu(false);
+                    }}
+                    className="w-full text-left px-4 py-3 hover:bg-gray-50 flex items-center gap-2"
+                  >
+                    <MessageCircle className="w-4 h-4" style={{ color: '#25D366' }} />
+                    <div>
+                      <p className="font-medium text-gray-900">Send WhatsApp</p>
+                      <p className="text-xs text-gray-500">Send a WhatsApp message</p>
+                    </div>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Statistics Cards */}
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className={`grid gap-6 ${whatsappEnabled ? 'grid-cols-1 md:grid-cols-5' : 'grid-cols-1 md:grid-cols-4'}`}>
           <div className="bg-white rounded-lg shadow-sm p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -157,6 +209,23 @@ const CommunicationsPage = () => {
               {stats.sms.sent || 0} sent • {stats.sms.received || 0} received
             </p>
           </div>
+
+          {whatsappEnabled && (
+            <div className="rounded-lg shadow-sm p-6 text-white" style={{ backgroundColor: '#25D366' }}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm opacity-90">Total WhatsApp</p>
+                  <p className="text-2xl font-bold">
+                    {stats.sms.total_whatsapp || 0}
+                  </p>
+                </div>
+                <MessageCircle className="w-8 h-8" />
+              </div>
+              <p className="text-sm opacity-75 mt-2">
+                Messages via WhatsApp
+              </p>
+            </div>
+          )}
 
           <div className="bg-white rounded-lg shadow-sm p-6">
             <div className="flex items-center justify-between">
@@ -219,8 +288,25 @@ const CommunicationsPage = () => {
               }`}
             >
               <MessageSquare className="w-4 h-4 inline mr-2" />
-              Messages
+              Messages (SMS)
             </button>
+            {whatsappEnabled && (
+              <button
+                onClick={() => {
+                  setActiveTab('whatsapp');
+                  setSelectedPhone(null);
+                }}
+                className={`px-6 py-4 text-sm font-medium border-b-2 ${
+                  activeTab === 'whatsapp'
+                    ? 'border-b-2 text-white'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+                style={activeTab === 'whatsapp' ? { borderBottomColor: '#25D366', color: '#25D366' } : {}}
+              >
+                <MessageCircle className="w-4 h-4 inline mr-2" />
+                WhatsApp
+              </button>
+            )}
             <button
               onClick={() => setActiveTab('calls')}
               className={`px-6 py-4 text-sm font-medium border-b-2 ${
@@ -236,12 +322,14 @@ const CommunicationsPage = () => {
         </div>
 
         {/* Tab Content */}
-        {activeTab === 'sms' && (
+        {(activeTab === 'sms' || activeTab === 'whatsapp') && (
           <div className="flex h-[600px]">
             {/* Conversation List */}
             <div className={`${selectedPhone ? 'hidden md:block' : ''} w-full md:w-1/3 border-r border-gray-200 overflow-y-auto`}>
               <div className="p-4 border-b border-gray-200">
-                <h3 className="text-sm font-medium text-gray-700">Conversations</h3>
+                <h3 className="text-sm font-medium text-gray-700">
+                  {activeTab === 'sms' ? 'SMS Conversations' : 'WhatsApp Conversations'}
+                </h3>
               </div>
               <ConversationList
                 conversations={conversationsData?.conversations}
@@ -261,18 +349,30 @@ const CommunicationsPage = () => {
                   isLoading={conversationLoading}
                   onBack={() => setSelectedPhone(null)}
                   onSendMessage={() => {
-                    queryClient.invalidateQueries(['conversation', selectedPhone]);
-                    queryClient.invalidateQueries(['conversations']);
+                    queryClient.invalidateQueries(['conversation', selectedPhone, activeTab]);
+                    queryClient.invalidateQueries(['conversations', activeTab]);
                     queryClient.invalidateQueries(['twilioStats']);
                   }}
                 />
               ) : (
                 <div className="text-center">
-                  <MessageSquare className="mx-auto h-12 w-12 text-gray-400" />
-                  <h3 className="mt-2 text-sm font-medium text-gray-900">Select a conversation</h3>
-                  <p className="mt-1 text-sm text-gray-500">
-                    Choose a conversation from the list to view messages
-                  </p>
+                  {activeTab === 'sms' ? (
+                    <>
+                      <MessageSquare className="mx-auto h-12 w-12 text-gray-400" />
+                      <h3 className="mt-2 text-sm font-medium text-gray-900">Select a conversation</h3>
+                      <p className="mt-1 text-sm text-gray-500">
+                        Choose a conversation from the list to view SMS messages
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <MessageCircle className="mx-auto h-12 w-12 text-gray-400" />
+                      <h3 className="mt-2 text-sm font-medium text-gray-900">Select a conversation</h3>
+                      <p className="mt-1 text-sm text-gray-500">
+                        Choose a conversation from the list to view WhatsApp messages
+                      </p>
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -301,7 +401,17 @@ const CommunicationsPage = () => {
         <SendSMSModal
           onClose={() => setShowSendSMS(false)}
           onSuccess={() => {
-            queryClient.invalidateQueries(['conversations']);
+            queryClient.invalidateQueries(['conversations', 'sms']);
+            queryClient.invalidateQueries(['twilioStats']);
+          }}
+        />
+      )}
+
+      {showSendWhatsApp && (
+        <SendWhatsAppModal
+          onClose={() => setShowSendWhatsApp(false)}
+          onSuccess={() => {
+            queryClient.invalidateQueries(['conversations', 'whatsapp']);
             queryClient.invalidateQueries(['twilioStats']);
           }}
         />

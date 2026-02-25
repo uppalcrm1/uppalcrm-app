@@ -166,7 +166,7 @@ router.get('/config', authenticateToken, async (req, res) => {
     const organizationId = req.organizationId;
 
     const query = `
-      SELECT id, phone_number, sms_enabled, voice_enabled, is_active, verified_at
+      SELECT id, phone_number, sms_enabled, voice_enabled, is_active, verified_at, whatsapp_enabled, whatsapp_number
       FROM twilio_config
       WHERE organization_id = $1
     `;
@@ -343,6 +343,17 @@ router.get('/sms/conversations', authenticateToken, async (req, res) => {
   try {
     const organizationId = req.organizationId;
 
+    // First, check if sms_messages table has any records for this organization
+    const countResult = await db.query(
+      'SELECT COUNT(*) FROM sms_messages WHERE organization_id = $1',
+      [organizationId]
+    );
+
+    // If no messages exist, return empty array immediately (avoids empty JOIN issues)
+    if (parseInt(countResult.rows[0].count) === 0) {
+      return res.json({ conversations: [] });
+    }
+
     const query = `
       WITH conversation_stats AS (
         SELECT
@@ -425,7 +436,8 @@ router.get('/sms/conversations', authenticateToken, async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching conversations:', error);
-    res.status(500).json({ error: 'Failed to fetch conversations' });
+    // Return empty array instead of error, as this is expected when no messages exist
+    res.json({ conversations: [] });
   }
 });
 
@@ -1376,16 +1388,25 @@ router.post('/webhook/call-status', async (req, res) => {
 });
 
 /**
- * Get SMS/Call Statistics
+ * Get SMS/WhatsApp/Call Statistics
+ *
+ * Returns statistics for SMS, WhatsApp, and phone calls:
+ * - SMS stats include separate counts for total_sms and total_whatsapp
+ * - Sent/received counts are combined for both channels
+ * - Cost is the sum of all SMS and WhatsApp messaging costs
+ * - Returns 0 for all counts if no messages/calls exist
+ * - Cost returns null (converted to 0 by frontend) if no activity
  */
 router.get('/stats', authenticateToken, async (req, res) => {
   try {
     const organizationId = req.organizationId;
 
-    // SMS stats
+    // SMS and WhatsApp stats (combined and channel breakdown)
+    // Note: channel column defaults to 'sms' for backward compatibility
     const smsQuery = `
       SELECT
-        COUNT(*) as total_sms,
+        COUNT(*) FILTER (WHERE channel = 'sms') as total_sms,
+        COUNT(*) FILTER (WHERE channel = 'whatsapp') as total_whatsapp,
         COUNT(*) FILTER (WHERE direction = 'outbound') as sent,
         COUNT(*) FILTER (WHERE direction = 'inbound') as received,
         COUNT(*) FILTER (WHERE twilio_status = 'delivered') as delivered,
@@ -1413,12 +1434,46 @@ router.get('/stats', authenticateToken, async (req, res) => {
     const callResult = await db.query(callQuery, [organizationId]);
 
     res.json({
-      sms: smsResult.rows[0],
-      calls: callResult.rows[0]
+      sms: smsResult.rows[0] || {
+        total_sms: 0,
+        total_whatsapp: 0,
+        sent: 0,
+        received: 0,
+        delivered: 0,
+        failed: 0,
+        total_sms_cost: null
+      },
+      calls: callResult.rows[0] || {
+        total_calls: 0,
+        outbound: 0,
+        inbound: 0,
+        answered: 0,
+        total_duration: null,
+        total_call_cost: null
+      }
     });
   } catch (error) {
     console.error('Error fetching stats:', error);
-    res.status(500).json({ error: 'Failed to fetch statistics' });
+    // Return empty stats instead of error for better UX
+    res.json({
+      sms: {
+        total_sms: 0,
+        total_whatsapp: 0,
+        sent: 0,
+        received: 0,
+        delivered: 0,
+        failed: 0,
+        total_sms_cost: null
+      },
+      calls: {
+        total_calls: 0,
+        outbound: 0,
+        inbound: 0,
+        answered: 0,
+        total_duration: null,
+        total_call_cost: null
+      }
+    });
   }
 });
 

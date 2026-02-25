@@ -994,8 +994,8 @@ export const twilioAPI = {
   },
 
   // Get SMS conversations (grouped by phone number)
-  getConversations: async () => {
-    const response = await api.get('/twilio/sms/conversations')
+  getConversations: async (params = {}) => {
+    const response = await api.get('/twilio/sms/conversations', { params })
     return response.data
   },
 
