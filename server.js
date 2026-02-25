@@ -619,6 +619,23 @@ const startServer = async () => {
       // Don't stop server if migrations fail - log but continue
     }
 
+    // Cleanup incoming calls from server restart
+    try {
+      const { query } = require('./database/connection');
+      console.log('🔧 Cleaning up stale incoming calls from previous server session...');
+      
+      const cleanupResult = await query(`
+        UPDATE incoming_calls 
+        SET status = 'expired', updated_at = NOW()
+        WHERE status = 'ringing' AND created_at < NOW() - INTERVAL '5 minutes'
+      `);
+
+      console.log(`✅ Cleaned up ${cleanupResult.rowCount || 0} stale incoming calls`);
+    } catch (cleanupError) {
+      console.error('⚠️  Error cleaning up stale incoming calls:', cleanupError.message);
+      // Don't stop server if cleanup fails
+    }
+
     // Fix lead creation trigger (run once on startup)
     try {
       const { fixLeadCreationTrigger } = require('./scripts/fix-lead-creation-trigger');

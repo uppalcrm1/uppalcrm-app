@@ -985,44 +985,79 @@ router.post('/webhook/voice', async (req, res) => {
         CallSid
       ]);
 
-      // Store pending incoming call for frontend notification
-      const cacheKey = `incoming_call:${organizationId}`;
-      if (!global.incomingCalls) {
-        global.incomingCalls = {};
-      }
-      const incomingCallData = {
-        callSid: CallSid,
-        from: From,
-        to: To,
-        callerName: contactInfo ? `${contactInfo.first_name || ''} ${contactInfo.last_name || ''}`.trim() : null,
-        leadId: contactInfo?.type === 'lead' ? contactInfo.id : null,
-        contactId: contactInfo?.type === 'contact' ? contactInfo.id : null,
-        timestamp: new Date().toISOString()
-      };
-      global.incomingCalls[cacheKey] = incomingCallData;
+      // Store pending incoming call in database for frontend notification
+      try {
+        const insertIncomingCallQuery = `
+          INSERT INTO incoming_calls (
+            organization_id, call_sid, from_number, to_number, status, conference_id
+          ) VALUES ($1, $2, $3, $4, 'ringing', $5)
+          ON CONFLICT (call_sid) DO UPDATE SET status = 'ringing', updated_at = NOW()
+          RETURNING *
+        `;
 
-      // Emit real-time notification via WebSocket
-      const websocketService = require('../services/websocketService');
-      websocketService.emitIncomingCall(organizationId, incomingCallData);
+        const conferenceId = `incoming-${CallSid}`;
+        const result = await db.query(insertIncomingCallQuery, [
+          organizationId,
+          CallSid,
+          From,
+          To,
+          conferenceId
+        ]);
+
+        const incomingCallData = {
+          callSid: CallSid,
+          from: From,
+          to: To,
+          callerName: contactInfo ? `${contactInfo.first_name || ''} ${contactInfo.last_name || ''}`.trim() : null,
+          leadId: contactInfo?.type === 'lead' ? contactInfo.id : null,
+          contactId: contactInfo?.type === 'contact' ? contactInfo.id : null,
+          timestamp: new Date().toISOString()
+        };
+
+        console.log(`✅ Stored incoming call ${CallSid} in database for organization ${organizationId}`);
+
+        // Emit real-time notification via WebSocket
+        const websocketService = require('../services/websocketService');
+        websocketService.emitIncomingCall(organizationId, incomingCallData);
+      } catch (dbError) {
+        console.error(`❌ Error storing incoming call in database: ${dbError.message}`);
+        // Continue with the call even if database storage fails
+      }
 
       // Timeout: Hang up after 60 seconds if not answered
+      // Note: We validate status in the database to see if it's still 'ringing'
       setTimeout(async () => {
         console.log('========================================');
-        console.log(`⏰ TIMEOUT: Ending unanswered call ${CallSid} after 60 seconds`);
+        console.log(`⏰ TIMEOUT: Checking if call ${CallSid} should end after 60 seconds`);
         console.log('========================================');
 
-        if (global.incomingCalls && global.incomingCalls[cacheKey]?.callSid === CallSid) {
-          delete global.incomingCalls[cacheKey];
+        try {
+          // Check if call is still ringing (not accepted)
+          const checkQuery = `
+            SELECT status FROM incoming_calls
+            WHERE call_sid = $1
+          `;
+          const checkResult = await db.query(checkQuery, [CallSid]);
 
-          try {
+          if (checkResult.rows.length > 0 && checkResult.rows[0].status === 'ringing') {
+            // Still ringing, update to expired
+            const updateQuery = `
+              UPDATE incoming_calls SET status = 'expired', updated_at = NOW()
+              WHERE call_sid = $1
+            `;
+            await db.query(updateQuery, [CallSid]);
+
+            // Hang up the call
             const { client } = await twilioService.getClient(organizationId);
             await client.calls(CallSid).update({
               status: 'completed'
             });
-            console.log(`✅ Call ${CallSid} ended due to timeout`);
-          } catch (err) {
-            console.log(`Call already ended: ${err.message}`);
+            console.log(`✅ Call ${CallSid} ended due to timeout (marked as expired in DB)`);
+          } else {
+            console.log(`Call ${CallSid} already accepted or handled`);
           }
+        } catch (err) {
+          console.log(`Error during timeout handling for call ${CallSid}: ${err.message}`);
         }
       }, 60000); // 60 seconds
     }
@@ -1078,15 +1113,22 @@ router.post('/incoming-calls/accept', authenticateToken, async (req, res) => {
 
     console.log(`Agent will join existing conference: ${conferenceId}`);
 
-    // Clear from cache
-    if (global.incomingCalls) {
-      const cacheKey = Object.keys(global.incomingCalls).find(
-        key => global.incomingCalls[key].callSid === callSid
-      );
-      if (cacheKey) {
-        delete global.incomingCalls[cacheKey];
-      }
+    // Update call status in database
+    const updateQuery = `
+      UPDATE incoming_calls 
+      SET status = 'accepted', accepted_by = $1, updated_at = NOW()
+      WHERE call_sid = $2 AND organization_id = $3
+      RETURNING *
+    `;
+
+    const result = await db.query(updateQuery, [userId, callSid, organizationId]);
+
+    if (result.rows.length === 0) {
+      console.warn(`⚠️  Call ${callSid} not found in database for organization ${organizationId}`);
+      return res.status(404).json({ error: 'Call not found' });
     }
+
+    console.log(`✅ Updated call ${callSid} status to 'accepted' by user ${userId}`);
 
     // Emit call-accepted notification via WebSocket
     const websocketService = require('../services/websocketService');
@@ -1114,16 +1156,22 @@ router.post('/incoming-calls/decline', authenticateToken, async (req, res) => {
 
     console.log(`Declining incoming call: ${callSid}`);
 
-    // Clear from global cache
-    if (global.incomingCalls) {
-      const cacheKey = Object.keys(global.incomingCalls).find(
-        key => global.incomingCalls[key].callSid === callSid
-      );
-      if (cacheKey) {
-        console.log(`Clearing declined call ${callSid} from global cache`);
-        delete global.incomingCalls[cacheKey];
-      }
+    // Update call status in database
+    const updateQuery = `
+      UPDATE incoming_calls 
+      SET status = 'hangup', updated_at = NOW()
+      WHERE call_sid = $1 AND organization_id = $2
+      RETURNING *
+    `;
+
+    const result = await db.query(updateQuery, [callSid, organizationId]);
+
+    if (result.rows.length === 0) {
+      console.warn(`⚠️  Call ${callSid} not found in database for organization ${organizationId}`);
+      return res.status(404).json({ error: 'Call not found' });
     }
+
+    console.log(`✅ Updated call ${callSid} status to 'hangup' in database`);
 
     // Get Twilio client and hang up the call
     const { client } = await twilioService.getClient(organizationId);
@@ -1271,9 +1319,50 @@ router.post('/webhook/conference-status', async (req, res) => {
 router.get('/incoming-calls/pending', authenticateToken, async (req, res) => {
   try {
     const organizationId = req.organizationId;
-    const cacheKey = `incoming_call:${organizationId}`;
 
-    const incomingCall = global.incomingCalls?.[cacheKey] || null;
+    // Query the database for ringing calls
+    const queryText = `
+      SELECT 
+        id,
+        call_sid AS "callSid",
+        from_number AS "from",
+        to_number AS "to",
+        status,
+        conference_id AS "conferenceId",
+        created_at AS "timestamp"
+      FROM incoming_calls
+      WHERE organization_id = $1 AND status = 'ringing'
+      ORDER BY created_at DESC
+      LIMIT 1
+    `;
+
+    const result = await db.query(queryText, [organizationId]);
+    const incomingCall = result.rows.length > 0 ? result.rows[0] : null;
+
+    // If we have an incoming call, fetch contact info for the frontend
+    if (incomingCall) {
+      const contactQuery = `
+        SELECT 'lead' as type, id, first_name, last_name FROM leads
+        WHERE organization_id = $1 AND phone = $2
+        UNION ALL
+        SELECT 'contact' as type, id, first_name, last_name FROM contacts
+        WHERE organization_id = $1 AND phone = $2
+        LIMIT 1
+      `;
+
+      const contactResult = await db.query(contactQuery, [organizationId, incomingCall.from]);
+      const contactInfo = contactResult.rows[0] || null;
+
+      if (contactInfo) {
+        incomingCall.callerName = `${contactInfo.first_name || ''} ${contactInfo.last_name || ''}`.trim();
+        incomingCall.leadId = contactInfo.type === 'lead' ? contactInfo.id : null;
+        incomingCall.contactId = contactInfo.type === 'contact' ? contactInfo.id : null;
+      } else {
+        incomingCall.callerName = null;
+        incomingCall.leadId = null;
+        incomingCall.contactId = null;
+      }
+    }
 
     res.json({ incomingCall });
   } catch (error) {
@@ -1288,11 +1377,31 @@ router.get('/incoming-calls/pending', authenticateToken, async (req, res) => {
 router.post('/incoming-calls/clear', authenticateToken, async (req, res) => {
   try {
     const organizationId = req.organizationId;
-    const cacheKey = `incoming_call:${organizationId}`;
+    const { callSid } = req.body;
 
-    if (global.incomingCalls) {
-      delete global.incomingCalls[cacheKey];
+    // Update the call status to 'hangup' if not already updated
+    let updateQuery;
+    let params;
+
+    if (callSid) {
+      // If callSid is provided, clear that specific call
+      updateQuery = `
+        UPDATE incoming_calls 
+        SET status = 'hangup', updated_at = NOW()
+        WHERE call_sid = $1 AND organization_id = $2 AND status = 'ringing'
+      `;
+      params = [callSid, organizationId];
+    } else {
+      // Otherwise clear all ringing calls for this organization (cleanup)
+      updateQuery = `
+        UPDATE incoming_calls 
+        SET status = 'hangup', updated_at = NOW()
+        WHERE organization_id = $1 AND status = 'ringing'
+      `;
+      params = [organizationId];
     }
+
+    await db.query(updateQuery, params);
 
     res.json({ success: true });
   } catch (error) {
