@@ -166,7 +166,7 @@ router.get('/config', authenticateToken, async (req, res) => {
     const organizationId = req.organizationId;
 
     const query = `
-      SELECT id, phone_number, sms_enabled, voice_enabled, is_active, verified_at
+      SELECT id, phone_number, sms_enabled, voice_enabled, is_active, verified_at, whatsapp_enabled, whatsapp_number
       FROM twilio_config
       WHERE organization_id = $1
     `;

@@ -23,6 +23,7 @@ import {
   MessageCircle
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { useTwilioConfig } from '../hooks/useTwilioConfig'
 import api from '../services/api'
 import LoadingSpinner from '../components/LoadingSpinner'
 import LeadProgressBar from '../components/Lead/LeadProgressBar'
@@ -40,6 +41,7 @@ const LeadDetail = () => {
   const { id } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
+  const { whatsappEnabled } = useTwilioConfig()
 
   const [lead, setLead] = useState(null)
   const [activityStats, setActivityStats] = useState([])
@@ -266,16 +268,18 @@ const LeadDetail = () => {
                 Edit
               </button>
 
-              <button
-                onClick={() => setShowWhatsAppModal(true)}
-                disabled={!lead?.phone}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-white text-white border rounded-lg font-medium text-sm hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ backgroundColor: lead?.phone ? '#25D366' : '#cccccc' }}
-                title={lead?.phone ? 'Send WhatsApp message' : 'No phone number available'}
-              >
-                <MessageCircle size={16} />
-                WhatsApp
-              </button>
+              {whatsappEnabled && (
+                <button
+                  onClick={() => setShowWhatsAppModal(true)}
+                  disabled={!lead?.phone}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-white text-white border rounded-lg font-medium text-sm hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ backgroundColor: lead?.phone ? '#25D366' : '#cccccc' }}
+                  title={lead?.phone ? 'Send WhatsApp message' : 'No phone number available'}
+                >
+                  <MessageCircle size={16} />
+                  WhatsApp
+                </button>
+              )}
 
               <button
                 onClick={handleConvertToContact}

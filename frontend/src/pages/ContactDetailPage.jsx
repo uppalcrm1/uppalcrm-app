@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useFieldVisibility } from '../hooks/useFieldVisibility';
+import { useTwilioConfig } from '../hooks/useTwilioConfig';
 import {
   ArrowLeft, Mail, Phone, Copy, ChevronDown, ChevronUp,
   MessageSquare, MessageCircle, Edit, MoreVertical, Calendar, CheckCircle2,
@@ -17,6 +18,7 @@ import { format } from 'date-fns';
 const ContactDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { whatsappEnabled } = useTwilioConfig();
 
   // State
   const [contact, setContact] = useState(null);
@@ -217,16 +219,18 @@ const ContactDetailPage = () => {
                 <MessageSquare size={16} />
                 SMS
               </button>
-              <button
-                onClick={() => setShowWhatsAppModal(true)}
-                disabled={!contact.phone}
-                className="px-4 py-2 border rounded-lg hover:opacity-90 flex items-center gap-2 text-sm font-medium text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ backgroundColor: contact.phone ? '#25D366' : '#cccccc', borderColor: '#25D366' }}
-                title={contact.phone ? 'Send WhatsApp' : 'No phone number available'}
-              >
-                <MessageCircle size={16} />
-                WhatsApp
-              </button>
+              {whatsappEnabled && (
+                <button
+                  onClick={() => setShowWhatsAppModal(true)}
+                  disabled={!contact.phone}
+                  className="px-4 py-2 border rounded-lg hover:opacity-90 flex items-center gap-2 text-sm font-medium text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ backgroundColor: contact.phone ? '#25D366' : '#cccccc', borderColor: '#25D366' }}
+                  title={contact.phone ? 'Send WhatsApp' : 'No phone number available'}
+                >
+                  <MessageCircle size={16} />
+                  WhatsApp
+                </button>
+              )}
               <button
                 onClick={() => setShowEditModal(true)}
                 className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2 text-sm font-medium"

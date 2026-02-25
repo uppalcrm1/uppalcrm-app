@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { MessageSquare, MessageCircle, Phone, Send, Settings, PhoneCall, ChevronDown } from 'lucide-react';
 import { twilioAPI } from '../services/api';
+import { useTwilioConfig } from '../hooks/useTwilioConfig';
 import { useNotifications } from '../context/NotificationContext';
 import SendSMSModal from '../components/SendSMSModal';
 import SendWhatsAppModal from '../components/SendWhatsAppModal';
@@ -24,6 +25,7 @@ const CommunicationsPage = () => {
   const [selectedPhone, setSelectedPhone] = useState(null);
   const queryClient = useQueryClient();
   const { clearUnread } = useNotifications();
+  const { whatsappEnabled } = useTwilioConfig();
 
   // Clear unread count when viewing Communications page
   useEffect(() => {
@@ -161,7 +163,7 @@ const CommunicationsPage = () => {
                     setShowSendSMS(true);
                     setShowMessageMenu(false);
                   }}
-                  className="w-full text-left px-4 py-3 hover:bg-gray-50 flex items-center gap-2 border-b border-gray-100"
+                  className={`w-full text-left px-4 py-3 hover:bg-gray-50 flex items-center gap-2 ${whatsappEnabled ? 'border-b border-gray-100' : ''}`}
                 >
                   <MessageSquare className="w-4 h-4 text-blue-600" />
                   <div>
@@ -169,19 +171,21 @@ const CommunicationsPage = () => {
                     <p className="text-xs text-gray-500">Send a text message</p>
                   </div>
                 </button>
-                <button
-                  onClick={() => {
-                    setShowSendWhatsApp(true);
-                    setShowMessageMenu(false);
-                  }}
-                  className="w-full text-left px-4 py-3 hover:bg-gray-50 flex items-center gap-2"
-                >
-                  <MessageCircle className="w-4 h-4" style={{ color: '#25D366' }} />
-                  <div>
-                    <p className="font-medium text-gray-900">Send WhatsApp</p>
-                    <p className="text-xs text-gray-500">Send a WhatsApp message</p>
-                  </div>
-                </button>
+                {whatsappEnabled && (
+                  <button
+                    onClick={() => {
+                      setShowSendWhatsApp(true);
+                      setShowMessageMenu(false);
+                    }}
+                    className="w-full text-left px-4 py-3 hover:bg-gray-50 flex items-center gap-2"
+                  >
+                    <MessageCircle className="w-4 h-4" style={{ color: '#25D366' }} />
+                    <div>
+                      <p className="font-medium text-gray-900">Send WhatsApp</p>
+                      <p className="text-xs text-gray-500">Send a WhatsApp message</p>
+                    </div>
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -190,7 +194,7 @@ const CommunicationsPage = () => {
 
       {/* Statistics Cards */}
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+        <div className={`grid gap-6 ${whatsappEnabled ? 'grid-cols-1 md:grid-cols-5' : 'grid-cols-1 md:grid-cols-4'}`}>
           <div className="bg-white rounded-lg shadow-sm p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -206,20 +210,22 @@ const CommunicationsPage = () => {
             </p>
           </div>
 
-          <div className="rounded-lg shadow-sm p-6 text-white" style={{ backgroundColor: '#25D366' }}>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm opacity-90">Total WhatsApp</p>
-                <p className="text-2xl font-bold">
-                  {stats.sms.total_whatsapp || 0}
-                </p>
+          {whatsappEnabled && (
+            <div className="rounded-lg shadow-sm p-6 text-white" style={{ backgroundColor: '#25D366' }}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm opacity-90">Total WhatsApp</p>
+                  <p className="text-2xl font-bold">
+                    {stats.sms.total_whatsapp || 0}
+                  </p>
+                </div>
+                <MessageCircle className="w-8 h-8" />
               </div>
-              <MessageCircle className="w-8 h-8" />
+              <p className="text-sm opacity-75 mt-2">
+                Messages via WhatsApp
+              </p>
             </div>
-            <p className="text-sm opacity-75 mt-2">
-              Messages via WhatsApp
-            </p>
-          </div>
+          )}
 
           <div className="bg-white rounded-lg shadow-sm p-6">
             <div className="flex items-center justify-between">
@@ -284,21 +290,23 @@ const CommunicationsPage = () => {
               <MessageSquare className="w-4 h-4 inline mr-2" />
               Messages (SMS)
             </button>
-            <button
-              onClick={() => {
-                setActiveTab('whatsapp');
-                setSelectedPhone(null);
-              }}
-              className={`px-6 py-4 text-sm font-medium border-b-2 ${
-                activeTab === 'whatsapp'
-                  ? 'border-b-2 text-white'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-              style={activeTab === 'whatsapp' ? { borderBottomColor: '#25D366', color: '#25D366' } : {}}
-            >
-              <MessageCircle className="w-4 h-4 inline mr-2" />
-              WhatsApp
-            </button>
+            {whatsappEnabled && (
+              <button
+                onClick={() => {
+                  setActiveTab('whatsapp');
+                  setSelectedPhone(null);
+                }}
+                className={`px-6 py-4 text-sm font-medium border-b-2 ${
+                  activeTab === 'whatsapp'
+                    ? 'border-b-2 text-white'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+                style={activeTab === 'whatsapp' ? { borderBottomColor: '#25D366', color: '#25D366' } : {}}
+              >
+                <MessageCircle className="w-4 h-4 inline mr-2" />
+                WhatsApp
+              </button>
+            )}
             <button
               onClick={() => setActiveTab('calls')}
               className={`px-6 py-4 text-sm font-medium border-b-2 ${
