@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
+import { Device } from '@twilio/voice-sdk'
 import { twilioAPI } from '../services/api'
 import toast from 'react-hot-toast'
 import { useAuth } from '../contexts/AuthContext'
@@ -20,6 +21,150 @@ export const CallProvider = ({ children }) => {
   const [activeCall, setActiveCall] = useState(null)
   const [callHistory, setCallHistory] = useState([])
   const [missedCallCount, setMissedCallCount] = useState(0)
+  const [deviceStatus, setDeviceStatus] = useState('initializing') // 'initializing', 'ready', 'error'
+  const deviceRef = useRef(null)
+
+  // Initialize Twilio Device when user logs in
+  useEffect(() => {
+    if (!isAuthenticated) {
+      // Cleanup device when logging out
+      if (deviceRef.current) {
+        deviceRef.current.destroy()
+        deviceRef.current = null
+      }
+      setDeviceStatus('initializing')
+      return
+    }
+
+    const initDevice = async () => {
+      try {
+        console.log('🎧 Twilio Device initializing in CallContext...')
+        setDeviceStatus('initializing')
+
+        // Check microphone permission
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+          stream.getTracks().forEach(track => track.stop())
+          console.log('✅ Microphone permission granted')
+        } catch (error) {
+          console.error('❌ Microphone permission denied:', error)
+          setDeviceStatus('error')
+          toast.error('Please allow microphone access for incoming calls')
+          return
+        }
+
+        const token = localStorage.getItem('authToken')
+        if (!token) {
+          console.error('No auth token found')
+          setDeviceStatus('error')
+          return
+        }
+
+        // Fetch Twilio token from backend
+        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3004/api'
+        const response = await fetch(`${API_URL}/twilio/token`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'X-Organization-Slug': localStorage.getItem('organizationSlug')
+          }
+        })
+
+        if (!response.ok) {
+          throw new Error(`Failed to get Twilio token: ${response.statusText}`)
+        }
+
+        const { token: twilioToken } = await response.json()
+        console.log('✅ Token received, creating device in CallContext...')
+
+        // Create device instance
+        const device = new Device(twilioToken, {
+          debug: true,
+          sounds: {
+            incoming: true,
+            outgoing: true,
+            disconnect: true
+          }
+        })
+
+        // Device registered - ready to make/receive calls
+        device.on('registered', () => {
+          console.log('✅ Twilio Device registered and ready')
+          console.log('📱 Registered identity:', device.identity)
+          setDeviceStatus('ready')
+          toast.success('Voice connection ready')
+        })
+
+        // Handle token expiration
+        device.on('tokenWillExpire', async () => {
+          console.warn('⏰ Token expiring soon - refreshing...')
+          try {
+            const token = localStorage.getItem('authToken')
+            const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3004/api'
+            const response = await fetch(`${API_URL}/twilio/token`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'X-Organization-Slug': localStorage.getItem('organizationSlug')
+              }
+            })
+
+            if (!response.ok) {
+              throw new Error('Failed to refresh token')
+            }
+
+            const { token: newToken } = await response.json()
+            device.updateToken(newToken)
+            console.log('✅ Token refreshed successfully')
+          } catch (error) {
+            console.error('❌ Error refreshing token:', error)
+            setDeviceStatus('error')
+          }
+        })
+
+        // Handle errors
+        device.on('error', (error) => {
+          console.error('❌ Twilio Device error:', error)
+          setDeviceStatus('error')
+          toast.error(`Connection error: ${error.message}`)
+        })
+
+        // Handle incoming calls via SDK
+        device.on('incoming', (call) => {
+          console.log('📞 SDK incoming event fired! Call object:', call)
+          console.log('📞 SDK incoming call received from:', call.parameters.From)
+
+          // Dispatch custom event for CallContext to handle
+          window.dispatchEvent(new CustomEvent('twilioIncomingCall', {
+            detail: {
+              call: call,
+              from: call.parameters.From,
+              callSid: call.parameters.CallSid
+            }
+          }))
+        })
+
+        // Register the device
+        await device.register()
+        deviceRef.current = device
+
+        console.log('✅ Device initialization complete')
+      } catch (error) {
+        console.error('❌ Error initializing Twilio device:', error)
+        setDeviceStatus('error')
+        toast.error(error.message || 'Failed to initialize voice connection')
+      }
+    }
+
+    initDevice()
+
+    return () => {
+      if (deviceRef.current) {
+        deviceRef.current.destroy()
+        deviceRef.current = null
+      }
+    }
+  }, [isAuthenticated])
 
   // Fetch call history
   const fetchCallHistory = useCallback(async () => {
@@ -183,7 +328,9 @@ export const CallProvider = ({ children }) => {
     declineCall,
     endCall,
     clearMissedCalls,
-    fetchCallHistory
+    fetchCallHistory,
+    device: deviceRef.current,
+    deviceStatus
   }
 
   return (

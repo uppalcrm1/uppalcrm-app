@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Phone, PhoneOff, Mic, MicOff, Volume2, VolumeX, Delete, X, User } from 'lucide-react'
-import { Device } from '@twilio/voice-sdk'
 import { twilioAPI } from '../services/api'
+import { useCall } from '../context/CallContext'
 import toast from 'react-hot-toast'
 
 const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
+  const { device, deviceStatus } = useCall()
   const [phoneNumber, setPhoneNumber] = useState(prefilledNumber)
   const [isCallActive, setIsCallActive] = useState(false)
   const [callStatus, setCallStatus] = useState('')
@@ -12,9 +13,7 @@ const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
   const [isMuted, setIsMuted] = useState(false)
   const [isSpeakerOn, setIsSpeakerOn] = useState(true)
   const [isDialing, setIsDialing] = useState(false)
-  const [deviceStatus, setDeviceStatus] = useState('initializing') // 'initializing', 'ready', 'error'
   const timerRef = useRef(null)
-  const deviceRef = useRef(null)
   const activeCallRef = useRef(null)
 
   // Format phone number as user types
@@ -59,7 +58,7 @@ const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
       return
     }
 
-    if (!deviceRef.current) {
+    if (!device) {
       toast.error('Voice connection not ready. Please refresh the page.')
       return
     }
@@ -81,7 +80,7 @@ const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
 
       // STEP 2: Agent joins conference FIRST via Voice SDK
       console.log('Agent joining conference via Voice SDK...')
-      const call = await deviceRef.current.connect({
+      const call = await device.connect({
         params: {
           conference: conferenceId,
           participant: 'agent'
@@ -185,136 +184,8 @@ const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
   }
 
-  // Initialize Twilio Device on mount
-  useEffect(() => {
-    const initDevice = async () => {
-      try {
-        setDeviceStatus('initializing')
-
-        // Check microphone permission
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-          stream.getTracks().forEach(track => track.stop())
-          console.log('Microphone permission granted')
-        } catch (error) {
-          console.error('Microphone permission denied:', error)
-          toast.error('Please allow microphone access to use calling')
-          setDeviceStatus('error')
-          return
-        }
-
-        const token = localStorage.getItem('authToken')
-        if (!token) {
-          console.error('No auth token found')
-          setDeviceStatus('error')
-          toast.error('Not authenticated. Please log in again.')
-          return
-        }
-
-        // Get token from backend
-        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3004/api'
-        const response = await fetch(`${API_URL}/twilio/token`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'X-Organization-Slug': localStorage.getItem('organizationSlug')
-          }
-        })
-
-        if (!response.ok) {
-          throw new Error(`Failed to get Twilio token: ${response.statusText}`)
-        }
-
-        const { token: twilioToken } = await response.json()
-
-        console.log('Token received, creating device...')
-
-        // Create and register device
-        const device = new Device(twilioToken, {
-          debug: true,
-          sounds: {
-            incoming: true,
-            outgoing: true,
-            disconnect: true
-          }
-        })
-
-        device.on('registered', () => {
-          console.log('Twilio Device registered and ready')
-          console.log('Registered identity:', device.identity)
-          setDeviceStatus('ready')
-          toast.success('Voice connection ready')
-        })
-
-        device.on('tokenWillExpire', async () => {
-          console.warn('Token expiring soon - refreshing...')
-          try {
-            const token = localStorage.getItem('authToken')
-            const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3004/api'
-            const response = await fetch(`${API_URL}/twilio/token`, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'X-Organization-Slug': localStorage.getItem('organizationSlug')
-              }
-            })
-
-            if (!response.ok) {
-              throw new Error('Failed to refresh token')
-            }
-
-            const { token: newToken } = await response.json()
-            device.updateToken(newToken)
-            console.log('Token refreshed successfully')
-            toast.success('Voice connection refreshed')
-          } catch (error) {
-            console.error('Error refreshing token:', error)
-            toast.error('Failed to refresh connection')
-            setDeviceStatus('error')
-          }
-        })
-
-        device.on('error', (error) => {
-          console.error('Twilio Device error:', error)
-          setDeviceStatus('error')
-          toast.error(`Connection error: ${error.message}`)
-        })
-
-        // NEW: Handle incoming calls via SDK (replaces polling)
-        device.on('incoming', (call) => {
-          console.log('📞 SDK incoming event fired! Call object:', call)
-          console.log('📞 Incoming call from SDK:', {
-            from: call.parameters.From,
-            callSid: call.parameters.CallSid
-          })
-
-          // Dispatch custom event with the actual Twilio call object
-          window.dispatchEvent(new CustomEvent('twilioIncomingCall', {
-            detail: {
-              call: call,  // The actual Twilio call object with accept() and reject() methods
-              from: call.parameters.From,
-              callSid: call.parameters.CallSid
-            }
-          }))
-        })
-
-        await device.register()
-        deviceRef.current = device
-      } catch (error) {
-        console.error('Error initializing Twilio device:', error)
-        setDeviceStatus('error')
-        toast.error(error.message || 'Failed to initialize voice connection')
-      }
-    }
-
-    initDevice()
-
-    return () => {
-      if (deviceRef.current) {
-        deviceRef.current.destroy()
-      }
-    }
-  }, [])
+  // Device is now initialized in CallContext when user logs in
+  // No need to initialize it here anymore
 
   // Cleanup timer on unmount
   useEffect(() => {
@@ -333,7 +204,7 @@ const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
     const handleJoinIncomingConference = async (event) => {
       const { conferenceId, callerPhone, callerName } = event.detail
 
-      if (!conferenceId || !deviceRef.current || deviceStatus !== 'ready' || isCallActive) {
+      if (!conferenceId || !device || deviceStatus !== 'ready' || isCallActive) {
         return
       }
 
@@ -344,7 +215,7 @@ const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
         setCallStatus('Joining conference...')
 
         // Auto-join the conference
-        const call = await deviceRef.current.connect({
+        const call = await device.connect({
           params: {
             conference: conferenceId,
             participant: 'agent'
@@ -387,7 +258,7 @@ const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
     return () => {
       window.removeEventListener('joinIncomingCallConference', handleJoinIncomingConference)
     }
-  }, [deviceStatus, isCallActive])
+  }, [device, deviceStatus, isCallActive])
 
   const dialpadButtons = [
     ['1', '2', '3'],
