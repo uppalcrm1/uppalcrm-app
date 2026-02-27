@@ -1045,7 +1045,7 @@ router.post('/webhook/voice', async (req, res) => {
 
           // Get all users with active sessions in this organization
           const agentsQuery = `
-            SELECT DISTINCT u.id, u.first_name, u.last_name
+            SELECT DISTINCT u.id, u.first_name, u.last_name, u.created_at
             FROM users u
             INNER JOIN user_sessions s ON u.id = s.user_id
             WHERE u.organization_id = $1
