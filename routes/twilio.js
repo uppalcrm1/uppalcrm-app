@@ -76,8 +76,8 @@ router.post('/token', authenticateToken, async (req, res) => {
     const AccessToken = twilio.jwt.AccessToken;
     const VoiceGrant = AccessToken.VoiceGrant;
 
-    // Generate a unique identity for this user
-    const identity = `user-${userId}`;
+    // Generate a unique identity for this user (agent-{userId} format for client dialing)
+    const identity = `agent-${userId}`;
 
     // Create access token with identity in constructor
     const token = new AccessToken(
@@ -88,7 +88,8 @@ router.post('/token', authenticateToken, async (req, res) => {
     );
 
     token.addGrant(new VoiceGrant({
-      outgoingApplicationSid: twimlAppSid || undefined
+      outgoingApplicationSid: twimlAppSid || undefined,
+      incomingAllow: true  // Allow incoming calls to this client identity
     }));
 
     res.json({
@@ -952,6 +953,7 @@ router.post('/webhook/voice', async (req, res) => {
 
     if (orgResult.rows.length > 0) {
       const organizationId = orgResult.rows[0].organization_id;
+      const { client, phoneNumber } = await twilioService.getClient(organizationId);
 
       // Check if caller is a known lead or contact
       const contactQuery = `
@@ -985,18 +987,22 @@ router.post('/webhook/voice', async (req, res) => {
         CallSid
       ]);
 
-      // Store pending incoming call in database for frontend notification
+      // Generate unique conference ID for this incoming call
+      const timestamp = Date.now();
+      const random = Math.random().toString(36).substr(2, 9);
+      const conferenceId = `conf-incoming-${timestamp}-${random}`;
+
+      // Store incoming call in database
       try {
         const insertIncomingCallQuery = `
           INSERT INTO incoming_calls (
             organization_id, call_sid, from_number, to_number, status, conference_id
           ) VALUES ($1, $2, $3, $4, 'ringing', $5)
-          ON CONFLICT (call_sid) DO UPDATE SET status = 'ringing', updated_at = NOW()
+          ON CONFLICT (call_sid) DO UPDATE SET status = 'ringing', conference_id = $5, updated_at = NOW()
           RETURNING *
         `;
 
-        const conferenceId = `incoming-${CallSid}`;
-        const result = await db.query(insertIncomingCallQuery, [
+        await db.query(insertIncomingCallQuery, [
           organizationId,
           CallSid,
           From,
@@ -1004,73 +1010,19 @@ router.post('/webhook/voice', async (req, res) => {
           conferenceId
         ]);
 
-        const incomingCallData = {
-          callSid: CallSid,
-          from: From,
-          to: To,
-          callerName: contactInfo ? `${contactInfo.first_name || ''} ${contactInfo.last_name || ''}`.trim() : null,
-          leadId: contactInfo?.type === 'lead' ? contactInfo.id : null,
-          contactId: contactInfo?.type === 'contact' ? contactInfo.id : null,
-          timestamp: new Date().toISOString()
-        };
-
-        console.log(`✅ Stored incoming call ${CallSid} in database for organization ${organizationId}`);
-
-        // Emit real-time notification via WebSocket
-        const websocketService = require('../services/websocketService');
-        websocketService.emitIncomingCall(organizationId, incomingCallData);
+        console.log(`✅ Stored incoming call ${CallSid} with conference ${conferenceId}`);
       } catch (dbError) {
         console.error(`❌ Error storing incoming call in database: ${dbError.message}`);
         // Continue with the call even if database storage fails
       }
 
-      // Timeout: Hang up after 60 seconds if not answered
-      // Note: We validate status in the database to see if it's still 'ringing'
-      setTimeout(async () => {
-        console.log('========================================');
-        console.log(`⏰ TIMEOUT: Checking if call ${CallSid} should end after 60 seconds`);
-        console.log('========================================');
-
-        try {
-          // Check if call is still ringing (not accepted)
-          const checkQuery = `
-            SELECT status FROM incoming_calls
-            WHERE call_sid = $1
-          `;
-          const checkResult = await db.query(checkQuery, [CallSid]);
-
-          if (checkResult.rows.length > 0 && checkResult.rows[0].status === 'ringing') {
-            // Still ringing, update to expired
-            const updateQuery = `
-              UPDATE incoming_calls SET status = 'expired', updated_at = NOW()
-              WHERE call_sid = $1
-            `;
-            await db.query(updateQuery, [CallSid]);
-
-            // Hang up the call
-            const { client } = await twilioService.getClient(organizationId);
-            await client.calls(CallSid).update({
-              status: 'completed'
-            });
-            console.log(`✅ Call ${CallSid} ended due to timeout (marked as expired in DB)`);
-          } else {
-            console.log(`Call ${CallSid} already accepted or handled`);
-          }
-        } catch (err) {
-          console.log(`Error during timeout handling for call ${CallSid}: ${err.message}`);
-        }
-      }, 60000); // 60 seconds
-    }
-
-    // Return TwiML to handle incoming calls - put in conference based on CallSid
-    // Use CallSid as the conference name so agent can join same conference later
-    const conferenceId = `incoming-${CallSid}`;
-    const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+      // STEP 1: Put customer into conference with hold music
+      const customerTwiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="alice">Thank you for calling. Please hold while we connect you to an agent.</Say>
   <Dial>
     <Conference
-      startConferenceOnEnter="false"
+      startConferenceOnEnter="true"
       endConferenceOnExit="true"
       beep="false"
       waitUrl="http://twimlets.com/holdmusic?Bucket=com.twilio.music.ambient"
@@ -1082,8 +1034,144 @@ router.post('/webhook/voice', async (req, res) => {
   </Dial>
 </Response>`;
 
-    res.type('text/xml');
-    res.send(twiml);
+      res.type('text/xml');
+      res.send(customerTwiml);
+
+      // STEP 2: Ring all active agents via REST API (after responding to Twilio)
+      // Only ring agents with active sessions to avoid unnecessary calls
+      setTimeout(async () => {
+        try {
+          console.log(`📞 Ringing agents for incoming call ${CallSid}...`);
+
+          // Get all users with active sessions in this organization
+          const agentsQuery = `
+            SELECT DISTINCT u.id, u.first_name, u.last_name
+            FROM users u
+            INNER JOIN user_sessions s ON u.id = s.user_id
+            WHERE u.organization_id = $1
+              AND u.is_active = true
+              AND s.expires_at > NOW()
+            ORDER BY u.created_at DESC
+          `;
+
+          const agentsResult = await db.query(agentsQuery, [organizationId]);
+          const agents = agentsResult.rows;
+
+          if (agents.length === 0) {
+            console.log('⚠️  No agents with active sessions found. Customer will go to voicemail.');
+            return;
+          }
+
+          console.log(`Found ${agents.length} agents with active sessions`);
+
+          // Track agent call SIDs so we can cancel them when one agent answers
+          const agentCallSids = [];
+
+          // Ring each agent (and track userId mapping)
+          const agentCallMapping = [];  // Array of {callSid, userId}
+
+          for (const agent of agents) {
+            try {
+              const clientIdentity = `agent-${agent.id}`;
+              const agentName = `${agent.first_name} ${agent.last_name}`.trim();
+
+              console.log(`📞 Ringing agent: ${agentName} (${clientIdentity})`);
+
+              const call = await client.calls.create({
+                to: `client:${clientIdentity}`,
+                from: phoneNumber,
+                url: `${API_BASE_URL}/api/twilio/webhook/agent-bridge?conference=${conferenceId}`,
+                statusCallback: `${API_BASE_URL}/api/twilio/webhook/agent-call-status?callSid=${CallSid}`,
+                statusCallbackEvent: ['answered', 'completed'],
+                timeout: 60  // Auto-cancel if no answer after 60 seconds
+              });
+
+              agentCallSids.push(call.sid);
+              // Store mapping of callSid -> userId for later lookup
+              agentCallMapping.push({
+                callSid: call.sid,
+                userId: agent.id
+              });
+              console.log(`✅ Agent call created: ${call.sid} for ${agentName}`);
+            } catch (agentError) {
+              console.error(`❌ Error ringing agent ${agent.id}: ${agentError.message}`);
+              // Continue with next agent even if this one fails
+            }
+          }
+
+          // Store agent call mapping in database for later cancellation and userId lookup
+          if (agentCallMapping.length > 0) {
+            try {
+              await db.query(`
+                UPDATE incoming_calls
+                SET agent_call_sids = $1
+                WHERE call_sid = $2
+              `, [JSON.stringify(agentCallMapping), CallSid]);
+            } catch (updateError) {
+              console.error(`Error storing agent call mapping: ${updateError.message}`);
+            }
+          }
+
+          // TIMEOUT: If no agent answers within 60 seconds, redirect customer to voicemail
+          setTimeout(async () => {
+            try {
+              console.log(`⏰ Checking if any agent answered for call ${CallSid}...`);
+
+              // Check current status of incoming call
+              const statusQuery = `
+                SELECT status FROM incoming_calls
+                WHERE call_sid = $1
+              `;
+              const statusResult = await db.query(statusQuery, [CallSid]);
+
+              if (statusResult.rows.length > 0 && statusResult.rows[0].status === 'ringing') {
+                // Still ringing - no agent answered, redirect to voicemail
+                console.log(`📞 No agent answered within 60 seconds. Redirecting customer to voicemail...`);
+
+                const voicemailTwiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="alice">We apologize, all agents are currently busy. Please leave a detailed message after the beep, and we will return your call as soon as possible.</Say>
+  <Record maxLength="120" playBeep="true"
+    recordingStatusCallback="${API_BASE_URL}/api/twilio/webhook/recording"
+    recordingStatusCallbackEvent="completed" />
+  <Say voice="alice">Thank you for your message. Goodbye.</Say>
+  <Hangup />
+</Response>`;
+
+                // Redirect customer to voicemail using Twilio REST API
+                await client.calls(CallSid).update({
+                  twiml: voicemailTwiml
+                });
+
+                // Update call status in database
+                await db.query(`
+                  UPDATE incoming_calls
+                  SET status = 'voicemail', updated_at = NOW()
+                  WHERE call_sid = $1
+                `, [CallSid]);
+
+                console.log(`✅ Customer ${CallSid} redirected to voicemail`);
+              } else if (statusResult.rows.length > 0) {
+                console.log(`✅ Call ${CallSid} already handled (status: ${statusResult.rows[0].status})`);
+              }
+            } catch (timeoutError) {
+              console.error(`⚠️  Error handling 60s timeout for call ${CallSid}: ${timeoutError.message}`);
+            }
+          }, 61000); // 61 seconds - gives agents 60 seconds to answer
+        } catch (error) {
+          console.error(`Error ringing agents: ${error.message}`);
+        }
+      }, 100); // Small delay to ensure response is sent first
+    } else {
+      // Organization not found - return error TwiML
+      const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say>We're sorry, but we cannot process your call at this time. Goodbye.</Say>
+  <Hangup />
+</Response>`;
+      res.type('text/xml');
+      res.send(twiml);
+    }
   } catch (error) {
     console.error('Error handling voice webhook:', error);
     // Return a basic TwiML response even on error
@@ -1093,6 +1181,142 @@ router.post('/webhook/voice', async (req, res) => {
         <Say>We're sorry, but we cannot take your call at this time.</Say>
         <Hangup />
       </Response>`);
+  }
+});
+
+/**
+ * Agent Bridge - Agent joins the conference
+ * Called when agent's client receives incoming call and TwiML app dials to conference
+ */
+router.post('/webhook/agent-bridge', async (req, res) => {
+  try {
+    const { conference } = req.query;
+
+    if (!conference) {
+      console.error('Agent bridge: Missing conference parameter');
+      res.type('text/xml');
+      res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say>Error: No conference specified. Goodbye.</Say>
+  <Hangup />
+</Response>`);
+      return;
+    }
+
+    console.log(`✅ Agent joining conference: ${conference}`);
+
+    const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Dial>
+    <Conference
+      startConferenceOnEnter="true"
+      endConferenceOnExit="true"
+      beep="false">
+      ${conference}
+    </Conference>
+  </Dial>
+</Response>`;
+
+    res.type('text/xml');
+    res.send(twiml);
+  } catch (error) {
+    console.error('Error in agent bridge webhook:', error);
+    res.type('text/xml');
+    res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say>Error connecting to conference. Goodbye.</Say>
+  <Hangup />
+</Response>`);
+  }
+});
+
+/**
+ * Agent Call Status - Handle agent call status updates
+ * When an agent answers (in-progress), cancel ringing to other agents
+ * Ignore 'completed' status (which fires when call ends, including timeout)
+ */
+router.post('/webhook/agent-call-status', async (req, res) => {
+  try {
+    const { CallStatus, CallSid } = req.body;
+    const { callSid: incomingCallSid } = req.query;
+
+    console.log(`Agent call status: ${CallStatus} for agent call ${CallSid}`);
+
+    // ONLY process when agent ANSWERS (in-progress), NOT when call ends (completed)
+    if (CallStatus === 'in-progress') {
+      console.log(`✅ Agent answered! Extracting userId and cancelling other agent calls...`);
+
+      try {
+        // Get the incoming call, organization, and agent call mapping
+        const incomingCallQuery = `
+          SELECT organization_id, agent_call_sids
+          FROM incoming_calls
+          WHERE call_sid = $1
+        `;
+        const result = await db.query(incomingCallQuery, [incomingCallSid]);
+
+        if (result.rows.length > 0) {
+          const row = result.rows[0];
+          const organizationId = row.organization_id;
+
+          // Parse agent call mapping: [{callSid, userId}, ...]
+          const agentCallMapping = JSON.parse(row.agent_call_sids || '[]');
+
+          // Find the userId for the agent who just answered
+          let answeringAgentUserId = null;
+          for (const mapping of agentCallMapping) {
+            if (mapping.callSid === CallSid) {
+              answeringAgentUserId = mapping.userId;
+              break;
+            }
+          }
+
+          if (!answeringAgentUserId) {
+            console.warn(`⚠️  Could not find userId for answered call ${CallSid}`);
+          } else {
+            console.log(`✅ Answering agent userId: ${answeringAgentUserId}`);
+          }
+
+          // Get Twilio client
+          const { client } = await twilioService.getClient(organizationId);
+
+          // Cancel all OTHER agent calls (not the one that just answered)
+          for (const mapping of agentCallMapping) {
+            if (mapping.callSid !== CallSid) {
+              try {
+                await client.calls(mapping.callSid).update({
+                  status: 'completed'
+                });
+                console.log(`✅ Cancelled other agent call: ${mapping.callSid} (userId: ${mapping.userId})`);
+              } catch (cancelError) {
+                console.error(`Error cancelling agent call ${mapping.callSid}: ${cancelError.message}`);
+              }
+            }
+          }
+
+          // Update incoming call status to accepted with the answering agent's userId
+          const updateQuery = `
+            UPDATE incoming_calls
+            SET status = 'accepted', accepted_by = $1, updated_at = NOW()
+            WHERE call_sid = $2
+          `;
+          await db.query(updateQuery, [answeringAgentUserId, incomingCallSid]);
+          console.log(`✅ Incoming call ${incomingCallSid} marked as accepted by agent ${answeringAgentUserId}`);
+        }
+      } catch (error) {
+        console.error(`Error processing agent answer: ${error.message}`);
+      }
+    } else if (CallStatus === 'completed') {
+      // 'completed' fires when a call ends (including timeout after 60 seconds)
+      // We ignore this for the "agent answered" logic
+      console.log(`Agent call ${CallSid} completed/ended (timeout or agent hung up) - no action needed`);
+    }
+
+    // Return 200 OK for webhook
+    res.status(200).send('OK');
+  } catch (error) {
+    console.error('Error in agent call status webhook:', error);
+    res.status(200).send('OK');  // Always return 200 for webhooks
   }
 });
 
@@ -1324,74 +1548,8 @@ router.post('/webhook/conference-status', async (req, res) => {
 });
 
 /**
- * Get pending incoming calls (for frontend polling)
- */
-router.get('/incoming-calls/pending', authenticateToken, async (req, res) => {
-  try {
-    const organizationId = req.organizationId;
-
-    // Query the database for ringing calls
-    const queryText = `
-      SELECT 
-        id,
-        call_sid AS "callSid",
-        from_number AS "from",
-        to_number AS "to",
-        status,
-        conference_id AS "conferenceId",
-        created_at AS "timestamp"
-      FROM incoming_calls
-      WHERE organization_id = $1 AND status = 'ringing'
-      ORDER BY created_at DESC
-      LIMIT 1
-    `;
-
-    const result = await db.query(queryText, [organizationId]);
-    const incomingCall = result.rows.length > 0 ? result.rows[0] : null;
-
-    // If we have an incoming call, fetch contact info for the frontend
-    if (incomingCall) {
-      try {
-        const contactQuery = `
-          SELECT 'lead' as type, id, first_name, last_name FROM leads
-          WHERE organization_id = $1 AND phone = $2
-          UNION ALL
-          SELECT 'contact' as type, id, first_name, last_name FROM contacts
-          WHERE organization_id = $1 AND phone = $2
-          LIMIT 1
-        `;
-
-        const contactResult = await db.query(contactQuery, [organizationId, incomingCall.from]);
-        const contactInfo = contactResult.rows[0] || null;
-
-        if (contactInfo) {
-          incomingCall.callerName = `${contactInfo.first_name || ''} ${contactInfo.last_name || ''}`.trim();
-          incomingCall.leadId = contactInfo.type === 'lead' ? contactInfo.id : null;
-          incomingCall.contactId = contactInfo.type === 'contact' ? contactInfo.id : null;
-        } else {
-          incomingCall.callerName = null;
-          incomingCall.leadId = null;
-          incomingCall.contactId = null;
-        }
-      } catch (contactErr) {
-        console.warn('Warning: Could not fetch contact info for incoming call:', contactErr.message);
-        // Continue without contact info rather than failing the entire request
-        incomingCall.callerName = null;
-        incomingCall.leadId = null;
-        incomingCall.contactId = null;
-      }
-    }
-
-    res.json({ incomingCall });
-  } catch (error) {
-    console.error('Error getting pending calls:', error.message);
-    // Return gracefully even if table doesn't exist yet (migration hasn't run)
-    res.json({ incomingCall: null });
-  }
-});
-
-/**
  * Clear pending incoming call (when answered/declined)
+ * Note: No longer used in polling system, kept for backward compatibility
  */
 router.post('/incoming-calls/clear', authenticateToken, async (req, res) => {
   try {

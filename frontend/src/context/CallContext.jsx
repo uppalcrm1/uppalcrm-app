@@ -36,54 +36,39 @@ export const CallProvider = ({ children }) => {
     }
   }, [isAuthenticated])
 
-  // Poll for incoming calls
+  // Listen for incoming calls from Twilio Voice SDK (no polling needed!)
+  // The SDK fires twilioIncomingCall event when an incoming call arrives
   useEffect(() => {
-    const checkForIncomingCalls = async () => {
-      if (!isAuthenticated) return
-      const token = localStorage.getItem('authToken')
-      if (!token) return
+    const handleIncomingCall = (event) => {
+      const { call, from, callSid } = event.detail
 
-      try {
-        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3004/api'
-        const response = await fetch(`${API_URL}/twilio/incoming-calls/pending`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'X-Organization-Slug': localStorage.getItem('organizationSlug')
-          }
+      // Set incoming call data for display in notification
+      setIncomingCall({
+        callSid,
+        from,
+        callerName: 'Incoming Call',
+        twilioCall: call  // Store the actual SDK call object
+      })
+
+      // Play notification sound
+      playNotificationSound()
+
+      // Request browser notification permission
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('Incoming Call', {
+          body: `Call from ${from}`,
+          icon: '/phone-icon.png'
         })
-
-        if (response.ok) {
-          const data = await response.json()
-          if (data.incomingCall && !incomingCall) {
-            setIncomingCall(data.incomingCall)
-            // Play notification sound
-            playNotificationSound()
-            // Request browser notification permission
-            if ('Notification' in window && Notification.permission === 'granted') {
-              new Notification('Incoming Call', {
-                body: `Call from ${data.incomingCall.callerName || data.incomingCall.from}`,
-                icon: '/phone-icon.png'
-              })
-            }
-          } else if (!data.incomingCall && incomingCall) {
-            // Call was accepted by another agent - clear the popup
-            console.log('Incoming call no longer available (accepted by another agent)')
-            setIncomingCall(null)
-          }
-        }
-      } catch (error) {
-        // Silently fail
       }
     }
 
-    // Only start polling if authenticated
-    if (!isAuthenticated) return;
+    // Listen for incoming calls from SDK
+    window.addEventListener('twilioIncomingCall', handleIncomingCall)
 
-    // Poll every 10 seconds
-    const interval = setInterval(checkForIncomingCalls, 10000)
-
-    return () => clearInterval(interval)
-  }, [incomingCall, isAuthenticated])
+    return () => {
+      window.removeEventListener('twilioIncomingCall', handleIncomingCall)
+    }
+  }, [])
 
   // Play notification sound for incoming calls
   const playNotificationSound = () => {
@@ -109,79 +94,60 @@ export const CallProvider = ({ children }) => {
     }
   }
 
-  // Accept incoming call - Move customer from queue to conference
+  // Accept incoming call - Use SDK's native accept() method
   const acceptCall = async () => {
     if (!incomingCall) return
 
     try {
-      console.log('Accepting incoming call:', incomingCall)
+      const { twilioCall, from, callSid } = incomingCall
 
-      // Call backend to dequeue customer into conference
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3004/api'
-      const response = await fetch(`${API_URL}/twilio/incoming-calls/accept`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-          'X-Organization-Slug': localStorage.getItem('organizationSlug'),
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          callSid: incomingCall.callSid
-        })
-      })
+      console.log('Accepting incoming call:', callSid)
 
-      if (!response.ok) {
-        throw new Error('Failed to accept call')
+      if (!twilioCall) {
+        throw new Error('No Twilio call object available')
       }
 
-      const { conferenceId } = await response.json()
+      // Accept the call using SDK's native method
+      // This automatically connects the agent to the conference via the agent-bridge webhook
+      await twilioCall.accept()
 
-      console.log('Customer moved to conference:', conferenceId)
+      console.log('✅ Incoming call accepted via SDK')
 
       // Clear the incoming notification
       setIncomingCall(null)
 
-      // Dispatch event to connect agent to conference
-      window.dispatchEvent(new CustomEvent('joinIncomingCallConference', {
-        detail: {
-          conferenceId,
-          callerPhone: incomingCall.from,
-          callerName: incomingCall.callerName
-        }
-      }))
-
-      toast.success('Connecting to caller...')
+      // Notify user
+      toast.success(`Connected to ${from}...`)
     } catch (error) {
       console.error('Error accepting call:', error)
       toast.error('Failed to accept call')
     }
   }
 
-  // Decline incoming call
+  // Decline incoming call - Use SDK's native reject() method
   const declineCall = async () => {
     if (!incomingCall) return
 
     try {
-      // Call backend to decline and hang up the call
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3004/api'
-      await fetch(`${API_URL}/twilio/incoming-calls/decline`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-          'X-Organization-Slug': localStorage.getItem('organizationSlug'),
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          callSid: incomingCall.callSid
-        })
-      })
+      const { twilioCall, callSid } = incomingCall
+
+      console.log('Declining incoming call:', callSid)
+
+      if (!twilioCall) {
+        throw new Error('No Twilio call object available')
+      }
+
+      // Reject the call using SDK's native method
+      await twilioCall.reject()
+
+      console.log('✅ Incoming call rejected via SDK')
 
       setMissedCallCount(prev => prev + 1)
       setIncomingCall(null)
       toast.info('Call declined')
     } catch (error) {
       console.error('Error declining call:', error)
-      // Still clear the call locally even if backend fails
+      // Still clear the call locally even if SDK call fails
       setIncomingCall(null)
       toast.error('Failed to decline call')
     }

@@ -73,41 +73,26 @@ const DashboardLayout = () => {
     }
   }, [browserPermission, requestBrowserPermission])
 
-  // Listen for incoming call events
+  // Listen for incoming call events via Twilio SDK
   React.useEffect(() => {
-    // Handle dial back event (from accepting call in queue system)
-    const handleOpenDialpad = (event) => {
-      const { phoneNumber, callerName } = event.detail
-      setIncomingCallNumber(phoneNumber)
-      setIncomingCallName(callerName)
-      setShowIncomingCallDialpad(true)
-      console.log('Opening Dialpad for incoming call:', phoneNumber, callerName)
+    // Handle incoming calls from Twilio Voice SDK (replaces polling)
+    const handleTwilioIncomingCall = (event) => {
+      const { call, from, callSid } = event.detail
+
+      console.log('📞 SDK incoming call received:', { from, callSid })
+
+      // Store the call object reference so we can accept/reject it
+      window.incomingTwilioCall = call
+      window.incomingCallSid = callSid
+
+      // Show incoming call notification with the caller number
+      toast.success(`Incoming call from ${from}`)
     }
 
-    // Handle joining existing conference (new queue system - agent joins customer's conference)
-    const handleJoinConference = (event) => {
-      const { conferenceId, callerPhone, callerName } = event.detail
-
-      console.log('Agent joining incoming call conference:', conferenceId)
-
-      // Pass conference ID to Dialpad via window variable
-      window.incomingConferenceId = conferenceId
-
-      // Show dialpad with caller info
-      setIncomingCallNumber(callerPhone)
-      setIncomingCallName(callerName)
-      setShowIncomingCallDialpad(true)
-
-      // Use react-hot-toast for notification
-      toast.success(`Joining call with ${callerName || callerPhone}...`)
-    }
-
-    window.addEventListener('openDialpadWithNumber', handleOpenDialpad)
-    window.addEventListener('joinIncomingCallConference', handleJoinConference)
+    window.addEventListener('twilioIncomingCall', handleTwilioIncomingCall)
 
     return () => {
-      window.removeEventListener('openDialpadWithNumber', handleOpenDialpad)
-      window.removeEventListener('joinIncomingCallConference', handleJoinConference)
+      window.removeEventListener('twilioIncomingCall', handleTwilioIncomingCall)
     }
   }, [])
 

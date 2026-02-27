@@ -277,6 +277,23 @@ const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
           toast.error(`Connection error: ${error.message}`)
         })
 
+        // NEW: Handle incoming calls via SDK (replaces polling)
+        device.on('incoming', (call) => {
+          console.log('📞 Incoming call from SDK:', {
+            from: call.parameters.From,
+            callSid: call.parameters.CallSid
+          })
+
+          // Dispatch custom event with the actual Twilio call object
+          window.dispatchEvent(new CustomEvent('twilioIncomingCall', {
+            detail: {
+              call: call,  // The actual Twilio call object with accept() and reject() methods
+              from: call.parameters.From,
+              callSid: call.parameters.CallSid
+            }
+          }))
+        })
+
         await device.register()
         deviceRef.current = device
       } catch (error) {
