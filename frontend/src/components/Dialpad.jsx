@@ -227,6 +227,8 @@ const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
 
         const { token: twilioToken } = await response.json()
 
+        console.log('Token received, creating device...')
+
         // Create and register device
         const device = new Device(twilioToken, {
           debug: true,
@@ -239,6 +241,7 @@ const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
 
         device.on('registered', () => {
           console.log('Twilio Device registered and ready')
+          console.log('Registered identity:', device.identity)
           setDeviceStatus('ready')
           toast.success('Voice connection ready')
         })
@@ -279,6 +282,7 @@ const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
 
         // NEW: Handle incoming calls via SDK (replaces polling)
         device.on('incoming', (call) => {
+          console.log('📞 SDK incoming event fired! Call object:', call)
           console.log('📞 Incoming call from SDK:', {
             from: call.parameters.From,
             callSid: call.parameters.CallSid
