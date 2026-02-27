@@ -24,16 +24,8 @@ CREATE INDEX IF NOT EXISTS idx_incoming_calls_call_sid
 ON incoming_calls(call_sid);
 
 -- Create trigger to auto-update updated_at timestamp
-CREATE OR REPLACE FUNCTION update_incoming_calls_timestamp()
-RETURNS TRIGGER AS $$
-BEGIN
-  NEW.updated_at = NOW();
-  RETURN NEW;
-END;
-$$ language 'plpgsql';
+CREATE OR REPLACE FUNCTION update_incoming_calls_timestamp() RETURNS TRIGGER AS $update_incoming_calls$ BEGIN NEW.updated_at = NOW(); RETURN NEW; END; $update_incoming_calls$ LANGUAGE plpgsql;
 
 DROP TRIGGER IF EXISTS incoming_calls_update_timestamp ON incoming_calls;
-CREATE TRIGGER incoming_calls_update_timestamp
-BEFORE UPDATE ON incoming_calls
-FOR EACH ROW
-EXECUTE FUNCTION update_incoming_calls_timestamp();
+
+CREATE TRIGGER incoming_calls_update_timestamp BEFORE UPDATE ON incoming_calls FOR EACH ROW EXECUTE FUNCTION update_incoming_calls_timestamp();
