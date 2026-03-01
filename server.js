@@ -619,18 +619,30 @@ const startServer = async () => {
       // Don't stop server if migrations fail - log but continue
     }
 
-    // Cleanup incoming calls from server restart
+    // Cleanup incoming calls from server restart (only if table exists)
     try {
       const { query } = require('./database/connection');
       console.log('🔧 Cleaning up stale incoming calls from previous server session...');
       
-      const cleanupResult = await query(`
-        UPDATE incoming_calls 
-        SET status = 'expired', updated_at = NOW()
-        WHERE status = 'ringing' AND created_at < NOW() - INTERVAL '5 minutes'
+      // Check if table exists first
+      const tableExists = await query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables 
+          WHERE table_schema = 'public' 
+          AND table_name = 'incoming_calls'
+        );
       `);
 
-      console.log(`✅ Cleaned up ${cleanupResult.rowCount || 0} stale incoming calls`);
+      if (tableExists.rows[0].exists) {
+        const cleanupResult = await query(`
+          UPDATE incoming_calls 
+          SET status = 'expired', updated_at = NOW()
+          WHERE status = 'ringing' AND created_at < NOW() - INTERVAL '5 minutes'
+        `);
+        console.log(`✅ Cleaned up ${cleanupResult.rowCount || 0} stale incoming calls`);
+      } else {
+        console.log('⏭️  incoming_calls table not found, skipping cleanup (migration will create it)');
+      }
     } catch (cleanupError) {
       console.error('⚠️  Error cleaning up stale incoming calls:', cleanupError.message);
       // Don't stop server if cleanup fails
