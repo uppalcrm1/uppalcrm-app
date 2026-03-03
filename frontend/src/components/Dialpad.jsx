@@ -247,6 +247,14 @@ const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
     }
   }, [activeCall, isCallActive])
 
+  // Handle when activeCall becomes null (call ended from context)
+  useEffect(() => {
+    if (activeCall === null && isCallActive) {
+      console.log('📞 Active call cleared from context - closing Dialpad')
+      handleEndCall()
+    }
+  }, [activeCall, isCallActive])
+
   // Auto-join incoming call conference when accepted (legacy support, may not be needed)
   useEffect(() => {
     const handleJoinIncomingConference = async (event) => {

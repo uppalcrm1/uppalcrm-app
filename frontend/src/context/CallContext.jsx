@@ -292,6 +292,7 @@ export const CallProvider = ({ children }) => {
       await twilioCall.accept()
 
       console.log('✅ Incoming call accepted via SDK')
+      console.log('Call status after accept():', twilioCall.status())
 
       // Set activeCall state with call object for Dialpad to use
       const activeCallState = {
@@ -302,10 +303,27 @@ export const CallProvider = ({ children }) => {
       }
       setActiveCall(activeCallState)
 
-      // Set up disconnect listener to clear activeCall when call ends
-      // This handles both agent hang-up and customer hang-up
+      // Set up listeners for ALL possible call end events
+      // The SDK can fire different events depending on call state and how it ends
+
+      // When either party disconnects the call
       twilioCall.on('disconnect', () => {
-        console.log('📞 Incoming call disconnected')
+        console.log('📞 Active call disconnected (caller or agent hung up)')
+        console.log('Call status on disconnect:', twilioCall.status())
+        setActiveCall(null)
+      })
+
+      // When call is cancelled (e.g., caller hangs up quickly)
+      twilioCall.on('cancel', () => {
+        console.log('📞 Active call cancelled')
+        console.log('Call status on cancel:', twilioCall.status())
+        setActiveCall(null)
+      })
+
+      // When an error occurs during the call
+      twilioCall.on('error', (error) => {
+        console.error('📞 Active call error:', error)
+        console.log('Call status on error:', twilioCall.status())
         setActiveCall(null)
       })
 
