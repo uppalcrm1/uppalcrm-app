@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react'
 import { Phone, PhoneOff, User } from 'lucide-react'
+import { formatPhoneNumber } from '../utils/formatPhone'
 
 const IncomingCallNotification = ({
   callerNumber,
@@ -52,18 +53,6 @@ const IncomingCallNotification = ({
     }
   }, [])
 
-  // Format phone number for display
-  const formatPhoneNumber = (number) => {
-    if (!number) return 'Unknown'
-    const cleaned = number.replace(/\D/g, '')
-    if (cleaned.length === 11 && cleaned.startsWith('1')) {
-      return `+1 (${cleaned.slice(1, 4)}) ${cleaned.slice(4, 7)}-${cleaned.slice(7)}`
-    }
-    if (cleaned.length === 10) {
-      return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`
-    }
-    return number
-  }
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-70">
@@ -77,7 +66,7 @@ const IncomingCallNotification = ({
             {callerName || 'Unknown Caller'}
           </h3>
           <p className="text-white/90 text-lg">
-            {formatPhoneNumber(callerNumber)}
+            {formatPhoneNumber(callerNumber) || 'Unknown Caller'}
           </p>
           <p className="text-white/70 text-sm mt-2">Incoming Call...</p>
         </div>

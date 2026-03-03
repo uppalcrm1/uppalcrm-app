@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import { Send, ArrowLeft, User, Phone, Check, CheckCheck, Clock, AlertCircle, Image } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { twilioAPI } from '../services/api';
+import { formatPhoneNumber } from '../utils/formatPhone';
 
 export default function ConversationView({
   phoneNumber,
@@ -83,15 +84,15 @@ export default function ConversationView({
           </div>
           <div>
             <h3 className="text-sm font-medium text-gray-900">
-              {contactInfo?.name || phoneNumber}
+              {contactInfo?.name || formatPhoneNumber(phoneNumber)}
             </h3>
             {contactInfo?.name && (
-              <p className="text-xs text-gray-500">{phoneNumber}</p>
+              <p className="text-xs text-gray-500">{formatPhoneNumber(phoneNumber)}</p>
             )}
           </div>
         </div>
         <a
-          href={`tel:${phoneNumber}`}
+          href={`tel:${phoneNumber.replace(/\D/g, '')}`}
           className="p-2 hover:bg-gray-100 rounded-full"
         >
           <Phone className="h-5 w-5 text-gray-600" />

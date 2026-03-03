@@ -1,5 +1,6 @@
 import { formatDistanceToNow } from 'date-fns';
 import { MessageSquare, ArrowDownLeft, ArrowUpRight, User } from 'lucide-react';
+import { formatPhoneNumber } from '../utils/formatPhone';
 
 export default function ConversationList({ conversations, selectedPhone, onSelectConversation, isLoading }) {
   if (isLoading) {
@@ -39,14 +40,14 @@ export default function ConversationList({ conversations, selectedPhone, onSelec
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium text-gray-900 truncate">
-                  {conversation.contactName || conversation.phoneNumber}
+                  {conversation.contactName || formatPhoneNumber(conversation.phoneNumber)}
                 </p>
                 <p className="text-xs text-gray-500">
                   {formatDistanceToNow(new Date(conversation.lastMessageAt), { addSuffix: true })}
                 </p>
               </div>
               {conversation.contactName && (
-                <p className="text-xs text-gray-500">{conversation.phoneNumber}</p>
+                <p className="text-xs text-gray-500">{formatPhoneNumber(conversation.phoneNumber)}</p>
               )}
               <div className="mt-1 flex items-center">
                 {conversation.lastDirection === 'inbound' ? (
