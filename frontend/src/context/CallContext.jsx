@@ -258,8 +258,32 @@ export const CallProvider = ({ children }) => {
 
       console.log('✅ Incoming call accepted via SDK')
 
+      // Set activeCall state with call object for Dialpad to use
+      const activeCallState = {
+        status: 'in-progress',
+        from,
+        callSid,
+        twilioCall
+      }
+      setActiveCall(activeCallState)
+
+      // Set up disconnect listener to clear activeCall when call ends
+      // This handles both agent hang-up and customer hang-up
+      twilioCall.on('disconnect', () => {
+        console.log('📞 Incoming call disconnected')
+        setActiveCall(null)
+      })
+
       // Clear the incoming notification
       setIncomingCall(null)
+
+      // Dispatch event to open Dialpad with caller info
+      window.dispatchEvent(new CustomEvent('incomingCallAccepted', {
+        detail: {
+          from,
+          callSid
+        }
+      }))
 
       // Notify user
       toast.success(`Connected to ${from}...`)

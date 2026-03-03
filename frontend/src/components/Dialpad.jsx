@@ -5,7 +5,7 @@ import { useCall } from '../context/CallContext'
 import toast from 'react-hot-toast'
 
 const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
-  const { device, deviceStatus } = useCall()
+  const { device, deviceStatus, activeCall, endCall } = useCall()
   const [phoneNumber, setPhoneNumber] = useState(prefilledNumber)
   const [isCallActive, setIsCallActive] = useState(false)
   const [callStatus, setCallStatus] = useState('')
@@ -160,9 +160,16 @@ const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
     setCallStatus('Call ended')
     setCallDuration(0)
 
+    // Clear activeCall from context (for incoming calls)
+    if (activeCall) {
+      endCall()
+    }
+
+    // Close Dialpad after call ends
     setTimeout(() => {
       setCallStatus('')
-    }, 2000)
+      onClose()
+    }, 1500)
   }
 
   const toggleMute = () => {
@@ -199,7 +206,48 @@ const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
     }
   }, [])
 
-  // Auto-join incoming call conference when accepted
+  // Handle incoming call initialization when call is accepted via CallContext
+  useEffect(() => {
+    if (activeCall && activeCall.twilioCall && !isCallActive) {
+      console.log('📞 Incoming call detected in Dialpad - initializing in-progress UI')
+
+      // Bind the incoming call to Dialpad's local state
+      activeCallRef.current = activeCall.twilioCall
+      setIsCallActive(true)
+      setCallStatus('Connected')
+      setPhoneNumber(activeCall.from || 'Incoming Call')
+
+      // Start call timer
+      timerRef.current = setInterval(() => {
+        setCallDuration(prev => prev + 1)
+      }, 1000)
+
+      toast.success(`Call in progress with ${activeCall.from}`)
+
+      // Set up disconnect listeners for incoming call
+      const handleDisconnect = () => {
+        console.log('📞 Call disconnected (incoming)')
+        handleEndCall()
+      }
+
+      const handleError = (error) => {
+        console.error('Call error:', error)
+        toast.error(`Call error: ${error.message}`)
+        handleEndCall()
+      }
+
+      activeCall.twilioCall.on('disconnect', handleDisconnect)
+      activeCall.twilioCall.on('error', handleError)
+
+      // Cleanup listeners when component unmounts or activeCall changes
+      return () => {
+        activeCall.twilioCall.removeListener('disconnect', handleDisconnect)
+        activeCall.twilioCall.removeListener('error', handleError)
+      }
+    }
+  }, [activeCall, isCallActive])
+
+  // Auto-join incoming call conference when accepted (legacy support, may not be needed)
   useEffect(() => {
     const handleJoinIncomingConference = async (event) => {
       const { conferenceId, callerPhone, callerName } = event.detail
