@@ -187,12 +187,40 @@ export const CallProvider = ({ children }) => {
     const handleIncomingCall = (event) => {
       const { call, from, callSid } = event.detail
 
+      // Set up event listeners on the incoming call IMMEDIATELY
+      // These handle cases where caller hangs up or gets redirected BEFORE agent accepts
+      const handleCallCancel = () => {
+        console.log('📞 Incoming call cancelled (caller hung up or redirected to voicemail)')
+        setIncomingCall(null)
+      }
+
+      const handleCallDisconnect = () => {
+        console.log('📞 Incoming call disconnected before acceptance')
+        setIncomingCall(null)
+      }
+
+      const handleCallReject = () => {
+        console.log('📞 Incoming call rejected')
+        setIncomingCall(null)
+      }
+
+      // Attach listeners to the call object
+      call.on('cancel', handleCallCancel)
+      call.on('disconnect', handleCallDisconnect)
+      call.on('reject', handleCallReject)
+
       // Set incoming call data for display in notification
       setIncomingCall({
         callSid,
         from,
         callerName: 'Incoming Call',
-        twilioCall: call  // Store the actual SDK call object
+        twilioCall: call,  // Store the actual SDK call object
+        // Store listener functions for cleanup if needed
+        _listeners: {
+          handleCallCancel,
+          handleCallDisconnect,
+          handleCallReject
+        }
       })
 
       // Play notification sound
@@ -244,12 +272,19 @@ export const CallProvider = ({ children }) => {
     if (!incomingCall) return
 
     try {
-      const { twilioCall, from, callSid } = incomingCall
+      const { twilioCall, from, callSid, _listeners } = incomingCall
 
       console.log('Accepting incoming call:', callSid)
 
       if (!twilioCall) {
         throw new Error('No Twilio call object available')
+      }
+
+      // Clean up the incoming call event listeners before accepting
+      if (_listeners) {
+        twilioCall.removeListener('cancel', _listeners.handleCallCancel)
+        twilioCall.removeListener('disconnect', _listeners.handleCallDisconnect)
+        twilioCall.removeListener('reject', _listeners.handleCallReject)
       }
 
       // Accept the call using SDK's native method
@@ -298,12 +333,19 @@ export const CallProvider = ({ children }) => {
     if (!incomingCall) return
 
     try {
-      const { twilioCall, callSid } = incomingCall
+      const { twilioCall, callSid, _listeners } = incomingCall
 
       console.log('Declining incoming call:', callSid)
 
       if (!twilioCall) {
         throw new Error('No Twilio call object available')
+      }
+
+      // Clean up the incoming call event listeners before rejecting
+      if (_listeners) {
+        twilioCall.removeListener('cancel', _listeners.handleCallCancel)
+        twilioCall.removeListener('disconnect', _listeners.handleCallDisconnect)
+        twilioCall.removeListener('reject', _listeners.handleCallReject)
       }
 
       // Reject the call using SDK's native method
