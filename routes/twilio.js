@@ -877,6 +877,27 @@ router.post('/webhook/sms-status', async (req, res) => {
 });
 
 /**
+ * Twilio Webhooks - WhatsApp Status Updates
+ */
+router.post('/webhook/whatsapp-status', async (req, res) => {
+  try {
+    const { MessageSid, MessageStatus, ErrorCode, ErrorMessage } = req.body;
+
+    await twilioService.updateSMSStatus(
+      MessageSid,
+      MessageStatus,
+      ErrorCode ? parseInt(ErrorCode) : null,
+      ErrorMessage
+    );
+
+    res.status(200).send('OK');
+  } catch (error) {
+    console.error('Error updating WhatsApp status:', error);
+    res.status(500).send('Error');
+  }
+});
+
+/**
  * Twilio Webhooks - Voice (TwiML for incoming and outbound calls)
  */
 router.post('/webhook/voice', async (req, res) => {
