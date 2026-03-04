@@ -216,7 +216,7 @@ export const CallProvider = ({ children }) => {
         stopFlashTabTitle()
         setIncomingCall(null)
         setMissedCallCount(prev => prev + 1)
-        toast.info(`Missed call from ${from}`)
+        toast(`Missed call from ${from}`)
       })
 
       // Guard: also handle unexpected disconnect before answer
@@ -293,7 +293,7 @@ export const CallProvider = ({ children }) => {
 
       setMissedCallCount(prev => prev + 1)
       setIncomingCall(null)
-      toast.info('Call declined')
+      toast('Call declined')
     } catch (error) {
       console.error('Error declining call:', error)
       // Still stop audio and clear the call locally even if SDK call fails
@@ -308,7 +308,7 @@ export const CallProvider = ({ children }) => {
   const endCall = () => {
     if (activeCall) {
       setActiveCall(null)
-      toast.info('Call ended')
+      toast('Call ended')
       fetchCallHistory() // Refresh history
     }
   }
