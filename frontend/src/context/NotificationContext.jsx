@@ -57,28 +57,40 @@ export function NotificationProvider({ children }) {
     const latestConversation = conversations[0];
     const latestMessageTime = new Date(latestConversation.lastMessageAt).getTime();
 
+    console.log('[SMS Notif] Poll fired. watermark:', lastMessageIdRef.current,
+      '| latestTime:', latestMessageTime,
+      '| direction:', latestConversation.lastDirection,
+      '| isNew:', lastMessageIdRef.current ? latestMessageTime > lastMessageIdRef.current : '(first poll — skipping)')
+
     // If this is a new inbound message
     if (
       latestConversation.lastDirection === 'inbound' &&
       lastMessageIdRef.current &&
       latestMessageTime > lastMessageIdRef.current
     ) {
+      const senderName = latestConversation.contactName || latestConversation.phoneNumber;
+      const preview = latestConversation.lastMessage?.substring(0, 100) || '';
+
+      console.log('[SMS Notif] SMS notification triggered for:', senderName, '|', preview)
+      console.log('[SMS Notif] Notification.permission at call time:', Notification.permission)
+
       // Show toast notification
       addToast({
         type: 'sms',
         title: 'New SMS Message',
-        message: `From ${latestConversation.contactName || latestConversation.phoneNumber}: ${latestConversation.lastMessage.substring(0, 50)}...`,
+        message: `From ${senderName}: ${latestConversation.lastMessage.substring(0, 50)}...`,
         duration: 8000
       });
 
       // Show browser notification
-      const senderName = latestConversation.contactName || latestConversation.phoneNumber;
-      const preview = latestConversation.lastMessage?.substring(0, 100) || '';
-      showBrowserNotification('💬 New SMS Message', {
+      console.log('[SMS Notif] Calling showBrowserNotification...')
+      const notifResult = showBrowserNotification('💬 New SMS Message', {
         body: `From ${senderName}: ${preview}`,
         tag: `sms-${latestConversation.phoneNumber}`,
+        renotify: true,
         requireInteraction: false
       });
+      console.log('[SMS Notif] showBrowserNotification returned:', notifResult)
 
       // Play two-tone notification beep
       playNotificationSound();

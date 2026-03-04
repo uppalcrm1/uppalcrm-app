@@ -33,8 +33,7 @@ export function showBrowserNotification(title, options = {}) {
   if (Notification.permission !== 'granted') return null
 
   const notification = new Notification(title, {
-    icon: '/logo192.png',
-    badge: '/logo192.png',
+    icon: '/favicon.ico',
     requireInteraction: false,
     ...options
   })
