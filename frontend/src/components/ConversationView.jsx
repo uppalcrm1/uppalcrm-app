@@ -10,6 +10,7 @@ export default function ConversationView({
   messages,
   contactInfo,
   isLoading,
+  channel = 'sms',
   onBack,
   onSendMessage
 }) {
@@ -18,7 +19,19 @@ export default function ConversationView({
   const queryClient = useQueryClient();
 
   const sendMutation = useMutation({
-    mutationFn: (messageData) => twilioAPI.sendSMS(messageData),
+    mutationFn: (messageData) => {
+      // Call the correct API endpoint based on channel
+      if (channel === 'whatsapp') {
+        return twilioAPI.sendWhatsApp({
+          to_number: messageData.to,
+          message: messageData.body,
+          lead_id: messageData.leadId,
+          contact_id: messageData.contactId
+        });
+      } else {
+        return twilioAPI.sendSMS(messageData);
+      }
+    },
     onSuccess: () => {
       setNewMessage('');
       queryClient.invalidateQueries(['conversation', phoneNumber]);
