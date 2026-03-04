@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react'
+import React from 'react'
 import { Phone, PhoneOff, User } from 'lucide-react'
 import { formatPhoneNumber } from '../utils/formatPhone'
 
@@ -8,52 +8,6 @@ const IncomingCallNotification = ({
   onAccept,
   onDecline
 }) => {
-  const audioRef = useRef(null)
-
-  // Play ringtone
-  useEffect(() => {
-    // Create a simple ringtone using Web Audio API
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)()
-    let oscillator = null
-    let gainNode = null
-    let ringInterval = null
-
-    const playRing = () => {
-      oscillator = audioContext.createOscillator()
-      gainNode = audioContext.createGain()
-
-      oscillator.connect(gainNode)
-      gainNode.connect(audioContext.destination)
-
-      oscillator.frequency.value = 440
-      oscillator.type = 'sine'
-      gainNode.gain.value = 0.3
-
-      oscillator.start()
-
-      setTimeout(() => {
-        if (oscillator) {
-          oscillator.stop()
-        }
-      }, 500)
-    }
-
-    // Ring pattern: ring for 500ms, pause for 500ms
-    playRing()
-    ringInterval = setInterval(playRing, 1000)
-
-    return () => {
-      if (ringInterval) clearInterval(ringInterval)
-      if (oscillator) {
-        try {
-          oscillator.stop()
-        } catch (e) {}
-      }
-      audioContext.close()
-    }
-  }, [])
-
-
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-70">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-pulse-subtle">
