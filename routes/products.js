@@ -13,7 +13,7 @@ const productSchemas = {
     currency: Joi.string().default('USD').max(3),
     allowed_billing_cycles: Joi.array().items(
       Joi.string().valid('monthly', 'quarterly', 'semi-annual', 'annual')
-    ).default(['monthly', 'annual']),
+    ).optional().default([]),
     is_active: Joi.boolean().default(true),
     is_default: Joi.boolean().default(false),
     display_order: Joi.number().integer().default(0),
@@ -28,7 +28,7 @@ const productSchemas = {
     currency: Joi.string().max(3),
     allowed_billing_cycles: Joi.array().items(
       Joi.string().valid('monthly', 'quarterly', 'semi-annual', 'annual')
-    ),
+    ).optional(),
     is_active: Joi.boolean(),
     is_default: Joi.boolean(),
     display_order: Joi.number().integer(),
