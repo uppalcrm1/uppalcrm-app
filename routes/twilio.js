@@ -343,16 +343,30 @@ router.get('/sms', authenticateToken, async (req, res) => {
 router.get('/sms/conversations', authenticateToken, async (req, res) => {
   try {
     const organizationId = req.organizationId;
+    const { channel = 'all' } = req.query;
 
     // First, check if sms_messages table has any records for this organization
-    const countResult = await db.query(
-      'SELECT COUNT(*) FROM sms_messages WHERE organization_id = $1',
-      [organizationId]
-    );
+    let countQuery = 'SELECT COUNT(*) FROM sms_messages WHERE organization_id = $1';
+    const countParams = [organizationId];
+
+    // Add channel filter if specified
+    if (channel && channel !== 'all') {
+      countQuery += ` AND channel = $2`;
+      countParams.push(channel);
+    }
+
+    const countResult = await db.query(countQuery, countParams);
 
     // If no messages exist, return empty array immediately (avoids empty JOIN issues)
     if (parseInt(countResult.rows[0].count) === 0) {
       return res.json({ conversations: [] });
+    }
+
+    // Build WHERE clause for channel filtering
+    const channelFilter = channel && channel !== 'all' ? `AND channel = $2` : '';
+    const queryParams = [organizationId];
+    if (channel && channel !== 'all') {
+      queryParams.push(channel);
     }
 
     const query = `
@@ -369,7 +383,7 @@ router.get('/sms/conversations', authenticateToken, async (req, res) => {
           COUNT(*) FILTER (WHERE channel = 'sms') as sms_count,
           COUNT(*) FILTER (WHERE channel = 'whatsapp') as whatsapp_count
         FROM sms_messages
-        WHERE organization_id = $1
+        WHERE organization_id = $1 ${channelFilter}
         GROUP BY CASE WHEN direction = 'outbound' THEN to_number ELSE from_number END
       ),
       last_messages AS (
@@ -383,7 +397,7 @@ router.get('/sms/conversations', authenticateToken, async (req, res) => {
           lead_id,
           contact_id
         FROM sms_messages
-        WHERE organization_id = $1
+        WHERE organization_id = $1 ${channelFilter}
         ORDER BY
           CASE WHEN direction = 'outbound' THEN to_number ELSE from_number END,
           created_at DESC
@@ -412,7 +426,7 @@ router.get('/sms/conversations', authenticateToken, async (req, res) => {
       ORDER BY cs.last_message_at DESC
     `;
 
-    const result = await db.query(query, [organizationId]);
+    const result = await db.query(query, queryParams);
 
     res.json({
       conversations: result.rows.map(row => ({
@@ -858,6 +872,27 @@ router.post('/webhook/sms-status', async (req, res) => {
     res.status(200).send('OK');
   } catch (error) {
     console.error('Error updating SMS status:', error);
+    res.status(500).send('Error');
+  }
+});
+
+/**
+ * Twilio Webhooks - WhatsApp Status Updates
+ */
+router.post('/webhook/whatsapp-status', async (req, res) => {
+  try {
+    const { MessageSid, MessageStatus, ErrorCode, ErrorMessage } = req.body;
+
+    await twilioService.updateSMSStatus(
+      MessageSid,
+      MessageStatus,
+      ErrorCode ? parseInt(ErrorCode) : null,
+      ErrorMessage
+    );
+
+    res.status(200).send('OK');
+  } catch (error) {
+    console.error('Error updating WhatsApp status:', error);
     res.status(500).send('Error');
   }
 });

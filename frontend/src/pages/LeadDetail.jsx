@@ -282,6 +282,17 @@ const LeadDetail = () => {
               )}
 
               <button
+                onClick={() => setShowWhatsAppModal(true)}
+                disabled={!lead?.phone}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-white text-white border rounded-lg font-medium text-sm hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ backgroundColor: lead?.phone ? '#25D366' : '#cccccc' }}
+                title={lead?.phone ? 'Send WhatsApp message' : 'No phone number available'}
+              >
+                <MessageCircle size={16} />
+                WhatsApp
+              </button>
+
+              <button
                 onClick={handleConvertToContact}
                 className="inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg font-semibold text-sm hover:from-blue-700 hover:to-indigo-700 transition-all shadow-md hover:shadow-lg"
               >

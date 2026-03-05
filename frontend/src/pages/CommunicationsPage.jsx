@@ -347,6 +347,7 @@ const CommunicationsPage = () => {
                   messages={conversationData?.messages}
                   contactInfo={conversationData?.contactInfo}
                   isLoading={conversationLoading}
+                  channel={activeTab === 'sms' ? 'sms' : 'whatsapp'}
                   onBack={() => setSelectedPhone(null)}
                   onSendMessage={() => {
                     queryClient.invalidateQueries(['conversation', selectedPhone, activeTab]);

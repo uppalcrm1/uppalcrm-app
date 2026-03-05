@@ -3,12 +3,14 @@ import { format } from 'date-fns';
 import { Send, ArrowLeft, User, Phone, Check, CheckCheck, Clock, AlertCircle, Image } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { twilioAPI } from '../services/api';
+import { formatPhoneNumber } from '../utils/formatPhone';
 
 export default function ConversationView({
   phoneNumber,
   messages,
   contactInfo,
   isLoading,
+  channel = 'sms',
   onBack,
   onSendMessage
 }) {
@@ -17,7 +19,19 @@ export default function ConversationView({
   const queryClient = useQueryClient();
 
   const sendMutation = useMutation({
-    mutationFn: (messageData) => twilioAPI.sendSMS(messageData),
+    mutationFn: (messageData) => {
+      // Call the correct API endpoint based on channel
+      if (channel === 'whatsapp') {
+        return twilioAPI.sendWhatsApp({
+          to_number: messageData.to,
+          message: messageData.body,
+          lead_id: messageData.leadId,
+          contact_id: messageData.contactId
+        });
+      } else {
+        return twilioAPI.sendSMS(messageData);
+      }
+    },
     onSuccess: () => {
       setNewMessage('');
       queryClient.invalidateQueries(['conversation', phoneNumber]);
@@ -83,15 +97,15 @@ export default function ConversationView({
           </div>
           <div>
             <h3 className="text-sm font-medium text-gray-900">
-              {contactInfo?.name || phoneNumber}
+              {contactInfo?.name || formatPhoneNumber(phoneNumber)}
             </h3>
             {contactInfo?.name && (
-              <p className="text-xs text-gray-500">{phoneNumber}</p>
+              <p className="text-xs text-gray-500">{formatPhoneNumber(phoneNumber)}</p>
             )}
           </div>
         </div>
         <a
-          href={`tel:${phoneNumber}`}
+          href={`tel:${phoneNumber.replace(/\D/g, '')}`}
           className="p-2 hover:bg-gray-100 rounded-full"
         >
           <Phone className="h-5 w-5 text-gray-600" />

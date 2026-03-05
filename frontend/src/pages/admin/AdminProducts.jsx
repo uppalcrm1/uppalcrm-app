@@ -4,7 +4,6 @@ import { productsAPI } from '../../services/api'
 import toast from 'react-hot-toast'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import axios from 'axios'
-import { getTermOptions } from '../../utils/billingHelpers'
 
 const AdminProducts = () => {
   const [products, setProducts] = useState([])
@@ -19,7 +18,6 @@ const AdminProducts = () => {
     description: '',
     price: '',
     currency: 'USD',
-    allowed_billing_cycles: ['monthly', 'annual'],
     is_active: true,
     is_default: false,
     display_order: 0,
@@ -80,7 +78,6 @@ const AdminProducts = () => {
         description: product.description || '',
         price: product.price,
         currency: product.currency || 'USD',
-        allowed_billing_cycles: product.allowed_billing_cycles || ['monthly', 'annual'],
         is_active: product.is_active,
         is_default: product.is_default,
         display_order: product.display_order || 0,
@@ -94,7 +91,6 @@ const AdminProducts = () => {
         description: '',
         price: '',
         currency: 'USD',
-        allowed_billing_cycles: ['monthly', 'annual'],
         is_active: true,
         is_default: false,
         display_order: 0,
@@ -116,15 +112,6 @@ const AdminProducts = () => {
     setFormData(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value
-    }))
-  }
-
-  const handleBillingCycleToggle = (cycle) => {
-    setFormData(prev => ({
-      ...prev,
-      allowed_billing_cycles: prev.allowed_billing_cycles.includes(cycle)
-        ? prev.allowed_billing_cycles.filter(c => c !== cycle)
-        : [...prev.allowed_billing_cycles, cycle]
     }))
   }
 
@@ -156,11 +143,6 @@ const AdminProducts = () => {
 
     if (isFieldRequired('price') && !formData.price) {
       toast.error('Price is required')
-      return
-    }
-
-    if (formData.allowed_billing_cycles.length === 0) {
-      toast.error('At least one billing cycle must be selected')
       return
     }
 
@@ -244,14 +226,6 @@ const AdminProducts = () => {
     return field ? field.is_required === true : false
   }
 
-  // Build billing cycle options from term config
-  // Maps integer months_value to text keys for backward compatibility with existing product data
-  const monthsToKey = { 1: 'monthly', 3: 'quarterly', 6: 'semi-annual', 12: 'annual' };
-  const billingCycleOptions = getTermOptions().map(opt => ({
-    value: monthsToKey[opt.value] || `${opt.value}_months`,
-    label: opt.label
-  }));
-
   const colorOptions = [
     'blue', 'green', 'purple', 'yellow', 'red', 'pink', 'indigo', 'gray'
   ]
@@ -306,9 +280,6 @@ const AdminProducts = () => {
                 Price
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Billing Cycles
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Status
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -343,18 +314,6 @@ const AdminProducts = () => {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">
                       ${product.price} {product.currency}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex flex-wrap gap-1">
-                      {product.allowed_billing_cycles?.map((cycle) => {
-                        const matchedOption = billingCycleOptions.find(opt => opt.value === cycle);
-                        return (
-                          <span key={cycle} className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-700">
-                            {matchedOption ? matchedOption.label : cycle}
-                          </span>
-                        );
-                      })}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -484,26 +443,6 @@ const AdminProducts = () => {
                         />
                       </div>
                     )}
-                  </div>
-
-                  {/* Billing Cycles */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Allowed Billing Cycles *
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {billingCycleOptions.map((option) => (
-                        <label key={option.value} className="flex items-center">
-                          <input
-                            type="checkbox"
-                            checked={formData.allowed_billing_cycles.includes(option.value)}
-                            onChange={() => handleBillingCycleToggle(option.value)}
-                            className="mr-2"
-                          />
-                          <span className="text-sm">{option.label}</span>
-                        </label>
-                      ))}
-                    </div>
                   </div>
 
                   {/* Color and Display Order */}

@@ -3,6 +3,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { twilioAPI } from '../services/api';
 import { ToastContainer } from '../components/ToastNotification';
 import { useAuth } from '../contexts/AuthContext';
+import { playNotificationSound } from '../utils/audio';
+import { showBrowserNotification, flashTabTitle } from '../utils/notifications';
 
 const NotificationContext = createContext();
 
@@ -55,31 +57,46 @@ export function NotificationProvider({ children }) {
     const latestConversation = conversations[0];
     const latestMessageTime = new Date(latestConversation.lastMessageAt).getTime();
 
+    console.log('[SMS Notif] Poll fired. watermark:', lastMessageIdRef.current,
+      '| latestTime:', latestMessageTime,
+      '| direction:', latestConversation.lastDirection,
+      '| isNew:', lastMessageIdRef.current ? latestMessageTime > lastMessageIdRef.current : '(first poll — skipping)')
+
     // If this is a new inbound message
     if (
       latestConversation.lastDirection === 'inbound' &&
       lastMessageIdRef.current &&
       latestMessageTime > lastMessageIdRef.current
     ) {
+      const senderName = latestConversation.contactName || latestConversation.phoneNumber;
+      const preview = latestConversation.lastMessage?.substring(0, 100) || '';
+
+      console.log('[SMS Notif] SMS notification triggered for:', senderName, '|', preview)
+      console.log('[SMS Notif] Notification.permission at call time:', Notification.permission)
+
       // Show toast notification
       addToast({
         type: 'sms',
         title: 'New SMS Message',
-        message: `From ${latestConversation.contactName || latestConversation.phoneNumber}: ${latestConversation.lastMessage.substring(0, 50)}...`,
+        message: `From ${senderName}: ${latestConversation.lastMessage.substring(0, 50)}...`,
         duration: 8000
       });
 
       // Show browser notification
-      if (browserPermission === 'granted') {
-        showBrowserNotification(
-          'New SMS Message',
-          `From ${latestConversation.contactName || latestConversation.phoneNumber}`,
-          latestConversation.lastMessage
-        );
-      }
+      console.log('[SMS Notif] Calling showBrowserNotification...')
+      const notifResult = showBrowserNotification('💬 New SMS Message', {
+        body: `From ${senderName}: ${preview}`,
+        tag: `sms-${latestConversation.phoneNumber}`,
+        renotify: true,
+        requireInteraction: false
+      });
+      console.log('[SMS Notif] showBrowserNotification returned:', notifResult)
 
-      // Play notification sound
+      // Play two-tone notification beep
       playNotificationSound();
+
+      // Flash the browser tab title
+      flashTabTitle('💬 New Message!');
 
       // Invalidate conversations query to refresh UI
       queryClient.invalidateQueries(['conversations']);
@@ -95,7 +112,7 @@ export function NotificationProvider({ children }) {
     ).length;
     setUnreadCount(recentInbound);
 
-  }, [conversationsData, browserPermission, queryClient]);
+  }, [conversationsData, queryClient]);
 
   const addToast = useCallback((toast) => {
     const id = Date.now() + Math.random();
@@ -105,49 +122,6 @@ export function NotificationProvider({ children }) {
 
   const dismissToast = useCallback((id) => {
     setToasts(prev => prev.filter(t => t.id !== id));
-  }, []);
-
-  const showBrowserNotification = useCallback((title, subtitle, body) => {
-    if ('Notification' in window && Notification.permission === 'granted') {
-      const notification = new Notification(title, {
-        body: `${subtitle}\n${body}`,
-        icon: '/favicon.ico',
-        tag: 'sms-notification',
-        renotify: true
-      });
-
-      notification.onclick = () => {
-        window.focus();
-        notification.close();
-      };
-
-      // Auto close after 10 seconds
-      setTimeout(() => notification.close(), 10000);
-    }
-  }, []);
-
-  const playNotificationSound = useCallback(() => {
-    try {
-      // Create a simple beep sound using Web Audio API
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      const oscillator = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
-
-      oscillator.connect(gainNode);
-      gainNode.connect(audioContext.destination);
-
-      oscillator.frequency.value = 800;
-      oscillator.type = 'sine';
-      gainNode.gain.value = 0.3;
-
-      oscillator.start();
-      setTimeout(() => {
-        oscillator.stop();
-        audioContext.close();
-      }, 200);
-    } catch (e) {
-      console.log('Could not play notification sound');
-    }
   }, []);
 
   const clearUnread = useCallback(() => {

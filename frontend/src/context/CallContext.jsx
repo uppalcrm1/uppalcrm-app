@@ -3,6 +3,8 @@ import { Device } from '@twilio/voice-sdk'
 import { twilioAPI } from '../services/api'
 import toast from 'react-hot-toast'
 import { useAuth } from '../contexts/AuthContext'
+import { playRingtone, stopRingtone } from '../utils/audio'
+import { showBrowserNotification, flashTabTitle, stopFlashTabTitle } from '../utils/notifications'
 
 const CallContext = createContext()
 
@@ -223,16 +225,34 @@ export const CallProvider = ({ children }) => {
         }
       })
 
-      // Play notification sound
-      playNotificationSound()
+      // Play looping ringtone
+      playRingtone()
 
-      // Request browser notification permission
-      if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification('Incoming Call', {
-          body: `Call from ${from}`,
-          icon: '/phone-icon.png'
-        })
-      }
+      // Flash the browser tab title
+      flashTabTitle('📞 Incoming Call!')
+
+      // Show OS-level browser notification
+      showBrowserNotification('📞 Incoming Call', {
+        body: `Call from ${from}`,
+        tag: 'incoming-call',
+        requireInteraction: true
+      })
+
+      // Auto-dismiss if caller hangs up before agent answers
+      call.on('cancel', () => {
+        stopRingtone()
+        stopFlashTabTitle()
+        setIncomingCall(null)
+        setMissedCallCount(prev => prev + 1)
+        toast(`Missed call from ${from}`)
+      })
+
+      // Guard: also handle unexpected disconnect before answer
+      call.on('disconnect', () => {
+        stopRingtone()
+        stopFlashTabTitle()
+        setIncomingCall(null)
+      })
     }
 
     // Listen for incoming calls from SDK
@@ -242,30 +262,6 @@ export const CallProvider = ({ children }) => {
       window.removeEventListener('twilioIncomingCall', handleIncomingCall)
     }
   }, [])
-
-  // Play notification sound for incoming calls
-  const playNotificationSound = () => {
-    try {
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)()
-      const oscillator = audioContext.createOscillator()
-      const gainNode = audioContext.createGain()
-
-      oscillator.connect(gainNode)
-      gainNode.connect(audioContext.destination)
-
-      oscillator.frequency.value = 880
-      oscillator.type = 'sine'
-      gainNode.gain.value = 0.5
-
-      oscillator.start()
-      setTimeout(() => {
-        oscillator.stop()
-        audioContext.close()
-      }, 200)
-    } catch (error) {
-      console.error('Error playing notification sound:', error)
-    }
-  }
 
   // Accept incoming call - Use SDK's native accept() method
   const acceptCall = async () => {
@@ -327,6 +323,10 @@ export const CallProvider = ({ children }) => {
         setActiveCall(null)
       })
 
+      // Stop ringtone and tab flash
+      stopRingtone()
+      stopFlashTabTitle()
+
       // Clear the incoming notification
       setIncomingCall(null)
 
@@ -371,12 +371,18 @@ export const CallProvider = ({ children }) => {
 
       console.log('✅ Incoming call rejected via SDK')
 
+      // Stop ringtone and tab flash
+      stopRingtone()
+      stopFlashTabTitle()
+
       setMissedCallCount(prev => prev + 1)
       setIncomingCall(null)
-      toast.info('Call declined')
+      toast('Call declined')
     } catch (error) {
       console.error('Error declining call:', error)
-      // Still clear the call locally even if SDK call fails
+      // Still stop audio and clear the call locally even if SDK call fails
+      stopRingtone()
+      stopFlashTabTitle()
       setIncomingCall(null)
       toast.error('Failed to decline call')
     }
@@ -386,7 +392,7 @@ export const CallProvider = ({ children }) => {
   const endCall = () => {
     if (activeCall) {
       setActiveCall(null)
-      toast.info('Call ended')
+      toast('Call ended')
       fetchCallHistory() // Refresh history
     }
   }

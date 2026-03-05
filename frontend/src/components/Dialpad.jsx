@@ -3,6 +3,7 @@ import { Phone, PhoneOff, Mic, MicOff, Volume2, VolumeX, Delete, X, User } from 
 import { twilioAPI } from '../services/api'
 import { useCall } from '../context/CallContext'
 import toast from 'react-hot-toast'
+import { formatPhoneNumber as formatPhoneNumberDisplay } from '../utils/formatPhone'
 
 const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
   const { device, deviceStatus, activeCall, endCall } = useCall()
@@ -375,7 +376,9 @@ const Dialpad = ({ onClose, prefilledNumber = '', contactName = '' }) => {
             <p className="text-sm text-gray-600 mb-1">{contactName}</p>
           )}
           <div className="text-2xl font-semibold text-gray-900 min-h-[36px]">
-            {phoneNumber || 'Enter number'}
+            {phoneNumber && phoneNumber.replace(/\D/g, '').length >= 10
+              ? formatPhoneNumberDisplay(phoneNumber)
+              : (phoneNumber || 'Enter number')}
           </div>
           {callStatus && (
             <p className={`text-sm mt-1 ${isCallActive ? 'text-green-600' : 'text-gray-500'}`}>

@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Phone, PhoneIncoming, PhoneOutgoing, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { twilioAPI } from '../services/api';
 import LoadingSpinner from './LoadingSpinner';
+import { formatPhoneNumber } from '../utils/formatPhone';
 
 const CallHistoryList = ({ leadId = null, contactId = null }) => {
   const [filters, setFilters] = useState({
@@ -41,15 +42,6 @@ const CallHistoryList = ({ leadId = null, contactId = null }) => {
     );
   };
 
-  const formatPhoneNumber = (phone) => {
-    if (!phone) return '';
-    const cleaned = phone.replace(/\D/g, '');
-    const match = cleaned.match(/^(\d{1})(\d{3})(\d{3})(\d{4})$/);
-    if (match) {
-      return `+${match[1]} (${match[2]}) ${match[3]}-${match[4]}`;
-    }
-    return phone;
-  };
 
   const formatDuration = (seconds) => {
     if (!seconds) return '0:00';

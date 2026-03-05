@@ -1,5 +1,6 @@
-import React, { useEffect, useRef } from 'react'
+import React from 'react'
 import { Phone, PhoneOff, User } from 'lucide-react'
+import { formatPhoneNumber } from '../utils/formatPhone'
 
 const IncomingCallNotification = ({
   callerNumber,
@@ -7,64 +8,6 @@ const IncomingCallNotification = ({
   onAccept,
   onDecline
 }) => {
-  const audioRef = useRef(null)
-
-  // Play ringtone
-  useEffect(() => {
-    // Create a simple ringtone using Web Audio API
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)()
-    let oscillator = null
-    let gainNode = null
-    let ringInterval = null
-
-    const playRing = () => {
-      oscillator = audioContext.createOscillator()
-      gainNode = audioContext.createGain()
-
-      oscillator.connect(gainNode)
-      gainNode.connect(audioContext.destination)
-
-      oscillator.frequency.value = 440
-      oscillator.type = 'sine'
-      gainNode.gain.value = 0.3
-
-      oscillator.start()
-
-      setTimeout(() => {
-        if (oscillator) {
-          oscillator.stop()
-        }
-      }, 500)
-    }
-
-    // Ring pattern: ring for 500ms, pause for 500ms
-    playRing()
-    ringInterval = setInterval(playRing, 1000)
-
-    return () => {
-      if (ringInterval) clearInterval(ringInterval)
-      if (oscillator) {
-        try {
-          oscillator.stop()
-        } catch (e) {}
-      }
-      audioContext.close()
-    }
-  }, [])
-
-  // Format phone number for display
-  const formatPhoneNumber = (number) => {
-    if (!number) return 'Unknown'
-    const cleaned = number.replace(/\D/g, '')
-    if (cleaned.length === 11 && cleaned.startsWith('1')) {
-      return `+1 (${cleaned.slice(1, 4)}) ${cleaned.slice(4, 7)}-${cleaned.slice(7)}`
-    }
-    if (cleaned.length === 10) {
-      return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`
-    }
-    return number
-  }
-
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-70">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-pulse-subtle">
@@ -77,7 +20,7 @@ const IncomingCallNotification = ({
             {callerName || 'Unknown Caller'}
           </h3>
           <p className="text-white/90 text-lg">
-            {formatPhoneNumber(callerNumber)}
+            {formatPhoneNumber(callerNumber) || 'Unknown Caller'}
           </p>
           <p className="text-white/70 text-sm mt-2">Incoming Call...</p>
         </div>

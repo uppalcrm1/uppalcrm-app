@@ -838,7 +838,7 @@ router.get('/', async (req, res) => {
           label: 'Allowed Billing Cycles',
           type: 'multiselect',
           required: false,
-          editable: true,
+          editable: false,
           options: ['monthly', 'quarterly', 'semi-annual', 'annual']
         },
         color: {
@@ -1420,7 +1420,7 @@ router.put('/default/:fieldName', async (req, res) => {
           label: 'Allowed Billing Cycles',
           type: 'multiselect',
           required: false,
-          editable: true,
+          editable: false,
           options: ['monthly', 'quarterly', 'semi-annual', 'annual']
         },
         color: {
