@@ -494,7 +494,7 @@ const Contacts = () => {
     setSelectedContact(null)
   }
 
-  if (contactsLoading && !contactsData) {
+  if ((contactsLoading && !contactsData) || fieldConfigLoading) {
     return <LoadingSpinner className="mt-8" />
   }
 
