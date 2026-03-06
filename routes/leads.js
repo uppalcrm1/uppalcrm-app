@@ -569,7 +569,7 @@ const leadSchemas = {
   listLeads: {
     query: Joi.object({
       page: Joi.number().integer().min(1).default(1),
-      limit: Joi.number().integer().min(1).max(100).default(20),
+      limit: Joi.number().integer().min(1).max(100).default(100),
       status: Joi.string().valid('new', 'contacted', 'qualified', 'proposal', 'negotiation', 'converted', 'lost').allow('').optional(),
       priority: Joi.string().valid('low', 'medium', 'high').allow('').optional(),
       assigned_to: Joi.string().guid({ version: 'uuidv4' }).allow('').optional(),
@@ -668,7 +668,7 @@ router.get('/',
 
       const {
         page = 1,
-        limit = 20,
+        limit = 100,
         status,
         priority,
         assigned_to,
@@ -927,7 +927,7 @@ router.get('/tasks',
       status: Joi.string().optional().allow(''),
       sort_by: Joi.string().valid('scheduled_at', 'priority', 'created_at').default('scheduled_at'),
       sort_order: Joi.string().valid('asc', 'desc', 'ASC', 'DESC').default('ASC'),
-      limit: Joi.number().integer().min(1).max(1000).default(50),
+      limit: Joi.number().integer().min(1).max(100).default(100),
       offset: Joi.number().integer().min(0).default(0),
       priority: Joi.string().valid('low', 'medium', 'high').optional().allow('')
     })
@@ -941,7 +941,7 @@ router.get('/tasks',
         status,
         sort_by = 'scheduled_at',
         sort_order = 'ASC',
-        limit = 50,
+        limit = 100,
         offset = 0
       } = req.query;
 

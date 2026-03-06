@@ -68,7 +68,7 @@ const contactSchemas = {
   listContacts: {
     query: Joi.object({
       page: Joi.number().integer().min(1).default(1),
-      limit: Joi.number().integer().min(1).max(10000).default(10000),
+      limit: Joi.number().integer().min(1).max(100).default(100),
       status: Joi.string().max(50).allow('').optional(),
       type: Joi.string().max(50).allow('').optional(),
       priority: Joi.string().valid('low', 'medium', 'high').allow('').optional(),
@@ -233,7 +233,7 @@ router.get('/',
 
       const {
         page = 1,
-        limit = 10000,
+        limit = 100,
         status,
         type,
         priority,
