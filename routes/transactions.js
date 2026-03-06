@@ -309,9 +309,9 @@ router.get('/accounts/:accountId', async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const { organization_id } = req.user;
-    const { status, contact_id, limit = 100, offset = 0, search } = req.query;
+    const { status, contact_id, payment_method, source, limit = 100, offset = 0, search } = req.query;
 
-    console.log('📥 [Transactions GET] Received query:', { status, contact_id, search, limit, offset });
+    console.log('📥 [Transactions GET] Received query:', { status, contact_id, payment_method, source, search, limit, offset });
 
     // STEP 1: Load billing term options for this organization
     let termOptions = [];
@@ -385,6 +385,16 @@ router.get('/', async (req, res) => {
       params.push(contact_id);
     }
 
+    if (payment_method) {
+      query += ` AND t.payment_method = $${params.length + 1}`;
+      params.push(payment_method);
+    }
+
+    if (source) {
+      query += ` AND t.source = $${params.length + 1}`;
+      params.push(source);
+    }
+
     // Add search filter
     if (search && search.trim()) {
       query += ` AND (
@@ -422,6 +432,16 @@ router.get('/', async (req, res) => {
     if (contact_id) {
       countQuery += ` AND t.contact_id = $${countParams.length + 1}`;
       countParams.push(contact_id);
+    }
+
+    if (payment_method) {
+      countQuery += ` AND t.payment_method = $${countParams.length + 1}`;
+      countParams.push(payment_method);
+    }
+
+    if (source) {
+      countQuery += ` AND t.source = $${countParams.length + 1}`;
+      countParams.push(source);
     }
 
     // Add search filter to count query

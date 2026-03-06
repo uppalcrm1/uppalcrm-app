@@ -117,11 +117,15 @@ const TransactionsPage = () => {
     try {
       setLoading(true)
       const offset = (page - 1) * size
-      const response = await transactionsAPI.getTransactions({
+      const params = {
         limit: size,
         offset: offset,
         search: debouncedSearch || ''
-      })
+      }
+      if (filterStatus !== 'all') params.status = filterStatus
+      if (filterMethod !== 'all') params.payment_method = filterMethod
+      if (filterSource !== 'all') params.source = filterSource
+      const response = await transactionsAPI.getTransactions(params)
       setTransactions(response.transactions || [])
       setTotalCount(response.total || 0)
       setTotalPages(response.totalPages || 0)
@@ -133,7 +137,7 @@ const TransactionsPage = () => {
     } finally {
       setLoading(false)
     }
-  }, [debouncedSearch, pageSize])
+  }, [debouncedSearch, pageSize, filterStatus, filterMethod, filterSource])
 
   // Fetch transactions on component mount and when debouncedSearch changes
   useEffect(() => {
@@ -171,28 +175,8 @@ const TransactionsPage = () => {
     setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')
   }
 
-  // Filter transactions (search now happens server-side, filter client-side)
-  const filteredTransactions = transactions.filter(transaction => {
-    // Status filter
-    if (filterStatus !== 'all' && transaction.status !== filterStatus) {
-      return false
-    }
-
-    // Payment method filter
-    if (filterMethod !== 'all' && transaction.payment_method !== filterMethod) {
-      return false
-    }
-
-    // Source filter
-    if (filterSource !== 'all' && transaction.source !== filterSource) {
-      return false
-    }
-
-    return true
-  })
-
   // Sort transactions by payment date
-  const sortedTransactions = [...filteredTransactions].sort((a, b) => {
+  const sortedTransactions = [...transactions].sort((a, b) => {
     const dateA = new Date(a.payment_date || 0)
     const dateB = new Date(b.payment_date || 0)
     
@@ -427,13 +411,13 @@ const TransactionsPage = () => {
       {/* Transactions Table */}
       <div className="card">
         {/* Toolbar */}
-        {!loading && filteredTransactions.length > 0 && (
+        {!loading && transactions.length > 0 && (
           <div className="border-b border-gray-200 px-4 py-3 flex items-center justify-between bg-gray-50">
             <div className="flex items-center gap-2">
               <FileText size={20} className="text-gray-700" />
               <span className="text-sm font-medium text-gray-700">
                 {totalCount} total {totalCount === 1 ? 'Transaction' : 'Transactions'}
-                {totalPages > 1 && <span className="text-gray-500"> • Showing {filteredTransactions.length} per page</span>}
+                {totalPages > 1 && <span className="text-gray-500"> • Showing {transactions.length} per page</span>}
               </span>
             </div>
             <div className="flex items-center gap-2">
@@ -452,7 +436,7 @@ const TransactionsPage = () => {
             <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
             <p className="text-gray-600">Loading transactions...</p>
           </div>
-        ) : filteredTransactions.length === 0 ? (
+        ) : transactions.length === 0 ? (
           <div className="text-center py-12">
             <DollarSign className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No transactions found</h3>
@@ -648,7 +632,7 @@ const TransactionsPage = () => {
         )}
 
         {/* Pagination Controls */}
-        {!loading && filteredTransactions.length > 0 && totalPages > 1 && (
+        {!loading && transactions.length > 0 && totalPages > 1 && (
           <div className="border-t border-gray-200 px-4 py-4 flex items-center justify-between bg-gray-50">
             <div className="flex items-center gap-2">
               <label className="text-sm text-gray-700">Rows per page:</label>
