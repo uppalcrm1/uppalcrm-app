@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   CreditCard,
@@ -12,11 +12,9 @@ import {
   AlertCircle,
   CheckCircle,
   Clock,
-  Filter,
   ClipboardList
 } from 'lucide-react'
-import ColumnSelector from '../components/ColumnSelector'
-import InlineEditCell from '../components/InlineEditCell'
+import DataTable from '../components/shared/DataTable'
 import CreateTransactionModal from '../components/CreateTransactionModal'
 import AccountSelectorModal from '../components/AccountSelectorModal'
 import { AccountActions } from '../components/accounts/AccountActions'
@@ -28,18 +26,17 @@ import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import toast from 'react-hot-toast'
 import { formatDateOnly } from '../utils/dateUtils'
 
-// Define available columns with metadata (10 columns as per spec)
+// Define available columns with metadata — actions handled by renderRowActions
 const COLUMN_DEFINITIONS = [
-  { key: 'account_name', label: 'Account Name', description: 'Custom account name', required: true },
-  { key: 'mac_address', label: 'MAC Address', description: 'Device MAC address', required: false },
-  { key: 'device', label: 'Device', description: 'Device name/type', required: false },
-  { key: 'product', label: 'Product', description: 'Product type (Gold, Jio, Smart)', required: false },
-  { key: 'contact', label: 'Contact', description: 'Customer name', required: false },
-  { key: 'accounts_count', label: 'Accounts', description: 'Total accounts for contact', required: false },
-  { key: 'transactions_count', label: 'Transactions', description: 'Transactions for this account', required: false },
-  { key: 'created_date', label: 'Created Date', description: 'Account creation date', required: false },
-  { key: 'next_renewal', label: 'Next Renewal', description: 'Renewal date', required: false },
-  { key: 'actions', label: 'Actions', description: 'Account actions', required: true }
+  { key: 'account_name', label: 'Account Name', description: 'Custom account name', required: true, sortKey: 'account_name' },
+  { key: 'mac_address', label: 'MAC Address', description: 'Device MAC address', required: false, sortable: false },
+  { key: 'device', label: 'Device', description: 'Device name/type', required: false, sortable: false },
+  { key: 'product', label: 'Product', description: 'Product type (Gold, Jio, Smart)', required: false, sortable: false },
+  { key: 'contact', label: 'Contact', description: 'Customer name', required: false, sortable: false },
+  { key: 'accounts_count', label: 'Accounts', description: 'Total accounts for contact', required: false, sortable: false },
+  { key: 'transactions_count', label: 'Transactions', description: 'Transactions for this account', required: false, sortable: false },
+  { key: 'created_date', label: 'Created Date', description: 'Account creation date', required: false, sortKey: 'created_date' },
+  { key: 'next_renewal', label: 'Next Renewal', description: 'Renewal date', required: false, sortKey: 'next_renewal' },
 ]
 
 // Default visible columns
@@ -53,7 +50,6 @@ const DEFAULT_VISIBLE_COLUMNS = {
   transactions_count: true,
   created_date: true,
   next_renewal: true,
-  actions: true
 }
 
 // Product options (internal variable name can stay as SOFTWARE_EDITION_OPTIONS for database compatibility)
@@ -90,16 +86,6 @@ const getRenewalColor = (daysUntil) => {
   return 'text-green-600';
 }
 
-// Helper function to render sort indicator
-const SortIndicator = ({ column, currentSort, direction }) => {
-  if (currentSort !== column) return null
-  return (
-    <span className="ml-1 text-xs">
-      {direction === 'asc' ? '▲' : '▼'}
-    </span>
-  )
-}
-
 const AccountsPage = () => {
   const navigate = useNavigate()
   const [accounts, setAccounts] = useState([])
@@ -118,8 +104,7 @@ const AccountsPage = () => {
   const [filterStatus, setFilterStatus] = useState('')
   const [showDeleted, setShowDeleted] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [sortColumn, setSortColumn] = useState('created_date') // Default sort by created date
-  const [sortDirection, setSortDirection] = useState('desc') // 'asc' or 'desc' - default newest first
+  const [sortConfig, setSortConfig] = useState({ key: 'created_date', direction: 'desc' })
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -158,41 +143,19 @@ const AccountsPage = () => {
     localStorage.setItem('accounts_visible_columns', JSON.stringify(DEFAULT_VISIBLE_COLUMNS))
   }
 
-  // Sort handler - toggle sort direction when clicking a sortable column
-  const handleSort = (columnKey) => {
-    if (sortColumn === columnKey) {
-      // Toggle direction if same column clicked
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
-    } else {
-      // Set new column with ascending order
-      setSortColumn(columnKey)
-      setSortDirection('asc')
-    }
-  }
+  // Sort handler — toggles direction, maps to backend's orderBy/orderDirection
+  const handleSort = useCallback((key) => {
+    setSortConfig(prev => {
+      const direction = prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+      return { key, direction }
+    })
+  }, [])
 
-  // Pagination handlers
-  const handlePreviousPage = () => {
-    if (currentPage > 1) {
-      fetchAccounts(currentPage - 1, pageSize)
-    }
-  }
-
-  const handleNextPage = () => {
-    if (currentPage < totalPages) {
-      fetchAccounts(currentPage + 1, pageSize)
-    }
-  }
-
-  const handlePageSizeChange = (newSize) => {
-    setPageSize(newSize)
-    fetchAccounts(1, newSize)
-  }
-
-  const handleGoToPage = (page) => {
-    if (page >= 1 && page <= totalPages) {
-      fetchAccounts(page, pageSize)
-    }
-  }
+  // Pagination change handler for DataTable
+  const handlePaginationChange = useCallback((newPagination) => {
+    setPageSize(newPagination.limit)
+    fetchAccounts(newPagination.page, newPagination.limit)
+  }, [])
 
   // Inline edit handler with optimistic updates
   const handleFieldUpdate = async (recordId, fieldName, newValue) => {
@@ -276,11 +239,15 @@ const AccountsPage = () => {
       const params = {
         limit: size,
         offset: offset,
-        orderBy: sortColumn,
-        orderDirection: sortDirection
+        orderBy: sortConfig.key,
+        orderDirection: sortConfig.direction
       }
       if (debouncedSearch.trim()) {
         params.search = debouncedSearch
+      }
+      // Send includeDeleted flag to backend
+      if (showDeleted) {
+        params.includeDeleted = 'true'
       }
       // Add timestamp to bypass caching
       params.t = Date.now()
@@ -300,12 +267,12 @@ const AccountsPage = () => {
     } finally {
       setLoading(false)
     }
-  }, [debouncedSearch, pageSize, sortColumn, sortDirection])
+  }, [debouncedSearch, pageSize, sortConfig, showDeleted])
 
-  // Fetch accounts when sorting, search, or pageSize changes - reset to page 1
+  // Fetch accounts when sorting, search, showDeleted, or pageSize changes - reset to page 1
   React.useEffect(() => {
     fetchAccounts(1, pageSize)
-  }, [fetchAccounts, pageSize, sortColumn, sortDirection])
+  }, [fetchAccounts])
 
   // Fetch organization-wide stats (not limited to current page)
   const fetchStats = React.useCallback(async () => {
@@ -462,6 +429,136 @@ const AccountsPage = () => {
     setShowTaskModal(true)
   }
 
+  // Render cell content for DataTable
+  const renderCell = useCallback((account, column) => {
+    switch (column.key) {
+      case 'account_name':
+        return (
+          <button
+            onClick={() => navigate(`/accounts/${account.id}`)}
+            className="font-medium text-blue-600 hover:text-blue-800 hover:underline text-left"
+          >
+            {account.account_name || 'Unnamed Account'}
+          </button>
+        )
+      case 'mac_address':
+        return (
+          <span className="font-mono text-sm text-gray-700">
+            {account.mac_address || 'N/A'}
+          </span>
+        )
+      case 'device':
+        return <span className="text-gray-900">{account.device_name || 'Unknown Device'}</span>
+      case 'product':
+        return (
+          <span className="font-medium text-blue-600">
+            {account.edition_name || account.edition || 'N/A'}
+          </span>
+        )
+      case 'contact':
+        return (
+          <a
+            href={`/contacts/${account.contact_id}`}
+            className="text-blue-600 hover:underline font-medium"
+          >
+            {account.contact_name || `${account.first_name || ''} ${account.last_name || ''}`.trim() || 'Unknown Contact'}
+          </a>
+        )
+      case 'accounts_count':
+        return (
+          <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-700 font-semibold text-sm">
+            {account.total_accounts_for_contact || 0}
+          </span>
+        )
+      case 'transactions_count':
+        return (
+          <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-green-100 text-green-700 font-semibold text-sm">
+            {account.transaction_count || 0}
+          </span>
+        )
+      case 'created_date':
+        return (
+          <span className="text-gray-600 text-sm">
+            {formatDate(account.created_at)}
+          </span>
+        )
+      case 'next_renewal': {
+        const renewalColor = getRenewalColor(account.days_until_renewal)
+        return (
+          <div className="flex items-center gap-1">
+            <Calendar size={14} className={renewalColor} />
+            <span className={`text-sm ${renewalColor}`}>
+              {account.next_renewal_date ? formatDate(account.next_renewal_date) : 'N/A'}
+            </span>
+            {account.days_until_renewal != null && (
+              <span className="text-xs text-gray-500 ml-1">
+                ({Math.round(account.days_until_renewal)}d)
+              </span>
+            )}
+          </div>
+        )
+      }
+      default:
+        return <span className="text-gray-500">—</span>
+    }
+  }, [navigate])
+
+  // Render row actions for DataTable
+  const renderRowActions = useCallback((account) => (
+    <div className="flex items-center gap-2">
+      {/* Create Task button with optional active-task badge */}
+      <div className="relative inline-flex">
+        <button
+          onClick={() => handleCreateTask(account)}
+          className="p-2 text-gray-600 hover:text-orange-600 hover:bg-orange-50 rounded-lg"
+          title="Create Renewal Task"
+        >
+          <ClipboardList size={16} />
+        </button>
+        {account.active_task_count > 0 && (
+          <span className="absolute -top-1 -right-1 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white bg-orange-500 rounded-full">
+            {account.active_task_count}
+          </span>
+        )}
+      </div>
+      <button
+        onClick={() => handleCreateTransaction(account)}
+        className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
+        title="Create Transaction"
+      >
+        <Plus size={16} />
+      </button>
+      <button
+        onClick={() => handleRecordPayment(account)}
+        className="p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg"
+        title="Record Payment"
+      >
+        <DollarSign size={16} />
+      </button>
+      <button
+        onClick={() => navigate(`/accounts/${account.id}`)}
+        className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
+        title="View Details"
+      >
+        <Eye size={16} />
+      </button>
+      <button
+        onClick={() => handleEditAccount(account)}
+        disabled={loadingEditAccount}
+        className="p-2 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg"
+        title="Edit Account"
+      >
+        <Edit2 size={16} />
+      </button>
+      <AccountActions
+        account={account}
+        onDelete={handleDeleteAccount}
+        onRestore={handleRestoreAccount}
+        onRefresh={fetchAccounts}
+      />
+    </div>
+  ), [loadingEditAccount, navigate, fetchAccounts])
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -553,6 +650,7 @@ const AccountsPage = () => {
           >
             <option value="all">All Status</option>
             <option value="active">Active</option>
+            {/* TODO: "expiring_soon" is client-side only — not a stored account_status. Add backend support for computed expiry filter. */}
             <option value="expiring_soon">Expiring Soon</option>
             <option value="expired">Expired</option>
           </select>
@@ -570,39 +668,39 @@ const AccountsPage = () => {
 
       {/* Accounts Table */}
       <div className="card">
-        {/* Toolbar */}
-        {displayAccounts.length > 0 && (
-          <div className="border-b border-gray-200 px-4 py-3 flex items-center justify-between bg-gray-50">
-            <div className="flex items-center gap-2">
-              <Users size={20} className="text-gray-700" />
-              <span className="text-sm font-medium text-gray-700">
-                {totalCount} total {totalCount === 1 ? 'Account' : 'Accounts'}
-                {totalPages > 1 && <span className="text-gray-500"> • Showing {displayAccounts.length} per page</span>}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <ColumnSelector
-                columns={COLUMN_DEFINITIONS}
-                visibleColumns={visibleColumns}
-                onColumnToggle={handleColumnToggle}
-                onReset={handleResetColumns}
-              />
-            </div>
-          </div>
-        )}
-
-        {loading ? (
-          // Loading state - show skeleton
-          <div className="space-y-4">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="h-16 bg-gray-200 rounded animate-pulse"></div>
-            ))}
-          </div>
-        ) : displayAccounts.length === 0 ? (
-          <div className="text-center py-12">
-            <CreditCard className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No accounts found</h3>
-            <p className="text-gray-600 mb-6">Start by recording your first account payment</p>
+        <DataTable
+          data={filteredAccounts}
+          loading={loading}
+          entityName="Account"
+          entityType="accounts"
+          rowKey="id"
+          columns={COLUMN_DEFINITIONS}
+          visibleColumns={visibleColumns}
+          onColumnToggle={handleColumnToggle}
+          onColumnsReset={handleResetColumns}
+          sortConfig={sortConfig}
+          onSort={handleSort}
+          pagination={{ page: currentPage, limit: pageSize, total: totalCount }}
+          onPaginationChange={handlePaginationChange}
+          pageSizeOptions={[25, 50, 100, 200]}
+          selectable={false}
+          renderCell={renderCell}
+          renderRowActions={renderRowActions}
+          getRowClassName={(row) => row.deleted_at ? 'opacity-50 bg-gray-50' : ''}
+          emptyIcon={CreditCard}
+          emptyMessage="No accounts found"
+          emptySubMessage="Start by creating your first account"
+        />
+        {/* Empty state action buttons — shown below DataTable's empty state */}
+        {filteredAccounts.length === 0 && !loading && (
+          <div className="flex items-center justify-center space-x-3 pb-8 -mt-4">
+            <button
+              onClick={() => setShowCreateAccountModal(true)}
+              className="btn btn-primary btn-md"
+            >
+              <Plus size={16} className="mr-2" />
+              Create Account
+            </button>
             <button
               onClick={() => {
                 if (!accounts || accounts.length === 0) {
@@ -611,282 +709,11 @@ const AccountsPage = () => {
                 }
                 setShowAccountSelector(true)
               }}
-              className="btn btn-primary btn-md"
+              className="btn btn-secondary btn-md"
             >
               <DollarSign size={16} className="mr-2" />
               Record Payment
             </button>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  {visibleColumns.account_name && <th className="text-left py-3 px-4 font-medium text-gray-900">Account Name</th>}
-                  {visibleColumns.mac_address && <th className="text-left py-3 px-4 font-medium text-gray-900">MAC Address</th>}
-                  {visibleColumns.device && <th className="text-left py-3 px-4 font-medium text-gray-900">Device</th>}
-                  {visibleColumns.product && <th className="text-left py-3 px-4 font-medium text-gray-900">Product</th>}
-                  {visibleColumns.contact && <th className="text-left py-3 px-4 font-medium text-gray-900">Contact</th>}
-                  {visibleColumns.accounts_count && <th className="text-center py-3 px-4 font-medium text-gray-900">Accounts</th>}
-                  {visibleColumns.transactions_count && <th className="text-center py-3 px-4 font-medium text-gray-900">Transactions</th>}
-                  {visibleColumns.created_date && (
-                    <th
-                      onClick={() => handleSort('created_date')}
-                      className="text-left py-3 px-4 font-medium text-gray-900 cursor-pointer hover:bg-gray-100 select-none"
-                      title="Click to sort by Created Date"
-                    >
-                      Created Date
-                      <SortIndicator column="created_date" currentSort={sortColumn} direction={sortDirection} />
-                    </th>
-                  )}
-                  {visibleColumns.next_renewal && (
-                    <th
-                      onClick={() => handleSort('next_renewal')}
-                      className="text-left py-3 px-4 font-medium text-gray-900 cursor-pointer hover:bg-gray-100 select-none"
-                      title="Click to sort by Next Renewal date"
-                    >
-                      Next Renewal
-                      <SortIndicator column="next_renewal" currentSort={sortColumn} direction={sortDirection} />
-                    </th>
-                  )}
-                  {visibleColumns.actions && <th className="text-left py-3 px-4 font-medium text-gray-900">Actions</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {filteredAccounts.map((account) => {
-                  const renewalColor = getRenewalColor(account.days_until_renewal)
-                  return (
-                    <tr key={account.id} className="border-b border-gray-100 hover:bg-gray-50">
-                      {/* Column 1: Account Name */}
-                      {visibleColumns.account_name && (
-                        <td className="py-4 px-4">
-                          <button
-                            onClick={() => navigate(`/accounts/${account.id}`)}
-                            className="font-medium text-blue-600 hover:text-blue-800 hover:underline text-left"
-                          >
-                            {account.account_name || 'Unnamed Account'}
-                          </button>
-                        </td>
-                      )}
-
-                      {/* Column 2: MAC Address */}
-                      {visibleColumns.mac_address && (
-                        <td className="py-4 px-4">
-                          <span className="font-mono text-sm text-gray-700">
-                            {account.mac_address || 'N/A'}
-                          </span>
-                        </td>
-                      )}
-
-                      {/* Column 3: Device */}
-                      {visibleColumns.device && (
-                        <td className="py-4 px-4">
-                          <span className="text-gray-900">
-                            {account.device_name || 'Unknown Device'}
-                          </span>
-                        </td>
-                      )}
-
-                      {/* Column 4: Product */}
-                      {visibleColumns.product && (
-                        <td className="py-4 px-4">
-                          <span className="font-medium text-blue-600">
-                            {account.edition_name || account.edition || 'N/A'}
-                          </span>
-                        </td>
-                      )}
-
-                      {/* Column 5: Contact (clickable) */}
-                      {visibleColumns.contact && (
-                        <td className="py-4 px-4">
-                          <a
-                            href={`/contacts/${account.contact_id}`}
-                            className="text-blue-600 hover:underline font-medium"
-                          >
-                            {account.contact_name || `${account.first_name || ''} ${account.last_name || ''}`.trim() || 'Unknown Contact'}
-                          </a>
-                        </td>
-                      )}
-
-                      {/* Column 6: Total Accounts for Contact */}
-                      {visibleColumns.accounts_count && (
-                        <td className="py-4 px-4 text-center">
-                          <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-700 font-semibold text-sm">
-                            {account.total_accounts_for_contact || 0}
-                          </span>
-                        </td>
-                      )}
-
-                      {/* Column 7: Transactions for THIS Account */}
-                      {visibleColumns.transactions_count && (
-                        <td className="py-4 px-4 text-center">
-                          <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-green-100 text-green-700 font-semibold text-sm">
-                            {account.transaction_count || 0}
-                          </span>
-                        </td>
-                      )}
-
-                      {/* Column 8: Created Date */}
-                      {visibleColumns.created_date && (
-                        <td className="py-4 px-4">
-                          <span className="text-gray-600 text-sm">
-                            {formatDate(account.created_at)}
-                          </span>
-                        </td>
-                      )}
-
-                      {/* Column 9: Next Renewal with Color Coding */}
-                      {visibleColumns.next_renewal && (
-                        <td className="py-4 px-4">
-                          <div className="flex items-center gap-1">
-                            <Calendar size={14} className={renewalColor} />
-                            <span className={`text-sm ${renewalColor}`}>
-                              {account.next_renewal_date ? formatDate(account.next_renewal_date) : 'N/A'}
-                            </span>
-                            {account.days_until_renewal != null && (
-                              <span className="text-xs text-gray-500 ml-1">
-                                ({Math.round(account.days_until_renewal)}d)
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                      )}
-
-                      {/* Column 10: Actions */}
-                      {visibleColumns.actions && (
-                        <td className="py-4 px-4">
-                          <div className="flex items-center gap-2">
-                            {/* Create Task button with optional active-task badge */}
-                            <div className="relative inline-flex">
-                              <button
-                                onClick={() => handleCreateTask(account)}
-                                className="p-2 text-gray-600 hover:text-orange-600 hover:bg-orange-50 rounded-lg"
-                                title="Create Renewal Task"
-                              >
-                                <ClipboardList size={16} />
-                              </button>
-                              {account.active_task_count > 0 && (
-                                <span className="absolute -top-1 -right-1 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white bg-orange-500 rounded-full">
-                                  {account.active_task_count}
-                                </span>
-                              )}
-                            </div>
-                            <button
-                              onClick={() => handleCreateTransaction(account)}
-                              className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
-                              title="Create Transaction"
-                            >
-                              <Plus size={16} />
-                            </button>
-                            <button
-                              onClick={() => handleRecordPayment(account)}
-                              className="p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg"
-                              title="Record Payment"
-                            >
-                              <DollarSign size={16} />
-                            </button>
-                            <button
-                              onClick={() => navigate(`/accounts/${account.id}`)}
-                              className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
-                              title="View Details"
-                            >
-                              <Eye size={16} />
-                            </button>
-                            <button
-                              onClick={() => handleEditAccount(account)}
-                              disabled={loadingEditAccount}
-                              className="p-2 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg"
-                              title="Edit Account"
-                            >
-                              <Edit2 size={16} />
-                            </button>
-                            <AccountActions
-                              account={account}
-                              onDelete={handleDeleteAccount}
-                              onRestore={handleRestoreAccount}
-                              onRefresh={fetchAccounts}
-                            />
-                          </div>
-                        </td>
-                      )}
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* Pagination Controls */}
-        {!loading && displayAccounts.length > 0 && totalPages > 1 && (
-          <div className="border-t border-gray-200 px-4 py-4 flex items-center justify-between bg-gray-50">
-            <div className="flex items-center gap-2">
-              <label className="text-sm text-gray-700">Rows per page:</label>
-              <select
-                value={pageSize}
-                onChange={(e) => handlePageSizeChange(parseInt(e.target.value))}
-                className="input input-sm"
-              >
-                <option value="25">25</option>
-                <option value="50">50</option>
-                <option value="100">100</option>
-                <option value="200">200</option>
-              </select>
-            </div>
-
-            <div className="text-sm text-gray-700">
-              Page <span className="font-medium">{currentPage}</span> of{' '}
-              <span className="font-medium">{totalPages}</span> ({' '}
-              <span className="font-medium">{totalCount}</span> total)
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handlePreviousPage}
-                disabled={currentPage === 1}
-                className="btn btn-sm btn-outline"
-              >
-                Previous
-              </button>
-
-              {/* Page number buttons */}
-              <div className="flex gap-1">
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  let pageNum
-                  if (totalPages <= 5) {
-                    pageNum = i + 1
-                  } else if (currentPage <= 3) {
-                    pageNum = i + 1
-                  } else if (currentPage > totalPages - 3) {
-                    pageNum = totalPages - 4 + i
-                  } else {
-                    pageNum = currentPage - 2 + i
-                  }
-
-                  return (
-                    <button
-                      key={pageNum}
-                      onClick={() => handleGoToPage(pageNum)}
-                      className={`btn btn-sm ${
-                        currentPage === pageNum
-                          ? 'btn-primary'
-                          : 'btn-outline'
-                      }`}
-                    >
-                      {pageNum}
-                    </button>
-                  )
-                })}
-              </div>
-
-              <button
-                onClick={handleNextPage}
-                disabled={currentPage === totalPages}
-                className="btn btn-sm btn-outline"
-              >
-                Next
-              </button>
-            </div>
           </div>
         )}
       </div>
