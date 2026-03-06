@@ -1,49 +1,38 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import {
   Plus,
   Search,
   Filter,
-  MoreVertical,
   Edit,
   Trash2,
-  UserPlus,
   Mail,
   Phone,
   Building,
   DollarSign,
-  Calendar,
-  AlertCircle,
-  CheckCircle,
-  Clock,
-  X,
-  Eye,
   Users,
-  Smartphone,
-  Key,
-  PlayCircle,
   ArrowRightLeft
 } from 'lucide-react'
 import { contactsAPI, usersAPI } from '../services/api'
 import LoadingSpinner from '../components/LoadingSpinner'
-import ColumnSelector from '../components/ColumnSelector'
+import DataTable from '../components/shared/DataTable'
 import toast from 'react-hot-toast'
-import { useForm } from 'react-hook-form'
 import { format } from 'date-fns'
 import ContactDetail from '../components/ContactDetail'
 import ContactForm from '../components/ContactForm'
 import ConvertLeadModal from '../components/ConvertLeadModal'
-import api from '../services/api'
 import { useFieldVisibility } from '../hooks/useFieldVisibility'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 
 // Hardcoded special columns (not from field configuration)
 const SPECIAL_COLUMNS = {
-  accounts: { key: 'accounts', label: 'Accounts', description: 'Number of accounts', required: false, isSpecial: true },
-  transactions: { key: 'transactions', label: 'Transactions', description: 'Number of transactions', required: false, isSpecial: true },
-  actions: { key: 'actions', label: 'Actions', description: 'Edit/Delete actions', required: false, isSpecial: true }
+  accounts: { key: 'accounts', label: 'Accounts', description: 'Number of accounts', required: false, isSpecial: true, sortable: false },
+  transactions: { key: 'transactions', label: 'Transactions', description: 'Number of transactions', required: false, isSpecial: true, sortable: false },
 }
+
+// Backend-supported sort columns
+const SORTABLE_COLUMNS = new Set(['created_at', 'updated_at', 'first_name', 'last_name', 'company', 'status'])
 
 // Build column definitions dynamically based on field configuration
 // This will be set in the component using useFieldVisibility hook
@@ -89,6 +78,7 @@ const Contacts = () => {
   const [viewMode, setViewMode] = useState('list') // 'list' or 'detail'
   const [loadingEditContact, setLoadingEditContact] = useState(false)
   const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '')
+  const [sortConfig, setSortConfig] = useState({ key: 'created_at', direction: 'desc' })
 
   // Debounced search - separate immediate input from debounced API calls
   // Must be defined early, before currentFilters uses it
@@ -112,6 +102,7 @@ const Contacts = () => {
             if (!addedFields.has('name')) {
               columns.push({
                 key: 'name',
+                sortKey: 'first_name',
                 label: 'Name',
                 type: 'text',
                 isCustom: false,
@@ -125,13 +116,15 @@ const Contacts = () => {
             return
           } else {
             // Add other fields normally
+            const isSortable = SORTABLE_COLUMNS.has(field.field_name)
             columns.push({
               key: field.field_name,
               label: field.field_label,
               type: field.field_type,
               isCustom: false,
               description: `${field.field_label}`,
-              required: field.is_required
+              required: field.is_required,
+              ...(isSortable ? {} : { sortable: false })
             })
             addedFields.add(field.field_name)
           }
@@ -181,7 +174,9 @@ const Contacts = () => {
     priority: searchParams.get('priority') || '',
     assigned_to: searchParams.get('assigned_to') || '',
     source: searchParams.get('source') || '',
-  }), [searchParams, debouncedSearch])
+    sort: sortConfig.key === 'name' ? 'first_name' : sortConfig.key,
+    order: sortConfig.direction,
+  }), [searchParams, debouncedSearch, sortConfig])
 
   // Update URL with new filters
   const updateFilters = (newFilters) => {
@@ -192,10 +187,29 @@ const Contacts = () => {
     setSearchParams(params)
   }
 
-  // Memoize active filter count
+  // Memoize active filter count (exclude sort/order/limit/page from count)
   const activeFilterCount = React.useMemo(() => {
-    return Object.values(currentFilters).filter(v => v && v !== 1 && v !== 20 && v !== '').length
+    const { page, limit, sort, order, ...filters } = currentFilters
+    return Object.values(filters).filter(v => v && v !== '').length
   }, [currentFilters])
+
+  // Sort handler - toggles direction, same pattern as LeadListTable
+  const handleSort = useCallback((key) => {
+    setSortConfig(prev => {
+      const direction = prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+      return { key, direction }
+    })
+    // Reset to page 1 when sort changes
+    updateFilters({ page: 1 })
+  }, [])
+
+  // Pagination change handler for DataTable
+  const handlePaginationChange = useCallback((newPagination) => {
+    updateFilters({
+      page: newPagination.page,
+      limit: newPagination.limit
+    })
+  }, [])
 
   // Column visibility handlers
   const handleColumnToggle = (columnKey) => {
@@ -494,6 +508,34 @@ const Contacts = () => {
     setSelectedContact(null)
   }
 
+  // Render row actions for DataTable
+  const renderRowActions = useCallback((contact) => (
+    <div className="flex items-center space-x-2" onClick={(e) => e.stopPropagation()}>
+      <button
+        onClick={() => handleEditContact(contact)}
+        disabled={loadingEditContact}
+        className="p-1 text-gray-600 hover:text-primary-600 disabled:opacity-50 disabled:cursor-not-allowed"
+        title="Edit Contact"
+      >
+        <Edit size={16} />
+      </button>
+      <button
+        onClick={() => {
+          if (window.confirm('Are you sure you want to delete this contact?')) {
+            deleteMutation.mutate(contact.id)
+          }
+        }}
+        className="p-1 text-gray-600 hover:text-red-600"
+        title="Delete Contact"
+      >
+        <Trash2 size={16} />
+      </button>
+    </div>
+  ), [loadingEditContact])
+
+  // Empty state helper
+  const hasActiveFilters = !!(currentFilters.search || currentFilters.status || currentFilters.type || currentFilters.priority || currentFilters.source)
+
   if ((contactsLoading && !contactsData) || fieldConfigLoading) {
     return <LoadingSpinner className="mt-8" />
   }
@@ -658,159 +700,46 @@ const Contacts = () => {
 
       {/* Contacts List */}
       <div className="card">
-        {/* Toolbar - Always visible */}
-        <div className="border-b border-gray-200 px-4 py-3 flex items-center justify-between bg-gray-50">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-gray-700">
-              {pagination.total || 0} {pagination.total === 1 ? 'Contact' : 'Contacts'}
-            </span>
+        <DataTable
+          data={contacts}
+          loading={contactsLoading && !contactsData}
+          entityName="Contact"
+          entityType="contacts"
+          rowKey="id"
+          columns={COLUMN_DEFINITIONS}
+          visibleColumns={visibleColumns}
+          onColumnToggle={handleColumnToggle}
+          onColumnsReset={handleResetColumns}
+          sortConfig={sortConfig}
+          onSort={handleSort}
+          pagination={pagination}
+          onPaginationChange={handlePaginationChange}
+          pageSizeOptions={[20, 50, 100]}
+          selectable={false}
+          renderCell={renderCellContent}
+          renderRowActions={renderRowActions}
+          emptyIcon={Users}
+          emptyMessage="No contacts found"
+          emptySubMessage={hasActiveFilters ? "Try adjusting your search criteria or filters" : "Get started by adding your first contact"}
+        />
+        {/* Empty state action buttons — shown below DataTable's empty state */}
+        {contacts.length === 0 && !contactsLoading && (
+          <div className="flex items-center justify-center space-x-3 pb-8 -mt-4">
+            <button
+              onClick={() => setShowConvertModal(true)}
+              className="btn btn-secondary btn-md"
+            >
+              <ArrowRightLeft size={16} className="mr-2" />
+              Convert Lead
+            </button>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="btn btn-primary btn-md"
+            >
+              <Plus size={16} className="mr-2" />
+              Add Contact
+            </button>
           </div>
-          <div className="flex items-center gap-2">
-            <ColumnSelector
-              columns={COLUMN_DEFINITIONS}
-              visibleColumns={visibleColumns}
-              onColumnToggle={handleColumnToggle}
-              onReset={handleResetColumns}
-            />
-          </div>
-        </div>
-
-        {contacts.length === 0 ? (
-          <div className="text-center py-12">
-            <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No contacts found</h3>
-            <p className="text-gray-600 mb-6">
-              {currentFilters.search || currentFilters.status || currentFilters.type 
-                ? "Try adjusting your search criteria or filters"
-                : "Get started by adding your first contact"
-              }
-            </p>
-            <div className="flex items-center justify-center space-x-3">
-              <button
-                onClick={() => setShowConvertModal(true)}
-                className="btn btn-secondary btn-md"
-              >
-                <ArrowRightLeft size={16} className="mr-2" />
-                Convert Lead
-              </button>
-              <button
-                onClick={() => setShowCreateModal(true)}
-                className="btn btn-primary btn-md"
-              >
-                <Plus size={16} className="mr-2" />
-                Add Contact
-              </button>
-            </div>
-          </div>
-        ) : (
-          <>
-            {/* Table Header */}
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-gray-200">
-                    {/* Dynamic columns from field configuration */}
-                    {COLUMN_DEFINITIONS.map(column => {
-                      if (!visibleColumns[column.key]) return null
-
-                      const textAlignment = (column.isSpecial && (column.key === 'accounts' || column.key === 'transactions'))
-                        ? 'text-center'
-                        : 'text-left'
-
-                      return (
-                        <th
-                          key={column.key}
-                          className={`${textAlignment} py-3 px-4 font-medium text-gray-900`}
-                        >
-                          {column.label}
-                        </th>
-                      )
-                    })}
-                    {/* Actions column */}
-                    <th className="text-left py-3 px-4 font-medium text-gray-900">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {contacts.map((contact) => (
-                    <tr
-                      key={contact.id}
-                      className="border-b border-gray-100 hover:bg-gray-50"
-                    >
-                      {/* Dynamic cells from field configuration */}
-                      {COLUMN_DEFINITIONS.map(column => {
-                        if (!visibleColumns[column.key]) return null
-
-                        const textAlignment = (column.isSpecial && (column.key === 'accounts' || column.key === 'transactions'))
-                          ? 'text-center'
-                          : ''
-
-                        return (
-                          <td
-                            key={`${contact.id}-${column.key}`}
-                            className={`py-4 px-4 ${textAlignment}`}
-                          >
-                            {renderCellContent(contact, column)}
-                          </td>
-                        )
-                      })}
-                      {/* Actions column */}
-                      <td className="py-4 px-4">
-                        <div className="flex items-center space-x-2" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            onClick={() => handleEditContact(contact)}
-                            disabled={loadingEditContact}
-                            className="p-1 text-gray-600 hover:text-primary-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                            title="Edit Contact"
-                          >
-                            <Edit size={16} />
-                          </button>
-                          <button
-                            onClick={() => {
-                              if (window.confirm('Are you sure you want to delete this contact?')) {
-                                deleteMutation.mutate(contact.id)
-                              }
-                            }}
-                            className="p-1 text-gray-600 hover:text-red-600"
-                            title="Delete Contact"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Pagination */}
-            {pagination.pages > 1 && (
-              <div className="flex items-center justify-between mt-6 pt-6 border-t border-gray-200">
-                <div className="text-sm text-gray-600">
-                  Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} contacts
-                </div>
-                <div className="flex space-x-2">
-                  <button
-                    onClick={() => updateFilters({ page: pagination.page - 1 })}
-                    disabled={pagination.page <= 1}
-                    className="btn btn-secondary btn-sm disabled:opacity-50"
-                  >
-                    Previous
-                  </button>
-                  <span className="px-3 py-2 text-sm text-gray-600">
-                    Page {pagination.page} of {pagination.pages}
-                  </span>
-                  <button
-                    onClick={() => updateFilters({ page: pagination.page + 1 })}
-                    disabled={pagination.page >= pagination.pages}
-                    className="btn btn-secondary btn-sm disabled:opacity-50"
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
-            )}
-          </>
         )}
       </div>
 
