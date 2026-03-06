@@ -84,7 +84,7 @@ api.interceptors.response.use(
   (error) => {
     const message = error.response?.data?.message || error.message || 'An error occurred'
     const details = error.response?.data?.details
-    const isSupedAdminRoute = error.config?.url?.includes('/api/super-admin')
+    const isSuperAdminRoute = error.config?.url?.includes('/api/super-admin')
 
     // Log validation errors with full details for debugging
     if (error.response?.status === 400 && details) {
@@ -109,11 +109,11 @@ api.interceptors.response.use(
       }
     } else if (error.response?.status === 401) {
       // Don't interfere with super admin authentication
-      if (!isSupedAdminRoute) {
+      if (!isSuperAdminRoute) {
         // Don't show error or redirect for auth check requests (like /auth/me)
         // or if we're already on the login page
         const isAuthCheckRequest = error.config?.url?.includes('/auth/me')
-        const isOnLoginPage = window.location.pathname === '/login' || window.location.pathname === '/register'
+        const isOnLoginPage = window.location.pathname === '/login' || window.location.pathname === '/register' || window.location.pathname === '/super-admin/login'
         const isTwilioCall = error.config?.url?.includes('/twilio')
 
         // Don't clear auth or show errors if on login page or for Twilio calls when not authenticated
@@ -216,7 +216,12 @@ export const usersAPI = {
     const response = await api.delete(`/users/${id}`)
     return response.data
   },
-  
+
+  resetPassword: async (id, newPassword) => {
+    const response = await api.put(`/users/${id}/password`, { new_password: newPassword })
+    return response.data
+  },
+
   getStats: async () => {
     const response = await api.get('/users/stats')
     return response.data
@@ -976,6 +981,12 @@ export const twilioAPI = {
     return response.data
   },
 
+  // Send WhatsApp message
+  sendWhatsApp: async (whatsappData) => {
+    const response = await api.post('/twilio/whatsapp/send', whatsappData)
+    return response.data
+  },
+
   // Get SMS history
   getSMSHistory: async (params = {}) => {
     const response = await api.get('/twilio/sms', { params })
@@ -983,8 +994,8 @@ export const twilioAPI = {
   },
 
   // Get SMS conversations (grouped by phone number)
-  getConversations: async () => {
-    const response = await api.get('/twilio/sms/conversations')
+  getConversations: async (params = {}) => {
+    const response = await api.get('/twilio/sms/conversations', { params })
     return response.data
   },
 
@@ -1129,7 +1140,31 @@ export const taskAPI = {
 
   // Get all tasks across organization with filters
   getAllTasks: async (params = {}) => {
-    const response = await api.get('/tasks/all', { params })
+    const response = await api.get('/tasks', { params })
+    return response.data
+  },
+
+  // Create a general task (can link to lead, contact, account, or any combination)
+  createGeneralTask: async (data) => {
+    const response = await api.post('/tasks', data)
+    return response.data
+  },
+
+  // Complete a task (works for tasks without leads - contact/account only tasks)
+  completeGeneralTask: async (taskId, data = {}) => {
+    const response = await api.patch(`/tasks/${taskId}/complete`, data)
+    return response.data
+  },
+
+  // Get all tasks with optional filtering and pagination
+  getOrganizationTasks: async (params = {}) => {
+    const response = await api.get('/tasks', { params })
+    return response.data
+  },
+
+  // Get task statistics
+  getTaskStats: async () => {
+    const response = await api.get('/tasks/stats')
     return response.data
   }
 }
@@ -1372,6 +1407,59 @@ export const fieldMappingAPI = {
   // Get available fields for an entity
   getEntityFields: async (entityType) => {
     const response = await api.get(`/field-mappings/fields/${entityType}`)
+    return response.data
+  }
+}
+
+// Workflow Rules API
+export const workflowAPI = {
+  // Get all workflow rules
+  getRules: async () => {
+    const response = await api.get('/workflow-rules')
+    return response.data
+  },
+
+  // Get a single workflow rule
+  getRule: async (id) => {
+    const response = await api.get(`/workflow-rules/${id}`)
+    return response.data
+  },
+
+  // Create a new workflow rule
+  createRule: async (data) => {
+    const response = await api.post('/workflow-rules', data)
+    return response.data
+  },
+
+  // Update a workflow rule
+  updateRule: async (id, data) => {
+    const response = await api.put(`/workflow-rules/${id}`, data)
+    return response.data
+  },
+
+  // Delete a workflow rule
+  deleteRule: async (id) => {
+    const response = await api.delete(`/workflow-rules/${id}`)
+    return response.data
+  },
+
+  // Execute a specific rule immediately
+  executeRule: async (id) => {
+    const response = await api.post(`/workflow-rules/${id}/execute`)
+    return response.data
+  },
+
+  // Execute all enabled rules immediately
+  executeAll: async () => {
+    const response = await api.post('/workflow-rules/execute-all')
+    return response.data
+  },
+
+  // Get execution logs for a rule
+  getRuleLogs: async (id, page = 1) => {
+    const response = await api.get(`/workflow-rules/${id}/logs`, {
+      params: { page, limit: 10 }
+    })
     return response.data
   }
 }
