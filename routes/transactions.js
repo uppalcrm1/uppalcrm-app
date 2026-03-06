@@ -90,7 +90,7 @@ router.get('/stats/revenue', async (req, res) => {
       WHERE organization_id = $1
         AND status = 'completed'
         AND (deleted_at IS NULL OR is_void = FALSE)
-    `, [organization_id]);
+    `, [organization_id], organization_id);
 
     // Get all transactions count (for total count)
     const countResult = await db.query(`
@@ -98,7 +98,7 @@ router.get('/stats/revenue', async (req, res) => {
       FROM transactions
       WHERE organization_id = $1
         AND (deleted_at IS NULL OR is_void = FALSE)
-    `, [organization_id]);
+    `, [organization_id], organization_id);
 
     // Get exchange rate
     const exchangeRate = await ConfigService.getExchangeRate(organization_id);
@@ -282,7 +282,7 @@ router.get('/accounts/:accountId', async (req, res) => {
       WHERE t.account_id = $1
         AND t.organization_id = $2
       ORDER BY t.transaction_date DESC, t.created_at DESC
-    `, [accountId, organization_id]);
+    `, [accountId, organization_id], organization_id);
 
     res.json({
       success: true,
@@ -319,7 +319,7 @@ router.get('/', async (req, res) => {
       const termConfigResult = await db.query(`
         SELECT field_options FROM default_field_configurations
         WHERE organization_id = $1 AND field_name = 'term' AND entity_type = 'transactions'
-      `, [organization_id]);
+      `, [organization_id], organization_id);
 
       if (termConfigResult.rows.length > 0 && termConfigResult.rows[0].field_options) {
         termOptions = termConfigResult.rows[0].field_options;
@@ -437,8 +437,8 @@ router.get('/', async (req, res) => {
       countParams.push(`%${search}%`);
     }
 
-    const result = await db.query(query, params);
-    const countResult = await db.query(countQuery, countParams);
+    const result = await db.query(query, params, organization_id);
+    const countResult = await db.query(countQuery, countParams, organization_id);
     const totalCount = parseInt(countResult.rows[0].total_count, 10);
 
     // STEP 3: Build transaction_id from term options lookup
@@ -516,7 +516,7 @@ router.get('/:id', async (req, res) => {
       LEFT JOIN accounts a ON t.account_id = a.id
       LEFT JOIN products p ON t.product_id = p.id
       WHERE t.id = $1 AND t.organization_id = $2
-    `, [id, organization_id]);
+    `, [id, organization_id], organization_id);
 
     if (result.rows.length === 0) {
       return res.status(404).json({
@@ -677,7 +677,7 @@ router.get('/accounts/:accountId', async (req, res) => {
       WHERE t.account_id = $1
         AND t.organization_id = $2
       ORDER BY t.transaction_date DESC, t.created_at DESC
-    `, [accountId, organization_id]);
+    `, [accountId, organization_id], organization_id);
 
     res.json({
       success: true,
