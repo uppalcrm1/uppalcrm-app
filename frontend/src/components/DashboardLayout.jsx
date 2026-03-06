@@ -96,6 +96,26 @@ const DashboardLayout = () => {
     }
   }, [])
 
+  // Listen for incoming call accepted event to show Dialpad with active call UI
+  React.useEffect(() => {
+    const handleIncomingCallAccepted = (event) => {
+      const { from, callSid } = event.detail
+
+      console.log('📞 Incoming call accepted - opening Dialpad:', { from, callSid })
+
+      // Open Dialpad to show call-in-progress UI
+      setShowIncomingCallDialpad(true)
+      setIncomingCallNumber(from)
+      setIncomingCallName('Incoming Call')
+    }
+
+    window.addEventListener('incomingCallAccepted', handleIncomingCallAccepted)
+
+    return () => {
+      window.removeEventListener('incomingCallAccepted', handleIncomingCallAccepted)
+    }
+  }, [])
+
   if (isLoading) {
     return <LoadingSpinner />
   }

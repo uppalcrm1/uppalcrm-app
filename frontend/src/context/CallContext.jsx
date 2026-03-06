@@ -189,12 +189,40 @@ export const CallProvider = ({ children }) => {
     const handleIncomingCall = (event) => {
       const { call, from, callSid } = event.detail
 
+      // Set up event listeners on the incoming call IMMEDIATELY
+      // These handle cases where caller hangs up or gets redirected BEFORE agent accepts
+      const handleCallCancel = () => {
+        console.log('📞 Incoming call cancelled (caller hung up or redirected to voicemail)')
+        setIncomingCall(null)
+      }
+
+      const handleCallDisconnect = () => {
+        console.log('📞 Incoming call disconnected before acceptance')
+        setIncomingCall(null)
+      }
+
+      const handleCallReject = () => {
+        console.log('📞 Incoming call rejected')
+        setIncomingCall(null)
+      }
+
+      // Attach listeners to the call object
+      call.on('cancel', handleCallCancel)
+      call.on('disconnect', handleCallDisconnect)
+      call.on('reject', handleCallReject)
+
       // Set incoming call data for display in notification
       setIncomingCall({
         callSid,
         from,
         callerName: 'Incoming Call',
-        twilioCall: call  // Store the actual SDK call object
+        twilioCall: call,  // Store the actual SDK call object
+        // Store listener functions for cleanup if needed
+        _listeners: {
+          handleCallCancel,
+          handleCallDisconnect,
+          handleCallReject
+        }
       })
 
       // Play looping ringtone
@@ -240,7 +268,7 @@ export const CallProvider = ({ children }) => {
     if (!incomingCall) return
 
     try {
-      const { twilioCall, from, callSid } = incomingCall
+      const { twilioCall, from, callSid, _listeners } = incomingCall
 
       console.log('Accepting incoming call:', callSid)
 
@@ -248,11 +276,52 @@ export const CallProvider = ({ children }) => {
         throw new Error('No Twilio call object available')
       }
 
+      // Clean up the incoming call event listeners before accepting
+      if (_listeners) {
+        twilioCall.removeListener('cancel', _listeners.handleCallCancel)
+        twilioCall.removeListener('disconnect', _listeners.handleCallDisconnect)
+        twilioCall.removeListener('reject', _listeners.handleCallReject)
+      }
+
       // Accept the call using SDK's native method
       // This automatically connects the agent to the conference via the agent-bridge webhook
       await twilioCall.accept()
 
       console.log('✅ Incoming call accepted via SDK')
+      console.log('Call status after accept():', twilioCall.status())
+
+      // Set activeCall state with call object for Dialpad to use
+      const activeCallState = {
+        status: 'in-progress',
+        from,
+        callSid,
+        twilioCall
+      }
+      setActiveCall(activeCallState)
+
+      // Set up listeners for ALL possible call end events
+      // The SDK can fire different events depending on call state and how it ends
+
+      // When either party disconnects the call
+      twilioCall.on('disconnect', () => {
+        console.log('📞 Active call disconnected (caller or agent hung up)')
+        console.log('Call status on disconnect:', twilioCall.status())
+        setActiveCall(null)
+      })
+
+      // When call is cancelled (e.g., caller hangs up quickly)
+      twilioCall.on('cancel', () => {
+        console.log('📞 Active call cancelled')
+        console.log('Call status on cancel:', twilioCall.status())
+        setActiveCall(null)
+      })
+
+      // When an error occurs during the call
+      twilioCall.on('error', (error) => {
+        console.error('📞 Active call error:', error)
+        console.log('Call status on error:', twilioCall.status())
+        setActiveCall(null)
+      })
 
       // Stop ringtone and tab flash
       stopRingtone()
@@ -260,6 +329,14 @@ export const CallProvider = ({ children }) => {
 
       // Clear the incoming notification
       setIncomingCall(null)
+
+      // Dispatch event to open Dialpad with caller info
+      window.dispatchEvent(new CustomEvent('incomingCallAccepted', {
+        detail: {
+          from,
+          callSid
+        }
+      }))
 
       // Notify user
       toast.success(`Connected to ${from}...`)
@@ -274,12 +351,19 @@ export const CallProvider = ({ children }) => {
     if (!incomingCall) return
 
     try {
-      const { twilioCall, callSid } = incomingCall
+      const { twilioCall, callSid, _listeners } = incomingCall
 
       console.log('Declining incoming call:', callSid)
 
       if (!twilioCall) {
         throw new Error('No Twilio call object available')
+      }
+
+      // Clean up the incoming call event listeners before rejecting
+      if (_listeners) {
+        twilioCall.removeListener('cancel', _listeners.handleCallCancel)
+        twilioCall.removeListener('disconnect', _listeners.handleCallDisconnect)
+        twilioCall.removeListener('reject', _listeners.handleCallReject)
       }
 
       // Reject the call using SDK's native method

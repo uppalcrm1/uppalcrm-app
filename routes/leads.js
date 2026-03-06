@@ -191,7 +191,7 @@ const getFieldConfigurations = async (organizationId) => {
       FROM custom_field_definitions
       WHERE organization_id = $1 AND is_active = true
       ORDER BY display_order ASC, created_at ASC
-    `, [organizationId]);
+    `, [organizationId], organizationId);
 
     // Fetch system fields with ALL visibility flags from default_field_configurations
     let storedSystemFields = [];
@@ -213,7 +213,7 @@ const getFieldConfigurations = async (organizationId) => {
         FROM default_field_configurations
         WHERE organization_id = $1
         ORDER BY display_order ASC
-      `, [organizationId]);
+      `, [organizationId], organizationId);
       storedSystemFields = systemFieldsResult.rows;
     } catch (error) {
       console.warn('⚠️ Error fetching system fields from database:', error.message);
@@ -379,7 +379,7 @@ async function getSystemFieldConfigurations(organizationId) {
       SELECT field_name, field_options, is_enabled, is_required
       FROM default_field_configurations
       WHERE organization_id = $1 AND entity_type = 'leads'
-    `, [organizationId]);
+    `, [organizationId], organizationId);
 
     return result.rows;
   } catch (error) {
@@ -609,7 +609,7 @@ router.get('/by-status', async (req, res) => {
       FROM leads
       WHERE organization_id = $1
       ORDER BY created_at DESC
-    `, [req.organizationId]);
+    `, [req.organizationId], req.organizationId);
 
     // Add computed name field - return snake_case directly for consistency
     const convertedLeads = addComputedNameField(leads.rows);
@@ -766,7 +766,7 @@ router.get('/',
         WHERE ${whereClause}
         ORDER BY ${sortColumn} ${orderDirection}
         LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
-      `, queryParams);
+      `, queryParams, req.organizationId);
 
       // Get total count for pagination with same filters
       const countParams = queryParams.slice(0, -2); // Remove limit and offset
@@ -774,7 +774,7 @@ router.get('/',
         SELECT COUNT(*) as total
         FROM leads
         WHERE ${whereClause}
-      `, countParams);
+      `, countParams, req.organizationId);
 
       const total = parseInt(countResult.rows[0].total);
       const totalPages = Math.ceil(total / limit);
@@ -1071,7 +1071,8 @@ router.get('/:leadId/tasks',
       // Verify lead belongs to organization
       const leadCheck = await db.query(
         'SELECT id FROM leads WHERE id = $1 AND organization_id = $2',
-        [leadId, organizationId]
+        [leadId, organizationId],
+        organizationId
       );
 
       if (leadCheck.rows.length === 0) {
@@ -1129,7 +1130,7 @@ router.get('/:leadId/tasks',
           li.created_at DESC
       `;
 
-      const result = await db.query(query, queryParams);
+      const result = await db.query(query, queryParams, organizationId);
 
       // Calculate statistics from ALL tasks (not filtered)
       const statsQuery = `
@@ -1141,7 +1142,7 @@ router.get('/:leadId/tasks',
         FROM lead_interactions
         WHERE lead_id = $1 AND interaction_type = 'task' AND organization_id = $2
       `;
-      const statsResult = await db.query(statsQuery, [leadId, organizationId]);
+      const statsResult = await db.query(statsQuery, [leadId, organizationId], organizationId);
       const stats = {
         total: parseInt(statsResult.rows[0].total),
         pending: parseInt(statsResult.rows[0].pending),
@@ -1192,7 +1193,8 @@ router.post('/:leadId/tasks',
       // Verify lead belongs to organization
       const leadCheck = await db.query(
         'SELECT assigned_to FROM leads WHERE id = $1 AND organization_id = $2',
-        [leadId, organizationId]
+        [leadId, organizationId],
+        organizationId
       );
 
       if (leadCheck.rows.length === 0) {
@@ -1203,7 +1205,8 @@ router.post('/:leadId/tasks',
       if (contact_id) {
         const contactCheck = await db.query(
           'SELECT id FROM contacts WHERE id = $1 AND organization_id = $2',
-          [contact_id, organizationId]
+          [contact_id, organizationId],
+          organizationId
         );
         if (contactCheck.rows.length === 0) {
           return res.status(404).json({ error: 'Contact not found' });
@@ -1214,7 +1217,8 @@ router.post('/:leadId/tasks',
       if (account_id) {
         const accountCheck = await db.query(
           'SELECT id FROM accounts WHERE id = $1 AND organization_id = $2',
-          [account_id, organizationId]
+          [account_id, organizationId],
+          organizationId
         );
         if (accountCheck.rows.length === 0) {
           return res.status(404).json({ error: 'Account not found' });
@@ -1250,7 +1254,7 @@ router.post('/:leadId/tasks',
         status,
         priority,
         userId
-      ]);
+      ], organizationId);
 
       res.status(201).json({
         message: 'Task created successfully',
@@ -1334,7 +1338,8 @@ router.patch('/:leadId/tasks/:taskId/complete',
       // Verify lead belongs to organization
       const leadCheck = await db.query(
         'SELECT id FROM leads WHERE id = $1 AND organization_id = $2',
-        [leadId, organizationId]
+        [leadId, organizationId],
+        organizationId
       );
 
       if (leadCheck.rows.length === 0) {
@@ -1358,7 +1363,7 @@ router.patch('/:leadId/tasks/:taskId/complete',
         RETURNING *
       `;
 
-      const result = await db.query(query, [outcome, notes, taskId, leadId, organizationId, userId]);
+      const result = await db.query(query, [outcome, notes, taskId, leadId, organizationId, userId], organizationId);
 
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Task not found' });
@@ -1367,7 +1372,8 @@ router.patch('/:leadId/tasks/:taskId/complete',
       // Update lead's last_contact_date
       await db.query(
         'UPDATE leads SET last_contact_date = NOW(), updated_at = NOW() WHERE id = $1',
-        [leadId]
+        [leadId],
+        organizationId
       );
 
       res.json({
@@ -1412,7 +1418,8 @@ router.patch('/:leadId/tasks/:taskId',
       // Verify lead belongs to organization
       const leadCheck = await db.query(
         'SELECT id FROM leads WHERE id = $1 AND organization_id = $2',
-        [leadId, organizationId]
+        [leadId, organizationId],
+        organizationId
       );
 
       if (leadCheck.rows.length === 0) {
@@ -1444,7 +1451,7 @@ router.patch('/:leadId/tasks/:taskId',
         leadId,
         organizationId,
         userId
-      ]);
+      ], organizationId);
 
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Task not found' });
@@ -1484,7 +1491,8 @@ router.delete('/:leadId/tasks/:taskId',
       // Verify lead belongs to organization
       const leadCheck = await db.query(
         'SELECT id FROM leads WHERE id = $1 AND organization_id = $2',
-        [leadId, organizationId]
+        [leadId, organizationId],
+        organizationId
       );
 
       if (leadCheck.rows.length === 0) {
@@ -1497,7 +1505,7 @@ router.delete('/:leadId/tasks/:taskId',
         RETURNING id
       `;
 
-      const result = await db.query(query, [taskId, leadId, organizationId]);
+      const result = await db.query(query, [taskId, leadId, organizationId], organizationId);
 
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Task not found' });
@@ -1538,7 +1546,8 @@ router.post('/:leadId/tasks/bulk-complete',
       // Verify lead belongs to organization
       const leadCheck = await db.query(
         'SELECT id FROM leads WHERE id = $1 AND organization_id = $2',
-        [leadId, organizationId]
+        [leadId, organizationId],
+        organizationId
       );
 
       if (leadCheck.rows.length === 0) {
@@ -1558,7 +1567,7 @@ router.post('/:leadId/tasks/bulk-complete',
         RETURNING id
       `;
 
-      const result = await db.query(query, [taskIds, leadId]);
+      const result = await db.query(query, [taskIds, leadId], organizationId);
 
       res.json({
         message: `${result.rows.length} tasks marked as completed`,
@@ -1597,7 +1606,7 @@ router.get('/tasks/overdue', async (req, res) => {
       ORDER BY li.scheduled_at ASC
     `;
 
-    const result = await db.query(query, [organizationId]);
+    const result = await db.query(query, [organizationId], organizationId);
 
     res.json({
       tasks: result.rows,
@@ -1636,7 +1645,7 @@ router.get('/tasks/upcoming', async (req, res) => {
       ORDER BY li.scheduled_at ASC
     `;
 
-    const result = await db.query(query, [organizationId]);
+    const result = await db.query(query, [organizationId], organizationId);
 
     res.json({
       tasks: result.rows,
@@ -1787,7 +1796,7 @@ router.post('/', validateLeadDynamic(false), async (req, res) => {
           'scheduled',
           'medium',
           req.user.id
-        ]);
+        ], req.organizationId);
 
         console.log('✅ Follow-up task created successfully');
       } catch (taskError) {
@@ -1821,7 +1830,8 @@ router.post('/', validateLeadDynamic(false), async (req, res) => {
           console.log('📧 Looking up assigned user email for ID:', assigned_to);
           const userResult = await db.query(
             'SELECT email FROM users WHERE id = $1',
-            [assigned_to]
+            [assigned_to],
+            req.organizationId
           );
           const assignedUserEmail = userResult.rows[0]?.email;
           console.log('📧 Assigned user email:', assignedUserEmail);
@@ -1885,7 +1895,8 @@ router.put('/:id',
       // Get the old lead data to check if next_follow_up changed
       const oldLeadResult = await db.query(
         'SELECT next_follow_up, first_name, last_name, company, assigned_to FROM leads WHERE id = $1 AND organization_id = $2',
-        [req.params.id, req.organizationId]
+        [req.params.id, req.organizationId],
+        req.organizationId
       );
       const oldLead = oldLeadResult.rows[0];
 
@@ -1939,7 +1950,7 @@ router.put('/:id',
               'scheduled',
               'medium',
               userId
-            ]);
+            ], req.organizationId);
 
             console.log('✅ Follow-up task created successfully');
           } catch (taskError) {
@@ -2212,7 +2223,7 @@ router.get('/export', async (req, res) => {
       LEFT JOIN users u ON l.assigned_to = u.id AND u.organization_id = l.organization_id
       WHERE ${whereClause}
       ORDER BY l.created_at DESC
-    `, queryParams);
+    `, queryParams, req.organizationId);
 
     // Generate CSV
     const csvHeaders = [
