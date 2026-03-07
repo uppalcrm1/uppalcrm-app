@@ -57,6 +57,12 @@ checkAndInstallPlaywright();
 console.log('✅ Playwright check complete, starting server...\n');
 
 // ============================================
+// ENVIRONMENT VARIABLES - Load .env file
+// ============================================
+require('dotenv').config();
+console.log('✅ Environment variables loaded\n');
+
+// ============================================
 // LOG FILTER - Add at the very top of your server file
 // ============================================
 const originalConsoleLog = console.log;

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   DollarSign,
@@ -64,23 +65,18 @@ const formatDate = (dateString) => {
 
 const TransactionsPage = () => {
   const navigate = useNavigate()
-  const [transactions, setTransactions] = useState([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterMethod, setFilterMethod] = useState('all')
   const [filterSource, setFilterSource] = useState('all')
   const [showEditModal, setShowEditModal] = useState(false)
   const [selectedTransaction, setSelectedTransaction] = useState(null)
-  const [revenueStats, setRevenueStats] = useState(null)
-  const [loadingRevenue, setLoadingRevenue] = useState(false)
   const [sortConfig, setSortConfig] = useState({ key: 'transaction_date', direction: 'desc' })
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(50)
-  const [totalCount, setTotalCount] = useState(0)
-  const [totalPages, setTotalPages] = useState(0)
 
   // Debounce search - separate immediate input from debounced API calls
   const debouncedSearch = useDebouncedValue(searchTerm, 300)
@@ -106,13 +102,19 @@ const TransactionsPage = () => {
     localStorage.setItem('transactions_visible_columns', JSON.stringify(DEFAULT_VISIBLE_COLUMNS))
   }
 
-  const fetchTransactions = useCallback(async (page = 1, size = pageSize) => {
-    try {
-      setLoading(true)
-      const offset = (page - 1) * size
+  // Fetch transactions list via React Query
+  // Query key includes ALL variables from the old fetchTransactions dependency array:
+  // debouncedSearch, pageSize, sortConfig, filterStatus, filterMethod, filterSource — plus currentPage
+  const {
+    data: transactionsData,
+    isLoading,
+  } = useQuery({
+    queryKey: ['transactions', { search: debouncedSearch, sortConfig, filterStatus, filterMethod, filterSource, page: currentPage, pageSize }],
+    queryFn: async () => {
+      const offset = (currentPage - 1) * pageSize
       const params = {
-        limit: size,
-        offset: offset,
+        limit: pageSize,
+        offset,
         search: debouncedSearch || '',
         sort: sortConfig.key,
         order: sortConfig.direction
@@ -120,37 +122,27 @@ const TransactionsPage = () => {
       if (filterStatus !== 'all') params.status = filterStatus
       if (filterMethod !== 'all') params.payment_method = filterMethod
       if (filterSource !== 'all') params.source = filterSource
-      const response = await transactionsAPI.getTransactions(params)
-      setTransactions(response.transactions || [])
-      setTotalCount(response.total || 0)
-      setTotalPages(response.totalPages || 0)
-      setCurrentPage(page)
-      // Also refresh revenue stats when transactions change
-      fetchRevenueStats()
-    } catch (error) {
-      console.error('Error fetching transactions:', error)
-    } finally {
-      setLoading(false)
-    }
-  }, [debouncedSearch, pageSize, sortConfig, filterStatus, filterMethod, filterSource])
+      return transactionsAPI.getTransactions(params)
+    },
+    keepPreviousData: true,
+    staleTime: 30000,
+  })
 
-  // Fetch transactions on component mount and when debouncedSearch changes
+  const transactions = transactionsData?.transactions || []
+  const totalCount = transactionsData?.total || 0
+  const totalPages = transactionsData?.totalPages || 0
+
+  // Fetch revenue stats via React Query
+  const { data: revenueStats, isLoading: loadingRevenue } = useQuery({
+    queryKey: ['transactions', 'stats'],
+    queryFn: () => transactionsAPI.getRevenueStats(),
+    staleTime: 30000,
+  })
+
+  // Reset to page 1 when search, sort, or filter changes
   useEffect(() => {
-    fetchTransactions(1, pageSize)
-    fetchRevenueStats()
-  }, [fetchTransactions, pageSize])
-
-  const fetchRevenueStats = async () => {
-    try {
-      setLoadingRevenue(true)
-      const response = await transactionsAPI.getRevenueStats()
-      setRevenueStats(response)
-    } catch (error) {
-      console.error('Error fetching revenue stats:', error)
-    } finally {
-      setLoadingRevenue(false)
-    }
-  }
+    setCurrentPage(1)
+  }, [debouncedSearch, sortConfig, filterStatus, filterMethod, filterSource])
 
   // Calculate statistics from frontend data (for filtering/display only)
   const stats = {
@@ -175,8 +167,8 @@ const TransactionsPage = () => {
 
   // Pagination change handler for DataTable
   const handlePaginationChange = useCallback((newPagination) => {
+    setCurrentPage(newPagination.page)
     setPageSize(newPagination.limit)
-    fetchTransactions(newPagination.page, newPagination.limit)
   }, [])
 
   const getStatusBadge = (status) => {
@@ -213,14 +205,14 @@ const TransactionsPage = () => {
   const handleEditSuccess = () => {
     setShowEditModal(false)
     setSelectedTransaction(null)
-    fetchTransactions(currentPage, pageSize) // Refresh the current page
+    queryClient.invalidateQueries(['transactions'])
   }
 
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this transaction?')) {
       try {
         await transactionsAPI.deleteTransaction(id)
-        fetchTransactions(currentPage, pageSize) // Refresh the list
+        queryClient.invalidateQueries(['transactions'])
       } catch (error) {
         console.error('Error deleting transaction:', error)
         alert('Failed to delete transaction')
@@ -487,7 +479,7 @@ const TransactionsPage = () => {
       <div className="card">
         <DataTable
           data={transactions}
-          loading={loading}
+          loading={isLoading}
           entityName="Transaction"
           entityType="transactions"
           rowKey="id"
