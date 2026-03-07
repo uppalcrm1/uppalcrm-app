@@ -13,7 +13,9 @@ import {
   AlertCircle,
   CheckCircle,
   Clock,
-  ClipboardList
+  ClipboardList,
+  Download,
+  Trash2
 } from 'lucide-react'
 import DataTable from '../components/shared/DataTable'
 import InlineEditCell from '../components/InlineEditCell'
@@ -27,6 +29,7 @@ import { accountsAPI, taskAPI } from '../services/api'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import toast from 'react-hot-toast'
 import { formatDateOnly } from '../utils/dateUtils'
+import DeleteConfirmModal from '../components/DeleteConfirmModal'
 
 // Define available columns with metadata — actions handled by renderRowActions
 const COLUMN_DEFINITIONS = [
@@ -105,6 +108,9 @@ const AccountsPage = () => {
   const [filterStatus, setFilterStatus] = useState('')
   const [showDeleted, setShowDeleted] = useState(false)
   const [sortConfig, setSortConfig] = useState({ key: 'created_date', direction: 'desc' })
+  const [selectedAccounts, setSelectedAccounts] = useState([])
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false)
+  const [bulkDeleting, setBulkDeleting] = useState(false)
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -236,6 +242,78 @@ const AccountsPage = () => {
   useEffect(() => {
     setCurrentPage(1)
   }, [debouncedSearch, sortConfig, showDeleted])
+
+  // Clear selection when filters, search, pagination, or sort changes
+  useEffect(() => {
+    setSelectedAccounts([])
+  }, [debouncedSearch, sortConfig, currentPage, filterStatus, showDeleted])
+
+  // Bulk export selected accounts as CSV (client-side)
+  const handleBulkExport = useCallback(() => {
+    if (selectedAccounts.length === 0) return
+    const selected = filteredAccounts.filter(a => selectedAccounts.includes(a.id))
+    const headers = ['Account Name', 'MAC Address', 'Device', 'Product', 'Edition', 'Contact Name', 'Status', 'Created Date', 'Next Renewal']
+    const rows = selected.map(a => [
+      a.account_name || '', a.mac_address || '', a.device || '',
+      a.product_name || '', a.edition_name || '', a.contact_name || '',
+      a.account_status || '', a.created_at || '', a.next_renewal_date || ''
+    ])
+    const csvContent = [headers, ...rows]
+      .map(row => row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
+      .join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv' })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `accounts_selected_${new Date().toISOString().split('T')[0]}.csv`
+    document.body.appendChild(a)
+    a.click()
+    window.URL.revokeObjectURL(url)
+    document.body.removeChild(a)
+    toast.success(`Exported ${selected.length} accounts`)
+  }, [selectedAccounts, filteredAccounts])
+
+  // Export all accounts matching current filters (server-side)
+  const handleExportAll = useCallback(async () => {
+    try {
+      const params = {}
+      if (debouncedSearch.trim()) params.search = debouncedSearch
+      if (filterStatus) params.status = filterStatus
+      if (showDeleted) params.includeDeleted = 'true'
+      const exportData = await accountsAPI.exportAccounts(params)
+      const blob = new Blob([exportData], { type: 'text/csv' })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `accounts_export_${new Date().toISOString().split('T')[0]}.csv`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      toast.success('Accounts exported successfully')
+    } catch (error) {
+      console.error('Export failed:', error)
+      toast.error('Failed to export accounts')
+    }
+  }, [debouncedSearch, filterStatus, showDeleted])
+
+  // Bulk delete selected accounts (soft delete)
+  const handleBulkDelete = useCallback(async () => {
+    if (selectedAccounts.length === 0) return
+    setBulkDeleting(true)
+    try {
+      await Promise.all(selectedAccounts.map(id => accountsAPI.softDeleteAccount(id, 'Bulk deleted')))
+      queryClient.invalidateQueries(['accounts'])
+      toast.success(`Successfully deleted ${selectedAccounts.length} accounts`)
+      setSelectedAccounts([])
+      setShowBulkDeleteModal(false)
+    } catch (error) {
+      console.error('Bulk delete failed:', error)
+      toast.error('Failed to delete some accounts')
+    } finally {
+      setBulkDeleting(false)
+    }
+  }, [selectedAccounts, queryClient])
 
   const getStatusBadge = (status, daysUntilExpiry) => {
     if (status === 'active' && daysUntilExpiry > 7) {
@@ -520,6 +598,14 @@ const AccountsPage = () => {
         </div>
         <div className="flex items-center gap-3">
           <button
+            onClick={handleExportAll}
+            className="btn btn-secondary btn-md"
+            title="Export all accounts matching current filters"
+          >
+            <Download size={16} className="mr-2" />
+            Export
+          </button>
+          <button
             onClick={() => setShowCreateAccountModal(true)}
             className="btn btn-primary btn-md"
           >
@@ -634,7 +720,13 @@ const AccountsPage = () => {
           pagination={{ page: currentPage, limit: pageSize, total: totalCount }}
           onPaginationChange={handlePaginationChange}
           pageSizeOptions={[25, 50, 100, 200]}
-          selectable={false}
+          selectable
+          selectedIds={selectedAccounts}
+          onSelectionChange={setSelectedAccounts}
+          bulkActions={[
+            { label: 'Export', icon: Download, onClick: handleBulkExport },
+            { label: 'Delete', icon: Trash2, onClick: () => setShowBulkDeleteModal(true), variant: 'danger' },
+          ]}
           renderCell={renderCell}
           renderRowActions={renderRowActions}
           onInlineEdit={handleFieldUpdate}
@@ -669,6 +761,18 @@ const AccountsPage = () => {
           </div>
         )}
       </div>
+
+      {/* Bulk Delete Confirmation Modal */}
+      <DeleteConfirmModal
+        isOpen={showBulkDeleteModal}
+        onClose={() => setShowBulkDeleteModal(false)}
+        onConfirm={handleBulkDelete}
+        title="Delete Selected Accounts"
+        message={`Are you sure you want to delete ${selectedAccounts.length} account${selectedAccounts.length !== 1 ? 's' : ''}? Accounts will be soft-deleted and can be restored later.`}
+        confirmButtonText={`Delete ${selectedAccounts.length} Account${selectedAccounts.length !== 1 ? 's' : ''}`}
+        isDestructive
+        loading={bulkDeleting}
+      />
 
       {/* Account Selector Modal - Select account before creating transaction */}
       <AccountSelectorModal

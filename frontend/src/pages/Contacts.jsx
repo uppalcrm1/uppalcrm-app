@@ -12,7 +12,8 @@ import {
   Building,
   DollarSign,
   Users,
-  ArrowRightLeft
+  ArrowRightLeft,
+  Download
 } from 'lucide-react'
 import { contactsAPI, usersAPI } from '../services/api'
 import LoadingSpinner from '../components/LoadingSpinner'
@@ -25,6 +26,7 @@ import ConvertLeadModal from '../components/ConvertLeadModal'
 import InlineEditCell from '../components/InlineEditCell'
 import { useFieldVisibility } from '../hooks/useFieldVisibility'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
+import DeleteConfirmModal from '../components/DeleteConfirmModal'
 
 // Hardcoded special columns (not from field configuration)
 const SPECIAL_COLUMNS = {
@@ -80,6 +82,9 @@ const Contacts = () => {
   const [loadingEditContact, setLoadingEditContact] = useState(false)
   const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '')
   const [sortConfig, setSortConfig] = useState({ key: 'created_at', direction: 'desc' })
+  const [selectedContacts, setSelectedContacts] = useState([])
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false)
+  const [bulkDeleting, setBulkDeleting] = useState(false)
 
   // Debounced search - separate immediate input from debounced API calls
   // Must be defined early, before currentFilters uses it
@@ -193,6 +198,11 @@ const Contacts = () => {
     const { page, limit, sort, order, ...filters } = currentFilters
     return Object.values(filters).filter(v => v && v !== '').length
   }, [currentFilters])
+
+  // Clear selection when filters, search, pagination, or sort changes
+  useEffect(() => {
+    setSelectedContacts([])
+  }, [debouncedSearch, sortConfig, searchParams.get('page'), searchParams.get('status'), searchParams.get('type'), searchParams.get('priority'), searchParams.get('source')])
 
   // Sort handler - toggles direction, same pattern as LeadListTable
   const handleSort = useCallback((key) => {
@@ -311,6 +321,70 @@ const Contacts = () => {
       toast.error(error.response?.data?.message || 'Failed to delete contact')
     }
   })
+
+  // Bulk export selected contacts as CSV (client-side)
+  const handleBulkExport = useCallback(() => {
+    if (selectedContacts.length === 0) return
+    const allContacts = contactsData?.contacts || []
+    const selected = allContacts.filter(c => selectedContacts.includes(c.id))
+    const headers = ['Name', 'Email', 'Phone', 'Company', 'Status', 'Type', 'Source', 'Priority', 'Created At']
+    const rows = selected.map(c => [
+      c.name || `${c.first_name || ''} ${c.last_name || ''}`.trim(),
+      c.email || '', c.phone || '', c.company || '', c.status || '',
+      c.type || '', c.source || '', c.priority || '', c.created_at || ''
+    ])
+    const csvContent = [headers, ...rows]
+      .map(row => row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
+      .join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv' })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `contacts_selected_${new Date().toISOString().split('T')[0]}.csv`
+    document.body.appendChild(a)
+    a.click()
+    window.URL.revokeObjectURL(url)
+    document.body.removeChild(a)
+    toast.success(`Exported ${selected.length} contacts`)
+  }, [selectedContacts, contactsData])
+
+  // Export all contacts matching current filters (server-side)
+  const handleExportAll = useCallback(async () => {
+    try {
+      const exportData = await contactsAPI.exportContacts(currentFilters)
+      const blob = new Blob([exportData], { type: 'text/csv' })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `contacts_export_${new Date().toISOString().split('T')[0]}.csv`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      toast.success('Contacts exported successfully')
+    } catch (error) {
+      console.error('Export failed:', error)
+      toast.error('Failed to export contacts')
+    }
+  }, [currentFilters])
+
+  // Bulk delete selected contacts
+  const handleBulkDelete = useCallback(async () => {
+    if (selectedContacts.length === 0) return
+    setBulkDeleting(true)
+    try {
+      await Promise.all(selectedContacts.map(id => contactsAPI.deleteContact(id)))
+      queryClient.invalidateQueries(['contacts'])
+      toast.success(`Successfully deleted ${selectedContacts.length} contacts`)
+      setSelectedContacts([])
+      setShowBulkDeleteModal(false)
+    } catch (error) {
+      console.error('Bulk delete failed:', error)
+      toast.error('Failed to delete some contacts')
+    } finally {
+      setBulkDeleting(false)
+    }
+  }, [selectedContacts, queryClient])
 
   // Inline edit handler
   const handleFieldUpdate = async (recordId, fieldName, newValue, isCustomField = false) => {
@@ -681,6 +755,14 @@ const Contacts = () => {
         </div>
         <div className="flex items-center space-x-3 mt-4 sm:mt-0">
           <button
+            onClick={handleExportAll}
+            className="btn btn-secondary btn-md"
+            title="Export all contacts matching current filters"
+          >
+            <Download size={16} className="mr-2" />
+            Export
+          </button>
+          <button
             onClick={() => setShowConvertModal(true)}
             className="btn btn-secondary btn-md"
           >
@@ -826,7 +908,13 @@ const Contacts = () => {
           pagination={pagination}
           onPaginationChange={handlePaginationChange}
           pageSizeOptions={[20, 50, 100]}
-          selectable={false}
+          selectable
+          selectedIds={selectedContacts}
+          onSelectionChange={setSelectedContacts}
+          bulkActions={[
+            { label: 'Export', icon: Download, onClick: handleBulkExport },
+            { label: 'Delete', icon: Trash2, onClick: () => setShowBulkDeleteModal(true), variant: 'danger' },
+          ]}
           renderCell={renderCellContent}
           renderRowActions={renderRowActions}
           onInlineEdit={handleFieldUpdate}
@@ -878,6 +966,18 @@ const Contacts = () => {
           isLoading={updateMutation.isPending}
         />
       )}
+
+      {/* Bulk Delete Confirmation Modal */}
+      <DeleteConfirmModal
+        isOpen={showBulkDeleteModal}
+        onClose={() => setShowBulkDeleteModal(false)}
+        onConfirm={handleBulkDelete}
+        title="Delete Selected Contacts"
+        message={`Are you sure you want to delete ${selectedContacts.length} contact${selectedContacts.length !== 1 ? 's' : ''}? This action cannot be undone.`}
+        confirmButtonText={`Delete ${selectedContacts.length} Contact${selectedContacts.length !== 1 ? 's' : ''}`}
+        isDestructive
+        loading={bulkDeleting}
+      />
 
       {/* Convert Lead Modal */}
       {showConvertModal && (
