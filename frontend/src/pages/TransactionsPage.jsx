@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   DollarSign,
   Search,
@@ -70,24 +70,59 @@ const formatDate = (dateString) => {
 const TransactionsPage = () => {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const [searchTerm, setSearchTerm] = useState('')
-  const [filterStatus, setFilterStatus] = useState('all')
-  const [filterMethod, setFilterMethod] = useState('all')
-  const [filterSource, setFilterSource] = useState('all')
+  const [searchParams, setSearchParams] = useSearchParams()
   const [showEditModal, setShowEditModal] = useState(false)
   const [selectedTransaction, setSelectedTransaction] = useState(null)
-  const [sortConfig, setSortConfig] = useState({ key: 'transaction_date', direction: 'desc' })
   const [selectedTransactions, setSelectedTransactions] = useState([])
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false)
   const [bulkDeleting, setBulkDeleting] = useState(false)
-  const [showVoided, setShowVoided] = useState(false)
 
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState(50)
+  // --- URL-driven filter/sort/pagination state ---
+  const filterStatus = searchParams.get('status') || ''
+  const filterMethod = searchParams.get('method') || ''
+  const filterSource = searchParams.get('source') || ''
+  const showVoided = searchParams.get('voided') === 'true'
+  const sortConfig = {
+    key: searchParams.get('sort') || 'transaction_date',
+    direction: searchParams.get('order') || 'desc'
+  }
+  const currentPage = parseInt(searchParams.get('page')) || 1
+  const pageSize = parseInt(searchParams.get('limit')) || 50
 
-  // Debounce search - separate immediate input from debounced API calls
+  // Search: local state for instant input, debounced for API & URL
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '')
   const debouncedSearch = useDebouncedValue(searchTerm, 300)
+
+  // Helper to update URL params (merges with existing)
+  const updateUrlParams = useCallback((updates) => {
+    setSearchParams(prev => {
+      const newParams = new URLSearchParams(prev)
+      Object.entries(updates).forEach(([key, value]) => {
+        const defaults = { search: '', status: '', method: '', source: '', voided: 'false', sort: 'transaction_date', order: 'desc', page: '1', limit: '50' }
+        if (String(value) === '' || String(value) === defaults[key]) {
+          newParams.delete(key)
+        } else {
+          newParams.set(key, String(value))
+        }
+      })
+      return newParams
+    })
+  }, [setSearchParams])
+
+  // Sync debounced search → URL (with page reset)
+  useEffect(() => {
+    const currentUrlSearch = searchParams.get('search') || ''
+    if (currentUrlSearch === debouncedSearch) return
+    updateUrlParams({ search: debouncedSearch, page: '1' })
+  }, [debouncedSearch])
+
+  // Sync URL → searchTerm on external navigation (back button)
+  useEffect(() => {
+    const urlSearch = searchParams.get('search') || ''
+    if (urlSearch !== searchTerm) {
+      setSearchTerm(urlSearch)
+    }
+  }, [searchParams.get('search')])
 
   // Load column visibility from localStorage or use defaults
   const [visibleColumns, setVisibleColumns] = useState(() => {
@@ -148,15 +183,10 @@ const TransactionsPage = () => {
     staleTime: 30000,
   })
 
-  // Reset to page 1 when search, sort, or filter changes
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [debouncedSearch, sortConfig, filterStatus, filterMethod, filterSource, showVoided])
-
   // Clear selection when filters, search, pagination, or sort changes
   useEffect(() => {
     setSelectedTransactions([])
-  }, [debouncedSearch, sortConfig, currentPage, filterStatus, filterMethod, filterSource, showVoided])
+  }, [debouncedSearch, sortConfig.key, sortConfig.direction, currentPage, filterStatus, filterMethod, filterSource, showVoided])
 
   // Bulk export selected transactions as CSV (client-side)
   const handleBulkExport = useCallback(() => {
@@ -189,9 +219,9 @@ const TransactionsPage = () => {
     try {
       const params = {}
       if (debouncedSearch.trim()) params.search = debouncedSearch
-      if (filterStatus !== 'all') params.status = filterStatus
-      if (filterMethod !== 'all') params.payment_method = filterMethod
-      if (filterSource !== 'all') params.source = filterSource
+      if (filterStatus) params.status = filterStatus
+      if (filterMethod) params.payment_method = filterMethod
+      if (filterSource) params.source = filterSource
       const exportData = await transactionsAPI.exportTransactions(params)
       const blob = new Blob([exportData], { type: 'text/csv' })
       const url = window.URL.createObjectURL(blob)
@@ -240,19 +270,16 @@ const TransactionsPage = () => {
     failedTransactions: transactions.filter(t => t.status === 'failed').length
   }
 
-  // Sort handler — toggles direction, sends to server via fetchTransactions
+  // Sort handler — toggles direction, updates URL
   const handleSort = useCallback((key) => {
-    setSortConfig(prev => {
-      const direction = prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
-      return { key, direction }
-    })
-  }, [])
+    const direction = sortConfig.key === key && sortConfig.direction === 'asc' ? 'desc' : 'asc'
+    updateUrlParams({ sort: key, order: direction, page: '1' })
+  }, [sortConfig, updateUrlParams])
 
   // Pagination change handler for DataTable
   const handlePaginationChange = useCallback((newPagination) => {
-    setCurrentPage(newPagination.page)
-    setPageSize(newPagination.limit)
-  }, [])
+    updateUrlParams({ page: String(newPagination.page), limit: String(newPagination.limit) })
+  }, [updateUrlParams])
 
   const getStatusBadge = (status) => {
     const badges = {
@@ -571,10 +598,10 @@ const TransactionsPage = () => {
 
           <select
             value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
+            onChange={(e) => updateUrlParams({ status: e.target.value, page: '1' })}
             className="input"
           >
-            <option value="all">All Status</option>
+            <option value="">All Status</option>
             <option value="completed">Completed</option>
             <option value="pending">Pending</option>
             <option value="failed">Failed</option>
@@ -583,10 +610,10 @@ const TransactionsPage = () => {
 
           <select
             value={filterMethod}
-            onChange={(e) => setFilterMethod(e.target.value)}
+            onChange={(e) => updateUrlParams({ method: e.target.value, page: '1' })}
             className="input"
           >
-            <option value="all">All Methods</option>
+            <option value="">All Methods</option>
             <option value="Credit Card">Credit Card</option>
             <option value="PayPal">PayPal</option>
             <option value="Bank Transfer">Bank Transfer</option>
@@ -596,10 +623,10 @@ const TransactionsPage = () => {
 
           <select
             value={filterSource}
-            onChange={(e) => setFilterSource(e.target.value)}
+            onChange={(e) => updateUrlParams({ source: e.target.value, page: '1' })}
             className="input"
           >
-            <option value="all">All Sources</option>
+            <option value="">All Sources</option>
             <option value="website">Website</option>
             <option value="phone">Phone</option>
             <option value="email">Email</option>
@@ -615,7 +642,7 @@ const TransactionsPage = () => {
             <input
               type="checkbox"
               checked={showVoided}
-              onChange={(e) => setShowVoided(e.target.checked)}
+              onChange={(e) => updateUrlParams({ voided: e.target.checked ? 'true' : 'false', page: '1' })}
               className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
             />
             <span className="text-sm font-medium text-gray-700">Show voided</span>
@@ -653,7 +680,7 @@ const TransactionsPage = () => {
           emptyIcon={DollarSign}
           emptyMessage="No transactions found"
           emptySubMessage={
-            searchTerm || filterStatus !== 'all' || filterMethod !== 'all' || filterSource !== 'all'
+            searchTerm || filterStatus || filterMethod || filterSource
               ? 'Try adjusting your filters'
               : 'Transaction records will appear here once they are created'
           }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   CreditCard,
   Plus,
@@ -94,6 +94,7 @@ const getRenewalColor = (daysUntil) => {
 const AccountsPage = () => {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [showAccountSelector, setShowAccountSelector] = useState(false)
   const [selectedAccount, setSelectedAccount] = useState(null)
   const [showCreateTransactionModal, setShowCreateTransactionModal] = useState(false)
@@ -104,20 +105,55 @@ const AccountsPage = () => {
   const [loadingEditAccount, setLoadingEditAccount] = useState(false)
   const [showTaskModal, setShowTaskModal] = useState(false)
   const [selectedAccountForTask, setSelectedAccountForTask] = useState(null)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [filterStatus, setFilterStatus] = useState('')
-  const [showDeleted, setShowDeleted] = useState(false)
-  const [sortConfig, setSortConfig] = useState({ key: 'created_date', direction: 'desc' })
   const [selectedAccounts, setSelectedAccounts] = useState([])
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false)
   const [bulkDeleting, setBulkDeleting] = useState(false)
 
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState(50)
+  // --- URL-driven filter/sort/pagination state ---
+  const filterStatus = searchParams.get('status') || ''
+  const showDeleted = searchParams.get('deleted') === 'true'
+  const sortConfig = {
+    key: searchParams.get('sort') || 'created_date',
+    direction: searchParams.get('order') || 'desc'
+  }
+  const currentPage = parseInt(searchParams.get('page')) || 1
+  const pageSize = parseInt(searchParams.get('limit')) || 50
 
-  // Debounce search - separate immediate input from debounced API calls
+  // Search: local state for instant input, debounced for API & URL
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '')
   const debouncedSearch = useDebouncedValue(searchTerm, 300)
+
+  // Helper to update URL params (merges with existing)
+  const updateUrlParams = useCallback((updates) => {
+    setSearchParams(prev => {
+      const newParams = new URLSearchParams(prev)
+      Object.entries(updates).forEach(([key, value]) => {
+        // Remove param if it's the default value
+        const defaults = { search: '', status: '', deleted: 'false', sort: 'created_date', order: 'desc', page: '1', limit: '50' }
+        if (String(value) === '' || String(value) === defaults[key]) {
+          newParams.delete(key)
+        } else {
+          newParams.set(key, String(value))
+        }
+      })
+      return newParams
+    })
+  }, [setSearchParams])
+
+  // Sync debounced search → URL (with page reset)
+  useEffect(() => {
+    const currentUrlSearch = searchParams.get('search') || ''
+    if (currentUrlSearch === debouncedSearch) return
+    updateUrlParams({ search: debouncedSearch, page: '1' })
+  }, [debouncedSearch])
+
+  // Sync URL → searchTerm on external navigation (back button)
+  useEffect(() => {
+    const urlSearch = searchParams.get('search') || ''
+    if (urlSearch !== searchTerm) {
+      setSearchTerm(urlSearch)
+    }
+  }, [searchParams.get('search')])
 
   // Fetch accounts list via React Query
   // Query key includes ALL variables from the old fetchAccounts dependency array:
@@ -181,19 +217,16 @@ const AccountsPage = () => {
     localStorage.setItem('accounts_visible_columns', JSON.stringify(DEFAULT_VISIBLE_COLUMNS))
   }
 
-  // Sort handler — toggles direction, maps to backend's orderBy/orderDirection
+  // Sort handler — toggles direction, updates URL
   const handleSort = useCallback((key) => {
-    setSortConfig(prev => {
-      const direction = prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
-      return { key, direction }
-    })
-  }, [])
+    const direction = sortConfig.key === key && sortConfig.direction === 'asc' ? 'desc' : 'asc'
+    updateUrlParams({ sort: key, order: direction, page: '1' })
+  }, [sortConfig, updateUrlParams])
 
   // Pagination change handler for DataTable
   const handlePaginationChange = useCallback((newPagination) => {
-    setCurrentPage(newPagination.page)
-    setPageSize(newPagination.limit)
-  }, [])
+    updateUrlParams({ page: String(newPagination.page), limit: String(newPagination.limit) })
+  }, [updateUrlParams])
 
   // Inline edit handler
   const handleFieldUpdate = async (recordId, fieldName, newValue) => {
@@ -238,15 +271,10 @@ const AccountsPage = () => {
     return filtered
   }, [accounts, filterStatus])
 
-  // Reset to page 1 when search, sort, or filter changes (mirrors old fetchAccounts useEffect behavior)
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [debouncedSearch, sortConfig, showDeleted])
-
   // Clear selection when filters, search, pagination, or sort changes
   useEffect(() => {
     setSelectedAccounts([])
-  }, [debouncedSearch, sortConfig, currentPage, filterStatus, showDeleted])
+  }, [debouncedSearch, sortConfig.key, sortConfig.direction, currentPage, filterStatus, showDeleted])
 
   // Bulk export selected accounts as CSV (client-side)
   const handleBulkExport = useCallback(() => {
@@ -682,10 +710,10 @@ const AccountsPage = () => {
           </div>
           <select
             value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
+            onChange={(e) => updateUrlParams({ status: e.target.value, page: '1' })}
             className="input w-full sm:w-48"
           >
-            <option value="all">All Status</option>
+            <option value="">All Status</option>
             <option value="active">Active</option>
             {/* TODO: "expiring_soon" is client-side only — not a stored account_status. Add backend support for computed expiry filter. */}
             <option value="expiring_soon">Expiring Soon</option>
@@ -695,7 +723,7 @@ const AccountsPage = () => {
             <input
               type="checkbox"
               checked={showDeleted}
-              onChange={(e) => setShowDeleted(e.target.checked)}
+              onChange={(e) => updateUrlParams({ deleted: e.target.checked ? 'true' : 'false', page: '1' })}
               className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
             />
             <span className="text-sm font-medium text-gray-700">Show deleted</span>

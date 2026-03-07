@@ -41,6 +41,12 @@ const LeadViews = ({ onAddLead, onEditLead, onDeleteLead }) => {
     limit: parseInt(searchParams.get('limit')) || 20
   })
 
+  // Sort config: derived from URL params for list view
+  const sortConfig = {
+    key: searchParams.get('sort') || 'created_at',
+    direction: searchParams.get('order') || 'desc'
+  }
+
   // Debounce the search filter to prevent API calls on every keystroke
   // Other filters (status, priority, etc.) are not debounced
   const debouncedSearch = useDebouncedValue(filters.search, 300)
@@ -128,11 +134,15 @@ const LeadViews = ({ onAddLead, onEditLead, onDeleteLead }) => {
       if (value) params.set(key, value)
     })
 
+    // Sort params (only include non-defaults)
+    if (sortConfig.key !== 'created_at') params.set('sort', sortConfig.key)
+    if (sortConfig.direction !== 'desc') params.set('order', sortConfig.direction)
+
     if (pagination.page !== 1) params.set('page', pagination.page.toString())
     if (pagination.limit !== 20) params.set('limit', pagination.limit.toString())
 
     setSearchParams(params, { replace: true })
-  }, [view, filters, pagination, setSearchParams])
+  }, [view, filters, pagination, sortConfig.key, sortConfig.direction, setSearchParams])
 
   const handleViewChange = useCallback((newView) => {
     setView(newView)
@@ -147,6 +157,18 @@ const LeadViews = ({ onAddLead, onEditLead, onDeleteLead }) => {
   const handlePaginationChange = useCallback((newPagination) => {
     setPagination(newPagination)
   }, [])
+
+  // Sort handler for list view — updates URL params
+  const handleSortChange = useCallback((key) => {
+    const direction = sortConfig.key === key && sortConfig.direction === 'asc' ? 'desc' : 'asc'
+    // Update URL directly — the useEffect will sync to searchParams
+    const params = new URLSearchParams(searchParams)
+    params.set('sort', key)
+    params.set('order', direction)
+    params.set('page', '1')
+    setSearchParams(params, { replace: true })
+    setPagination(prev => ({ ...prev, page: 1 }))
+  }, [sortConfig, searchParams, setSearchParams])
 
   const handleStatusUpdate = useCallback(async (leadId, newStatus) => {
     try {
@@ -308,6 +330,8 @@ const LeadViews = ({ onAddLead, onEditLead, onDeleteLead }) => {
             users={usersData?.users || []}
             statuses={statuses}
             loading={leadsLoading}
+            sortConfig={sortConfig}
+            onSort={handleSortChange}
           />
         )}
       </div>

@@ -60,11 +60,15 @@ const LeadListTable = ({
   onBulkAction,
   users,
   statuses,
-  loading
+  loading,
+  sortConfig: externalSortConfig,
+  onSort: externalOnSort
 }) => {
   console.log('🟢 LeadListTable RENDER - BUILD TIMESTAMP: 2026-01-25-095000', { leadsCount: leads?.length, firstLead: leads?.[0] })
   const navigate = useNavigate()
-  const [sortConfig, setSortConfig] = useState({ key: 'created_at', direction: 'desc' })
+  const [internalSortConfig, setInternalSortConfig] = useState({ key: 'created_at', direction: 'desc' })
+  // Use external sort props if provided, otherwise fall back to internal state
+  const sortConfig = externalSortConfig || internalSortConfig
   const [selectedLeads, setSelectedLeads] = useState([])
   const [fieldLabels, setFieldLabels] = useState({})
   const [columnDefinitions, setColumnDefinitions] = useState(SYSTEM_COLUMN_DEFINITIONS)
@@ -171,11 +175,17 @@ const LeadListTable = ({
   }, [localLeads, sortConfig])
 
   const handleSort = (key) => {
-    let direction = 'asc'
-    if (sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc'
+    if (externalOnSort) {
+      // Delegate to parent (LeadViews) which manages URL params
+      externalOnSort(key)
+    } else {
+      // Internal sort (fallback)
+      let direction = 'asc'
+      if (internalSortConfig.key === key && internalSortConfig.direction === 'asc') {
+        direction = 'desc'
+      }
+      setInternalSortConfig({ key, direction })
     }
-    setSortConfig({ key, direction })
   }
 
   const handleBulkDelete = () => {

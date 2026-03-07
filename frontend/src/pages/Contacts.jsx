@@ -81,7 +81,6 @@ const Contacts = () => {
   const [viewMode, setViewMode] = useState('list') // 'list' or 'detail'
   const [loadingEditContact, setLoadingEditContact] = useState(false)
   const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '')
-  const [sortConfig, setSortConfig] = useState({ key: 'created_at', direction: 'desc' })
   const [selectedContacts, setSelectedContacts] = useState([])
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false)
   const [bulkDeleting, setBulkDeleting] = useState(false)
@@ -91,6 +90,12 @@ const Contacts = () => {
   // Debounced search - separate immediate input from debounced API calls
   // Must be defined early, before currentFilters uses it
   const debouncedSearch = useDebouncedValue(searchTerm, 300)
+
+  // Sort config derived from URL params
+  const sortConfig = {
+    key: searchParams.get('sort') || 'created_at',
+    direction: searchParams.get('order') || 'desc'
+  }
 
   // Build dynamic column definitions from field configuration
   const { COLUMN_DEFINITIONS, DEFAULT_VISIBLE_COLUMNS } = React.useMemo(() => {
@@ -182,7 +187,7 @@ const Contacts = () => {
     priority: searchParams.get('priority') || '',
     assigned_to: searchParams.get('assigned_to') || '',
     source: searchParams.get('source') || '',
-    sort: sortConfig.key === 'name' ? 'first_name' : sortConfig.key,
+    sort: sortConfig.key,
     order: sortConfig.direction,
   }), [searchParams, debouncedSearch, sortConfig])
 
@@ -204,17 +209,13 @@ const Contacts = () => {
   // Clear selection when filters, search, pagination, or sort changes
   useEffect(() => {
     setSelectedContacts([])
-  }, [debouncedSearch, sortConfig, searchParams.get('page'), searchParams.get('status'), searchParams.get('type'), searchParams.get('priority'), searchParams.get('source')])
+  }, [debouncedSearch, sortConfig.key, sortConfig.direction, searchParams.get('page'), searchParams.get('status'), searchParams.get('type'), searchParams.get('priority'), searchParams.get('source')])
 
-  // Sort handler - toggles direction, same pattern as LeadListTable
+  // Sort handler - toggles direction, updates URL
   const handleSort = useCallback((key) => {
-    setSortConfig(prev => {
-      const direction = prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
-      return { key, direction }
-    })
-    // Reset to page 1 when sort changes
-    updateFilters({ page: 1 })
-  }, [])
+    const direction = sortConfig.key === key && sortConfig.direction === 'asc' ? 'desc' : 'asc'
+    updateFilters({ sort: key, order: direction, page: 1 })
+  }, [sortConfig])
 
   // Pagination change handler for DataTable
   const handlePaginationChange = useCallback((newPagination) => {
