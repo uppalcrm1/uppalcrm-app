@@ -595,6 +595,14 @@ export const contactsAPI = {
   getRecentInteractions: async (params = {}) => {
     const response = await api.get('/contacts/interactions/recent', { params })
     return response.data
+  },
+
+  exportContacts: async (filters = {}) => {
+    const response = await api.get('/contacts/export', {
+      params: filters,
+      responseType: 'blob'
+    })
+    return response.data
   }
 }
 
@@ -655,6 +663,14 @@ export const accountsAPI = {
 
   getStats: async () => {
     const response = await api.get('/accounts/stats')
+    return response.data
+  },
+
+  exportAccounts: async (filters = {}) => {
+    const response = await api.get('/accounts/export', {
+      params: filters,
+      responseType: 'blob'
+    })
     return response.data
   }
 }
@@ -733,6 +749,14 @@ export const transactionsAPI = {
   // Revenue stats with CAD conversion
   getRevenueStats: async () => {
     const response = await api.get('/transactions/stats/revenue')
+    return response.data
+  },
+
+  exportTransactions: async (filters = {}) => {
+    const response = await api.get('/transactions/export', {
+      params: filters,
+      responseType: 'blob'
+    })
     return response.data
   }
 }

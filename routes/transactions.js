@@ -298,6 +298,124 @@ router.get('/accounts/:accountId', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/transactions/export
+ * Export transactions as CSV
+ */
+router.get('/export', async (req, res) => {
+  try {
+    const { organization_id } = req.user;
+    const { ids, status, contact_id, payment_method, source, search } = req.query;
+
+    let query = `
+      SELECT
+        t.id,
+        CAST(t.transaction_date AS DATE) as payment_date,
+        t.transaction_reference,
+        a.account_name,
+        COALESCE(c.name, c.first_name || ' ' || c.last_name) as contact_name,
+        c.email as contact_email,
+        p.name as product_name,
+        t.amount,
+        t.currency,
+        t.status,
+        t.payment_method,
+        t.source,
+        t.term,
+        t.notes,
+        COALESCE(u.first_name || ' ' || u.last_name, 'Unknown') as created_by_name,
+        t.created_at
+      FROM transactions t
+      LEFT JOIN accounts a ON t.account_id = a.id
+      LEFT JOIN contacts c ON t.contact_id = c.id
+      LEFT JOIN products p ON t.product_id = p.id
+      LEFT JOIN users u ON t.created_by = u.id
+      WHERE t.organization_id = $1
+    `;
+
+    const params = [organization_id];
+
+    // Filter by specific IDs (for bulk export of selected)
+    if (ids) {
+      const idList = Array.isArray(ids) ? ids : ids.split(',');
+      query += ` AND t.id = ANY($${params.length + 1})`;
+      params.push(idList);
+    }
+
+    if (status) {
+      query += ` AND t.status = $${params.length + 1}`;
+      params.push(status);
+    }
+
+    if (contact_id) {
+      query += ` AND t.contact_id = $${params.length + 1}`;
+      params.push(contact_id);
+    }
+
+    if (payment_method) {
+      query += ` AND t.payment_method = $${params.length + 1}`;
+      params.push(payment_method);
+    }
+
+    if (source) {
+      query += ` AND t.source = $${params.length + 1}`;
+      params.push(source);
+    }
+
+    if (search && search.trim()) {
+      query += ` AND (
+        t.transaction_reference ILIKE $${params.length + 1} OR
+        a.account_name ILIKE $${params.length + 1} OR
+        c.first_name ILIKE $${params.length + 1} OR
+        c.last_name ILIKE $${params.length + 1} OR
+        c.email ILIKE $${params.length + 1} OR
+        p.name ILIKE $${params.length + 1}
+      )`;
+      params.push(`%${search}%`);
+    }
+
+    query += ` ORDER BY t.transaction_date DESC, t.created_at DESC`;
+
+    const result = await db.query(query, params, organization_id);
+
+    const csvHeaders = [
+      'ID', 'Payment Date', 'Transaction Reference', 'Account Name', 'Contact Name',
+      'Contact Email', 'Product', 'Amount', 'Currency', 'Status', 'Payment Method',
+      'Source', 'Term', 'Notes', 'Created By', 'Created At'
+    ];
+
+    const csvRows = result.rows.map(row => [
+      row.id,
+      row.payment_date || '',
+      row.transaction_reference || '',
+      row.account_name || '',
+      row.contact_name || '',
+      row.contact_email || '',
+      row.product_name || '',
+      row.amount || '',
+      row.currency || '',
+      row.status || '',
+      row.payment_method || '',
+      row.source || '',
+      row.term || '',
+      row.notes || '',
+      row.created_by_name || '',
+      row.created_at || ''
+    ]);
+
+    const csvContent = [csvHeaders, ...csvRows]
+      .map(row => row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="transactions_export_${new Date().toISOString().split('T')[0]}.csv"`);
+    res.send(csvContent);
+  } catch (error) {
+    console.error('Export transactions error:', error);
+    res.status(500).json({ error: 'Export failed', message: 'Unable to export transactions' });
+  }
+});
+
 // =====================================================
 // GENERAL CRUD ROUTES
 // =====================================================
