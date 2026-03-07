@@ -190,6 +190,18 @@ router.get('/stats/revenue', async (req, res) => {
 router.get('/voided/list', transactionController.getVoidedTransactions);
 
 /**
+ * POST /api/transactions/:id/void
+ * Void (soft delete) a transaction
+ */
+router.post('/:id/void', transactionController.voidTransaction);
+
+/**
+ * POST /api/transactions/:id/restore
+ * Restore a voided transaction
+ */
+router.post('/:id/restore', transactionController.restoreTransaction);
+
+/**
  * GET /api/transactions/config/exchange-rate
  * Get current exchange rate configuration
  */
@@ -427,7 +439,7 @@ router.get('/export', async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const { organization_id } = req.user;
-    const { status, contact_id, payment_method, source, limit = 100, offset = 0, search, sort = 'transaction_date', order = 'desc' } = req.query;
+    const { status, contact_id, payment_method, source, limit = 100, offset = 0, search, sort = 'transaction_date', order = 'desc', includeDeleted } = req.query;
 
     // Validate sort column against allowlist
     const ALLOWED_SORT_COLUMNS = {
@@ -471,6 +483,10 @@ router.get('/', async (req, res) => {
         t.source,
         t.term,
         t.status,
+        t.is_void,
+        t.deleted_at,
+        t.deleted_by,
+        t.deletion_reason,
         t.transaction_reference,
         t.notes,
         -- Payment date in YYYY-MM-DD format
@@ -502,6 +518,11 @@ router.get('/', async (req, res) => {
     `;
 
     const params = [organization_id];
+
+    // By default, exclude voided/deleted transactions
+    if (includeDeleted !== 'true') {
+      query += ` AND (t.deleted_at IS NULL AND t.is_void = FALSE)`;
+    }
 
     if (status) {
       query += ` AND t.status = $${params.length + 1}`;
@@ -551,6 +572,11 @@ router.get('/', async (req, res) => {
     `;
 
     const countParams = [organization_id];
+
+    // By default, exclude voided/deleted transactions from count
+    if (includeDeleted !== 'true') {
+      countQuery += ` AND (t.deleted_at IS NULL AND t.is_void = FALSE)`;
+    }
 
     if (status) {
       countQuery += ` AND t.status = $${countParams.length + 1}`;

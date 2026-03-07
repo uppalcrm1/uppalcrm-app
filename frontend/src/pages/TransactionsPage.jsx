@@ -12,7 +12,6 @@ import {
   TrendingUp,
   Eye,
   Edit,
-  Trash2,
   User,
   Download
 } from 'lucide-react'
@@ -24,6 +23,7 @@ import { formatSource, formatPaymentMethod, TRANSACTION_STATUSES, PAYMENT_METHOD
 import { formatDateOnly } from '../utils/dateUtils'
 import { formatCurrency } from '../utils/currency'
 import InlineEditCell from '../components/InlineEditCell'
+import { TransactionActions } from '../components/transactions/TransactionActions'
 import DeleteConfirmModal from '../components/DeleteConfirmModal'
 import toast from 'react-hot-toast'
 
@@ -80,6 +80,7 @@ const TransactionsPage = () => {
   const [selectedTransactions, setSelectedTransactions] = useState([])
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false)
   const [bulkDeleting, setBulkDeleting] = useState(false)
+  const [showVoided, setShowVoided] = useState(false)
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -116,7 +117,7 @@ const TransactionsPage = () => {
     data: transactionsData,
     isLoading,
   } = useQuery({
-    queryKey: ['transactions', { search: debouncedSearch, sortConfig, filterStatus, filterMethod, filterSource, page: currentPage, pageSize }],
+    queryKey: ['transactions', { search: debouncedSearch, sortConfig, filterStatus, filterMethod, filterSource, page: currentPage, pageSize, showVoided }],
     queryFn: async () => {
       const offset = (currentPage - 1) * pageSize
       const params = {
@@ -129,6 +130,7 @@ const TransactionsPage = () => {
       if (filterStatus !== 'all') params.status = filterStatus
       if (filterMethod !== 'all') params.payment_method = filterMethod
       if (filterSource !== 'all') params.source = filterSource
+      if (showVoided) params.includeDeleted = 'true'
       return transactionsAPI.getTransactions(params)
     },
     keepPreviousData: true,
@@ -149,12 +151,12 @@ const TransactionsPage = () => {
   // Reset to page 1 when search, sort, or filter changes
   useEffect(() => {
     setCurrentPage(1)
-  }, [debouncedSearch, sortConfig, filterStatus, filterMethod, filterSource])
+  }, [debouncedSearch, sortConfig, filterStatus, filterMethod, filterSource, showVoided])
 
   // Clear selection when filters, search, pagination, or sort changes
   useEffect(() => {
     setSelectedTransactions([])
-  }, [debouncedSearch, sortConfig, currentPage, filterStatus, filterMethod, filterSource])
+  }, [debouncedSearch, sortConfig, currentPage, filterStatus, filterMethod, filterSource, showVoided])
 
   // Bulk export selected transactions as CSV (client-side)
   const handleBulkExport = useCallback(() => {
@@ -207,19 +209,19 @@ const TransactionsPage = () => {
     }
   }, [debouncedSearch, filterStatus, filterMethod, filterSource])
 
-  // Bulk delete selected transactions
+  // Bulk void selected transactions (soft delete)
   const handleBulkDelete = useCallback(async () => {
     if (selectedTransactions.length === 0) return
     setBulkDeleting(true)
     try {
-      await Promise.all(selectedTransactions.map(id => transactionsAPI.deleteTransaction(id)))
+      await Promise.all(selectedTransactions.map(id => transactionsAPI.voidTransaction(id, 'Bulk voided')))
       queryClient.invalidateQueries(['transactions'])
-      toast.success(`Successfully deleted ${selectedTransactions.length} transactions`)
+      toast.success(`Successfully voided ${selectedTransactions.length} transactions`)
       setSelectedTransactions([])
       setShowBulkDeleteModal(false)
     } catch (error) {
-      console.error('Bulk delete failed:', error)
-      toast.error('Failed to delete some transactions')
+      console.error('Bulk void failed:', error)
+      toast.error('Failed to void some transactions')
     } finally {
       setBulkDeleting(false)
     }
@@ -289,16 +291,16 @@ const TransactionsPage = () => {
     queryClient.invalidateQueries(['transactions'])
   }
 
-  const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this transaction?')) {
-      try {
-        await transactionsAPI.deleteTransaction(id)
-        queryClient.invalidateQueries(['transactions'])
-      } catch (error) {
-        console.error('Error deleting transaction:', error)
-        alert('Failed to delete transaction')
-      }
-    }
+  // Void a transaction (soft delete)
+  const handleVoidTransaction = async (id, reason) => {
+    await transactionsAPI.voidTransaction(id, reason)
+    queryClient.invalidateQueries(['transactions'])
+  }
+
+  // Restore a voided transaction
+  const handleRestoreTransaction = async (id) => {
+    await transactionsAPI.restoreTransaction(id, 'Restored from transactions list')
+    queryClient.invalidateQueries(['transactions'])
   }
 
   // Inline edit handler
@@ -441,23 +443,23 @@ const TransactionsPage = () => {
       >
         <Eye size={16} />
       </button>
-      <button
-        onClick={() => handleEdit(transaction)}
-        className="p-1 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded"
-        title="Edit Transaction"
-      >
-        <Edit size={16} />
-      </button>
-      {/* TODO: Consider replacing window.confirm with TransactionActions void/restore for audit trail */}
-      <button
-        onClick={() => handleDelete(transaction.id)}
-        className="p-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded"
-        title="Delete Transaction"
-      >
-        <Trash2 size={16} />
-      </button>
+      {!transaction.is_void && !transaction.deleted_at && (
+        <button
+          onClick={() => handleEdit(transaction)}
+          className="p-1 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded"
+          title="Edit Transaction"
+        >
+          <Edit size={16} />
+        </button>
+      )}
+      <TransactionActions
+        transaction={transaction}
+        onVoid={handleVoidTransaction}
+        onRestore={handleRestoreTransaction}
+        onRefresh={() => queryClient.invalidateQueries(['transactions'])}
+      />
     </div>
-  ), [navigate])
+  ), [navigate, queryClient])
 
   return (
     <div className="space-y-6">
@@ -606,6 +608,19 @@ const TransactionsPage = () => {
             <option value="partner">Partner</option>
           </select>
         </div>
+
+        {/* Show Voided Toggle */}
+        <div className="flex items-center mt-3">
+          <label className="flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors">
+            <input
+              type="checkbox"
+              checked={showVoided}
+              onChange={(e) => setShowVoided(e.target.checked)}
+              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+            />
+            <span className="text-sm font-medium text-gray-700">Show voided</span>
+          </label>
+        </div>
       </div>
 
       {/* Transactions Table */}
@@ -630,10 +645,11 @@ const TransactionsPage = () => {
           onSelectionChange={setSelectedTransactions}
           bulkActions={[
             { label: 'Export', icon: Download, onClick: handleBulkExport },
-            { label: 'Delete', icon: Trash2, onClick: () => setShowBulkDeleteModal(true), variant: 'danger' },
+            { label: 'Void', icon: XCircle, onClick: () => setShowBulkDeleteModal(true), variant: 'danger' },
           ]}
           renderCell={renderCell}
           renderRowActions={renderRowActions}
+          getRowClassName={(row) => (row.is_void || row.deleted_at) ? 'opacity-50 bg-gray-50' : ''}
           emptyIcon={DollarSign}
           emptyMessage="No transactions found"
           emptySubMessage={
@@ -644,14 +660,14 @@ const TransactionsPage = () => {
         />
       </div>
 
-      {/* Bulk Delete Confirmation Modal */}
+      {/* Bulk Void Confirmation Modal */}
       <DeleteConfirmModal
         isOpen={showBulkDeleteModal}
         onClose={() => setShowBulkDeleteModal(false)}
         onConfirm={handleBulkDelete}
-        title="Delete Selected Transactions"
-        message={`Are you sure you want to delete ${selectedTransactions.length} transaction${selectedTransactions.length !== 1 ? 's' : ''}? This action cannot be undone.`}
-        confirmButtonText={`Delete ${selectedTransactions.length} Transaction${selectedTransactions.length !== 1 ? 's' : ''}`}
+        title="Void Selected Transactions"
+        message={`Are you sure you want to void ${selectedTransactions.length} transaction${selectedTransactions.length !== 1 ? 's' : ''}? Voided transactions will be excluded from revenue calculations but can be restored later.`}
+        confirmButtonText={`Void ${selectedTransactions.length} Transaction${selectedTransactions.length !== 1 ? 's' : ''}`}
         isDestructive
         loading={bulkDeleting}
       />

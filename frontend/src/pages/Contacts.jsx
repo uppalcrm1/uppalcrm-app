@@ -85,6 +85,8 @@ const Contacts = () => {
   const [selectedContacts, setSelectedContacts] = useState([])
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false)
   const [bulkDeleting, setBulkDeleting] = useState(false)
+  const [contactToDelete, setContactToDelete] = useState(null)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
 
   // Debounced search - separate immediate input from debounced API calls
   // Must be defined early, before currentFilters uses it
@@ -706,9 +708,8 @@ const Contacts = () => {
       </button>
       <button
         onClick={() => {
-          if (window.confirm('Are you sure you want to delete this contact?')) {
-            deleteMutation.mutate(contact.id)
-          }
+          setContactToDelete(contact)
+          setShowDeleteModal(true)
         }}
         className="p-1 text-gray-600 hover:text-red-600"
         title="Delete Contact"
@@ -977,6 +978,24 @@ const Contacts = () => {
         confirmButtonText={`Delete ${selectedContacts.length} Contact${selectedContacts.length !== 1 ? 's' : ''}`}
         isDestructive
         loading={bulkDeleting}
+      />
+
+      {/* Single Delete Confirmation Modal */}
+      <DeleteConfirmModal
+        isOpen={showDeleteModal}
+        onClose={() => { setShowDeleteModal(false); setContactToDelete(null) }}
+        onConfirm={() => {
+          if (contactToDelete) {
+            deleteMutation.mutate(contactToDelete.id)
+            setShowDeleteModal(false)
+            setContactToDelete(null)
+          }
+        }}
+        title="Delete Contact"
+        message={`Are you sure you want to delete ${contactToDelete?.name || contactToDelete?.first_name || 'this contact'}? This action cannot be undone.`}
+        confirmButtonText="Delete"
+        isDestructive
+        loading={deleteMutation.isPending}
       />
 
       {/* Convert Lead Modal */}
