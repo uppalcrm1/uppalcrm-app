@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import {
   CreditCard,
@@ -88,8 +89,7 @@ const getRenewalColor = (daysUntil) => {
 
 const AccountsPage = () => {
   const navigate = useNavigate()
-  const [accounts, setAccounts] = useState([])
-  const [localAccounts, setLocalAccounts] = useState([]) // For optimistic updates
+  const queryClient = useQueryClient()
   const [showAccountSelector, setShowAccountSelector] = useState(false)
   const [selectedAccount, setSelectedAccount] = useState(null)
   const [showCreateTransactionModal, setShowCreateTransactionModal] = useState(false)
@@ -103,24 +103,55 @@ const AccountsPage = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const [showDeleted, setShowDeleted] = useState(false)
-  const [loading, setLoading] = useState(false)
   const [sortConfig, setSortConfig] = useState({ key: 'created_date', direction: 'desc' })
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(50)
-  const [totalCount, setTotalCount] = useState(0)
-  const [totalPages, setTotalPages] = useState(0)
-
-  // Stats state (organization-wide, not just current page)
-  const [stats, setStats] = useState({
-    totalRevenue: 0,
-    totalAccounts: 0,
-    activeUsers: 0
-  })
 
   // Debounce search - separate immediate input from debounced API calls
   const debouncedSearch = useDebouncedValue(searchTerm, 300)
+
+  // Fetch accounts list via React Query
+  // Query key includes ALL variables from the old fetchAccounts dependency array:
+  // debouncedSearch, pageSize, sortConfig, showDeleted — plus currentPage for pagination
+  const {
+    data: accountsData,
+    isLoading,
+  } = useQuery({
+    queryKey: ['accounts', { search: debouncedSearch, sortConfig, showDeleted, page: currentPage, pageSize }],
+    queryFn: async () => {
+      const offset = (currentPage - 1) * pageSize
+      const params = {
+        limit: pageSize,
+        offset,
+        orderBy: sortConfig.key,
+        orderDirection: sortConfig.direction
+      }
+      if (debouncedSearch.trim()) params.search = debouncedSearch
+      if (showDeleted) params.includeDeleted = 'true'
+      return accountsAPI.getAccounts(params)
+    },
+    keepPreviousData: true,
+    staleTime: 30000,
+  })
+
+  const accounts = accountsData?.accounts || accountsData?.subscriptions || []
+  const totalCount = accountsData?.total || 0
+  const totalPages = accountsData?.totalPages || 0
+
+  // Fetch organization-wide stats via React Query
+  const { data: statsData } = useQuery({
+    queryKey: ['accounts', 'stats'],
+    queryFn: () => accountsAPI.getStats(),
+    staleTime: 30000,
+  })
+
+  const stats = {
+    totalRevenue: parseFloat(statsData?.stats?.total_revenue ?? 0) || 0,
+    totalAccounts: parseInt(statsData?.stats?.total_accounts ?? 0) || 0,
+    activeUsers: parseInt(statsData?.stats?.active_accounts ?? 0) || 0,
+  }
 
   // Load column visibility from localStorage or use defaults
   const [visibleColumns, setVisibleColumns] = useState(() => {
@@ -153,35 +184,16 @@ const AccountsPage = () => {
 
   // Pagination change handler for DataTable
   const handlePaginationChange = useCallback((newPagination) => {
+    setCurrentPage(newPagination.page)
     setPageSize(newPagination.limit)
-    fetchAccounts(newPagination.page, newPagination.limit)
   }, [])
 
-  // Inline edit handler with optimistic updates
+  // Inline edit handler
   const handleFieldUpdate = async (recordId, fieldName, newValue) => {
-    // Optimistic update: immediately update local state
-    setLocalAccounts(prevAccounts =>
-      prevAccounts.map(account =>
-        account.id === recordId
-          ? { ...account, [fieldName]: newValue }
-          : account
-      )
-    )
-
     try {
-      // Make API call to update the account
       await accountsAPI.updateAccount(recordId, { [fieldName]: newValue })
-
-      // Also update the main accounts state for consistency
-      setAccounts(prevAccounts =>
-        prevAccounts.map(account =>
-          account.id === recordId
-            ? { ...account, [fieldName]: newValue }
-            : account
-        )
-      )
+      queryClient.invalidateQueries(['accounts'])
     } catch (error) {
-      // Error is thrown back to InlineEditCell for rollback
       console.error('Failed to update account:', error)
       throw error
     }
@@ -191,9 +203,7 @@ const AccountsPage = () => {
   const handleDeleteAccount = async (accountId, reason) => {
     try {
       await accountsAPI.softDeleteAccount(accountId, reason)
-      // Refresh accounts list and stats
-      await fetchAccounts()
-      await fetchStats()
+      queryClient.invalidateQueries(['accounts'])
     } catch (error) {
       throw error // Let component handle error
     }
@@ -203,20 +213,15 @@ const AccountsPage = () => {
   const handleRestoreAccount = async (accountId) => {
     try {
       await accountsAPI.restoreAccount(accountId)
-      // Refresh accounts list and stats
-      await fetchAccounts()
-      await fetchStats()
+      queryClient.invalidateQueries(['accounts'])
     } catch (error) {
       throw error // Let component handle error
     }
   }
 
-  // Use localAccounts for display (optimistic updates), fallback to accounts
-  const displayAccounts = localAccounts.length > 0 ? localAccounts : accounts
-
-  // Apply status filter (sorting is now done server-side)
+  // Apply status filter (sorting is done server-side)
   const filteredAccounts = React.useMemo(() => {
-    let filtered = displayAccounts
+    let filtered = accounts
 
     // Apply status filter (client-side only)
     if (filterStatus && filterStatus !== '') {
@@ -224,82 +229,12 @@ const AccountsPage = () => {
     }
 
     return filtered
-  }, [displayAccounts, filterStatus])
+  }, [accounts, filterStatus])
 
-  // Initialize localAccounts when accounts changes
-  React.useEffect(() => {
-    setLocalAccounts(accounts)
-  }, [accounts])
-
-  // Fetch accounts function (moved outside useEffect to be callable)
-  const fetchAccounts = React.useCallback(async (page = 1, size = pageSize) => {
-    try {
-      setLoading(true)
-      const offset = (page - 1) * size
-      const params = {
-        limit: size,
-        offset: offset,
-        orderBy: sortConfig.key,
-        orderDirection: sortConfig.direction
-      }
-      if (debouncedSearch.trim()) {
-        params.search = debouncedSearch
-      }
-      // Send includeDeleted flag to backend
-      if (showDeleted) {
-        params.includeDeleted = 'true'
-      }
-      // Add timestamp to bypass caching
-      params.t = Date.now()
-      console.log('🔍 Fetching accounts with params:', params)
-      const response = await accountsAPI.getAccounts(params)
-      console.log('📥 API Response:', response)
-      // Backend can return either 'accounts' or 'subscriptions' depending on endpoint
-      const accountsData = response.accounts || response.subscriptions || []
-      console.log('📥 Accounts data length:', accountsData.length)
-      console.log('📥 First account:', accountsData[0]?.contact_name)
-      setAccounts(accountsData)
-      setTotalCount(response.total || 0)
-      setTotalPages(response.totalPages || 0)
-      setCurrentPage(page)
-    } catch (error) {
-      console.error('Error fetching accounts:', error)
-    } finally {
-      setLoading(false)
-    }
-  }, [debouncedSearch, pageSize, sortConfig, showDeleted])
-
-  // Fetch accounts when sorting, search, showDeleted, or pageSize changes - reset to page 1
-  React.useEffect(() => {
-    fetchAccounts(1, pageSize)
-  }, [fetchAccounts])
-
-  // Fetch organization-wide stats (not limited to current page)
-  const fetchStats = React.useCallback(async () => {
-    try {
-      const response = await accountsAPI.getStats()
-      console.log('📊 Stats API Response:', response)
-
-      setStats({
-        totalRevenue: parseFloat(response.stats?.total_revenue ?? 0) || 0,
-        totalAccounts: parseInt(response.stats?.total_accounts ?? 0) || 0,
-        activeUsers: parseInt(response.stats?.active_accounts ?? 0) || 0
-      })
-    } catch (error) {
-      console.error('Error fetching stats:', error)
-      // Set defaults on error
-      setStats({
-        totalRevenue: 0,
-        totalAccounts: 0,
-        activeUsers: 0
-      })
-    }
-  }, [])
-
-  // Fetch stats on component mount
-  React.useEffect(() => {
-    fetchStats()
-  }, [fetchStats])
+  // Reset to page 1 when search, sort, or filter changes (mirrors old fetchAccounts useEffect behavior)
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [debouncedSearch, sortConfig, showDeleted])
 
   const getStatusBadge = (status, daysUntilExpiry) => {
     if (status === 'active' && daysUntilExpiry > 7) {
@@ -353,15 +288,13 @@ const AccountsPage = () => {
   const handleTransactionCreated = () => {
     setShowCreateTransactionModal(false)
     setSelectedAccountForTransaction(null)
-    fetchAccounts() // Refresh accounts to reflect transaction
-    fetchStats() // Refresh organization-wide stats
+    queryClient.invalidateQueries(['accounts'])
     toast.success('Transaction created successfully')
   }
 
   const handleAccountCreated = () => {
     setShowCreateAccountModal(false)
-    fetchAccounts() // Refresh the accounts list
-    fetchStats() // Refresh organization-wide stats
+    queryClient.invalidateQueries(['accounts'])
     toast.success('Account created successfully')
   }
 
@@ -382,8 +315,7 @@ const AccountsPage = () => {
   const handleAccountUpdated = () => {
     setShowEditModal(false)
     setSelectedAccountForEdit(null)
-    fetchAccounts() // Refresh the accounts list
-    fetchStats() // Refresh organization-wide stats
+    queryClient.invalidateQueries(['accounts'])
   }
 
   const handleCreateTask = (account) => {
@@ -554,10 +486,10 @@ const AccountsPage = () => {
         account={account}
         onDelete={handleDeleteAccount}
         onRestore={handleRestoreAccount}
-        onRefresh={fetchAccounts}
+        onRefresh={() => queryClient.invalidateQueries(['accounts'])}
       />
     </div>
-  ), [loadingEditAccount, navigate, fetchAccounts])
+  ), [loadingEditAccount, navigate, queryClient])
 
   return (
     <div className="space-y-6">
@@ -670,7 +602,7 @@ const AccountsPage = () => {
       <div className="card">
         <DataTable
           data={filteredAccounts}
-          loading={loading}
+          loading={isLoading}
           entityName="Account"
           entityType="accounts"
           rowKey="id"
@@ -766,7 +698,7 @@ const AccountsPage = () => {
           onClose={() => {
             setShowTaskModal(false)
             setSelectedAccountForTask(null)
-            fetchAccounts() // refresh active_task_count badges
+            queryClient.invalidateQueries(['accounts']) // refresh active_task_count badges
           }}
           api={taskAPI}
           defaultValues={selectedAccountForTask.defaultValues}
