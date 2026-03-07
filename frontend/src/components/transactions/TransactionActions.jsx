@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
-import { XCircle, AlertTriangle } from 'lucide-react';
+import { XCircle, AlertTriangle, RotateCcw } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 /**
  * TransactionActions Component
  * Handles void (soft delete) operations for transactions
  */
-export function TransactionActions({ transaction, onVoid, onRefresh }) {
+export function TransactionActions({ transaction, onVoid, onRestore, onRefresh }) {
   const [showVoidDialog, setShowVoidDialog] = useState(false);
   const [voidReason, setVoidReason] = useState('');
   const [isVoiding, setIsVoiding] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
 
   // Void reason options
   const VOID_REASONS = [
@@ -49,13 +50,34 @@ export function TransactionActions({ transaction, onVoid, onRefresh }) {
     }
   };
 
-  // If transaction is already voided, don't show button
+  const handleRestore = async () => {
+    setIsRestoring(true);
+    try {
+      await onRestore(transaction.id);
+      toast.success('Transaction restored successfully');
+      if (onRefresh) {
+        onRefresh();
+      }
+    } catch (error) {
+      console.error('Restore failed:', error);
+      toast.error(error.response?.data?.error || 'Failed to restore transaction');
+    } finally {
+      setIsRestoring(false);
+    }
+  };
+
+  // If transaction is already voided, show restore button
   if (transaction.is_void || transaction.deleted_at) {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-500 bg-gray-100 rounded">
-        <XCircle className="w-3 h-3" />
-        Voided
-      </span>
+      <button
+        onClick={handleRestore}
+        disabled={isRestoring}
+        className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-green-700 bg-green-50 border border-green-300 rounded hover:bg-green-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        title="Restore Transaction"
+      >
+        <RotateCcw className="w-4 h-4" />
+        {isRestoring ? 'Restoring...' : 'Restore'}
+      </button>
     );
   }
 
