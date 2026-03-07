@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import React, { useState, useEffect, useCallback } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   DollarSign,
   Search,
   Calendar,
-  Download,
   CreditCard,
   CheckCircle,
   XCircle,
@@ -13,34 +12,28 @@ import {
   Eye,
   Edit,
   Trash2,
-  FileText,
-  RotateCcw,
-  ArrowUpDown,
-  ArrowUp,
-  ArrowDown,
   User
 } from 'lucide-react'
 import { transactionsAPI } from '../services/api'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import EditTransactionModal from '../components/EditTransactionModal'
-import ColumnSelector from '../components/ColumnSelector'
+import DataTable from '../components/shared/DataTable'
 import { formatSource, formatPaymentMethod } from '../constants/transactions'
 import { formatDateOnly } from '../utils/dateUtils'
 import { formatCurrency } from '../utils/currency'
 
 // Define available columns with metadata
 const COLUMN_DEFINITIONS = [
-  { key: 'payment_date', label: 'Payment Date', description: 'Transaction payment date', required: true },
-  { key: 'transaction_id', label: 'Transaction ID', description: 'Unique transaction identifier', required: true },
-  { key: 'account_name', label: 'Account Name', description: 'Associated account', required: false },
-  { key: 'contact_name', label: 'Contact Name', description: 'Associated contact', required: false },
-  { key: 'amount', label: 'Amount', description: 'Transaction amount', required: true },
-  { key: 'currency', label: 'Currency', description: 'Transaction currency (CAD or USD)', required: false },
-  { key: 'status', label: 'Status', description: 'Transaction status', required: false },
-  { key: 'source', label: 'Source', description: 'Payment source', required: false },
-  { key: 'payment_method', label: 'Payment Method', description: 'Payment method used', required: false },
-  { key: 'created_by', label: 'Created By', description: 'User who created the transaction', required: false },
-  { key: 'actions', label: 'Actions', description: 'Transaction actions', required: true }
+  { key: 'payment_date', label: 'Payment Date', description: 'Transaction payment date', required: true, sortKey: 'transaction_date' },
+  { key: 'transaction_id', label: 'Transaction ID', description: 'Unique transaction identifier', required: true, sortable: false },
+  { key: 'account_name', label: 'Account Name', description: 'Associated account', required: false, sortKey: 'account_name' },
+  { key: 'contact_name', label: 'Contact Name', description: 'Associated contact', required: false, sortable: false },
+  { key: 'amount', label: 'Amount', description: 'Transaction amount', required: true, sortKey: 'amount' },
+  { key: 'currency', label: 'Currency', description: 'Transaction currency (CAD or USD)', required: false, sortable: false },
+  { key: 'status', label: 'Status', description: 'Transaction status', required: false, sortable: false },
+  { key: 'source', label: 'Source', description: 'Payment source', required: false, sortable: false },
+  { key: 'payment_method', label: 'Payment Method', description: 'Payment method used', required: false, sortable: false },
+  { key: 'created_by', label: 'Created By', description: 'User who created the transaction', required: false, sortable: false },
 ]
 
 // Default visible columns
@@ -55,7 +48,6 @@ const DEFAULT_VISIBLE_COLUMNS = {
   source: true,
   payment_method: true,
   created_by: false,
-  actions: true
 }
 
 // formatSource and formatPaymentMethod are now imported from constants/transactions.js
@@ -71,6 +63,7 @@ const formatDate = (dateString) => {
 }
 
 const TransactionsPage = () => {
+  const navigate = useNavigate()
   const [transactions, setTransactions] = useState([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -81,7 +74,7 @@ const TransactionsPage = () => {
   const [selectedTransaction, setSelectedTransaction] = useState(null)
   const [revenueStats, setRevenueStats] = useState(null)
   const [loadingRevenue, setLoadingRevenue] = useState(false)
-  const [sortDirection, setSortDirection] = useState('desc') // 'asc' or 'desc'
+  const [sortConfig, setSortConfig] = useState({ key: 'transaction_date', direction: 'desc' })
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -113,14 +106,16 @@ const TransactionsPage = () => {
     localStorage.setItem('transactions_visible_columns', JSON.stringify(DEFAULT_VISIBLE_COLUMNS))
   }
 
-  const fetchTransactions = React.useCallback(async (page = 1, size = pageSize) => {
+  const fetchTransactions = useCallback(async (page = 1, size = pageSize) => {
     try {
       setLoading(true)
       const offset = (page - 1) * size
       const params = {
         limit: size,
         offset: offset,
-        search: debouncedSearch || ''
+        search: debouncedSearch || '',
+        sort: sortConfig.key,
+        order: sortConfig.direction
       }
       if (filterStatus !== 'all') params.status = filterStatus
       if (filterMethod !== 'all') params.payment_method = filterMethod
@@ -137,7 +132,7 @@ const TransactionsPage = () => {
     } finally {
       setLoading(false)
     }
-  }, [debouncedSearch, pageSize, filterStatus, filterMethod, filterSource])
+  }, [debouncedSearch, pageSize, sortConfig, filterStatus, filterMethod, filterSource])
 
   // Fetch transactions on component mount and when debouncedSearch changes
   useEffect(() => {
@@ -170,22 +165,19 @@ const TransactionsPage = () => {
     failedTransactions: transactions.filter(t => t.status === 'failed').length
   }
 
-  // Toggle sort direction
-  const handleToggleSort = () => {
-    setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')
-  }
+  // Sort handler — toggles direction, sends to server via fetchTransactions
+  const handleSort = useCallback((key) => {
+    setSortConfig(prev => {
+      const direction = prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+      return { key, direction }
+    })
+  }, [])
 
-  // Sort transactions by payment date
-  const sortedTransactions = [...transactions].sort((a, b) => {
-    const dateA = new Date(a.payment_date || 0)
-    const dateB = new Date(b.payment_date || 0)
-    
-    if (sortDirection === 'asc') {
-      return dateA - dateB
-    } else {
-      return dateB - dateA
-    }
-  })
+  // Pagination change handler for DataTable
+  const handlePaginationChange = useCallback((newPagination) => {
+    setPageSize(newPagination.limit)
+    fetchTransactions(newPagination.page, newPagination.limit)
+  }, [])
 
   const getStatusBadge = (status) => {
     const badges = {
@@ -213,11 +205,6 @@ const TransactionsPage = () => {
     return badges[status] || badges.completed
   }
 
-  const handleView = (id) => {
-    console.log('View transaction:', id)
-    // TODO: Navigate to transaction details page
-  }
-
   const handleEdit = (transaction) => {
     setSelectedTransaction(transaction)
     setShowEditModal(true)
@@ -241,29 +228,120 @@ const TransactionsPage = () => {
     }
   }
 
-  // Pagination handlers
-  const handlePreviousPage = () => {
-    if (currentPage > 1) {
-      fetchTransactions(currentPage - 1, pageSize)
+  // Render cell content for DataTable
+  const renderCell = useCallback((transaction, column) => {
+    const statusBadge = getStatusBadge(transaction.status)
+    switch (column.key) {
+      case 'payment_date':
+        return (
+          <div className="flex items-center text-sm text-gray-900 font-mono">
+            <Calendar size={14} className="mr-2 text-gray-400" />
+            {formatDate(transaction.payment_date)}
+          </div>
+        )
+      case 'transaction_id':
+        return (
+          <span className="text-sm font-medium text-gray-900">
+            {transaction.transaction_id || 'Unknown'}
+          </span>
+        )
+      case 'account_name':
+        return transaction.account_id ? (
+          <Link
+            to={`/accounts/${transaction.account_id}`}
+            className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
+          >
+            {transaction.account_name || 'Unknown Account'}
+          </Link>
+        ) : (
+          <span className="text-sm text-gray-500">No account</span>
+        )
+      case 'contact_name':
+        return transaction.contact_id ? (
+          <Link
+            to={`/contacts/${transaction.contact_id}`}
+            className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
+          >
+            {transaction.contact_name || 'Unknown Contact'}
+          </Link>
+        ) : (
+          <span className="text-sm text-gray-500">No contact</span>
+        )
+      case 'amount':
+        return (
+          <span className="text-sm font-semibold text-green-600">
+            {formatCurrency(transaction.amount, transaction.currency || 'CAD')}
+          </span>
+        )
+      case 'currency':
+        return (
+          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+            transaction.currency === 'USD'
+              ? 'bg-blue-100 text-blue-800'
+              : 'bg-green-100 text-green-800'
+          }`}>
+            {transaction.currency || 'CAD'}
+          </span>
+        )
+      case 'status':
+        return (
+          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${statusBadge.class}`}>
+            {statusBadge.icon}
+            {statusBadge.text}
+          </span>
+        )
+      case 'source':
+        return (
+          <span className="text-sm text-gray-700">
+            {formatSource(transaction.source)}
+          </span>
+        )
+      case 'payment_method':
+        return (
+          <div className="flex items-center text-sm text-gray-700">
+            <CreditCard size={14} className="mr-2 text-gray-400" />
+            {formatPaymentMethod(transaction.payment_method)}
+          </div>
+        )
+      case 'created_by':
+        return (
+          <div className="flex items-center text-sm text-gray-700">
+            <User size={14} className="mr-2 text-gray-400" />
+            {transaction.created_by_name || 'Unknown'}
+          </div>
+        )
+      default:
+        return <span className="text-gray-500">&mdash;</span>
     }
-  }
+  }, [])
 
-  const handleNextPage = () => {
-    if (currentPage < totalPages) {
-      fetchTransactions(currentPage + 1, pageSize)
-    }
-  }
-
-  const handlePageSizeChange = (newSize) => {
-    setPageSize(newSize)
-    fetchTransactions(1, newSize)
-  }
-
-  const handleGoToPage = (page) => {
-    if (page >= 1 && page <= totalPages) {
-      fetchTransactions(page, pageSize)
-    }
-  }
+  // Render row actions for DataTable
+  const renderRowActions = useCallback((transaction) => (
+    <div className="flex items-center gap-2">
+      <button
+        onClick={() => navigate(`/transactions/${transaction.id}`)}
+        className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded"
+        title="View Details"
+      >
+        <Eye size={16} />
+      </button>
+      <button
+        onClick={() => handleEdit(transaction)}
+        className="p-1 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded"
+        title="Edit Transaction"
+      >
+        <Edit size={16} />
+      </button>
+      {/* TODO: Consider replacing window.confirm with TransactionActions void/restore for audit trail */}
+      <button
+        onClick={() => handleDelete(transaction.id)}
+        className="p-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded"
+        title="Delete Transaction"
+      >
+        <Trash2 size={16} />
+      </button>
+    </div>
+  ), [navigate])
 
   return (
     <div className="space-y-6">
@@ -273,10 +351,7 @@ const TransactionsPage = () => {
           <h1 className="text-2xl font-bold text-gray-900">Transactions</h1>
           <p className="text-gray-600 mt-1">Track all payment transactions and revenue</p>
         </div>
-        <button className="btn btn-primary btn-md">
-          <Download size={16} className="mr-2" />
-          Export Report
-        </button>
+        {/* TODO: Add Export Report button when backend export endpoint is implemented */}
       </div>
 
       {/* Summary Cards */}
@@ -410,299 +485,32 @@ const TransactionsPage = () => {
 
       {/* Transactions Table */}
       <div className="card">
-        {/* Toolbar */}
-        {!loading && transactions.length > 0 && (
-          <div className="border-b border-gray-200 px-4 py-3 flex items-center justify-between bg-gray-50">
-            <div className="flex items-center gap-2">
-              <FileText size={20} className="text-gray-700" />
-              <span className="text-sm font-medium text-gray-700">
-                {totalCount} total {totalCount === 1 ? 'Transaction' : 'Transactions'}
-                {totalPages > 1 && <span className="text-gray-500"> • Showing {transactions.length} per page</span>}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <ColumnSelector
-                columns={COLUMN_DEFINITIONS}
-                visibleColumns={visibleColumns}
-                onColumnToggle={handleColumnToggle}
-                onReset={handleResetColumns}
-              />
-            </div>
-          </div>
-        )}
-
-        {loading ? (
-          <div className="text-center py-12">
-            <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading transactions...</p>
-          </div>
-        ) : transactions.length === 0 ? (
-          <div className="text-center py-12">
-            <DollarSign className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No transactions found</h3>
-            <p className="text-gray-600">
-              {searchTerm || filterStatus !== 'all' || filterMethod !== 'all' || filterSource !== 'all'
-                ? 'Try adjusting your filters'
-                : 'Transaction records will appear here once they are created'}
-            </p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  {visibleColumns.payment_date && (
-                    <th className="text-left py-3 px-4 font-medium text-gray-900">
-                      <button
-                        onClick={handleToggleSort}
-                        className="flex items-center gap-2 hover:text-primary-600 transition-colors"
-                      >
-                        Payment Date
-                        {sortDirection === 'asc' ? (
-                          <ArrowUp size={16} className="text-primary-600" />
-                        ) : (
-                          <ArrowDown size={16} className="text-primary-600" />
-                        )}
-                      </button>
-                    </th>
-                  )}
-                  {visibleColumns.transaction_id && <th className="text-left py-3 px-4 font-medium text-gray-900">Transaction ID</th>}
-                  {visibleColumns.account_name && <th className="text-left py-3 px-4 font-medium text-gray-900">Account Name</th>}
-                  {visibleColumns.contact_name && <th className="text-left py-3 px-4 font-medium text-gray-900">Contact Name</th>}
-                  {visibleColumns.amount && <th className="text-left py-3 px-4 font-medium text-gray-900">Amount</th>}
-                  {visibleColumns.currency && <th className="text-left py-3 px-4 font-medium text-gray-900">Currency</th>}
-                  {visibleColumns.status && <th className="text-left py-3 px-4 font-medium text-gray-900">Status</th>}
-                  {visibleColumns.source && <th className="text-left py-3 px-4 font-medium text-gray-900">Source</th>}
-                  {visibleColumns.payment_method && <th className="text-left py-3 px-4 font-medium text-gray-900">Payment Method</th>}
-                  {visibleColumns.created_by && <th className="text-left py-3 px-4 font-medium text-gray-900">Created By</th>}
-                  {visibleColumns.actions && <th className="text-left py-3 px-4 font-medium text-gray-900">Actions</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {sortedTransactions.map((transaction) => {
-                  const statusBadge = getStatusBadge(transaction.status)
-                  return (
-                    <tr key={transaction.id} className="border-b border-gray-100 hover:bg-gray-50">
-                      {/* Column 1: Payment Date */}
-                      {visibleColumns.payment_date && (
-                        <td className="py-4 px-4">
-                          <div className="flex items-center text-sm text-gray-900 font-mono">
-                            <Calendar size={14} className="mr-2 text-gray-400" />
-                            {formatDate(transaction.payment_date)}
-                          </div>
-                        </td>
-                      )}
-
-                      {/* Column 2: Transaction ID */}
-                      {visibleColumns.transaction_id && (
-                        <td className="py-4 px-4">
-                          <span className="text-sm font-medium text-gray-900">
-                            {transaction.transaction_id || 'Unknown'}
-                          </span>
-                        </td>
-                      )}
-
-                      {/* Column 3: Account Name */}
-                      {visibleColumns.account_name && (
-                        <td className="py-4 px-4">
-                          {transaction.account_id ? (
-                            <Link
-                              to={`/accounts/${transaction.account_id}`}
-                              className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
-                            >
-                              {transaction.account_name || 'Unknown Account'}
-                            </Link>
-                          ) : (
-                            <span className="text-sm text-gray-500">No account</span>
-                          )}
-                        </td>
-                      )}
-
-                      {/* Column 4: Contact Name */}
-                      {visibleColumns.contact_name && (
-                        <td className="py-4 px-4">
-                          {transaction.contact_id ? (
-                            <Link
-                              to={`/contacts/${transaction.contact_id}`}
-                              className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
-                            >
-                              {transaction.contact_name || 'Unknown Contact'}
-                            </Link>
-                          ) : (
-                            <span className="text-sm text-gray-500">No contact</span>
-                          )}
-                        </td>
-                      )}
-
-                      {/* Column 5: Amount */}
-                      {visibleColumns.amount && (
-                        <td className="py-4 px-4">
-                          <span className="text-sm font-semibold text-green-600">
-                            {formatCurrency(transaction.amount, transaction.currency || 'CAD')}
-                          </span>
-                        </td>
-                      )}
-
-                      {/* Column 6: Currency */}
-                      {visibleColumns.currency && (
-                        <td className="py-4 px-4">
-                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                            transaction.currency === 'USD'
-                              ? 'bg-blue-100 text-blue-800'
-                              : 'bg-green-100 text-green-800'
-                          }`}>
-                            {transaction.currency || 'CAD'}
-                          </span>
-                        </td>
-                      )}
-
-                      {/* Column 7: Status */}
-                      {visibleColumns.status && (
-                        <td className="py-4 px-4">
-                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${statusBadge.class}`}>
-                            {statusBadge.icon}
-                            {statusBadge.text}
-                          </span>
-                        </td>
-                      )}
-
-                      {/* Column 8: Source */}
-                      {visibleColumns.source && (
-                        <td className="py-4 px-4">
-                          <span className="text-sm text-gray-700">
-                            {formatSource(transaction.source)}
-                          </span>
-                        </td>
-                      )}
-
-                      {/* Column 9: Payment Method */}
-                      {visibleColumns.payment_method && (
-                        <td className="py-4 px-4">
-                          <div className="flex items-center text-sm text-gray-700">
-                            <CreditCard size={14} className="mr-2 text-gray-400" />
-                            {formatPaymentMethod(transaction.payment_method)}
-                          </div>
-                        </td>
-                      )}
-
-                      {/* Column 10: Created By */}
-                      {visibleColumns.created_by && (
-                        <td className="py-4 px-4">
-                          <div className="flex items-center text-sm text-gray-700">
-                            <User size={14} className="mr-2 text-gray-400" />
-                            {transaction.created_by_name || 'Unknown'}
-                          </div>
-                        </td>
-                      )}
-
-                      {/* Column 11: Actions */}
-                      {visibleColumns.actions && (
-                        <td className="py-4 px-4">
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => handleView(transaction.id)}
-                              className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded"
-                              title="View Details"
-                            >
-                              <Eye size={16} />
-                            </button>
-                            <button
-                              onClick={() => handleEdit(transaction)}
-                              className="p-1 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded"
-                              title="Edit Transaction"
-                            >
-                              <Edit size={16} />
-                            </button>
-                            <button
-                              onClick={() => handleDelete(transaction.id)}
-                              className="p-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded"
-                              title="Delete Transaction"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
-                        </td>
-                      )}
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* Pagination Controls */}
-        {!loading && transactions.length > 0 && totalPages > 1 && (
-          <div className="border-t border-gray-200 px-4 py-4 flex items-center justify-between bg-gray-50">
-            <div className="flex items-center gap-2">
-              <label className="text-sm text-gray-700">Rows per page:</label>
-              <select
-                value={pageSize}
-                onChange={(e) => handlePageSizeChange(parseInt(e.target.value))}
-                className="input input-sm"
-              >
-                <option value="25">25</option>
-                <option value="50">50</option>
-                <option value="100">100</option>
-                <option value="200">200</option>
-              </select>
-            </div>
-
-            <div className="text-sm text-gray-700">
-              Page <span className="font-medium">{currentPage}</span> of{' '}
-              <span className="font-medium">{totalPages}</span> ({' '}
-              <span className="font-medium">{totalCount}</span> total)
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handlePreviousPage}
-                disabled={currentPage === 1}
-                className="btn btn-sm btn-outline"
-              >
-                Previous
-              </button>
-
-              {/* Page number buttons */}
-              <div className="flex gap-1">
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  let pageNum
-                  if (totalPages <= 5) {
-                    pageNum = i + 1
-                  } else if (currentPage <= 3) {
-                    pageNum = i + 1
-                  } else if (currentPage > totalPages - 3) {
-                    pageNum = totalPages - 4 + i
-                  } else {
-                    pageNum = currentPage - 2 + i
-                  }
-
-                  return (
-                    <button
-                      key={pageNum}
-                      onClick={() => handleGoToPage(pageNum)}
-                      className={`btn btn-sm ${
-                        currentPage === pageNum
-                          ? 'btn-primary'
-                          : 'btn-outline'
-                      }`}
-                    >
-                      {pageNum}
-                    </button>
-                  )
-                })}
-              </div>
-
-              <button
-                onClick={handleNextPage}
-                disabled={currentPage === totalPages}
-                className="btn btn-sm btn-outline"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        )}
+        <DataTable
+          data={transactions}
+          loading={loading}
+          entityName="Transaction"
+          entityType="transactions"
+          rowKey="id"
+          columns={COLUMN_DEFINITIONS}
+          visibleColumns={visibleColumns}
+          onColumnToggle={handleColumnToggle}
+          onColumnsReset={handleResetColumns}
+          sortConfig={sortConfig}
+          onSort={handleSort}
+          pagination={{ page: currentPage, limit: pageSize, total: totalCount }}
+          onPaginationChange={handlePaginationChange}
+          pageSizeOptions={[25, 50, 100]}
+          selectable={false}
+          renderCell={renderCell}
+          renderRowActions={renderRowActions}
+          emptyIcon={DollarSign}
+          emptyMessage="No transactions found"
+          emptySubMessage={
+            searchTerm || filterStatus !== 'all' || filterMethod !== 'all' || filterSource !== 'all'
+              ? 'Try adjusting your filters'
+              : 'Transaction records will appear here once they are created'
+          }
+        />
       </div>
 
       {/* Edit Transaction Modal */}

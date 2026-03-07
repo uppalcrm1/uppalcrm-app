@@ -309,9 +309,19 @@ router.get('/accounts/:accountId', async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const { organization_id } = req.user;
-    const { status, contact_id, payment_method, source, limit = 100, offset = 0, search } = req.query;
+    const { status, contact_id, payment_method, source, limit = 100, offset = 0, search, sort = 'transaction_date', order = 'desc' } = req.query;
 
-    console.log('📥 [Transactions GET] Received query:', { status, contact_id, payment_method, source, search, limit, offset });
+    // Validate sort column against allowlist
+    const ALLOWED_SORT_COLUMNS = {
+      'transaction_date': 't.transaction_date',
+      'amount': 't.amount',
+      'account_name': 'a.account_name',
+      'created_at': 't.created_at'
+    };
+    const sortCol = ALLOWED_SORT_COLUMNS[sort] || 't.transaction_date';
+    const sortDir = order === 'asc' ? 'ASC' : 'DESC';
+
+    console.log('📥 [Transactions GET] Received query:', { status, contact_id, payment_method, source, search, limit, offset, sort, order });
 
     // STEP 1: Load billing term options for this organization
     let termOptions = [];
@@ -408,7 +418,7 @@ router.get('/', async (req, res) => {
       params.push(`%${search}%`);
     }
 
-    query += ` ORDER BY t.transaction_date DESC, t.created_at DESC`;
+    query += ` ORDER BY ${sortCol} ${sortDir}, t.created_at DESC`;
     query += ` LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
     params.push(limit, offset);
 
