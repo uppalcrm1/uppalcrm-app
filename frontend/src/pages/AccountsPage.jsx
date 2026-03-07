@@ -624,7 +624,7 @@ const AccountsPage = () => {
           emptySubMessage="Start by creating your first account"
         />
         {/* Empty state action buttons — shown below DataTable's empty state */}
-        {filteredAccounts.length === 0 && !loading && (
+        {filteredAccounts.length === 0 && !isLoading && (
           <div className="flex items-center justify-center space-x-3 pb-8 -mt-4">
             <button
               onClick={() => setShowCreateAccountModal(true)}
