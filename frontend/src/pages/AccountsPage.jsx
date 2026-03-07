@@ -16,6 +16,7 @@ import {
   ClipboardList
 } from 'lucide-react'
 import DataTable from '../components/shared/DataTable'
+import InlineEditCell from '../components/InlineEditCell'
 import CreateTransactionModal from '../components/CreateTransactionModal'
 import AccountSelectorModal from '../components/AccountSelectorModal'
 import { AccountActions } from '../components/accounts/AccountActions'
@@ -375,12 +376,30 @@ const AccountsPage = () => {
         )
       case 'mac_address':
         return (
-          <span className="font-mono text-sm text-gray-700">
-            {account.mac_address || 'N/A'}
-          </span>
+          <InlineEditCell
+            value={account.mac_address}
+            fieldName="mac_address"
+            fieldType="text"
+            recordId={account.id}
+            entityType="accounts"
+            onSave={handleFieldUpdate}
+            placeholder="Add MAC address..."
+            className="font-mono text-sm"
+          />
         )
       case 'device':
-        return <span className="text-gray-900">{account.device_name || 'Unknown Device'}</span>
+        return (
+          <InlineEditCell
+            value={account.device_name}
+            fieldName="device_name"
+            fieldType="text"
+            recordId={account.id}
+            entityType="accounts"
+            onSave={handleFieldUpdate}
+            placeholder="Add device..."
+            className="text-sm"
+          />
+        )
       case 'product':
         return (
           <span className="font-medium text-blue-600">
@@ -433,7 +452,7 @@ const AccountsPage = () => {
       default:
         return <span className="text-gray-500">—</span>
     }
-  }, [navigate])
+  }, [navigate, handleFieldUpdate])
 
   // Render row actions for DataTable
   const renderRowActions = useCallback((account) => (
@@ -618,6 +637,7 @@ const AccountsPage = () => {
           selectable={false}
           renderCell={renderCell}
           renderRowActions={renderRowActions}
+          onInlineEdit={handleFieldUpdate}
           getRowClassName={(row) => row.deleted_at ? 'opacity-50 bg-gray-50' : ''}
           emptyIcon={CreditCard}
           emptyMessage="No accounts found"
