@@ -1,6 +1,7 @@
 const express = require('express');
 const Contact = require('../models/Contact');
 const { findByOrganizationSafe } = require('../models/Contact-Safe');
+const { query } = require('../database/connection');
 const {
   validateUuidParam,
   validate,
@@ -271,6 +272,41 @@ router.get('/',
         error: 'Failed to retrieve contacts',
         message: 'Unable to get contacts list',
         details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+);
+
+/**
+ * GET /contacts/dropdown
+ * Get all contacts for dropdown/select fields (lightweight, no pagination limit)
+ */
+router.get('/dropdown',
+  async (req, res) => {
+    try {
+      if (!req.organizationId) {
+        return res.status(400).json({
+          error: 'Missing organization context',
+          message: 'Organization ID is required'
+        });
+      }
+
+      const result = await query(
+        `SELECT id, first_name, last_name, email, company, phone
+         FROM contacts
+         WHERE organization_id = $1 AND (is_deleted = false OR is_deleted IS NULL)
+         ORDER BY first_name ASC, last_name ASC`,
+        [req.organizationId]
+      );
+
+      res.json({
+        contacts: result.rows
+      });
+    } catch (error) {
+      console.error('Get contacts dropdown error:', error);
+      res.status(500).json({
+        error: 'Failed to retrieve contacts',
+        message: 'Unable to get contacts list for dropdown'
       });
     }
   }

@@ -440,6 +440,11 @@ export const contactsAPI = {
     const response = await api.get('/contacts', { params })
     return response.data
   },
+
+  getContactsDropdown: async () => {
+    const response = await api.get('/contacts/dropdown')
+    return response.data
+  },
   
   getContact: async (id) => {
     const response = await api.get(`/contacts/${id}`)

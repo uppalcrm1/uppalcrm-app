@@ -63,23 +63,10 @@ const CreateAccountModal = ({ isOpen, onClose, onSuccess }) => {
   const loadContacts = async () => {
     setLoadingContacts(true)
     try {
-      // Load all contacts (no limit - same as ContactsPage)
-      const response = await contactsAPI.getContacts()
+      // Use lightweight dropdown endpoint to load ALL contacts (no pagination limit)
+      const response = await contactsAPI.getContactsDropdown()
       const contactsArray = response.contacts || []
-
-      console.log('📥 Contacts loaded:', contactsArray.length)
-      console.log('📥 First contact sample:', contactsArray[0])
-
-      // Debug: Log all contact names to verify data
-      contactsArray.forEach((contact, index) => {
-        console.log(`Contact ${index + 1}:`, {
-          id: contact.id,
-          first_name: contact.first_name,
-          last_name: contact.last_name,
-          email: contact.email
-        })
-      })
-
+      console.log('📥 Contacts loaded for dropdown:', contactsArray.length)
       setContacts(contactsArray)
     } catch (error) {
       console.error('❌ Error loading contacts:', error)
