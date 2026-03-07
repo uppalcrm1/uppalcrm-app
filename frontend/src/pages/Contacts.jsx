@@ -22,6 +22,7 @@ import { format } from 'date-fns'
 import ContactDetail from '../components/ContactDetail'
 import ContactForm from '../components/ContactForm'
 import ConvertLeadModal from '../components/ConvertLeadModal'
+import InlineEditCell from '../components/InlineEditCell'
 import { useFieldVisibility } from '../hooks/useFieldVisibility'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 
@@ -311,6 +312,30 @@ const Contacts = () => {
     }
   })
 
+  // Inline edit handler
+  const handleFieldUpdate = async (recordId, fieldName, newValue, isCustomField = false) => {
+    try {
+      const isCustom = isCustomField || COLUMN_DEFINITIONS.some(col => col.key === fieldName && col.isCustom)
+
+      if (isCustom) {
+        const allContacts = contactsData?.contacts || []
+        const currentContact = allContacts.find(c => c.id === recordId)
+        await contactsAPI.updateContact(recordId, {
+          custom_fields: {
+            ...(currentContact?.custom_fields || {}),
+            [fieldName]: newValue
+          }
+        })
+      } else {
+        await contactsAPI.updateContact(recordId, { [fieldName]: newValue })
+      }
+      queryClient.invalidateQueries(['contacts'])
+    } catch (error) {
+      console.error('Failed to update contact:', error)
+      throw error
+    }
+  }
+
   // Handler to fetch full contact before opening edit modal
   const handleEditContact = async (contactFromList) => {
     try {
@@ -371,76 +396,132 @@ const Contacts = () => {
         )
 
       case 'email':
-        return value ? (
-          <div className="flex items-center text-gray-900">
-            <Mail size={14} className="mr-2 text-gray-400" />
-            {value}
-          </div>
-        ) : (
-          <span className="text-gray-500">—</span>
+        return (
+          <InlineEditCell
+            value={value}
+            fieldName="email"
+            fieldType="email"
+            recordId={contact.id}
+            entityType="contacts"
+            onSave={handleFieldUpdate}
+            placeholder="Add email..."
+            icon={<Mail size={14} />}
+            className="text-sm"
+          />
         )
 
       case 'phone':
-        return value ? (
-          <div className="flex items-center text-gray-900">
-            <Phone size={14} className="mr-2 text-gray-400" />
-            {value}
-          </div>
-        ) : (
-          <span className="text-gray-500">—</span>
+        return (
+          <InlineEditCell
+            value={value}
+            fieldName="phone"
+            fieldType="text"
+            recordId={contact.id}
+            entityType="contacts"
+            onSave={handleFieldUpdate}
+            placeholder="Add phone..."
+            icon={<Phone size={14} />}
+            className="text-sm"
+          />
         )
 
       case 'company':
-        return value ? (
-          <div className="flex items-center text-gray-900">
-            <Building size={14} className="mr-2 text-gray-400" />
-            {value}
-          </div>
-        ) : (
-          <span className="text-gray-500">—</span>
+        return (
+          <InlineEditCell
+            value={value}
+            fieldName="company"
+            fieldType="text"
+            recordId={contact.id}
+            entityType="contacts"
+            onSave={handleFieldUpdate}
+            placeholder="Add company..."
+            icon={<Building size={14} />}
+            className="text-sm"
+          />
         )
 
       case 'status':
         return (
-          <span className={`badge badge-${getStatusBadgeColor(value)}`}>
-            {CONTACT_STATUSES.find(s => s.value === value)?.label || value || '—'}
-          </span>
+          <InlineEditCell
+            value={value}
+            fieldName="status"
+            fieldType="select"
+            recordId={contact.id}
+            entityType="contacts"
+            onSave={handleFieldUpdate}
+            options={CONTACT_STATUSES.map(s => ({ value: s.value, label: s.label }))}
+            displayValue={
+              <span className={`badge badge-${getStatusBadgeColor(value)}`}>
+                {CONTACT_STATUSES.find(s => s.value === value)?.label || value || '—'}
+              </span>
+            }
+          />
         )
 
       case 'type':
         return (
-          <span className={`badge badge-${getTypeBadgeColor(value)}`}>
-            {CONTACT_TYPES.find(t => t.value === value)?.label || value || '—'}
-          </span>
+          <InlineEditCell
+            value={value}
+            fieldName="type"
+            fieldType="select"
+            recordId={contact.id}
+            entityType="contacts"
+            onSave={handleFieldUpdate}
+            options={CONTACT_TYPES.map(t => ({ value: t.value, label: t.label }))}
+            displayValue={
+              <span className={`badge badge-${getTypeBadgeColor(value)}`}>
+                {CONTACT_TYPES.find(t => t.value === value)?.label || value || '—'}
+              </span>
+            }
+          />
         )
 
       case 'priority':
         return (
-          <span className={`badge badge-${getPriorityBadgeColor(value)}`}>
-            {CONTACT_PRIORITIES.find(p => p.value === value)?.label || value || '—'}
-          </span>
+          <InlineEditCell
+            value={value}
+            fieldName="priority"
+            fieldType="select"
+            recordId={contact.id}
+            entityType="contacts"
+            onSave={handleFieldUpdate}
+            options={CONTACT_PRIORITIES.map(p => ({ value: p.value, label: p.label }))}
+            displayValue={
+              <span className={`badge badge-${getPriorityBadgeColor(value)}`}>
+                {CONTACT_PRIORITIES.find(p => p.value === value)?.label || value || '—'}
+              </span>
+            }
+          />
         )
 
       case 'value':
         return (
-          <div className="flex items-center text-gray-900">
-            <DollarSign size={14} className="mr-1" />
-            {value?.toLocaleString() || 0}
-          </div>
+          <InlineEditCell
+            value={value}
+            fieldName="value"
+            fieldType="number"
+            recordId={contact.id}
+            entityType="contacts"
+            onSave={handleFieldUpdate}
+            placeholder="Add value..."
+            prefix="$"
+            icon={<DollarSign size={14} />}
+            className="text-sm font-semibold text-green-600"
+          />
         )
 
       case 'assigned_to':
-        return contact.assigned_user ? (
-          <div className="flex items-center">
-            <div className="w-6 h-6 bg-primary-600 rounded-full flex items-center justify-center mr-2">
-              <span className="text-white text-xs font-medium">
-                {contact.assigned_user.first_name?.[0]}{contact.assigned_user.last_name?.[0]}
-              </span>
-            </div>
-            <span className="text-sm text-gray-900">{contact.assigned_user.full_name}</span>
-          </div>
-        ) : (
-          <span className="text-sm text-gray-500">Unassigned</span>
+        return (
+          <InlineEditCell
+            value={value}
+            fieldName="assigned_to"
+            fieldType="user-select"
+            recordId={contact.id}
+            entityType="contacts"
+            onSave={handleFieldUpdate}
+            users={usersData?.users || []}
+            className="text-sm"
+          />
         )
 
       case 'created_at':
@@ -452,9 +533,16 @@ const Contacts = () => {
 
       case 'next_follow_up':
         return (
-          <div className="text-sm text-gray-600">
-            {value ? format(new Date(value), 'MMM d, yyyy') : '—'}
-          </div>
+          <InlineEditCell
+            value={value}
+            fieldName="next_follow_up"
+            fieldType="date"
+            recordId={contact.id}
+            entityType="contacts"
+            onSave={handleFieldUpdate}
+            placeholder="Set date..."
+            className="text-sm"
+          />
         )
 
       case 'last_contact_date':
@@ -476,6 +564,29 @@ const Contacts = () => {
           <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-green-100 text-green-700 font-semibold text-sm">
             {contact.transactions_count || 0}
           </span>
+        )
+
+      case 'source':
+        return (
+          <InlineEditCell
+            value={value}
+            fieldName="source"
+            fieldType="select"
+            recordId={contact.id}
+            entityType="contacts"
+            onSave={handleFieldUpdate}
+            options={[
+              { value: 'website', label: 'Website' },
+              { value: 'referral', label: 'Referral' },
+              { value: 'social', label: 'Social Media' },
+              { value: 'cold-call', label: 'Cold Call' },
+              { value: 'email', label: 'Email' },
+              { value: 'advertisement', label: 'Advertisement' },
+              { value: 'trade-show', label: 'Trade Show' },
+              { value: 'other', label: 'Other' }
+            ]}
+            className="text-sm"
+          />
         )
 
       // Default rendering for other text/select/number fields
@@ -718,6 +829,7 @@ const Contacts = () => {
           selectable={false}
           renderCell={renderCellContent}
           renderRowActions={renderRowActions}
+          onInlineEdit={handleFieldUpdate}
           emptyIcon={Users}
           emptyMessage="No contacts found"
           emptySubMessage={hasActiveFilters ? "Try adjusting your search criteria or filters" : "Get started by adding your first contact"}

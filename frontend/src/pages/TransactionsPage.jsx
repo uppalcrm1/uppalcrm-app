@@ -19,9 +19,10 @@ import { transactionsAPI } from '../services/api'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import EditTransactionModal from '../components/EditTransactionModal'
 import DataTable from '../components/shared/DataTable'
-import { formatSource, formatPaymentMethod } from '../constants/transactions'
+import { formatSource, formatPaymentMethod, TRANSACTION_STATUSES, PAYMENT_METHODS } from '../constants/transactions'
 import { formatDateOnly } from '../utils/dateUtils'
 import { formatCurrency } from '../utils/currency'
+import InlineEditCell from '../components/InlineEditCell'
 
 // Define available columns with metadata
 const COLUMN_DEFINITIONS = [
@@ -220,6 +221,17 @@ const TransactionsPage = () => {
     }
   }
 
+  // Inline edit handler
+  const handleFieldUpdate = async (recordId, fieldName, newValue) => {
+    try {
+      await transactionsAPI.updateTransaction(recordId, { [fieldName]: newValue })
+      queryClient.invalidateQueries(['transactions'])
+    } catch (error) {
+      console.error('Failed to update transaction:', error)
+      throw error
+    }
+  }
+
   // Render cell content for DataTable
   const renderCell = useCallback((transaction, column) => {
     const statusBadge = getStatusBadge(transaction.status)
@@ -277,23 +289,55 @@ const TransactionsPage = () => {
         )
       case 'status':
         return (
-          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${statusBadge.class}`}>
-            {statusBadge.icon}
-            {statusBadge.text}
-          </span>
+          <InlineEditCell
+            value={transaction.status}
+            fieldName="status"
+            fieldType="select"
+            recordId={transaction.id}
+            entityType="transactions"
+            onSave={handleFieldUpdate}
+            options={TRANSACTION_STATUSES.map(s => ({ value: s.value, label: s.label }))}
+            displayValue={
+              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${statusBadge.class}`}>
+                {statusBadge.icon}
+                {statusBadge.text}
+              </span>
+            }
+          />
         )
       case 'source':
         return (
-          <span className="text-sm text-gray-700">
-            {formatSource(transaction.source)}
-          </span>
+          <InlineEditCell
+            value={transaction.source}
+            fieldName="source"
+            fieldType="select"
+            recordId={transaction.id}
+            entityType="transactions"
+            onSave={handleFieldUpdate}
+            options={[
+              { value: 'website', label: 'Website' },
+              { value: 'phone', label: 'Phone' },
+              { value: 'email', label: 'Email' },
+              { value: 'referral', label: 'Referral' },
+              { value: 'walk-in', label: 'Walk-in' },
+              { value: 'partner', label: 'Partner' }
+            ]}
+            className="text-sm"
+          />
         )
       case 'payment_method':
         return (
-          <div className="flex items-center text-sm text-gray-700">
-            <CreditCard size={14} className="mr-2 text-gray-400" />
-            {formatPaymentMethod(transaction.payment_method)}
-          </div>
+          <InlineEditCell
+            value={transaction.payment_method}
+            fieldName="payment_method"
+            fieldType="select"
+            recordId={transaction.id}
+            entityType="transactions"
+            onSave={handleFieldUpdate}
+            options={PAYMENT_METHODS.map(m => ({ value: m, label: m }))}
+            icon={<CreditCard size={14} />}
+            className="text-sm"
+          />
         )
       case 'created_by':
         return (
@@ -305,7 +349,7 @@ const TransactionsPage = () => {
       default:
         return <span className="text-gray-500">&mdash;</span>
     }
-  }, [])
+  }, [handleFieldUpdate])
 
   // Render row actions for DataTable
   const renderRowActions = useCallback((transaction) => (
