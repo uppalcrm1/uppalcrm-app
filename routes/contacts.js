@@ -294,7 +294,7 @@ router.get('/dropdown',
       const result = await query(
         `SELECT id, first_name, last_name, email, company, phone
          FROM contacts
-         WHERE organization_id = $1 AND (is_deleted = false OR is_deleted IS NULL)
+         WHERE organization_id = $1
          ORDER BY first_name ASC, last_name ASC`,
         [req.organizationId]
       );
