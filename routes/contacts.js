@@ -351,6 +351,111 @@ router.get('/stats',
 );
 
 /**
+ * GET /contacts/export
+ * Export contacts as CSV
+ */
+router.get('/export', async (req, res) => {
+  try {
+    const { query } = require('../database/connection');
+    const { ids, status, source, search } = req.query;
+
+    let whereConditions = ['c.organization_id = $1'];
+    const params = [req.organizationId];
+    let paramCount = 1;
+
+    // Filter by specific IDs (for bulk export of selected)
+    if (ids) {
+      const idList = Array.isArray(ids) ? ids : ids.split(',');
+      whereConditions.push(`c.id = ANY($${++paramCount})`);
+      params.push(idList);
+    }
+
+    if (status) {
+      whereConditions.push(`c.status = $${++paramCount}`);
+      params.push(status);
+    }
+
+    if (source) {
+      whereConditions.push(`c.source ILIKE $${++paramCount}`);
+      params.push(`%${source}%`);
+    }
+
+    if (search && search.trim()) {
+      whereConditions.push(`(
+        c.first_name ILIKE $${++paramCount} OR
+        c.last_name ILIKE $${paramCount} OR
+        COALESCE(c.name, c.first_name || ' ' || c.last_name) ILIKE $${paramCount} OR
+        c.email ILIKE $${paramCount}
+      )`);
+      params.push(`%${search}%`);
+    }
+
+    const whereClause = whereConditions.join(' AND ');
+
+    const result = await query(`
+      SELECT
+        c.id,
+        c.first_name,
+        c.last_name,
+        COALESCE(c.name, c.first_name || ' ' || c.last_name) as name,
+        c.email,
+        c.phone,
+        c.company,
+        c.title,
+        c.department,
+        c.linkedin,
+        c.status,
+        c.type,
+        c.source,
+        c.priority,
+        c.notes,
+        c.created_at,
+        c.updated_at
+      FROM contacts c
+      WHERE ${whereClause}
+      ORDER BY c.created_at DESC
+    `, params, req.organizationId);
+
+    const csvHeaders = [
+      'ID', 'First Name', 'Last Name', 'Name', 'Email', 'Phone', 'Company',
+      'Title', 'Department', 'LinkedIn', 'Status', 'Type', 'Source', 'Priority',
+      'Notes', 'Created At', 'Updated At'
+    ];
+
+    const csvRows = result.rows.map(row => [
+      row.id,
+      row.first_name || '',
+      row.last_name || '',
+      row.name || '',
+      row.email || '',
+      row.phone || '',
+      row.company || '',
+      row.title || '',
+      row.department || '',
+      row.linkedin || '',
+      row.status || '',
+      row.type || '',
+      row.source || '',
+      row.priority || '',
+      row.notes || '',
+      row.created_at || '',
+      row.updated_at || ''
+    ]);
+
+    const csvContent = [csvHeaders, ...csvRows]
+      .map(row => row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="contacts_export_${new Date().toISOString().split('T')[0]}.csv"`);
+    res.send(csvContent);
+  } catch (error) {
+    console.error('Export contacts error:', error);
+    res.status(500).json({ error: 'Export failed', message: 'Unable to export contacts' });
+  }
+});
+
+/**
  * GET /contacts/debug
  * Debug endpoint to test database connection and table creation
  */

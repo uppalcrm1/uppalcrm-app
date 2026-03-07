@@ -13,7 +13,8 @@ import {
   Eye,
   Edit,
   Trash2,
-  User
+  User,
+  Download
 } from 'lucide-react'
 import { transactionsAPI } from '../services/api'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
@@ -23,6 +24,8 @@ import { formatSource, formatPaymentMethod, TRANSACTION_STATUSES, PAYMENT_METHOD
 import { formatDateOnly } from '../utils/dateUtils'
 import { formatCurrency } from '../utils/currency'
 import InlineEditCell from '../components/InlineEditCell'
+import DeleteConfirmModal from '../components/DeleteConfirmModal'
+import toast from 'react-hot-toast'
 
 // Define available columns with metadata
 const COLUMN_DEFINITIONS = [
@@ -74,6 +77,9 @@ const TransactionsPage = () => {
   const [showEditModal, setShowEditModal] = useState(false)
   const [selectedTransaction, setSelectedTransaction] = useState(null)
   const [sortConfig, setSortConfig] = useState({ key: 'transaction_date', direction: 'desc' })
+  const [selectedTransactions, setSelectedTransactions] = useState([])
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false)
+  const [bulkDeleting, setBulkDeleting] = useState(false)
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -144,6 +150,80 @@ const TransactionsPage = () => {
   useEffect(() => {
     setCurrentPage(1)
   }, [debouncedSearch, sortConfig, filterStatus, filterMethod, filterSource])
+
+  // Clear selection when filters, search, pagination, or sort changes
+  useEffect(() => {
+    setSelectedTransactions([])
+  }, [debouncedSearch, sortConfig, currentPage, filterStatus, filterMethod, filterSource])
+
+  // Bulk export selected transactions as CSV (client-side)
+  const handleBulkExport = useCallback(() => {
+    if (selectedTransactions.length === 0) return
+    const selected = transactions.filter(t => selectedTransactions.includes(t.id))
+    const headers = ['Payment Date', 'Transaction ID', 'Account Name', 'Contact Name', 'Amount', 'Currency', 'Status', 'Source', 'Payment Method', 'Created By']
+    const rows = selected.map(t => [
+      t.payment_date || '', t.transaction_id || '', t.account_name || '',
+      t.contact_name || '', t.amount || '', t.currency || '',
+      t.status || '', t.source || '', t.payment_method || '',
+      t.created_by_name || ''
+    ])
+    const csvContent = [headers, ...rows]
+      .map(row => row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
+      .join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv' })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `transactions_selected_${new Date().toISOString().split('T')[0]}.csv`
+    document.body.appendChild(a)
+    a.click()
+    window.URL.revokeObjectURL(url)
+    document.body.removeChild(a)
+    toast.success(`Exported ${selected.length} transactions`)
+  }, [selectedTransactions, transactions])
+
+  // Export all transactions matching current filters (server-side)
+  const handleExportAll = useCallback(async () => {
+    try {
+      const params = {}
+      if (debouncedSearch.trim()) params.search = debouncedSearch
+      if (filterStatus !== 'all') params.status = filterStatus
+      if (filterMethod !== 'all') params.payment_method = filterMethod
+      if (filterSource !== 'all') params.source = filterSource
+      const exportData = await transactionsAPI.exportTransactions(params)
+      const blob = new Blob([exportData], { type: 'text/csv' })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `transactions_export_${new Date().toISOString().split('T')[0]}.csv`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      toast.success('Transactions exported successfully')
+    } catch (error) {
+      console.error('Export failed:', error)
+      toast.error('Failed to export transactions')
+    }
+  }, [debouncedSearch, filterStatus, filterMethod, filterSource])
+
+  // Bulk delete selected transactions
+  const handleBulkDelete = useCallback(async () => {
+    if (selectedTransactions.length === 0) return
+    setBulkDeleting(true)
+    try {
+      await Promise.all(selectedTransactions.map(id => transactionsAPI.deleteTransaction(id)))
+      queryClient.invalidateQueries(['transactions'])
+      toast.success(`Successfully deleted ${selectedTransactions.length} transactions`)
+      setSelectedTransactions([])
+      setShowBulkDeleteModal(false)
+    } catch (error) {
+      console.error('Bulk delete failed:', error)
+      toast.error('Failed to delete some transactions')
+    } finally {
+      setBulkDeleting(false)
+    }
+  }, [selectedTransactions, queryClient])
 
   // Calculate statistics from frontend data (for filtering/display only)
   const stats = {
@@ -387,7 +467,16 @@ const TransactionsPage = () => {
           <h1 className="text-2xl font-bold text-gray-900">Transactions</h1>
           <p className="text-gray-600 mt-1">Track all payment transactions and revenue</p>
         </div>
-        {/* TODO: Add Export Report button when backend export endpoint is implemented */}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleExportAll}
+            className="btn btn-secondary btn-md"
+            title="Export all transactions matching current filters"
+          >
+            <Download size={16} className="mr-2" />
+            Export
+          </button>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -536,7 +625,13 @@ const TransactionsPage = () => {
           pagination={{ page: currentPage, limit: pageSize, total: totalCount }}
           onPaginationChange={handlePaginationChange}
           pageSizeOptions={[25, 50, 100]}
-          selectable={false}
+          selectable
+          selectedIds={selectedTransactions}
+          onSelectionChange={setSelectedTransactions}
+          bulkActions={[
+            { label: 'Export', icon: Download, onClick: handleBulkExport },
+            { label: 'Delete', icon: Trash2, onClick: () => setShowBulkDeleteModal(true), variant: 'danger' },
+          ]}
           renderCell={renderCell}
           renderRowActions={renderRowActions}
           emptyIcon={DollarSign}
@@ -548,6 +643,18 @@ const TransactionsPage = () => {
           }
         />
       </div>
+
+      {/* Bulk Delete Confirmation Modal */}
+      <DeleteConfirmModal
+        isOpen={showBulkDeleteModal}
+        onClose={() => setShowBulkDeleteModal(false)}
+        onConfirm={handleBulkDelete}
+        title="Delete Selected Transactions"
+        message={`Are you sure you want to delete ${selectedTransactions.length} transaction${selectedTransactions.length !== 1 ? 's' : ''}? This action cannot be undone.`}
+        confirmButtonText={`Delete ${selectedTransactions.length} Transaction${selectedTransactions.length !== 1 ? 's' : ''}`}
+        isDestructive
+        loading={bulkDeleting}
+      />
 
       {/* Edit Transaction Modal */}
       {showEditModal && selectedTransaction && (

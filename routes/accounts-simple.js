@@ -214,6 +214,114 @@ router.get('/stats', async (req, res) => {
 });
 
 /**
+ * GET /api/accounts/export
+ * Export accounts as CSV
+ */
+router.get('/export', async (req, res) => {
+  try {
+    const { organization_id } = req.user;
+    const { ids, status, includeDeleted = 'false', search } = req.query;
+
+    let query = `
+      SELECT
+        a.id,
+        a.account_name,
+        a.mac_address,
+        a.device,
+        p.name as product_name,
+        a.edition as edition_name,
+        CONCAT(c.first_name, ' ', c.last_name) as contact_name,
+        c.email as contact_email,
+        a.account_status,
+        a.price,
+        a.billing_term_months,
+        CASE
+          WHEN a.billing_term_months IS NOT NULL AND a.billing_term_months > 0
+            THEN a.price / a.billing_term_months
+          ELSE a.price
+        END as monthly_cost,
+        a.created_at,
+        a.next_renewal_date,
+        EXTRACT(DAY FROM (a.next_renewal_date - CURRENT_DATE)) as days_until_renewal
+      FROM accounts a
+      LEFT JOIN contacts c ON a.contact_id = c.id
+      LEFT JOIN products p ON a.product_id = p.id
+      WHERE a.organization_id = $1
+    `;
+
+    const params = [organization_id];
+
+    // Filter by specific IDs (for bulk export of selected)
+    if (ids) {
+      const idList = Array.isArray(ids) ? ids : ids.split(',');
+      query += ` AND a.id = ANY($${params.length + 1})`;
+      params.push(idList);
+    }
+
+    if (includeDeleted === 'false' || includeDeleted === false) {
+      query += ` AND a.deleted_at IS NULL`;
+    }
+
+    if (status) {
+      query += ` AND a.account_status = $${params.length + 1}`;
+      params.push(status);
+    }
+
+    if (search && search.trim()) {
+      query += ` AND (
+        a.account_name ILIKE $${params.length + 1} OR
+        a.mac_address ILIKE $${params.length + 1} OR
+        c.first_name ILIKE $${params.length + 1} OR
+        c.last_name ILIKE $${params.length + 1} OR
+        c.email ILIKE $${params.length + 1} OR
+        c.company ILIKE $${params.length + 1} OR
+        a.edition ILIKE $${params.length + 1}
+      )`;
+      params.push(`%${search}%`);
+    }
+
+    query += ` ORDER BY a.created_at DESC`;
+
+    const result = await db.query(query, params, organization_id);
+
+    const csvHeaders = [
+      'ID', 'Account Name', 'MAC Address', 'Device', 'Product', 'Edition',
+      'Contact Name', 'Contact Email', 'Status', 'Price', 'Billing Term (Months)',
+      'Monthly Cost', 'Created Date', 'Next Renewal Date', 'Days Until Renewal'
+    ];
+
+    const csvRows = result.rows.map(row => [
+      row.id,
+      row.account_name || '',
+      row.mac_address || '',
+      row.device || '',
+      row.product_name || '',
+      row.edition_name || '',
+      row.contact_name || '',
+      row.contact_email || '',
+      row.account_status || '',
+      row.price || '',
+      row.billing_term_months || '',
+      row.monthly_cost != null ? parseFloat(row.monthly_cost).toFixed(2) : '',
+      row.created_at || '',
+      row.next_renewal_date || '',
+      row.days_until_renewal != null ? Math.round(row.days_until_renewal) : ''
+    ]);
+
+    const csvContent = [csvHeaders, ...csvRows]
+      .map(row => row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="accounts_export_${new Date().toISOString().split('T')[0]}.csv"`);
+    res.send(csvContent);
+  } catch (error) {
+    console.error('Export accounts error:', error);
+    res.status(500).json({ error: 'Export failed', message: 'Unable to export accounts' });
+  }
+});
+
+/**
  * GET /api/accounts/:id/detail
  * Get detailed account information for the detail page
  */
