@@ -489,12 +489,12 @@ const TransactionsPage = () => {
   ), [navigate, queryClient])
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Transactions</h1>
-          <p className="text-gray-600 mt-1">Track all payment transactions and revenue</p>
+          <h1 className="text-lg font-bold text-gray-900">Transactions</h1>
+          <p className="text-gray-500 text-sm">Track all payment transactions and revenue</p>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -509,13 +509,13 @@ const TransactionsPage = () => {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
         {/* Total Revenue (CAD) */}
-        <div className="card">
+        <div className="card !p-3">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 mb-1">Total Revenue (CAD)</p>
-              <p className="text-2xl font-bold text-green-600">
+              <p className="text-xs text-gray-600">Total Revenue (CAD)</p>
+              <p className="text-lg font-bold text-green-600">
                 {revenueStats && !loadingRevenue
                   ? formatCurrency(revenueStats.total_revenue_cad, 'CAD')
                   : formatCurrency(0, 'CAD')
@@ -527,31 +527,31 @@ const TransactionsPage = () => {
                 </p>
               )}
             </div>
-            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-              <DollarSign className="text-green-600" size={24} />
+            <div className="w-9 h-9 bg-green-100 rounded-lg flex items-center justify-center">
+              <DollarSign className="text-green-600" size={18} />
             </div>
           </div>
         </div>
 
         {/* Total Transactions */}
-        <div className="card">
+        <div className="card !p-3">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 mb-1">Total Transactions</p>
-              <p className="text-2xl font-bold text-blue-600">{stats.totalTransactions}</p>
+              <p className="text-xs text-gray-600">Total Transactions</p>
+              <p className="text-lg font-bold text-blue-600">{stats.totalTransactions}</p>
             </div>
-            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-              <CheckCircle className="text-blue-600" size={24} />
+            <div className="w-9 h-9 bg-blue-100 rounded-lg flex items-center justify-center">
+              <CheckCircle className="text-blue-600" size={18} />
             </div>
           </div>
         </div>
 
         {/* This Month */}
-        <div className="card">
+        <div className="card !p-3">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 mb-1">This Month</p>
-              <p className="text-2xl font-bold text-purple-600">
+              <p className="text-xs text-gray-600">This Month</p>
+              <p className="text-lg font-bold text-purple-600">
                 {formatCurrency(stats.thisMonthRevenue, 'CAD')}
               </p>
               {revenueStats && revenueStats.this_month_breakdown && (
@@ -560,30 +560,30 @@ const TransactionsPage = () => {
                 </p>
               )}
             </div>
-            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-              <Calendar className="text-purple-600" size={24} />
+            <div className="w-9 h-9 bg-purple-100 rounded-lg flex items-center justify-center">
+              <Calendar className="text-purple-600" size={18} />
             </div>
           </div>
         </div>
 
         {/* Average Transaction */}
-        <div className="card">
+        <div className="card !p-3">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 mb-1">Average Transaction</p>
-              <p className="text-2xl font-bold text-orange-600">
+              <p className="text-xs text-gray-600">Average Transaction</p>
+              <p className="text-lg font-bold text-orange-600">
                 {formatCurrency(stats.avgTransaction, 'CAD')}
               </p>
             </div>
-            <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-              <TrendingUp className="text-orange-600" size={24} />
+            <div className="w-9 h-9 bg-orange-100 rounded-lg flex items-center justify-center">
+              <TrendingUp className="text-orange-600" size={18} />
             </div>
           </div>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="card">
+      <div className="card !py-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="relative">
             <Search size={16} className="absolute left-3 top-3 text-gray-400" />

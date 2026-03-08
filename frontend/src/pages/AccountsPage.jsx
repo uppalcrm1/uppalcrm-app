@@ -638,12 +638,12 @@ const AccountsPage = () => {
   ), [loadingEditAccount, navigate, queryClient])
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Account Management</h1>
-          <p className="text-gray-600 mt-1">Track software licenses, device registrations, and billing for customer accounts</p>
+          <h1 className="text-lg font-bold text-gray-900">Account Management</h1>
+          <p className="text-gray-500 text-sm">Track software licenses, device registrations, and billing for customer accounts</p>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -678,58 +678,58 @@ const AccountsPage = () => {
       </div>
 
       {/* Stats Cards — Account Health Funnel */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="card">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="card !p-3">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 mb-1">Total Accounts</p>
-              <p className="text-3xl font-bold text-blue-600">{stats.totalAccounts}</p>
+              <p className="text-xs text-gray-600">Total Accounts</p>
+              <p className="text-lg font-bold text-blue-600">{stats.totalAccounts}</p>
             </div>
-            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-              <CreditCard className="text-blue-600" size={24} />
+            <div className="w-9 h-9 bg-blue-100 rounded-lg flex items-center justify-center">
+              <CreditCard className="text-blue-600" size={18} />
             </div>
           </div>
         </div>
 
-        <div className="card">
+        <div className="card !p-3">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 mb-1">Active Accounts</p>
-              <p className="text-3xl font-bold text-green-600">{stats.activeAccounts}</p>
+              <p className="text-xs text-gray-600">Active Accounts</p>
+              <p className="text-lg font-bold text-green-600">{stats.activeAccounts}</p>
             </div>
-            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-              <CheckCircle className="text-green-600" size={24} />
+            <div className="w-9 h-9 bg-green-100 rounded-lg flex items-center justify-center">
+              <CheckCircle className="text-green-600" size={18} />
             </div>
           </div>
         </div>
 
-        <div className="card">
+        <div className="card !p-3">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 mb-1">Expiring This Month</p>
-              <p className="text-3xl font-bold text-amber-600">{stats.expiringThisMonth}</p>
+              <p className="text-xs text-gray-600">Expiring This Month</p>
+              <p className="text-lg font-bold text-amber-600">{stats.expiringThisMonth}</p>
             </div>
-            <div className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center">
-              <Clock className="text-amber-600" size={24} />
+            <div className="w-9 h-9 bg-amber-100 rounded-lg flex items-center justify-center">
+              <Clock className="text-amber-600" size={18} />
             </div>
           </div>
         </div>
 
-        <div className="card">
+        <div className="card !p-3">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 mb-1">Past Due</p>
-              <p className="text-3xl font-bold text-red-600">{stats.pastDueAccounts}</p>
+              <p className="text-xs text-gray-600">Past Due</p>
+              <p className="text-lg font-bold text-red-600">{stats.pastDueAccounts}</p>
             </div>
-            <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
-              <AlertCircle className="text-red-600" size={24} />
+            <div className="w-9 h-9 bg-red-100 rounded-lg flex items-center justify-center">
+              <AlertCircle className="text-red-600" size={18} />
             </div>
           </div>
         </div>
       </div>
 
       {/* Search and Filters */}
-      <div className="card">
+      <div className="card !py-3">
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="flex-1 relative">
             <Search size={16} className="absolute left-3 top-3 text-gray-400" />

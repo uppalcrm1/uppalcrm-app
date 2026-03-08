@@ -153,7 +153,7 @@ const DashboardLayout = () => {
       <header className="bg-white border-b border-gray-200 fixed w-full top-0 z-50">
         {/* Top Row - Brand & User */}
         <div className="px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+          <div className="flex items-center justify-between h-12">
             {/* Left - Brand */}
             <div className="flex items-center">
               <button
@@ -164,9 +164,9 @@ const DashboardLayout = () => {
               </button>
 
               <div className="flex items-center">
-                <Building2 className="h-8 w-8 text-primary-600" />
-                <div className="ml-3">
-                  <h1 className="text-lg font-semibold text-gray-900">
+                <Building2 className="h-6 w-6 text-primary-600" />
+                <div className="ml-2">
+                  <h1 className="text-sm font-semibold text-gray-900">
                     {organization?.name || 'UppalTV'}
                   </h1>
                   <p className="text-xs text-gray-500">CRM Dashboard</p>
@@ -355,7 +355,7 @@ const DashboardLayout = () => {
                     key={item.name}
                     to={item.href}
                     className={`
-                      flex items-center px-3 py-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors relative
+                      flex items-center px-3 py-2 text-sm font-medium border-b-2 whitespace-nowrap transition-colors relative
                       ${isActive
                         ? 'border-primary-600 text-primary-600'
                         : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -377,7 +377,7 @@ const DashboardLayout = () => {
                 <NavLink
                   to="/mac-search"
                   className={`
-                    flex items-center px-3 py-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors
+                    flex items-center px-3 py-2 text-sm font-medium border-b-2 whitespace-nowrap transition-colors
                     ${location.pathname === '/mac-search'
                       ? 'border-primary-600 text-primary-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -443,7 +443,7 @@ const DashboardLayout = () => {
       )}
 
       {/* Main Content - Full Width with optimized padding */}
-      <main className="pt-32 lg:pt-28 overflow-x-hidden">
+      <main className="pt-24 lg:pt-[5.5rem] overflow-x-hidden">
         <Outlet />
       </main>
     </div>

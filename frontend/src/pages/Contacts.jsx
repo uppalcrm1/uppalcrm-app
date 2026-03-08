@@ -748,12 +748,12 @@ const Contacts = () => {
   const pagination = contactsData?.pagination || {}
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Contacts</h1>
-          <p className="text-gray-600">Manage customer relationships and software licensing</p>
+          <h1 className="text-lg font-bold text-gray-900">Contacts</h1>
+          <p className="text-gray-500 text-sm">Manage customer relationships and software licensing</p>
         </div>
         <div className="flex items-center space-x-3 mt-4 sm:mt-0">
           <button
@@ -782,7 +782,7 @@ const Contacts = () => {
       </div>
 
       {/* Filters & Search */}
-      <div className="card">
+      <div className="card !py-3">
         <div className="flex flex-col sm:flex-row gap-4">
           {/* Search */}
           <div className="flex-1">
