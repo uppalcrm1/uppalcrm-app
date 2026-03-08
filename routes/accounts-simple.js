@@ -10,6 +10,30 @@ router.use(authenticateToken);
 router.use(validateOrganizationContext);
 
 /**
+ * Auto-expire accounts: set active accounts to 'expired' when next_renewal_date has passed.
+ * Called at the start of list, stats, and export endpoints to keep status in sync.
+ */
+const autoExpireAccounts = async (organization_id) => {
+  try {
+    const result = await db.query(`
+      UPDATE accounts
+      SET account_status = 'expired', updated_at = NOW()
+      WHERE organization_id = $1
+        AND account_status = 'active'
+        AND next_renewal_date IS NOT NULL
+        AND next_renewal_date < CURRENT_DATE
+        AND deleted_at IS NULL
+    `, [organization_id], organization_id);
+    if (result.rowCount > 0) {
+      console.log(`⏰ Auto-expired ${result.rowCount} account(s) for org ${organization_id}`);
+    }
+  } catch (e) {
+    // Non-fatal: log and continue (e.g. deleted_at column may not exist)
+    console.warn('Auto-expire accounts failed:', e.message);
+  }
+};
+
+/**
  * GET /api/accounts
  * Get all accounts for the organization
  */
@@ -17,6 +41,9 @@ router.get('/', async (req, res) => {
   try {
     const { organization_id } = req.user;
     const { status, expiring, limit = 100, offset = 0, includeDeleted = 'false', search, orderBy = 'created_date', orderDirection = 'desc' } = req.query;
+
+    // Auto-expire active accounts with past renewal dates
+    await autoExpireAccounts(organization_id);
 
     console.log('📥 [Accounts GET] Received query:', { status, expiring, limit, offset, search });
 
@@ -207,6 +234,9 @@ router.get('/stats', async (req, res) => {
   try {
     const { organization_id } = req.user;
 
+    // Auto-expire active accounts with past renewal dates
+    await autoExpireAccounts(organization_id);
+
     // Account health stats: Total → Active → Expiring This Month → Past Due
     let result;
     try {
@@ -258,6 +288,9 @@ router.get('/export', async (req, res) => {
   try {
     const { organization_id } = req.user;
     const { ids, status, expiring, includeDeleted = 'false', search } = req.query;
+
+    // Auto-expire active accounts with past renewal dates
+    await autoExpireAccounts(organization_id);
 
     let query = `
       SELECT
