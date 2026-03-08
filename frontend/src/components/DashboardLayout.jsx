@@ -345,7 +345,7 @@ const DashboardLayout = () => {
         {/* Navigation Tabs - Horizontal (Salesforce Style) */}
         <nav className="hidden lg:block border-t border-gray-200 bg-white">
           <div className="px-4 sm:px-6 lg:px-8">
-            <div className="flex space-x-8 overflow-x-auto">
+            <div className="flex space-x-1 overflow-x-auto scrollbar-hide">
               {navigation.map((item) => {
                 const Icon = item.icon
                 const isActive = location.pathname === item.href
@@ -355,14 +355,14 @@ const DashboardLayout = () => {
                     key={item.name}
                     to={item.href}
                     className={`
-                      flex items-center px-1 py-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors relative
+                      flex items-center px-3 py-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors relative
                       ${isActive
                         ? 'border-primary-600 text-primary-600'
                         : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                       }
                     `}
                   >
-                    <Icon size={18} className="mr-2" />
+                    <Icon size={16} className="mr-1.5" />
                     {item.name}
                     {item.name === 'Communications' && unreadCount > 0 && (
                       <span className="ml-2 inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold leading-none text-white bg-red-500 rounded-full">
@@ -377,14 +377,14 @@ const DashboardLayout = () => {
                 <NavLink
                   to="/mac-search"
                   className={`
-                    flex items-center px-1 py-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors
+                    flex items-center px-3 py-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors
                     ${location.pathname === '/mac-search'
                       ? 'border-primary-600 text-primary-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                     }
                   `}
                 >
-                  <Search size={18} className="mr-2" />
+                  <Search size={16} className="mr-1.5" />
                   MAC Search
                 </NavLink>
               )}
@@ -443,7 +443,7 @@ const DashboardLayout = () => {
       )}
 
       {/* Main Content - Full Width with optimized padding */}
-      <main className="pt-32 lg:pt-28">
+      <main className="pt-32 lg:pt-28 overflow-x-hidden">
         <Outlet />
       </main>
     </div>

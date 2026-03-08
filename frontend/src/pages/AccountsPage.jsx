@@ -772,7 +772,7 @@ const AccountsPage = () => {
       </div>
 
       {/* Accounts Table */}
-      <div className="card">
+      <div className="card p-0 overflow-hidden">
         <DataTable
           data={filteredAccounts}
           loading={isLoading}

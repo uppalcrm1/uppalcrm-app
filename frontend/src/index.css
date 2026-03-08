@@ -133,12 +133,32 @@ table td:hover {
 /* Maximize content width for list views */
 main > div {
   max-width: 100% !important;
-  padding-left: 1rem !important;
-  padding-right: 1rem !important;
+  padding-left: 1.5rem !important;
+  padding-right: 1.5rem !important;
+  box-sizing: border-box !important;
 }
 
 /* Make tables full width */
 .leads-container,
 [class*="space-y-6"] {
   max-width: 100% !important;
+}
+
+/* Ensure tables don't push page width beyond viewport */
+.card {
+  overflow: hidden;
+}
+
+/* Compact table styles for better fit at 100% zoom */
+table {
+  table-layout: auto;
+}
+
+/* Hide scrollbar for navigation tabs */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }

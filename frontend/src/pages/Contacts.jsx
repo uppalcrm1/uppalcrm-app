@@ -894,7 +894,7 @@ const Contacts = () => {
       </div>
 
       {/* Contacts List */}
-      <div className="card">
+      <div className="card p-0 overflow-hidden">
         <DataTable
           data={contacts}
           loading={contactsLoading && !contactsData}

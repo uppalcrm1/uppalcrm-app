@@ -651,7 +651,7 @@ const TransactionsPage = () => {
       </div>
 
       {/* Transactions Table */}
-      <div className="card">
+      <div className="card p-0 overflow-hidden">
         <DataTable
           data={transactions}
           loading={isLoading}

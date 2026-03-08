@@ -105,7 +105,7 @@ const DataTable = ({
   // SortableHeader sub-component
   const SortableHeader = ({ children, sortKey, className = '' }) => (
     <th
-      className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 ${className}`}
+      className={`px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 ${className}`}
       onClick={() => onSort && onSort(sortKey)}
     >
       <div className="flex items-center gap-1">
@@ -146,7 +146,7 @@ const DataTable = ({
     }
 
     return (
-      <div className="flex items-center justify-between px-6 py-3 bg-white border-t border-gray-200">
+      <div className="flex items-center justify-between px-4 py-3 bg-white border-t border-gray-200">
         <div className="flex items-center gap-4">
           <span className="text-sm text-gray-700">
             Showing {((currentPage - 1) * pagination.limit) + 1} to{' '}
@@ -243,7 +243,7 @@ const DataTable = ({
   return (
     <div className="bg-white">
       {/* Toolbar */}
-      <div className="border-b border-gray-200 px-6 py-3 flex items-center justify-between bg-gray-50">
+      <div className="border-b border-gray-200 px-4 py-3 flex items-center justify-between bg-gray-50">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-gray-700">
             {entityCount} {entityLabel}
@@ -261,7 +261,7 @@ const DataTable = ({
 
       {/* Bulk Actions Bar */}
       {selectable && selectedIds.length > 0 && (
-        <div className="bg-blue-50 border-b border-blue-200 px-6 py-3 flex items-center justify-between">
+        <div className="bg-blue-50 border-b border-blue-200 px-4 py-3 flex items-center justify-between">
           <span className="text-sm text-blue-800">
             {selectedIds.length} {entityName.toLowerCase()}{selectedIds.length !== 1 ? 's' : ''} selected
           </span>
@@ -300,7 +300,7 @@ const DataTable = ({
             <tr>
               {/* Select All Checkbox */}
               {selectable && (
-                <th className="px-6 py-3 text-left">
+                <th className="px-3 py-3 text-left">
                   <input
                     type="checkbox"
                     checked={selectedIds.length === data.length && data.length > 0}
@@ -314,7 +314,7 @@ const DataTable = ({
               {visibleSystemColumns.map(column => {
                 if (column.sortable === false) {
                   return (
-                    <th key={column.key} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th key={column.key} className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       {column.label}
                     </th>
                   )
@@ -328,14 +328,14 @@ const DataTable = ({
 
               {/* Custom Field Column Headers */}
               {visibleCustomColumns.map(column => (
-                <th key={column.key} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th key={column.key} className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   {column.label}
                 </th>
               ))}
 
               {/* Actions Header */}
               {renderRowActions && (
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
                 </th>
               )}
@@ -352,7 +352,7 @@ const DataTable = ({
                 <tr key={rowId} className={`${isSelected ? 'bg-blue-50' : ''} ${extraClassName}`}>
                   {/* Row Checkbox */}
                   {selectable && (
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-3 py-3 whitespace-nowrap">
                       <input
                         type="checkbox"
                         checked={isSelected}
@@ -364,21 +364,21 @@ const DataTable = ({
 
                   {/* System Column Cells */}
                   {visibleSystemColumns.map(column => (
-                    <td key={column.key} className={column.cellClassName || 'px-6 py-4 whitespace-nowrap'}>
+                    <td key={column.key} className={column.cellClassName || 'px-3 py-3 whitespace-nowrap'}>                     
                       {renderCell(row, column)}
                     </td>
                   ))}
 
                   {/* Custom Field Cells */}
                   {visibleCustomColumns.map(column => (
-                    <td key={column.key} className="px-6 py-4 whitespace-nowrap">
+                    <td key={column.key} className="px-3 py-3 whitespace-nowrap">
                       {renderCustomFieldCell(row, column)}
                     </td>
                   ))}
 
                   {/* Row Actions */}
                   {renderRowActions && (
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <td className="px-3 py-3 whitespace-nowrap text-right text-sm font-medium">
                       {renderRowActions(row)}
                     </td>
                   )}
