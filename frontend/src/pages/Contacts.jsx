@@ -13,7 +13,10 @@ import {
   DollarSign,
   Users,
   ArrowRightLeft,
-  Download
+  Download,
+  UserCheck,
+  CalendarPlus,
+  UserPlus
 } from 'lucide-react'
 import { contactsAPI, usersAPI } from '../services/api'
 import LoadingSpinner from '../components/LoadingSpinner'
@@ -283,6 +286,20 @@ const Contacts = () => {
     queryKey: ['users'],
     queryFn: () => usersAPI.getUsers({ limit: 100 })
   })
+
+  // Fetch contact stats
+  const { data: contactStatsData } = useQuery({
+    queryKey: ['contacts', 'stats'],
+    queryFn: () => contactsAPI.getStats(),
+    staleTime: 30000,
+  })
+
+  const contactStats = {
+    total: contactStatsData?.stats?.total_contacts || 0,
+    active: contactStatsData?.stats?.active_contacts || 0,
+    createdThisMonth: contactStatsData?.stats?.created_this_month || 0,
+    convertedThisMonth: contactStatsData?.stats?.converted_this_month || 0,
+  }
 
   // Mutations
   const createMutation = useMutation({
@@ -778,6 +795,57 @@ const Contacts = () => {
             <Plus size={16} className="mr-2" />
             Add Contact
           </button>
+        </div>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div className="card !p-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-gray-600">Total Contacts</p>
+              <p className="text-lg font-bold text-blue-600">{contactStats.total}</p>
+            </div>
+            <div className="w-9 h-9 bg-blue-100 rounded-lg flex items-center justify-center">
+              <Users className="text-blue-600" size={18} />
+            </div>
+          </div>
+        </div>
+
+        <div className="card !p-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-gray-600">Active Contacts</p>
+              <p className="text-lg font-bold text-green-600">{contactStats.active}</p>
+            </div>
+            <div className="w-9 h-9 bg-green-100 rounded-lg flex items-center justify-center">
+              <UserCheck className="text-green-600" size={18} />
+            </div>
+          </div>
+        </div>
+
+        <div className="card !p-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-gray-600">Created This Month</p>
+              <p className="text-lg font-bold text-purple-600">{contactStats.createdThisMonth}</p>
+            </div>
+            <div className="w-9 h-9 bg-purple-100 rounded-lg flex items-center justify-center">
+              <CalendarPlus className="text-purple-600" size={18} />
+            </div>
+          </div>
+        </div>
+
+        <div className="card !p-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-gray-600">Converted This Month</p>
+              <p className="text-lg font-bold text-orange-600">{contactStats.convertedThisMonth}</p>
+            </div>
+            <div className="w-9 h-9 bg-orange-100 rounded-lg flex items-center justify-center">
+              <UserPlus className="text-orange-600" size={18} />
+            </div>
+          </div>
         </div>
       </div>
 

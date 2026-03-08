@@ -9,7 +9,11 @@ import {
   ChevronDown,
   Plus,
   Download,
-  RefreshCw
+  RefreshCw,
+  Users,
+  UserPlus,
+  UserCheck,
+  UserX
 } from 'lucide-react'
 import { leadsAPI, usersAPI, customFieldsAPI } from '../services/api'
 import LoadingSpinner from '../components/LoadingSpinner'
@@ -124,6 +128,20 @@ const LeadViews = ({ onAddLead, onEditLead, onDeleteLead }) => {
     queryFn: () => usersAPI.getUsers(),
     staleTime: 10 * 60 * 1000 // 10 minutes
   })
+
+  // Fetch lead stats
+  const { data: leadStatsData } = useQuery({
+    queryKey: ['leadStats'],
+    queryFn: () => leadsAPI.getStats(),
+    staleTime: 30000
+  })
+
+  const leadStats = {
+    total: leadStatsData?.stats?.total_leads || leadsData?.pagination?.total || 0,
+    newLeads: leadStatsData?.stats?.new_leads || 0,
+    converted: leadStatsData?.stats?.converted_leads || 0,
+    unassigned: (leadStatsData?.stats?.total_leads || 0) - (leadStatsData?.stats?.assigned_leads || 0),
+  }
 
   // Update URL params when filters change
   useEffect(() => {
@@ -248,48 +266,94 @@ const LeadViews = ({ onAddLead, onEditLead, onDeleteLead }) => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Leads</h1>
-          <p className="text-gray-600 mt-1">
+          <h1 className="text-lg font-bold text-gray-900">Leads</h1>
+          <p className="text-gray-500 text-sm">
             {leadsData?.pagination?.total || 0} total leads
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+        <div className="flex items-center gap-3">
           <ViewToggle
             currentView={view}
             onViewChange={handleViewChange}
           />
+          <button
+            onClick={handleExport}
+            disabled={leadsLoading}
+            className="btn btn-secondary btn-md"
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Export
+          </button>
+          <button
+            onClick={refetchLeads}
+            disabled={leadsLoading}
+            className="btn btn-secondary btn-md"
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${leadsLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+          <button
+            onClick={onAddLead}
+            className="btn btn-primary btn-md"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add Lead
+          </button>
+        </div>
+      </div>
 
-          <div className="flex gap-2">
-            <button
-              onClick={handleExport}
-              disabled={leadsLoading}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Download className="w-4 h-4" />
-              Export
-            </button>
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div className="card !p-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-gray-600">Total Leads</p>
+              <p className="text-lg font-bold text-blue-600">{leadStats.total}</p>
+            </div>
+            <div className="w-9 h-9 bg-blue-100 rounded-lg flex items-center justify-center">
+              <Users className="text-blue-600" size={18} />
+            </div>
+          </div>
+        </div>
 
-            <button
-              onClick={refetchLeads}
-              disabled={leadsLoading}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <RefreshCw className={`w-4 h-4 ${leadsLoading ? 'animate-spin' : ''}`} />
-              Refresh
-            </button>
+        <div className="card !p-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-gray-600">New Leads</p>
+              <p className="text-lg font-bold text-green-600">{leadStats.newLeads}</p>
+            </div>
+            <div className="w-9 h-9 bg-green-100 rounded-lg flex items-center justify-center">
+              <UserPlus className="text-green-600" size={18} />
+            </div>
+          </div>
+        </div>
 
-            <button
-              onClick={onAddLead}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
-              <Plus className="w-4 h-4" />
-              Add Lead
-            </button>
+        <div className="card !p-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-gray-600">Converted</p>
+              <p className="text-lg font-bold text-purple-600">{leadStats.converted}</p>
+            </div>
+            <div className="w-9 h-9 bg-purple-100 rounded-lg flex items-center justify-center">
+              <UserCheck className="text-purple-600" size={18} />
+            </div>
+          </div>
+        </div>
+
+        <div className="card !p-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-gray-600">Unassigned</p>
+              <p className="text-lg font-bold text-orange-600">{leadStats.unassigned}</p>
+            </div>
+            <div className="w-9 h-9 bg-orange-100 rounded-lg flex items-center justify-center">
+              <UserX className="text-orange-600" size={18} />
+            </div>
           </div>
         </div>
       </div>
@@ -304,7 +368,7 @@ const LeadViews = ({ onAddLead, onEditLead, onDeleteLead }) => {
       />
 
       {/* Content */}
-      <div className="bg-white rounded-lg shadow">
+      <div className="card p-0 overflow-hidden">
         {leadsLoading ? (
           <div className="flex justify-center items-center py-12">
             <LoadingSpinner size="large" text="Loading leads..." />

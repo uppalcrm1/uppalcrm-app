@@ -125,12 +125,12 @@ const CommunicationsPage = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Communications</h1>
-          <p className="text-gray-600">Manage SMS, WhatsApp messages and phone calls</p>
+          <h1 className="text-lg font-bold text-gray-900">Communications</h1>
+          <p className="text-gray-500 text-sm">Manage SMS, WhatsApp messages and phone calls</p>
         </div>
         <div className="flex gap-3">
           <button
@@ -194,78 +194,53 @@ const CommunicationsPage = () => {
 
       {/* Statistics Cards */}
       {stats && (
-        <div className={`grid gap-6 ${whatsappEnabled ? 'grid-cols-1 md:grid-cols-5' : 'grid-cols-1 md:grid-cols-4'}`}>
-          <div className="bg-white rounded-lg shadow-sm p-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="card !p-3">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Total SMS</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {stats.sms.total_sms || 0}
-                </p>
+                <p className="text-xs text-gray-600">Total SMS</p>
+                <p className="text-lg font-bold text-blue-600">{stats.sms.total_sms || 0}</p>
               </div>
-              <MessageSquare className="w-8 h-8 text-blue-600" />
-            </div>
-            <p className="text-sm text-gray-500 mt-2">
-              {stats.sms.sent || 0} sent • {stats.sms.received || 0} received
-            </p>
-          </div>
-
-          {whatsappEnabled && (
-            <div className="rounded-lg shadow-sm p-6 text-white" style={{ backgroundColor: '#25D366' }}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm opacity-90">Total WhatsApp</p>
-                  <p className="text-2xl font-bold">
-                    {stats.sms.total_whatsapp || 0}
-                  </p>
-                </div>
-                <MessageCircle className="w-8 h-8" />
-              </div>
-              <p className="text-sm opacity-75 mt-2">
-                Messages via WhatsApp
-              </p>
-            </div>
-          )}
-
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Delivered</p>
-                <p className="text-2xl font-bold text-green-600">
-                  {stats.sms.delivered || 0}
-                </p>
-              </div>
-              <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                <span className="text-green-600 font-bold">✓</span>
+              <div className="w-9 h-9 bg-blue-100 rounded-lg flex items-center justify-center">
+                <MessageSquare className="text-blue-600" size={18} />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="card !p-3">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Total Calls</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {stats.calls.total_calls || 0}
-                </p>
+                <p className="text-xs text-gray-600">Total WhatsApp</p>
+                <p className="text-lg font-bold text-green-600">{stats.sms.total_whatsapp || 0}</p>
               </div>
-              <Phone className="w-8 h-8 text-purple-600" />
+              <div className="w-9 h-9 bg-green-100 rounded-lg flex items-center justify-center">
+                <MessageCircle className="text-green-600" size={18} />
+              </div>
             </div>
-            <p className="text-sm text-gray-500 mt-2">
-              {stats.calls.answered || 0} answered
-            </p>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="card !p-3">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Total Cost</p>
-                <p className="text-2xl font-bold text-gray-900">
+                <p className="text-xs text-gray-600">Total Calls</p>
+                <p className="text-lg font-bold text-purple-600">{stats.calls.total_calls || 0}</p>
+              </div>
+              <div className="w-9 h-9 bg-purple-100 rounded-lg flex items-center justify-center">
+                <Phone className="text-purple-600" size={18} />
+              </div>
+            </div>
+          </div>
+
+          <div className="card !p-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-600">Total Cost</p>
+                <p className="text-lg font-bold text-gray-900">
                   ${((parseFloat(stats.sms.total_sms_cost || 0) + parseFloat(stats.calls.total_call_cost || 0))).toFixed(2)}
                 </p>
               </div>
-              <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
-                <span className="text-gray-600 font-bold">$</span>
+              <div className="w-9 h-9 bg-gray-100 rounded-lg flex items-center justify-center">
+                <span className="text-gray-600 font-bold text-sm">$</span>
               </div>
             </div>
           </div>
@@ -273,7 +248,7 @@ const CommunicationsPage = () => {
       )}
 
       {/* Tabs */}
-      <div className="bg-white rounded-lg shadow-sm">
+      <div className="card p-0 overflow-hidden">
         <div className="border-b border-gray-200">
           <nav className="flex -mb-px">
             <button

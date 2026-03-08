@@ -339,6 +339,14 @@ router.get('/stats',
             WHEN c.status = 'active'
             THEN c.id
           END)::integer as active_contacts,
+          COUNT(DISTINCT CASE
+            WHEN c.created_at >= date_trunc('month', CURRENT_DATE)
+            THEN c.id
+          END)::integer as created_this_month,
+          COUNT(DISTINCT CASE
+            WHEN c.source = 'converted' AND c.created_at >= date_trunc('month', CURRENT_DATE)
+            THEN c.id
+          END)::integer as converted_this_month,
           COUNT(DISTINCT a.id)::integer as total_accounts,
           COALESCE(SUM(
             CASE
@@ -365,6 +373,8 @@ router.get('/stats',
         stats: {
           total_contacts: parseInt(stats.total_contacts) || 0,
           active_contacts: parseInt(stats.active_contacts) || 0,
+          created_this_month: parseInt(stats.created_this_month) || 0,
+          converted_this_month: parseInt(stats.converted_this_month) || 0,
           total_accounts: parseInt(stats.total_accounts) || 0,
           total_revenue: parseFloat(stats.total_revenue) || 0
         }

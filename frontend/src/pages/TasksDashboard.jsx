@@ -273,89 +273,79 @@ const TasksDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="space-y-3">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="px-6 py-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-lg font-bold text-gray-900">Tasks Dashboard</h1>
+          <p className="text-gray-500 text-sm">Manage and track all tasks across your organization</p>
+        </div>
+        <button
+          onClick={handleRunWorkflowRules}
+          disabled={isRunningRules}
+          className="btn btn-primary btn-md"
+        >
+          <Zap size={16} className="mr-2" />
+          {isRunningRules ? 'Running...' : 'Run Workflow Rules'}
+        </button>
+      </div>
+
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div className="card !p-3">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-                <ListTodo className="text-blue-600" />
-                Tasks Dashboard
-              </h1>
-              <p className="text-gray-600 mt-1">Manage and track all tasks across your organization</p>
+              <p className="text-xs text-gray-600">Pending</p>
+              <p className="text-lg font-bold text-yellow-600">{stats.pending}</p>
             </div>
-            <button
-              onClick={handleRunWorkflowRules}
-              disabled={isRunningRules}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              <Zap size={16} />
-              {isRunningRules ? 'Running...' : 'Run Workflow Rules'}
-            </button>
+            <div className="w-9 h-9 bg-yellow-100 rounded-lg flex items-center justify-center">
+              <Clock className="text-yellow-600" size={18} />
+            </div>
           </div>
+        </div>
 
-          {/* Statistics Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mt-6">
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-blue-600">Total Tasks</p>
-                  <p className="text-3xl font-bold text-blue-900 mt-1">{stats.total}</p>
-                </div>
-                <ListTodo className="text-blue-500" size={32} />
-              </div>
+        <div className="card !p-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-gray-600">Completed</p>
+              <p className="text-lg font-bold text-green-600">{stats.completed}</p>
             </div>
-
-            <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-lg p-4 border border-yellow-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-yellow-600">Pending</p>
-                  <p className="text-3xl font-bold text-yellow-900 mt-1">{stats.pending}</p>
-                </div>
-                <Clock className="text-yellow-500" size={32} />
-              </div>
+            <div className="w-9 h-9 bg-green-100 rounded-lg flex items-center justify-center">
+              <CheckCircle className="text-green-600" size={18} />
             </div>
+          </div>
+        </div>
 
-            <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4 border border-green-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-green-600">Completed</p>
-                  <p className="text-3xl font-bold text-green-900 mt-1">{stats.completed}</p>
-                </div>
-                <CheckCircle className="text-green-500" size={32} />
-              </div>
+        <div className="card !p-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-gray-600">Overdue</p>
+              <p className="text-lg font-bold text-red-600">{stats.overdue}</p>
             </div>
-
-            <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-lg p-4 border border-red-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-red-600">Overdue</p>
-                  <p className="text-3xl font-bold text-red-900 mt-1">{stats.overdue}</p>
-                </div>
-                <AlertCircle className="text-red-500" size={32} />
-              </div>
+            <div className="w-9 h-9 bg-red-100 rounded-lg flex items-center justify-center">
+              <AlertCircle className="text-red-600" size={18} />
             </div>
+          </div>
+        </div>
 
-            <div className="bg-gradient-to-br from-teal-50 to-teal-100 rounded-lg p-4 border border-teal-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-teal-600">Renewal Tasks</p>
-                  <p className="text-3xl font-bold text-teal-900 mt-1">{stats.renewal_pending}</p>
-                </div>
-                <TrendingUp className="text-teal-500" size={32} />
-              </div>
+        <div className="card !p-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-gray-600">Renewal Tasks</p>
+              <p className="text-lg font-bold text-teal-600">{stats.renewal_pending}</p>
+            </div>
+            <div className="w-9 h-9 bg-teal-100 rounded-lg flex items-center justify-center">
+              <TrendingUp className="text-teal-600" size={18} />
             </div>
           </div>
         </div>
       </div>
 
       {/* Filters and Controls */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex flex-wrap items-center gap-4">
-          {/* Filter Label */}
-          <div className="flex items-center gap-2 text-gray-700 font-medium">
-            <Filter size={18} />
+      <div className="card !py-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2 text-gray-700 font-medium text-sm">
+            <Filter size={16} />
             <span>Filters:</span>
           </div>
 
@@ -363,7 +353,7 @@ const TasksDashboard = () => {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           >
             <option value="all">All Status</option>
             <option value="pending">Pending</option>
@@ -376,7 +366,7 @@ const TasksDashboard = () => {
           <select
             value={priorityFilter}
             onChange={(e) => setPriorityFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           >
             <option value="all">All Priorities</option>
             <option value="high">High</option>
@@ -388,7 +378,7 @@ const TasksDashboard = () => {
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           >
             <option value="all">All Tasks</option>
             <option value="renewal">Renewal Tasks</option>
@@ -399,7 +389,7 @@ const TasksDashboard = () => {
           <select
             value={assignedToFilter}
             onChange={(e) => setAssignedToFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           >
             <option value="all">All Assignees</option>
             {usersData?.users?.map(u => (
@@ -413,7 +403,7 @@ const TasksDashboard = () => {
           <select
             value={leadOwnerFilter}
             onChange={(e) => setLeadOwnerFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           >
             <option value="all">All Lead Owners</option>
             {usersData?.users?.map(u => (
@@ -426,15 +416,15 @@ const TasksDashboard = () => {
           <div className="border-l border-gray-300 h-8 mx-2"></div>
 
           {/* Sort Controls */}
-          <div className="flex items-center gap-2 text-gray-700 font-medium">
-            <ArrowUpDown size={18} />
+          <div className="flex items-center gap-2 text-gray-700 font-medium text-sm">
+            <ArrowUpDown size={16} />
             <span>Sort by:</span>
           </div>
 
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           >
             <option value="scheduled_at">Scheduled Date</option>
             <option value="priority">Priority</option>
@@ -444,7 +434,7 @@ const TasksDashboard = () => {
           <select
             value={sortOrder}
             onChange={(e) => setSortOrder(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           >
             <option value="asc">Ascending</option>
             <option value="desc">Descending</option>
@@ -453,51 +443,50 @@ const TasksDashboard = () => {
       </div>
 
       {/* Tasks Table */}
-      <div className="px-6 py-6">
-        {filteredTasks.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-            <CheckSquare size={48} className="text-gray-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">No tasks found</h3>
-            <p className="text-gray-600">
-              {statusFilter === 'pending'
-                ? 'All caught up! No pending tasks at the moment.'
-                : 'Try adjusting your filters to see more tasks.'}
-            </p>
-          </div>
-        ) : (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">
+      {filteredTasks.length === 0 ? (
+        <div className="card p-12 text-center">
+          <CheckSquare size={48} className="text-gray-400 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-gray-900 mb-2">No tasks found</h3>
+          <p className="text-gray-600">
+            {statusFilter === 'pending'
+              ? 'All caught up! No pending tasks at the moment.'
+              : 'Try adjusting your filters to see more tasks.'}
+          </p>
+        </div>
+      ) : (
+        <div className="card p-0 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">
                       Done
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Task
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Lead
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Contact
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Account
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Lead Owner
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Assigned To
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Scheduled
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Priority
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
                     </th>
                   </tr>
@@ -510,20 +499,20 @@ const TasksDashboard = () => {
                         isOverdue(task) ? 'bg-red-50' : ''
                       }`}
                     >
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-3 py-3 whitespace-nowrap">
                         <button
                           onClick={() => handleCompleteTask(task)}
                           disabled={task.status === 'completed' || completeTaskMutation.isPending}
                           className="text-gray-400 hover:text-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {task.status === 'completed' ? (
-                            <CheckSquare size={24} className="text-green-600" />
+                            <CheckSquare size={20} className="text-green-600" />
                           ) : (
-                            <Square size={24} />
+                            <Square size={20} />
                           )}
                         </button>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-3 py-3">
                         <div className="text-sm">
                           <div className="font-medium text-gray-900">{task.subject}</div>
                           {task.description && (
@@ -531,7 +520,7 @@ const TasksDashboard = () => {
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-3 py-3 whitespace-nowrap">
                         {task.lead_id ? (
                           <button
                             onClick={() => navigate(`/leads/${task.lead_id}`)}
@@ -543,14 +532,14 @@ const TasksDashboard = () => {
                           <span className="text-sm text-gray-400">—</span>
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-3 py-3 whitespace-nowrap">
                         {task.contact_id ? (
                           <span className="text-sm font-medium text-gray-900">{task.contact_name}</span>
                         ) : (
                           <span className="text-sm text-gray-400">—</span>
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-3 py-3 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           {task.account_id && (
                             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-teal-100 text-teal-700">
@@ -562,7 +551,7 @@ const TasksDashboard = () => {
                           </span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-3 py-3 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <User size={16} className="text-gray-400" />
                           <span className="text-sm text-gray-900">
@@ -570,7 +559,7 @@ const TasksDashboard = () => {
                           </span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-3 py-3 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <User size={16} className="text-gray-400" />
                           <span className="text-sm text-gray-900">
@@ -578,7 +567,7 @@ const TasksDashboard = () => {
                           </span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-3 py-3 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <Calendar size={16} className={isOverdue(task) ? 'text-red-500' : 'text-gray-400'} />
                           <span className={`text-sm ${isOverdue(task) ? 'text-red-600 font-semibold' : 'text-gray-900'}`}>
@@ -586,12 +575,12 @@ const TasksDashboard = () => {
                           </span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-3 py-3 whitespace-nowrap">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getPriorityColor(task.priority)}`}>
                           {task.priority || 'medium'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-3 py-3 whitespace-nowrap">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                           task.status === 'completed'
                             ? 'bg-green-100 text-green-800'
@@ -613,7 +602,6 @@ const TasksDashboard = () => {
             </div>
           </div>
         )}
-      </div>
     </div>
   )
 }
