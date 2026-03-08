@@ -6,7 +6,6 @@ import {
   Plus,
   Search,
   DollarSign,
-  Users,
   Calendar,
   Edit2,
   Eye,
@@ -64,14 +63,22 @@ const SOFTWARE_EDITION_OPTIONS = [
   { value: 'jio', label: 'Jio' }
 ]
 
-// Status options
+// Account Status filter options (stored field)
 const STATUS_OPTIONS = [
-  { value: '', label: 'All' },
+  { value: '', label: 'All Statuses' },
   { value: 'active', label: 'Active' },
-  { value: 'inactive', label: 'Inactive' },
+  { value: 'expired', label: 'Expired' },
   { value: 'suspended', label: 'Suspended' },
   { value: 'cancelled', label: 'Cancelled' },
   { value: 'on_hold', label: 'On Hold' }
+]
+
+// Renewal State filter options (calculated from next_renewal_date)
+const RENEWAL_OPTIONS = [
+  { value: '', label: 'All Renewals' },
+  { value: 'expiring_soon', label: 'Expiring Soon' },
+  { value: 'expired', label: 'Expired (Past Due)' },
+  { value: 'current', label: 'Current' }
 ]
 
 // Helper function to format dates (using timezone-safe utility)
@@ -111,6 +118,7 @@ const AccountsPage = () => {
 
   // --- URL-driven filter/sort/pagination state ---
   const filterStatus = searchParams.get('status') || ''
+  const filterRenewal = searchParams.get('renewal') || ''
   const showDeleted = searchParams.get('deleted') === 'true'
   const sortConfig = {
     key: searchParams.get('sort') || 'created_date',
@@ -129,7 +137,7 @@ const AccountsPage = () => {
       const newParams = new URLSearchParams(prev)
       Object.entries(updates).forEach(([key, value]) => {
         // Remove param if it's the default value
-        const defaults = { search: '', status: '', deleted: 'false', sort: 'created_date', order: 'desc', page: '1', limit: '50' }
+        const defaults = { search: '', status: '', renewal: '', deleted: 'false', sort: 'created_date', order: 'desc', page: '1', limit: '50' }
         if (String(value) === '' || String(value) === defaults[key]) {
           newParams.delete(key)
         } else {
@@ -162,7 +170,7 @@ const AccountsPage = () => {
     data: accountsData,
     isLoading,
   } = useQuery({
-    queryKey: ['accounts', { search: debouncedSearch, sortConfig, showDeleted, page: currentPage, pageSize }],
+    queryKey: ['accounts', { search: debouncedSearch, status: filterStatus, renewal: filterRenewal, sortConfig, showDeleted, page: currentPage, pageSize }],
     queryFn: async () => {
       const offset = (currentPage - 1) * pageSize
       const params = {
@@ -172,6 +180,8 @@ const AccountsPage = () => {
         orderDirection: sortConfig.direction
       }
       if (debouncedSearch.trim()) params.search = debouncedSearch
+      if (filterStatus) params.status = filterStatus
+      if (filterRenewal) params.renewal = filterRenewal
       if (showDeleted) params.includeDeleted = 'true'
       return accountsAPI.getAccounts(params)
     },
@@ -191,9 +201,10 @@ const AccountsPage = () => {
   })
 
   const stats = {
-    totalRevenue: parseFloat(statsData?.stats?.total_revenue ?? 0) || 0,
     totalAccounts: parseInt(statsData?.stats?.total_accounts ?? 0) || 0,
-    activeUsers: parseInt(statsData?.stats?.active_accounts ?? 0) || 0,
+    activeAccounts: parseInt(statsData?.stats?.active_accounts ?? 0) || 0,
+    expiringSoon: parseInt(statsData?.stats?.expiring_soon_accounts ?? 0) || 0,
+    expiredAccounts: parseInt(statsData?.stats?.expired_accounts ?? 0) || 0,
   }
 
   // Load column visibility from localStorage or use defaults
@@ -259,33 +270,36 @@ const AccountsPage = () => {
     }
   }
 
-  // Apply status filter (sorting is done server-side)
-  const filteredAccounts = React.useMemo(() => {
-    let filtered = accounts
-
-    // Apply status filter (client-side only)
-    if (filterStatus && filterStatus !== '') {
-      filtered = filtered.filter(account => account.account_status === filterStatus)
-    }
-
-    return filtered
-  }, [accounts, filterStatus])
+  // All filtering is now server-side (status + renewal params sent to API)
+  const filteredAccounts = accounts
 
   // Clear selection when filters, search, pagination, or sort changes
   useEffect(() => {
     setSelectedAccounts([])
-  }, [debouncedSearch, sortConfig.key, sortConfig.direction, currentPage, filterStatus, showDeleted])
+  }, [debouncedSearch, sortConfig.key, sortConfig.direction, currentPage, filterStatus, filterRenewal, showDeleted])
 
   // Bulk export selected accounts as CSV (client-side)
   const handleBulkExport = useCallback(() => {
     if (selectedAccounts.length === 0) return
     const selected = filteredAccounts.filter(a => selectedAccounts.includes(a.id))
-    const headers = ['Account Name', 'MAC Address', 'Device', 'Product', 'Edition', 'Contact Name', 'Status', 'Created Date', 'Next Renewal']
-    const rows = selected.map(a => [
-      a.account_name || '', a.mac_address || '', a.device || '',
-      a.product_name || '', a.edition_name || '', a.contact_name || '',
-      a.account_status || '', a.created_at || '', a.next_renewal_date || ''
-    ])
+    const headers = ['Account Name', 'MAC Address', 'Device', 'Product', 'Edition', 'Contact Name', 'Status', 'Created Date', 'Next Renewal', 'Renewal State']
+    const rows = selected.map(a => {
+      let renewalState = ''
+      if (a.next_renewal_date) {
+        const days = a.days_until_renewal != null ? Math.round(a.days_until_renewal) : null
+        if (days != null) {
+          if (days < 0) renewalState = 'Expired'
+          else if (days <= 30) renewalState = 'Expiring Soon'
+          else renewalState = 'Current'
+        }
+      }
+      return [
+        a.account_name || '', a.mac_address || '', a.device || '',
+        a.product_name || '', a.edition_name || '', a.contact_name || '',
+        a.account_status || '', a.created_at || '', a.next_renewal_date || '',
+        renewalState
+      ]
+    })
     const csvContent = [headers, ...rows]
       .map(row => row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
       .join('\n')
@@ -307,6 +321,7 @@ const AccountsPage = () => {
       const params = {}
       if (debouncedSearch.trim()) params.search = debouncedSearch
       if (filterStatus) params.status = filterStatus
+      if (filterRenewal) params.renewal = filterRenewal
       if (showDeleted) params.includeDeleted = 'true'
       const exportData = await accountsAPI.exportAccounts(params)
       const blob = new Blob([exportData], { type: 'text/csv' })
@@ -323,7 +338,7 @@ const AccountsPage = () => {
       console.error('Export failed:', error)
       toast.error('Failed to export accounts')
     }
-  }, [debouncedSearch, filterStatus, showDeleted])
+  }, [debouncedSearch, filterStatus, filterRenewal, showDeleted])
 
   // Bulk delete selected accounts (soft delete)
   const handleBulkDelete = useCallback(async () => {
@@ -656,20 +671,8 @@ const AccountsPage = () => {
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="card">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Total Monthly Revenue</p>
-              <p className="text-3xl font-bold text-green-600">${stats.totalRevenue.toFixed(2)}</p>
-            </div>
-            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-              <DollarSign className="text-green-600" size={24} />
-            </div>
-          </div>
-        </div>
-
+      {/* Stats Cards — Account Health Funnel */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
@@ -685,11 +688,35 @@ const AccountsPage = () => {
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 mb-1">Active Users</p>
-              <p className="text-3xl font-bold text-purple-600">{stats.activeUsers}</p>
+              <p className="text-sm text-gray-600 mb-1">Active Accounts</p>
+              <p className="text-3xl font-bold text-green-600">{stats.activeAccounts}</p>
             </div>
-            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-              <Users className="text-purple-600" size={24} />
+            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+              <CheckCircle className="text-green-600" size={24} />
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600 mb-1">Expiring Soon</p>
+              <p className="text-3xl font-bold text-amber-600">{stats.expiringSoon}</p>
+            </div>
+            <div className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center">
+              <Clock className="text-amber-600" size={24} />
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600 mb-1">Expired (Past Due)</p>
+              <p className="text-3xl font-bold text-red-600">{stats.expiredAccounts}</p>
+            </div>
+            <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+              <AlertCircle className="text-red-600" size={24} />
             </div>
           </div>
         </div>
@@ -711,13 +738,20 @@ const AccountsPage = () => {
           <select
             value={filterStatus}
             onChange={(e) => updateUrlParams({ status: e.target.value, page: '1' })}
+            className="input w-full sm:w-44"
+          >
+            {STATUS_OPTIONS.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+          <select
+            value={filterRenewal}
+            onChange={(e) => updateUrlParams({ renewal: e.target.value, page: '1' })}
             className="input w-full sm:w-48"
           >
-            <option value="">All Status</option>
-            <option value="active">Active</option>
-            {/* TODO: "expiring_soon" is client-side only — not a stored account_status. Add backend support for computed expiry filter. */}
-            <option value="expiring_soon">Expiring Soon</option>
-            <option value="expired">Expired</option>
+            {RENEWAL_OPTIONS.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
           </select>
           <label className="flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors">
             <input

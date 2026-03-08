@@ -253,6 +253,11 @@ export const organizationsAPI = {
   getUsage: async () => {
     const response = await api.get('/organizations/current/usage')
     return response.data
+  },
+
+  updateSettings: async (settings) => {
+    const response = await api.put('/organizations/current/settings', { settings })
+    return response.data
   }
 }
 
