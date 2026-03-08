@@ -95,12 +95,12 @@ router.get('/', async (req, res) => {
 
     // Renewal state filter (calculated from next_renewal_date)
     if (renewal === 'expiring_soon') {
-      query += ` AND a.next_renewal_date >= CURRENT_DATE AND a.next_renewal_date <= CURRENT_DATE + $${params.length + 1}`;
+      query += ` AND a.next_renewal_date >= CURRENT_DATE AND a.next_renewal_date <= CURRENT_DATE + ($${params.length + 1})::integer`;
       params.push(expiringSoonDays);
     } else if (renewal === 'expired') {
       query += ` AND a.next_renewal_date < CURRENT_DATE`;
     } else if (renewal === 'current') {
-      query += ` AND a.next_renewal_date > CURRENT_DATE + $${params.length + 1}`;
+      query += ` AND a.next_renewal_date > CURRENT_DATE + ($${params.length + 1})::integer`;
       params.push(expiringSoonDays);
     }
 
@@ -161,12 +161,12 @@ router.get('/', async (req, res) => {
 
     // Renewal state filter (count query)
     if (renewal === 'expiring_soon') {
-      countQuery += ` AND a.next_renewal_date >= CURRENT_DATE AND a.next_renewal_date <= CURRENT_DATE + $${countParams.length + 1}`;
+      countQuery += ` AND a.next_renewal_date >= CURRENT_DATE AND a.next_renewal_date <= CURRENT_DATE + ($${countParams.length + 1})::integer`;
       countParams.push(expiringSoonDays);
     } else if (renewal === 'expired') {
       countQuery += ` AND a.next_renewal_date < CURRENT_DATE`;
     } else if (renewal === 'current') {
-      countQuery += ` AND a.next_renewal_date > CURRENT_DATE + $${countParams.length + 1}`;
+      countQuery += ` AND a.next_renewal_date > CURRENT_DATE + ($${countParams.length + 1})::integer`;
       countParams.push(expiringSoonDays);
     }
 
@@ -239,7 +239,7 @@ router.get('/stats', async (req, res) => {
           COUNT(CASE WHEN account_status = 'active' THEN 1 END) as active_accounts,
           COUNT(CASE WHEN account_status = 'active'
                       AND next_renewal_date >= CURRENT_DATE
-                      AND next_renewal_date <= CURRENT_DATE + $2
+                      AND next_renewal_date <= CURRENT_DATE + ($2)::integer
                 THEN 1 END) as expiring_soon_accounts,
           COUNT(CASE WHEN next_renewal_date < CURRENT_DATE THEN 1 END) as expired_accounts
         FROM accounts
@@ -254,7 +254,7 @@ router.get('/stats', async (req, res) => {
           COUNT(CASE WHEN account_status = 'active' THEN 1 END) as active_accounts,
           COUNT(CASE WHEN account_status = 'active'
                       AND next_renewal_date >= CURRENT_DATE
-                      AND next_renewal_date <= CURRENT_DATE + $2
+                      AND next_renewal_date <= CURRENT_DATE + ($2)::integer
                 THEN 1 END) as expiring_soon_accounts,
           COUNT(CASE WHEN next_renewal_date < CURRENT_DATE THEN 1 END) as expired_accounts
         FROM accounts
@@ -319,7 +319,7 @@ router.get('/export', async (req, res) => {
         CASE
           WHEN a.next_renewal_date IS NULL THEN ''
           WHEN a.next_renewal_date < CURRENT_DATE THEN 'Expired'
-          WHEN a.next_renewal_date <= CURRENT_DATE + $2 THEN 'Expiring Soon'
+          WHEN a.next_renewal_date <= CURRENT_DATE + ($2)::integer THEN 'Expiring Soon'
           ELSE 'Current'
         END as renewal_state
       FROM accounts a
@@ -352,12 +352,12 @@ router.get('/export', async (req, res) => {
 
     // Renewal state filter
     if (renewal === 'expiring_soon') {
-      query += ` AND a.next_renewal_date >= CURRENT_DATE AND a.next_renewal_date <= CURRENT_DATE + $${params.length + 1}`;
+      query += ` AND a.next_renewal_date >= CURRENT_DATE AND a.next_renewal_date <= CURRENT_DATE + ($${params.length + 1})::integer`;
       params.push(expiringSoonDays);
     } else if (renewal === 'expired') {
       query += ` AND a.next_renewal_date < CURRENT_DATE`;
     } else if (renewal === 'current') {
-      query += ` AND a.next_renewal_date > CURRENT_DATE + $${params.length + 1}`;
+      query += ` AND a.next_renewal_date > CURRENT_DATE + ($${params.length + 1})::integer`;
       params.push(expiringSoonDays);
     }
 
