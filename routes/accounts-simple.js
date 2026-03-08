@@ -16,22 +16,9 @@ router.use(validateOrganizationContext);
 router.get('/', async (req, res) => {
   try {
     const { organization_id } = req.user;
-    const { status, renewal, limit = 100, offset = 0, includeDeleted = 'false', search, orderBy = 'created_date', orderDirection = 'desc' } = req.query;
+    const { status, expiring, limit = 100, offset = 0, includeDeleted = 'false', search, orderBy = 'created_date', orderDirection = 'desc' } = req.query;
 
-    // Read org threshold for renewal filtering
-    let expiringSoonDays = 30;
-    if (renewal) {
-      try {
-        const orgResult = await db.query('SELECT settings FROM organizations WHERE id = $1', [organization_id], organization_id);
-        if (orgResult.rows[0]?.settings?.expiring_soon_days) {
-          expiringSoonDays = parseInt(orgResult.rows[0].settings.expiring_soon_days) || 30;
-        }
-      } catch (e) {
-        console.warn('Could not read org settings for renewal threshold:', e.message);
-      }
-    }
-
-    console.log('📥 [Accounts GET] Received query:', { status, renewal, limit, offset, search });
+    console.log('📥 [Accounts GET] Received query:', { status, expiring, limit, offset, search });
 
     let query = `
       SELECT
@@ -87,21 +74,22 @@ router.get('/', async (req, res) => {
       if (status === 'expired') {
         // Backwards compatibility: match both 'expired' and legacy 'inactive'
         query += ` AND a.account_status IN ('expired', 'inactive')`;
+      } else if (status === 'paused') {
+        // Backwards compatibility: match both 'paused' and legacy 'on_hold'
+        query += ` AND a.account_status IN ('paused', 'on_hold')`;
       } else {
         query += ` AND a.account_status = $${params.length + 1}`;
         params.push(status);
       }
     }
 
-    // Renewal state filter (calculated from next_renewal_date)
-    if (renewal === 'expiring_soon') {
-      query += ` AND a.next_renewal_date >= CURRENT_DATE AND a.next_renewal_date <= CURRENT_DATE + ($${params.length + 1})::integer`;
-      params.push(expiringSoonDays);
-    } else if (renewal === 'expired') {
+    // Expiring filter (calculated from next_renewal_date using calendar month boundaries)
+    if (expiring === 'this_month') {
+      query += ` AND a.next_renewal_date >= DATE_TRUNC('month', CURRENT_DATE) AND a.next_renewal_date < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'`;
+    } else if (expiring === 'next_month') {
+      query += ` AND a.next_renewal_date >= DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month' AND a.next_renewal_date < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '2 months'`;
+    } else if (expiring === 'past_due') {
       query += ` AND a.next_renewal_date < CURRENT_DATE`;
-    } else if (renewal === 'current') {
-      query += ` AND a.next_renewal_date > CURRENT_DATE + ($${params.length + 1})::integer`;
-      params.push(expiringSoonDays);
     }
 
     // Add search filter
@@ -153,21 +141,21 @@ router.get('/', async (req, res) => {
     if (status) {
       if (status === 'expired') {
         countQuery += ` AND a.account_status IN ('expired', 'inactive')`;
+      } else if (status === 'paused') {
+        countQuery += ` AND a.account_status IN ('paused', 'on_hold')`;
       } else {
         countQuery += ` AND a.account_status = $${countParams.length + 1}`;
         countParams.push(status);
       }
     }
 
-    // Renewal state filter (count query)
-    if (renewal === 'expiring_soon') {
-      countQuery += ` AND a.next_renewal_date >= CURRENT_DATE AND a.next_renewal_date <= CURRENT_DATE + ($${countParams.length + 1})::integer`;
-      countParams.push(expiringSoonDays);
-    } else if (renewal === 'expired') {
+    // Expiring filter (count query)
+    if (expiring === 'this_month') {
+      countQuery += ` AND a.next_renewal_date >= DATE_TRUNC('month', CURRENT_DATE) AND a.next_renewal_date < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'`;
+    } else if (expiring === 'next_month') {
+      countQuery += ` AND a.next_renewal_date >= DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month' AND a.next_renewal_date < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '2 months'`;
+    } else if (expiring === 'past_due') {
       countQuery += ` AND a.next_renewal_date < CURRENT_DATE`;
-    } else if (renewal === 'current') {
-      countQuery += ` AND a.next_renewal_date > CURRENT_DATE + ($${countParams.length + 1})::integer`;
-      countParams.push(expiringSoonDays);
     }
 
     if (search && search.trim()) {
@@ -219,32 +207,20 @@ router.get('/stats', async (req, res) => {
   try {
     const { organization_id } = req.user;
 
-    // Read org threshold for "expiring soon" calculation
-    let expiringSoonDays = 30;
-    try {
-      const orgResult = await db.query('SELECT settings FROM organizations WHERE id = $1', [organization_id], organization_id);
-      if (orgResult.rows[0]?.settings?.expiring_soon_days) {
-        expiringSoonDays = parseInt(orgResult.rows[0].settings.expiring_soon_days) || 30;
-      }
-    } catch (e) {
-      console.warn('Could not read org settings for stats threshold:', e.message);
-    }
-
-    // Account health stats: Total → Active → Expiring Soon → Expired (Past Due)
+    // Account health stats: Total → Active → Expiring This Month → Past Due
     let result;
     try {
       result = await db.query(`
         SELECT
           COUNT(*) as total_accounts,
           COUNT(CASE WHEN account_status = 'active' THEN 1 END) as active_accounts,
-          COUNT(CASE WHEN account_status = 'active'
-                      AND next_renewal_date >= CURRENT_DATE
-                      AND next_renewal_date <= CURRENT_DATE + ($2)::integer
-                THEN 1 END) as expiring_soon_accounts,
-          COUNT(CASE WHEN next_renewal_date < CURRENT_DATE THEN 1 END) as expired_accounts
+          COUNT(CASE WHEN next_renewal_date >= DATE_TRUNC('month', CURRENT_DATE)
+                      AND next_renewal_date < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'
+                THEN 1 END) as expiring_this_month,
+          COUNT(CASE WHEN next_renewal_date < CURRENT_DATE THEN 1 END) as past_due_accounts
         FROM accounts
         WHERE organization_id = $1 AND deleted_at IS NULL
-      `, [organization_id, expiringSoonDays], organization_id);
+      `, [organization_id], organization_id);
     } catch (error) {
       // Fallback if deleted_at column doesn't exist
       console.warn('Stats query with deleted_at failed, trying without it:', error.message);
@@ -252,14 +228,13 @@ router.get('/stats', async (req, res) => {
         SELECT
           COUNT(*) as total_accounts,
           COUNT(CASE WHEN account_status = 'active' THEN 1 END) as active_accounts,
-          COUNT(CASE WHEN account_status = 'active'
-                      AND next_renewal_date >= CURRENT_DATE
-                      AND next_renewal_date <= CURRENT_DATE + ($2)::integer
-                THEN 1 END) as expiring_soon_accounts,
-          COUNT(CASE WHEN next_renewal_date < CURRENT_DATE THEN 1 END) as expired_accounts
+          COUNT(CASE WHEN next_renewal_date >= DATE_TRUNC('month', CURRENT_DATE)
+                      AND next_renewal_date < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'
+                THEN 1 END) as expiring_this_month,
+          COUNT(CASE WHEN next_renewal_date < CURRENT_DATE THEN 1 END) as past_due_accounts
         FROM accounts
         WHERE organization_id = $1
-      `, [organization_id, expiringSoonDays], organization_id);
+      `, [organization_id], organization_id);
     }
 
     res.json({
@@ -282,18 +257,7 @@ router.get('/stats', async (req, res) => {
 router.get('/export', async (req, res) => {
   try {
     const { organization_id } = req.user;
-    const { ids, status, renewal, includeDeleted = 'false', search } = req.query;
-
-    // Read org threshold for renewal state calculation
-    let expiringSoonDays = 30;
-    try {
-      const orgResult = await db.query('SELECT settings FROM organizations WHERE id = $1', [organization_id], organization_id);
-      if (orgResult.rows[0]?.settings?.expiring_soon_days) {
-        expiringSoonDays = parseInt(orgResult.rows[0].settings.expiring_soon_days) || 30;
-      }
-    } catch (e) {
-      console.warn('Could not read org settings for export threshold:', e.message);
-    }
+    const { ids, status, expiring, includeDeleted = 'false', search } = req.query;
 
     let query = `
       SELECT
@@ -318,8 +282,13 @@ router.get('/export', async (req, res) => {
         EXTRACT(DAY FROM (a.next_renewal_date - CURRENT_DATE)) as days_until_renewal,
         CASE
           WHEN a.next_renewal_date IS NULL THEN ''
-          WHEN a.next_renewal_date < CURRENT_DATE THEN 'Expired'
-          WHEN a.next_renewal_date <= CURRENT_DATE + ($2)::integer THEN 'Expiring Soon'
+          WHEN a.next_renewal_date < CURRENT_DATE THEN 'Past Due'
+          WHEN a.next_renewal_date >= DATE_TRUNC('month', CURRENT_DATE)
+               AND a.next_renewal_date < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'
+               THEN 'Expiring This Month'
+          WHEN a.next_renewal_date >= DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'
+               AND a.next_renewal_date < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '2 months'
+               THEN 'Expiring Next Month'
           ELSE 'Current'
         END as renewal_state
       FROM accounts a
@@ -328,7 +297,7 @@ router.get('/export', async (req, res) => {
       WHERE a.organization_id = $1
     `;
 
-    const params = [organization_id, expiringSoonDays];
+    const params = [organization_id];
 
     // Filter by specific IDs (for bulk export of selected)
     if (ids) {
@@ -344,21 +313,21 @@ router.get('/export', async (req, res) => {
     if (status) {
       if (status === 'expired') {
         query += ` AND a.account_status IN ('expired', 'inactive')`;
+      } else if (status === 'paused') {
+        query += ` AND a.account_status IN ('paused', 'on_hold')`;
       } else {
         query += ` AND a.account_status = $${params.length + 1}`;
         params.push(status);
       }
     }
 
-    // Renewal state filter
-    if (renewal === 'expiring_soon') {
-      query += ` AND a.next_renewal_date >= CURRENT_DATE AND a.next_renewal_date <= CURRENT_DATE + ($${params.length + 1})::integer`;
-      params.push(expiringSoonDays);
-    } else if (renewal === 'expired') {
+    // Expiring filter
+    if (expiring === 'this_month') {
+      query += ` AND a.next_renewal_date >= DATE_TRUNC('month', CURRENT_DATE) AND a.next_renewal_date < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'`;
+    } else if (expiring === 'next_month') {
+      query += ` AND a.next_renewal_date >= DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month' AND a.next_renewal_date < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '2 months'`;
+    } else if (expiring === 'past_due') {
       query += ` AND a.next_renewal_date < CURRENT_DATE`;
-    } else if (renewal === 'current') {
-      query += ` AND a.next_renewal_date > CURRENT_DATE + ($${params.length + 1})::integer`;
-      params.push(expiringSoonDays);
     }
 
     if (search && search.trim()) {

@@ -68,17 +68,20 @@ const STATUS_OPTIONS = [
   { value: '', label: 'All Statuses' },
   { value: 'active', label: 'Active' },
   { value: 'expired', label: 'Expired' },
+  { value: 'paused', label: 'Paused' },
   { value: 'suspended', label: 'Suspended' },
   { value: 'cancelled', label: 'Cancelled' },
-  { value: 'on_hold', label: 'On Hold' }
+  { value: 'grace_period', label: 'Grace Period' },
+  { value: 'trial', label: 'Trial' },
+  { value: 'churned', label: 'Churned' }
 ]
 
-// Renewal State filter options (calculated from next_renewal_date)
-const RENEWAL_OPTIONS = [
+// Expiring filter options (calculated from next_renewal_date using calendar month boundaries)
+const EXPIRING_OPTIONS = [
   { value: '', label: 'All Renewals' },
-  { value: 'expiring_soon', label: 'Expiring Soon' },
-  { value: 'expired', label: 'Expired (Past Due)' },
-  { value: 'current', label: 'Current' }
+  { value: 'this_month', label: 'Expiring This Month' },
+  { value: 'next_month', label: 'Expiring Next Month' },
+  { value: 'past_due', label: 'Past Due' }
 ]
 
 // Helper function to format dates (using timezone-safe utility)
@@ -118,7 +121,7 @@ const AccountsPage = () => {
 
   // --- URL-driven filter/sort/pagination state ---
   const filterStatus = searchParams.get('status') || ''
-  const filterRenewal = searchParams.get('renewal') || ''
+  const filterExpiring = searchParams.get('expiring') || ''
   const showDeleted = searchParams.get('deleted') === 'true'
   const sortConfig = {
     key: searchParams.get('sort') || 'created_date',
@@ -137,7 +140,7 @@ const AccountsPage = () => {
       const newParams = new URLSearchParams(prev)
       Object.entries(updates).forEach(([key, value]) => {
         // Remove param if it's the default value
-        const defaults = { search: '', status: '', renewal: '', deleted: 'false', sort: 'created_date', order: 'desc', page: '1', limit: '50' }
+        const defaults = { search: '', status: '', expiring: '', deleted: 'false', sort: 'created_date', order: 'desc', page: '1', limit: '50' }
         if (String(value) === '' || String(value) === defaults[key]) {
           newParams.delete(key)
         } else {
@@ -170,7 +173,7 @@ const AccountsPage = () => {
     data: accountsData,
     isLoading,
   } = useQuery({
-    queryKey: ['accounts', { search: debouncedSearch, status: filterStatus, renewal: filterRenewal, sortConfig, showDeleted, page: currentPage, pageSize }],
+    queryKey: ['accounts', { search: debouncedSearch, status: filterStatus, expiring: filterExpiring, sortConfig, showDeleted, page: currentPage, pageSize }],
     queryFn: async () => {
       const offset = (currentPage - 1) * pageSize
       const params = {
@@ -181,7 +184,7 @@ const AccountsPage = () => {
       }
       if (debouncedSearch.trim()) params.search = debouncedSearch
       if (filterStatus) params.status = filterStatus
-      if (filterRenewal) params.renewal = filterRenewal
+      if (filterExpiring) params.expiring = filterExpiring
       if (showDeleted) params.includeDeleted = 'true'
       return accountsAPI.getAccounts(params)
     },
@@ -203,8 +206,8 @@ const AccountsPage = () => {
   const stats = {
     totalAccounts: parseInt(statsData?.stats?.total_accounts ?? 0) || 0,
     activeAccounts: parseInt(statsData?.stats?.active_accounts ?? 0) || 0,
-    expiringSoon: parseInt(statsData?.stats?.expiring_soon_accounts ?? 0) || 0,
-    expiredAccounts: parseInt(statsData?.stats?.expired_accounts ?? 0) || 0,
+    expiringThisMonth: parseInt(statsData?.stats?.expiring_this_month ?? 0) || 0,
+    pastDueAccounts: parseInt(statsData?.stats?.past_due_accounts ?? 0) || 0,
   }
 
   // Load column visibility from localStorage or use defaults
@@ -276,7 +279,7 @@ const AccountsPage = () => {
   // Clear selection when filters, search, pagination, or sort changes
   useEffect(() => {
     setSelectedAccounts([])
-  }, [debouncedSearch, sortConfig.key, sortConfig.direction, currentPage, filterStatus, filterRenewal, showDeleted])
+  }, [debouncedSearch, sortConfig.key, sortConfig.direction, currentPage, filterStatus, filterExpiring, showDeleted])
 
   // Bulk export selected accounts as CSV (client-side)
   const handleBulkExport = useCallback(() => {
@@ -286,12 +289,15 @@ const AccountsPage = () => {
     const rows = selected.map(a => {
       let renewalState = ''
       if (a.next_renewal_date) {
-        const days = a.days_until_renewal != null ? Math.round(a.days_until_renewal) : null
-        if (days != null) {
-          if (days < 0) renewalState = 'Expired'
-          else if (days <= 30) renewalState = 'Expiring Soon'
-          else renewalState = 'Current'
-        }
+        const renewalDate = new Date(a.next_renewal_date)
+        const today = new Date()
+        const monthStart = new Date(today.getFullYear(), today.getMonth(), 1)
+        const nextMonthStart = new Date(today.getFullYear(), today.getMonth() + 1, 1)
+        const twoMonthsStart = new Date(today.getFullYear(), today.getMonth() + 2, 1)
+        if (renewalDate < today) renewalState = 'Past Due'
+        else if (renewalDate >= monthStart && renewalDate < nextMonthStart) renewalState = 'Expiring This Month'
+        else if (renewalDate >= nextMonthStart && renewalDate < twoMonthsStart) renewalState = 'Expiring Next Month'
+        else renewalState = 'Current'
       }
       return [
         a.account_name || '', a.mac_address || '', a.device || '',
@@ -321,7 +327,7 @@ const AccountsPage = () => {
       const params = {}
       if (debouncedSearch.trim()) params.search = debouncedSearch
       if (filterStatus) params.status = filterStatus
-      if (filterRenewal) params.renewal = filterRenewal
+      if (filterExpiring) params.expiring = filterExpiring
       if (showDeleted) params.includeDeleted = 'true'
       const exportData = await accountsAPI.exportAccounts(params)
       const blob = new Blob([exportData], { type: 'text/csv' })
@@ -338,7 +344,7 @@ const AccountsPage = () => {
       console.error('Export failed:', error)
       toast.error('Failed to export accounts')
     }
-  }, [debouncedSearch, filterStatus, filterRenewal, showDeleted])
+  }, [debouncedSearch, filterStatus, filterExpiring, showDeleted])
 
   // Bulk delete selected accounts (soft delete)
   const handleBulkDelete = useCallback(async () => {
@@ -700,8 +706,8 @@ const AccountsPage = () => {
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 mb-1">Expiring Soon</p>
-              <p className="text-3xl font-bold text-amber-600">{stats.expiringSoon}</p>
+              <p className="text-sm text-gray-600 mb-1">Expiring This Month</p>
+              <p className="text-3xl font-bold text-amber-600">{stats.expiringThisMonth}</p>
             </div>
             <div className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center">
               <Clock className="text-amber-600" size={24} />
@@ -712,8 +718,8 @@ const AccountsPage = () => {
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 mb-1">Expired (Past Due)</p>
-              <p className="text-3xl font-bold text-red-600">{stats.expiredAccounts}</p>
+              <p className="text-sm text-gray-600 mb-1">Past Due</p>
+              <p className="text-3xl font-bold text-red-600">{stats.pastDueAccounts}</p>
             </div>
             <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
               <AlertCircle className="text-red-600" size={24} />
@@ -745,11 +751,11 @@ const AccountsPage = () => {
             ))}
           </select>
           <select
-            value={filterRenewal}
-            onChange={(e) => updateUrlParams({ renewal: e.target.value, page: '1' })}
+            value={filterExpiring}
+            onChange={(e) => updateUrlParams({ expiring: e.target.value, page: '1' })}
             className="input w-full sm:w-48"
           >
-            {RENEWAL_OPTIONS.map(opt => (
+            {EXPIRING_OPTIONS.map(opt => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </select>

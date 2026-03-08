@@ -346,9 +346,12 @@ const EditAccountModal = ({ isOpen, onClose, onSuccess, account }) => {
                   >
                     <option value="active">Active</option>
                     <option value="expired">Expired</option>
+                    <option value="paused">Paused</option>
                     <option value="suspended">Suspended</option>
                     <option value="cancelled">Cancelled</option>
-                    <option value="on_hold">On Hold</option>
+                    <option value="grace_period">Grace Period</option>
+                    <option value="trial">Trial</option>
+                    <option value="churned">Churned</option>
                   </select>
                 </div>
               </div>
