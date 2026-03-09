@@ -281,7 +281,7 @@ const LeadViews = ({ onAddLead, onEditLead, onDeleteLead }) => {
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
         <div className="card !p-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between min-h-[4.5rem]">
             <div>
               <p className="text-xs text-gray-600">Total Leads</p>
               <p className="text-lg font-bold text-blue-600">{leadStats.total}</p>
@@ -293,7 +293,7 @@ const LeadViews = ({ onAddLead, onEditLead, onDeleteLead }) => {
         </div>
 
         <div className="card !p-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between min-h-[4.5rem]">
             <div>
               <p className="text-xs text-gray-600">New Leads</p>
               <p className="text-lg font-bold text-green-600">{leadStats.newLeads}</p>
@@ -305,7 +305,7 @@ const LeadViews = ({ onAddLead, onEditLead, onDeleteLead }) => {
         </div>
 
         <div className="card !p-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between min-h-[4.5rem]">
             <div>
               <p className="text-xs text-gray-600">Converted</p>
               <p className="text-lg font-bold text-purple-600">{leadStats.converted}</p>
@@ -317,7 +317,7 @@ const LeadViews = ({ onAddLead, onEditLead, onDeleteLead }) => {
         </div>
 
         <div className="card !p-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between min-h-[4.5rem]">
             <div>
               <p className="text-xs text-gray-600">Unassigned</p>
               <p className="text-lg font-bold text-orange-600">{leadStats.unassigned}</p>
@@ -332,7 +332,7 @@ const LeadViews = ({ onAddLead, onEditLead, onDeleteLead }) => {
       {/* Search + Actions + Filters Row */}
       <div className="flex items-center gap-3">
         {/* Search Input */}
-        <div className="relative w-full max-w-md">
+        <div className="relative flex-1">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <Search className="h-4 w-4 text-gray-400" />
           </div>
