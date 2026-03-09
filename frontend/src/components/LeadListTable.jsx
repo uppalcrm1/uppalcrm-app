@@ -35,7 +35,7 @@ const SYSTEM_COLUMN_DEFINITIONS = [
   { key: 'phone', label: 'Phone', description: 'Phone number' },
   { key: 'source', label: 'Source', description: 'Lead source' },
   { key: 'next_follow_up', label: 'Next Follow Up', description: 'Next follow up date' },
-  { key: 'notes', label: 'Notes', description: 'Lead notes', sortable: false, cellClassName: 'px-6 py-4 max-w-xs' },
+  { key: 'notes', label: 'Notes', description: 'Lead notes', sortable: false, cellClassName: 'px-3 py-1.5 max-w-xs' },
   { key: 'updated_at', label: 'Updated', description: 'Last update date' },
 ]
 

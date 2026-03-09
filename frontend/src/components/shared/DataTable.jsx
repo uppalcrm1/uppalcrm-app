@@ -105,7 +105,7 @@ const DataTable = ({
   // SortableHeader sub-component
   const SortableHeader = ({ children, sortKey, className = '' }) => (
     <th
-      className={`px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 ${className}`}
+      className={`px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 ${className}`}
       onClick={() => onSort && onSort(sortKey)}
     >
       <div className="flex items-center gap-1">
@@ -300,7 +300,7 @@ const DataTable = ({
             <tr>
               {/* Select All Checkbox */}
               {selectable && (
-                <th className="px-3 py-3 text-left">
+                <th className="px-3 py-2 text-left">
                   <input
                     type="checkbox"
                     checked={selectedIds.length === data.length && data.length > 0}
@@ -314,7 +314,7 @@ const DataTable = ({
               {visibleSystemColumns.map(column => {
                 if (column.sortable === false) {
                   return (
-                    <th key={column.key} className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th key={column.key} className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       {column.label}
                     </th>
                   )
@@ -328,14 +328,14 @@ const DataTable = ({
 
               {/* Custom Field Column Headers */}
               {visibleCustomColumns.map(column => (
-                <th key={column.key} className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th key={column.key} className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   {column.label}
                 </th>
               ))}
 
               {/* Actions Header */}
               {renderRowActions && (
-                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
                 </th>
               )}
@@ -352,7 +352,7 @@ const DataTable = ({
                 <tr key={rowId} className={`${isSelected ? 'bg-blue-50' : ''} ${extraClassName}`}>
                   {/* Row Checkbox */}
                   {selectable && (
-                    <td className="px-3 py-3 whitespace-nowrap">
+                    <td className="px-3 py-1.5 whitespace-nowrap">
                       <input
                         type="checkbox"
                         checked={isSelected}
@@ -364,21 +364,21 @@ const DataTable = ({
 
                   {/* System Column Cells */}
                   {visibleSystemColumns.map(column => (
-                    <td key={column.key} className={column.cellClassName || 'px-3 py-3 whitespace-nowrap'}>                     
+                    <td key={column.key} className={column.cellClassName || 'px-3 py-1.5 whitespace-nowrap'}>                     
                       {renderCell(row, column)}
                     </td>
                   ))}
 
                   {/* Custom Field Cells */}
                   {visibleCustomColumns.map(column => (
-                    <td key={column.key} className="px-3 py-3 whitespace-nowrap">
+                    <td key={column.key} className="px-3 py-1.5 whitespace-nowrap">
                       {renderCustomFieldCell(row, column)}
                     </td>
                   ))}
 
                   {/* Row Actions */}
                   {renderRowActions && (
-                    <td className="px-3 py-3 whitespace-nowrap text-right text-sm font-medium">
+                    <td className="px-3 py-1.5 whitespace-nowrap text-right text-sm font-medium">
                       {renderRowActions(row)}
                     </td>
                   )}

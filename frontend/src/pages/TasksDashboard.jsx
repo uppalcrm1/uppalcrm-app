@@ -499,7 +499,7 @@ const TasksDashboard = () => {
                         isOverdue(task) ? 'bg-red-50' : ''
                       }`}
                     >
-                      <td className="px-3 py-3 whitespace-nowrap">
+                      <td className="px-3 py-1.5 whitespace-nowrap">
                         <button
                           onClick={() => handleCompleteTask(task)}
                           disabled={task.status === 'completed' || completeTaskMutation.isPending}
@@ -512,7 +512,7 @@ const TasksDashboard = () => {
                           )}
                         </button>
                       </td>
-                      <td className="px-3 py-3">
+                      <td className="px-3 py-1.5">
                         <div className="text-sm">
                           <div className="font-medium text-gray-900">{task.subject}</div>
                           {task.description && (
@@ -520,7 +520,7 @@ const TasksDashboard = () => {
                           )}
                         </div>
                       </td>
-                      <td className="px-3 py-3 whitespace-nowrap">
+                      <td className="px-3 py-1.5 whitespace-nowrap">
                         {task.lead_id ? (
                           <button
                             onClick={() => navigate(`/leads/${task.lead_id}`)}
@@ -532,14 +532,14 @@ const TasksDashboard = () => {
                           <span className="text-sm text-gray-400">—</span>
                         )}
                       </td>
-                      <td className="px-3 py-3 whitespace-nowrap">
+                      <td className="px-3 py-1.5 whitespace-nowrap">
                         {task.contact_id ? (
                           <span className="text-sm font-medium text-gray-900">{task.contact_name}</span>
                         ) : (
                           <span className="text-sm text-gray-400">—</span>
                         )}
                       </td>
-                      <td className="px-3 py-3 whitespace-nowrap">
+                      <td className="px-3 py-1.5 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           {task.account_id && (
                             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-teal-100 text-teal-700">
@@ -551,7 +551,7 @@ const TasksDashboard = () => {
                           </span>
                         </div>
                       </td>
-                      <td className="px-3 py-3 whitespace-nowrap">
+                      <td className="px-3 py-1.5 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <User size={16} className="text-gray-400" />
                           <span className="text-sm text-gray-900">
@@ -559,7 +559,7 @@ const TasksDashboard = () => {
                           </span>
                         </div>
                       </td>
-                      <td className="px-3 py-3 whitespace-nowrap">
+                      <td className="px-3 py-1.5 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <User size={16} className="text-gray-400" />
                           <span className="text-sm text-gray-900">
@@ -567,7 +567,7 @@ const TasksDashboard = () => {
                           </span>
                         </div>
                       </td>
-                      <td className="px-3 py-3 whitespace-nowrap">
+                      <td className="px-3 py-1.5 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <Calendar size={16} className={isOverdue(task) ? 'text-red-500' : 'text-gray-400'} />
                           <span className={`text-sm ${isOverdue(task) ? 'text-red-600 font-semibold' : 'text-gray-900'}`}>
@@ -575,12 +575,12 @@ const TasksDashboard = () => {
                           </span>
                         </div>
                       </td>
-                      <td className="px-3 py-3 whitespace-nowrap">
+                      <td className="px-3 py-1.5 whitespace-nowrap">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getPriorityColor(task.priority)}`}>
                           {task.priority || 'medium'}
                         </span>
                       </td>
-                      <td className="px-3 py-3 whitespace-nowrap">
+                      <td className="px-3 py-1.5 whitespace-nowrap">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                           task.status === 'completed'
                             ? 'bg-green-100 text-green-800'
