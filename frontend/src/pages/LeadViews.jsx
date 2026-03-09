@@ -275,36 +275,6 @@ const LeadViews = ({ onAddLead, onEditLead, onDeleteLead }) => {
             {leadsData?.pagination?.total || 0} total leads
           </p>
         </div>
-
-        <div className="flex items-center gap-3">
-          <ViewToggle
-            currentView={view}
-            onViewChange={handleViewChange}
-          />
-          <button
-            onClick={handleExport}
-            disabled={leadsLoading}
-            className="btn btn-secondary btn-md"
-          >
-            <Download className="w-4 h-4 mr-2" />
-            Export
-          </button>
-          <button
-            onClick={refetchLeads}
-            disabled={leadsLoading}
-            className="btn btn-secondary btn-md"
-          >
-            <RefreshCw className={`w-4 h-4 mr-2 ${leadsLoading ? 'animate-spin' : ''}`} />
-            Refresh
-          </button>
-          <button
-            onClick={onAddLead}
-            className="btn btn-primary btn-md"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Add Lead
-          </button>
-        </div>
       </div>
 
       {/* Stats Cards */}
@@ -356,6 +326,37 @@ const LeadViews = ({ onAddLead, onEditLead, onDeleteLead }) => {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="flex items-center justify-end gap-3">
+        <ViewToggle
+          currentView={view}
+          onViewChange={handleViewChange}
+        />
+        <button
+          onClick={handleExport}
+          disabled={leadsLoading}
+          className="btn btn-secondary btn-md"
+        >
+          <Download className="w-4 h-4 mr-2" />
+          Export
+        </button>
+        <button
+          onClick={refetchLeads}
+          disabled={leadsLoading}
+          className="btn btn-secondary btn-md"
+        >
+          <RefreshCw className={`w-4 h-4 mr-2 ${leadsLoading ? 'animate-spin' : ''}`} />
+          Refresh
+        </button>
+        <button
+          onClick={onAddLead}
+          className="btn btn-primary btn-md"
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          Add Lead
+        </button>
       </div>
 
       {/* Filters */}
