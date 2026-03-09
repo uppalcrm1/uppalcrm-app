@@ -403,13 +403,13 @@ const InlineEditCell = React.memo(({
         ${!disabled && !readOnly ? 'cursor-pointer' : ''}
         ${isSaving ? 'opacity-70' : ''}
         ${error ? 'bg-red-50' : ''}
-        px-2 py-1 rounded relative text-sm
+        rounded relative text-sm
         ${className}
       `}
       title={disabled ? 'This field cannot be edited' : 'Click to edit'}
       style={{ userSelect: 'none' }}
     >
-      <div className="flex items-center gap-2 pointer-events-none">
+      <div className="flex items-center gap-1 pointer-events-none">
         {icon && <span className="text-gray-400">{icon}</span>}
         <span className="flex-1">{getDisplayValue()}</span>
 
