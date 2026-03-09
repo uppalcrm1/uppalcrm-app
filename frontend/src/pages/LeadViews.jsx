@@ -29,6 +29,7 @@ const LeadViews = ({ onAddLead, onEditLead, onDeleteLead }) => {
   const [searchParams, setSearchParams] = useSearchParams()
   const [view, setView] = useState(searchParams.get('view') || 'list')
   const [statuses, setStatuses] = useState([]) // Fetch from API instead of hardcoded
+  const [filtersExpanded, setFiltersExpanded] = useState(false)
   const [filters, setFilters] = useState({
     search: searchParams.get('search') || '',
     status: searchParams.get('status') || '',
@@ -328,8 +329,23 @@ const LeadViews = ({ onAddLead, onEditLead, onDeleteLead }) => {
         </div>
       </div>
 
-      {/* Action Buttons */}
-      <div className="flex items-center justify-end gap-3">
+      {/* Search + Actions + Filters Row */}
+      <div className="flex items-center gap-3">
+        {/* Search Input */}
+        <div className="relative w-full max-w-md">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Search className="h-4 w-4 text-gray-400" />
+          </div>
+          <input
+            type="text"
+            placeholder="Search by name, email, or company..."
+            value={filters.search}
+            onChange={(e) => handleFiltersChange({ ...filters, search: e.target.value })}
+            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
+
+        {/* Actions */}
         <ViewToggle
           currentView={view}
           onViewChange={handleViewChange}
@@ -357,6 +373,22 @@ const LeadViews = ({ onAddLead, onEditLead, onDeleteLead }) => {
           <Plus className="w-4 h-4 mr-2" />
           Add Lead
         </button>
+
+        {/* Filters Toggle */}
+        <button
+          onClick={() => setFiltersExpanded(!filtersExpanded)}
+          className={`flex items-center gap-2 px-3 py-2 text-sm font-medium border rounded-lg transition-colors ${
+            filtersExpanded
+              ? 'bg-blue-50 text-blue-700 border-blue-200'
+              : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+          }`}
+        >
+          <Filter className="w-4 h-4" />
+          <span>Filters</span>
+          <ChevronDown
+            className={`w-4 h-4 transition-transform ${filtersExpanded ? 'rotate-180' : ''}`}
+          />
+        </button>
       </div>
 
       {/* Filters */}
@@ -366,6 +398,9 @@ const LeadViews = ({ onAddLead, onEditLead, onDeleteLead }) => {
         statuses={statuses}
         users={usersData?.users || []}
         loading={leadsLoading}
+        hideSearch
+        isExpandedExternal={filtersExpanded}
+        onToggleExpanded={setFiltersExpanded}
       />
 
       {/* Content */}

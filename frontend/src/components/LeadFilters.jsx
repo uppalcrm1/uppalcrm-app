@@ -10,8 +10,13 @@ import {
   RefreshCw
 } from 'lucide-react'
 
-const LeadFilters = ({ filters, onFiltersChange, statuses, users, loading }) => {
-  const [isExpanded, setIsExpanded] = useState(false)
+const LeadFilters = ({ filters, onFiltersChange, statuses, users, loading, hideSearch = false, isExpandedExternal, onToggleExpanded }) => {
+  const [isExpandedInternal, setIsExpandedInternal] = useState(false)
+  
+  // Use external state when hideSearch (controlled by parent), otherwise internal
+  const isExpanded = hideSearch ? isExpandedExternal : isExpandedInternal
+  const setIsExpanded = hideSearch ? (val) => onToggleExpanded?.(val) : setIsExpandedInternal
+
   const [localFilters, setLocalFilters] = useState(filters)
 
   // Debounce filter updates
@@ -66,66 +71,73 @@ const LeadFilters = ({ filters, onFiltersChange, statuses, users, loading }) => 
     { value: 'other', label: 'Other' }
   ]
 
+  // Don't render anything if search is hidden and filters are collapsed
+  if (hideSearch && !isExpanded) {
+    return null
+  }
+
   return (
     <div className="bg-white border border-gray-200 rounded-lg">
-      {/* Search Bar - Always Visible */}
-      <div className="p-4 border-b border-gray-100">
-        <div className="flex flex-col sm:flex-row gap-4">
-          {/* Search Input */}
-          <div className="flex-1 relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-gray-400" />
-            </div>
-            <input
-              type="text"
-              placeholder="Search leads by name, email, or company..."
-              value={localFilters.search}
-              onChange={(e) => updateFilter('search', e.target.value)}
-              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md text-sm placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-            />
-            {localFilters.search && (
-              <button
-                onClick={() => updateFilter('search', '')}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center"
-              >
-                <X className="h-4 w-4 text-gray-400 hover:text-gray-600" />
-              </button>
-            )}
-          </div>
-
-          {/* Filter Toggle */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setIsExpanded(!isExpanded)}
-              className={`flex items-center gap-2 px-3 py-2 text-sm font-medium border rounded-md transition-colors ${
-                isExpanded || getActiveFilterCount() > 0
-                  ? 'bg-blue-50 text-blue-700 border-blue-200'
-                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-              }`}
-            >
-              <Filter className="w-4 h-4" />
-              <span>Filters</span>
-              {getActiveFilterCount() > 0 && (
-                <span className="bg-blue-600 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[18px] h-[18px] flex items-center justify-center">
-                  {getActiveFilterCount()}
-                </span>
-              )}
-              <ChevronDown
-                className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+      {/* Search Bar - Always Visible (unless hidden by parent) */}
+      {!hideSearch && (
+        <div className="p-4 border-b border-gray-100">
+          <div className="flex flex-col sm:flex-row gap-4">
+            {/* Search Input */}
+            <div className="flex-1 relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search className="h-4 w-4 text-gray-400" />
+              </div>
+              <input
+                type="text"
+                placeholder="Search leads by name, email, or company..."
+                value={localFilters.search}
+                onChange={(e) => updateFilter('search', e.target.value)}
+                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md text-sm placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
               />
-            </button>
+              {localFilters.search && (
+                <button
+                  onClick={() => updateFilter('search', '')}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                >
+                  <X className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                </button>
+              )}
+            </div>
 
-            {getActiveFilterCount() > 0 && (
+            {/* Filter Toggle */}
+            <div className="flex items-center gap-2">
               <button
-                onClick={clearAllFilters}
-                className="px-3 py-2 text-sm text-gray-600 hover:text-gray-900"
+                onClick={() => setIsExpanded(!isExpanded)}
+                className={`flex items-center gap-2 px-3 py-2 text-sm font-medium border rounded-md transition-colors ${
+                  isExpanded || getActiveFilterCount() > 0
+                    ? 'bg-blue-50 text-blue-700 border-blue-200'
+                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                }`}
               >
-                Clear all
+                <Filter className="w-4 h-4" />
+                <span>Filters</span>
+                {getActiveFilterCount() > 0 && (
+                  <span className="bg-blue-600 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[18px] h-[18px] flex items-center justify-center">
+                    {getActiveFilterCount()}
+                  </span>
+                )}
+                <ChevronDown
+                  className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                />
               </button>
-            )}
+
+              {getActiveFilterCount() > 0 && (
+                <button
+                  onClick={clearAllFilters}
+                  className="px-3 py-2 text-sm text-gray-600 hover:text-gray-900"
+                >
+                  Clear all
+                </button>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Advanced Filters - Collapsible */}
       {isExpanded && (
