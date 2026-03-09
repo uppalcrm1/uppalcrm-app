@@ -130,6 +130,12 @@ const TransactionsPage = () => {
     return saved ? JSON.parse(saved) : DEFAULT_VISIBLE_COLUMNS
   })
 
+  // Load column order from localStorage
+  const [columnOrder, setColumnOrder] = useState(() => {
+    const saved = localStorage.getItem('transactions_column_order')
+    return saved ? JSON.parse(saved) : []
+  })
+
   // Column visibility handlers
   const handleColumnToggle = (columnKey) => {
     const newVisibleColumns = {
@@ -143,6 +149,13 @@ const TransactionsPage = () => {
   const handleResetColumns = () => {
     setVisibleColumns(DEFAULT_VISIBLE_COLUMNS)
     localStorage.setItem('transactions_visible_columns', JSON.stringify(DEFAULT_VISIBLE_COLUMNS))
+    setColumnOrder([])
+    localStorage.removeItem('transactions_column_order')
+  }
+
+  const handleColumnOrderChange = (newOrder) => {
+    setColumnOrder(newOrder)
+    localStorage.setItem('transactions_column_order', JSON.stringify(newOrder))
   }
 
   // Fetch transactions list via React Query
@@ -662,6 +675,8 @@ const TransactionsPage = () => {
           visibleColumns={visibleColumns}
           onColumnToggle={handleColumnToggle}
           onColumnsReset={handleResetColumns}
+          columnOrder={columnOrder}
+          onColumnOrderChange={handleColumnOrderChange}
           sortConfig={sortConfig}
           onSort={handleSort}
           pagination={{ page: currentPage, limit: pageSize, total: totalCount }}

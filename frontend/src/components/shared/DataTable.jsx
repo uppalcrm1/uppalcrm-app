@@ -28,6 +28,8 @@ const DataTable = ({
   visibleColumns = {},
   onColumnToggle,
   onColumnsReset,
+  columnOrder = [],
+  onColumnOrderChange,
 
   // Sorting
   sortConfig = { key: null, direction: 'asc' },
@@ -68,11 +70,20 @@ const DataTable = ({
     return row[rowKey]
   }, [rowKey])
 
-  // Visible columns split
-  const visibleSystemColumns = useMemo(() =>
-    columns.filter(col => !col.isCustom && visibleColumns[col.key]),
-    [columns, visibleColumns]
-  )
+  // Visible columns split, sorted by columnOrder
+  const visibleSystemColumns = useMemo(() => {
+    const filtered = columns.filter(col => !col.isCustom && visibleColumns[col.key])
+    if (columnOrder && columnOrder.length > 0) {
+      return [...filtered].sort((a, b) => {
+        const aIdx = columnOrder.indexOf(a.key)
+        const bIdx = columnOrder.indexOf(b.key)
+        const aPos = aIdx === -1 ? 999 + filtered.indexOf(a) : aIdx
+        const bPos = bIdx === -1 ? 999 + filtered.indexOf(b) : bIdx
+        return aPos - bPos
+      })
+    }
+    return filtered
+  }, [columns, visibleColumns, columnOrder])
 
   const visibleCustomColumns = useMemo(() =>
     columns.filter(col => col.isCustom && visibleColumns[col.key]),
@@ -255,6 +266,8 @@ const DataTable = ({
             visibleColumns={visibleColumns}
             onColumnToggle={onColumnToggle}
             onReset={onColumnsReset}
+            columnOrder={columnOrder}
+            onColumnOrderChange={onColumnOrderChange}
           />
         </div>
       </div>

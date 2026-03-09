@@ -81,6 +81,12 @@ const LeadListTable = ({
     return saved ? JSON.parse(saved) : DEFAULT_VISIBLE_COLUMNS
   })
 
+  // Load column order from localStorage
+  const [columnOrder, setColumnOrder] = useState(() => {
+    const saved = localStorage.getItem('leads_column_order')
+    return saved ? JSON.parse(saved) : []
+  })
+
   // Local state for leads to enable optimistic updates
   const [localLeads, setLocalLeads] = useState(leads)
 
@@ -215,7 +221,14 @@ const LeadListTable = ({
   const handleResetColumns = () => {
     setVisibleColumns(DEFAULT_VISIBLE_COLUMNS)
     localStorage.setItem('leads_visible_columns', JSON.stringify(DEFAULT_VISIBLE_COLUMNS))
+    setColumnOrder([])
+    localStorage.removeItem('leads_column_order')
     console.log('📋 Columns reset to defaults')
+  }
+
+  const handleColumnOrderChange = (newOrder) => {
+    setColumnOrder(newOrder)
+    localStorage.setItem('leads_column_order', JSON.stringify(newOrder))
   }
 
   // Inline edit handler with optimistic updates
@@ -555,6 +568,8 @@ const LeadListTable = ({
         visibleColumns={visibleColumns}
         onColumnToggle={handleColumnToggle}
         onColumnsReset={handleResetColumns}
+        columnOrder={columnOrder}
+        onColumnOrderChange={handleColumnOrderChange}
         sortConfig={sortConfig}
         onSort={handleSort}
         pagination={pagination}

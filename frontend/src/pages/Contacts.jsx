@@ -180,6 +180,12 @@ const Contacts = () => {
     return saved ? JSON.parse(saved) : DEFAULT_VISIBLE_COLUMNS
   })
 
+  // Load column order from localStorage
+  const [columnOrder, setColumnOrder] = useState(() => {
+    const saved = localStorage.getItem('contacts_column_order')
+    return saved ? JSON.parse(saved) : []
+  })
+
   // Build filters - use debouncedSearch for API calls, not searchParams
   const currentFilters = React.useMemo(() => ({
     page: parseInt(searchParams.get('page')) || 1,
@@ -243,7 +249,14 @@ const Contacts = () => {
     // Reset to defaults
     setVisibleColumns({ ...DEFAULT_VISIBLE_COLUMNS })
     localStorage.setItem('contacts_visible_columns', JSON.stringify(DEFAULT_VISIBLE_COLUMNS))
+    setColumnOrder([])
+    localStorage.removeItem('contacts_column_order')
     console.log('📋 Columns reset to defaults (respecting field configuration)')
+  }
+
+  const handleColumnOrderChange = (newOrder) => {
+    setColumnOrder(newOrder)
+    localStorage.setItem('contacts_column_order', JSON.stringify(newOrder))
   }
 
   // Sync URL when debounced value changes (after 300ms of no typing)
@@ -973,6 +986,8 @@ const Contacts = () => {
           visibleColumns={visibleColumns}
           onColumnToggle={handleColumnToggle}
           onColumnsReset={handleResetColumns}
+          columnOrder={columnOrder}
+          onColumnOrderChange={handleColumnOrderChange}
           sortConfig={sortConfig}
           onSort={handleSort}
           pagination={pagination}

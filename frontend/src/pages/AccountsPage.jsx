@@ -216,6 +216,12 @@ const AccountsPage = () => {
     return saved ? JSON.parse(saved) : DEFAULT_VISIBLE_COLUMNS
   })
 
+  // Load column order from localStorage
+  const [columnOrder, setColumnOrder] = useState(() => {
+    const saved = localStorage.getItem('accounts_column_order')
+    return saved ? JSON.parse(saved) : []
+  })
+
   // Column visibility handlers
   const handleColumnToggle = (columnKey) => {
     const newVisibleColumns = {
@@ -229,6 +235,13 @@ const AccountsPage = () => {
   const handleResetColumns = () => {
     setVisibleColumns(DEFAULT_VISIBLE_COLUMNS)
     localStorage.setItem('accounts_visible_columns', JSON.stringify(DEFAULT_VISIBLE_COLUMNS))
+    setColumnOrder([])
+    localStorage.removeItem('accounts_column_order')
+  }
+
+  const handleColumnOrderChange = (newOrder) => {
+    setColumnOrder(newOrder)
+    localStorage.setItem('accounts_column_order', JSON.stringify(newOrder))
   }
 
   // Sort handler — toggles direction, updates URL
@@ -783,6 +796,8 @@ const AccountsPage = () => {
           visibleColumns={visibleColumns}
           onColumnToggle={handleColumnToggle}
           onColumnsReset={handleResetColumns}
+          columnOrder={columnOrder}
+          onColumnOrderChange={handleColumnOrderChange}
           sortConfig={sortConfig}
           onSort={handleSort}
           pagination={{ page: currentPage, limit: pageSize, total: totalCount }}

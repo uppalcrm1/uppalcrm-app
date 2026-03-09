@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { Columns, Eye, EyeOff, RotateCcw } from 'lucide-react'
+import { Columns, Eye, EyeOff, RotateCcw, ChevronUp, ChevronDown } from 'lucide-react'
 
-const ColumnSelector = ({ columns, visibleColumns, onColumnToggle, onReset }) => {
+const ColumnSelector = ({ columns, visibleColumns, onColumnToggle, onReset, columnOrder, onColumnOrderChange }) => {
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef(null)
 
@@ -31,6 +31,31 @@ const ColumnSelector = ({ columns, visibleColumns, onColumnToggle, onReset }) =>
     setIsOpen(false)
   }
 
+  // Build ordered list of system columns for display
+  const systemColumns = columns.filter(c => !c.isCustom)
+  const orderedSystemColumns = columnOrder && columnOrder.length > 0
+    ? [...systemColumns].sort((a, b) => {
+        const aIdx = columnOrder.indexOf(a.key)
+        const bIdx = columnOrder.indexOf(b.key)
+        const aPos = aIdx === -1 ? 999 + systemColumns.indexOf(a) : aIdx
+        const bPos = bIdx === -1 ? 999 + systemColumns.indexOf(b) : bIdx
+        return aPos - bPos
+      })
+    : systemColumns
+
+  // Move a column up or down in order
+  const moveColumn = (columnKey, direction) => {
+    if (!onColumnOrderChange) return
+    const currentOrder = orderedSystemColumns.map(c => c.key)
+    const idx = currentOrder.indexOf(columnKey)
+    if (idx === -1) return
+    const newIdx = direction === 'up' ? idx - 1 : idx + 1
+    if (newIdx < 0 || newIdx >= currentOrder.length) return
+    const newOrder = [...currentOrder]
+    ;[newOrder[idx], newOrder[newIdx]] = [newOrder[newIdx], newOrder[idx]]
+    onColumnOrderChange(newOrder)
+  }
+
   const visibleCount = Object.values(visibleColumns).filter(Boolean).length
   const totalCount = columns.length
 
@@ -47,7 +72,7 @@ const ColumnSelector = ({ columns, visibleColumns, onColumnToggle, onReset }) =>
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-72 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+        <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
           {/* Header */}
           <div className="px-4 py-3 border-b border-gray-200">
             <div className="flex items-center justify-between">
@@ -55,14 +80,14 @@ const ColumnSelector = ({ columns, visibleColumns, onColumnToggle, onReset }) =>
               <button
                 onClick={handleResetToDefaults}
                 className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                title="Reset to default columns"
+                title="Reset to default columns and order"
               >
                 <RotateCcw size={12} />
                 Reset
               </button>
             </div>
             <p className="text-xs text-gray-500 mt-1">
-              Select which columns to display in the table
+              Toggle visibility and reorder columns
             </p>
           </div>
 
@@ -72,15 +97,15 @@ const ColumnSelector = ({ columns, visibleColumns, onColumnToggle, onReset }) =>
             <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">
               System Fields
             </div>
-            {columns.filter(c => !c.isCustom).map((column) => {
+            {orderedSystemColumns.map((column, index) => {
               const isVisible = visibleColumns[column.key]
               const isDisabled = column.required
 
               return (
-                <label
+                <div
                   key={column.key}
-                  className={`flex items-center px-4 py-2.5 hover:bg-gray-50 cursor-pointer transition-colors ${
-                    isDisabled ? 'opacity-50 cursor-not-allowed' : ''
+                  className={`flex items-center px-4 py-1.5 hover:bg-gray-50 transition-colors ${
+                    isDisabled ? 'opacity-60' : ''
                   }`}
                 >
                   <input
@@ -88,31 +113,48 @@ const ColumnSelector = ({ columns, visibleColumns, onColumnToggle, onReset }) =>
                     checked={isVisible}
                     onChange={() => !isDisabled && handleToggle(column.key)}
                     disabled={isDisabled}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 mr-3"
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 mr-2 cursor-pointer"
                   />
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
                       {isVisible ? (
-                        <Eye size={14} className="text-green-600" />
+                        <Eye size={12} className="text-green-600 flex-shrink-0" />
                       ) : (
-                        <EyeOff size={14} className="text-gray-400" />
+                        <EyeOff size={12} className="text-gray-400 flex-shrink-0" />
                       )}
-                      <span className="text-sm font-medium text-gray-900">
+                      <span className="text-sm font-medium text-gray-900 truncate">
                         {column.label}
                       </span>
                       {column.required && (
-                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                        <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full flex-shrink-0">
                           Required
                         </span>
                       )}
                     </div>
-                    {column.description && (
-                      <p className="text-xs text-gray-500 mt-0.5 ml-6">
-                        {column.description}
-                      </p>
-                    )}
                   </div>
-                </label>
+
+                  {/* Reorder arrows */}
+                  {onColumnOrderChange && (
+                    <div className="flex items-center gap-0.5 ml-2">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); moveColumn(column.key, 'up') }}
+                        disabled={index === 0}
+                        className={`p-0.5 rounded ${index === 0 ? 'text-gray-200 cursor-not-allowed' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100 cursor-pointer'}`}
+                        title="Move up"
+                      >
+                        <ChevronUp size={14} />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); moveColumn(column.key, 'down') }}
+                        disabled={index === orderedSystemColumns.length - 1}
+                        className={`p-0.5 rounded ${index === orderedSystemColumns.length - 1 ? 'text-gray-200 cursor-not-allowed' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100 cursor-pointer'}`}
+                        title="Move down"
+                      >
+                        <ChevronDown size={14} />
+                      </button>
+                    </div>
+                  )}
+                </div>
               )
             })}
 
@@ -126,37 +168,32 @@ const ColumnSelector = ({ columns, visibleColumns, onColumnToggle, onReset }) =>
                   const isVisible = visibleColumns[column.key]
 
                   return (
-                    <label
+                    <div
                       key={column.key}
-                      className="flex items-center px-4 py-2.5 hover:bg-gray-50 cursor-pointer transition-colors"
+                      className="flex items-center px-4 py-1.5 hover:bg-gray-50 transition-colors"
                     >
                       <input
                         type="checkbox"
                         checked={isVisible}
                         onChange={() => handleToggle(column.key)}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 mr-3"
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 mr-2 cursor-pointer"
                       />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
                           {isVisible ? (
-                            <Eye size={14} className="text-green-600" />
+                            <Eye size={12} className="text-green-600 flex-shrink-0" />
                           ) : (
-                            <EyeOff size={14} className="text-gray-400" />
+                            <EyeOff size={12} className="text-gray-400 flex-shrink-0" />
                           )}
-                          <span className="text-sm font-medium text-gray-900">
+                          <span className="text-sm font-medium text-gray-900 truncate">
                             {column.label}
                           </span>
-                          <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+                          <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full flex-shrink-0">
                             Custom
                           </span>
                         </div>
-                        {column.description && (
-                          <p className="text-xs text-gray-500 mt-0.5 ml-6">
-                            {column.description}
-                          </p>
-                        )}
                       </div>
-                    </label>
+                    </div>
                   )
                 })}
               </>
