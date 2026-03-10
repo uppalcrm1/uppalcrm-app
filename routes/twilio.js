@@ -464,6 +464,7 @@ router.get('/sms/conversations', authenticateToken, async (req, res) => {
               ELSE from_number
             END as phone_number,
             MAX(created_at) as last_message_at,
+            MAX(created_at) FILTER (WHERE direction = 'inbound') as last_inbound_message_at,
             COUNT(*) as message_count,
             COUNT(*) FILTER (WHERE direction = 'inbound') as inbound_count,
             COUNT(*) FILTER (WHERE direction = 'outbound') as outbound_count,
@@ -508,8 +509,9 @@ router.get('/sms/conversations', authenticateToken, async (req, res) => {
           c.last_name as contact_last_name,
           crs.last_read_at,
           CASE
+            WHEN cs.inbound_count = 0 THEN false
             WHEN crs.last_read_at IS NULL THEN true
-            WHEN cs.last_message_at > crs.last_read_at THEN true
+            WHEN cs.last_inbound_message_at > crs.last_read_at THEN true
             ELSE false
           END as is_unread
         FROM conversation_stats cs
@@ -522,7 +524,7 @@ router.get('/sms/conversations', authenticateToken, async (req, res) => {
           AND crs.conversation_phone = cs.phone_number
           AND crs.channel = $${readChannelParamIndex}
         ORDER BY
-          CASE WHEN crs.last_read_at IS NULL OR cs.last_message_at > crs.last_read_at THEN 0 ELSE 1 END,
+          CASE WHEN cs.inbound_count = 0 THEN 1 WHEN crs.last_read_at IS NULL OR cs.last_inbound_message_at > crs.last_read_at THEN 0 ELSE 1 END,
           cs.last_message_at DESC
       `;
     } else {
