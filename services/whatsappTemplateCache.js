@@ -1,5 +1,4 @@
 const twilio = require('twilio');
-const db = require('../database/connection');
 
 /**
  * WhatsApp Template Cache Service
@@ -20,12 +19,10 @@ class WhatsAppTemplateCache {
 
     // Return cached data if not expired
     if (cachedData && Date.now() < cachedData.expiresAt) {
-      console.log('📦 Returning cached WhatsApp templates for org:', organizationId);
       return cachedData.templates;
     }
 
     // Fetch fresh templates from Twilio
-    console.log('🔄 Fetching fresh WhatsApp templates from Twilio for org:', organizationId);
     const templates = await this.fetchFromTwilio(twilioClient);
 
     // Cache the results
@@ -34,124 +31,37 @@ class WhatsAppTemplateCache {
       expiresAt: Date.now() + this.CACHE_DURATION_MS
     });
 
-    console.log(`✅ Cached ${templates.length} WhatsApp templates (expires in 5 min)`);
     return templates;
   }
 
   /**
    * Fetch templates from Twilio Content API
-   * Filters for approved WhatsApp templates
+   * Returns all available content items (Twilio only returns approved templates)
    */
   async fetchFromTwilio(twilioClient) {
     try {
-      console.log('\n🔍 === TWILIO CONTENT API FETCH START ===');
-
-      // Check if content API exists
-      if (!twilioClient.content || !twilioClient.content.v1 || !twilioClient.content.v1.contents) {
-        console.error('❌ Twilio content API not available on this client');
-        return [];
-      }
-
       // Fetch all content items from Twilio
-      console.log('📡 Calling twilioClient.content.v1.contents.list()...');
       const contents = await twilioClient.content.v1.contents.list({ limit: 100 });
-
-      console.log(`✅ Received ${contents.length} total items from Twilio`);
-      if (contents.length === 0) {
-        console.log('⚠️  No content items found in Twilio account');
-        return [];
-      }
 
       const templates = [];
 
-      // Filter and map each content item
-      for (let i = 0; i < contents.length; i++) {
-        const content = contents[i];
-        console.log(`\n📄 [${i + 1}/${contents.length}] Processing: ${content.friendlyName}`);
-        console.log(`   SID: ${content.sid}`);
-        console.log(`   Language: ${content.language}`);
-
-        // Get friendly name (use camelCase property)
-        const displayName = content.friendlyName || 'Unnamed Template';
-        console.log(`   Display Name: ${displayName}`);
-
-        // Extract body from types.twilio/text.body
-        let bodyPreview = '';
-        if (content.types && content.types['twilio/text'] && content.types['twilio/text'].body) {
-          bodyPreview = content.types['twilio/text'].body;
-          console.log(`   Body Preview: ${bodyPreview.substring(0, 80)}...`);
-        } else {
-          console.log(`   ⚠️  No body text found in types`);
-        }
-
-        // Fetch approval status for this content using direct REST API
-        console.log(`   📋 Fetching approval status via REST API...`);
-        let whatsappApprovalStatus = null;
-
-        try {
-          // Use the approval endpoint from the content object
-          const approvalUrl = content.links.approval_fetch;
-          console.log(`   Approval URL: ${approvalUrl}`);
-
-          // Make direct HTTP request to get approvals
-          const response = await twilioClient.request({
-            method: 'GET',
-            uri: approvalUrl
-          });
-
-          const approvals = response.approval_requests || [];
-          console.log(`   Found ${approvals.length} approval requests`);
-
-          if (approvals && approvals.length > 0) {
-            // Find WhatsApp approval
-            const whatsappApproval = approvals.find(a => a.channel === 'whatsapp');
-            if (whatsappApproval) {
-              whatsappApprovalStatus = whatsappApproval.status;
-              console.log(`   ✅ WhatsApp Approval Status: ${whatsappApprovalStatus}`);
-            } else {
-              console.log(`   ⏭️  No WhatsApp approval request found`);
-              console.log(`   Available channels: ${approvals.map(a => a.channel).join(', ')}`);
-              continue;
-            }
-          } else {
-            console.log(`   ⏭️  No approval requests found for this content`);
-            continue;
-          }
-        } catch (approvalError) {
-          console.log(`   ⚠️  Could not fetch approval status: ${approvalError.message}`);
-          // Don't continue - try to extract approval status from the response error
-          // For now, skip this template if we can't verify approval
-          continue;
-        }
-
-        // Only include approved templates
-        if (whatsappApprovalStatus !== 'approved') {
-          console.log(`   ⏭️  Skipping - WhatsApp status is '${whatsappApprovalStatus}' (not 'approved')`);
-          continue;
-        }
-
-        // Map Twilio template to our format
+      // Map each content item to our template format
+      for (const content of contents) {
         const template = {
-          template_sid: content.sid, // Content SID (e.g., HX...)
-          display_name: displayName,
-          body_preview: bodyPreview,
-          category: content.language || 'general',
-          approval_status: whatsappApprovalStatus,
-          created_at: content.dateCreated
+          template_sid: content.sid,
+          display_name: content.friendlyName || 'Unnamed Template',
+          body_preview: content.types && content.types['twilio/text']
+            ? content.types['twilio/text'].body
+            : '',
+          category: content.language || 'general'
         };
 
         templates.push(template);
-        console.log(`   ✅ ADDED to templates`);
       }
 
-      console.log(`\n🎯 === RESULT: ${templates.length} approved WhatsApp templates ===\n`);
       return templates;
     } catch (error) {
-      console.error('\n❌ === TWILIO API ERROR ===');
-      console.error('Error Message:', error.message);
-      console.error('Error Code:', error.code);
-      console.error('Full Error:', JSON.stringify(error, null, 2));
-      console.error('=========================\n');
+      console.error('Error fetching WhatsApp templates from Twilio:', error.message);
       // Return empty array on error - graceful degradation
       return [];
     }
@@ -159,11 +69,9 @@ class WhatsAppTemplateCache {
 
   /**
    * Invalidate cache for an organization
-   * Useful when new templates are added in Twilio
    */
   invalidate(organizationId) {
     this.cache.delete(organizationId);
-    console.log('🗑️ Cache invalidated for org:', organizationId);
   }
 
   /**
@@ -171,7 +79,6 @@ class WhatsAppTemplateCache {
    */
   invalidateAll() {
     this.cache.clear();
-    console.log('🗑️ All template caches cleared');
   }
 
   /**
