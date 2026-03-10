@@ -10,7 +10,6 @@ import {
   XCircle,
   Clock,
   TrendingUp,
-  Eye,
   Edit,
   User,
   Download
@@ -367,9 +366,12 @@ const TransactionsPage = () => {
         )
       case 'transaction_id':
         return (
-          <span className="text-sm font-medium text-gray-900">
+          <button
+            onClick={() => navigate(`/transactions/${transaction.id}`)}
+            className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline text-left"
+          >
             {transaction.transaction_id || 'Unknown'}
-          </span>
+          </button>
         )
       case 'account_name':
         return transaction.account_id ? (
@@ -471,18 +473,11 @@ const TransactionsPage = () => {
       default:
         return <span className="text-gray-500">&mdash;</span>
     }
-  }, [handleFieldUpdate])
+  }, [navigate, handleFieldUpdate])
 
   // Render row actions for DataTable
   const renderRowActions = useCallback((transaction) => (
     <div className="flex items-center gap-2">
-      <button
-        onClick={() => navigate(`/transactions/${transaction.id}`)}
-        className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded"
-        title="View Details"
-      >
-        <Eye size={16} />
-      </button>
       {!transaction.is_void && !transaction.deleted_at && (
         <button
           onClick={() => handleEdit(transaction)}
@@ -499,7 +494,7 @@ const TransactionsPage = () => {
         onRefresh={() => queryClient.invalidateQueries(['transactions'])}
       />
     </div>
-  ), [navigate, queryClient])
+  ), [queryClient])
 
   return (
     <div className="space-y-3">

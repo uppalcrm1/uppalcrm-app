@@ -8,7 +8,6 @@ import {
   DollarSign,
   Calendar,
   Edit2,
-  Eye,
   AlertCircle,
   CheckCircle,
   Clock,
@@ -627,13 +626,6 @@ const AccountsPage = () => {
         <DollarSign size={16} />
       </button>
       <button
-        onClick={() => navigate(`/accounts/${account.id}`)}
-        className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
-        title="View Details"
-      >
-        <Eye size={16} />
-      </button>
-      <button
         onClick={() => handleEditAccount(account)}
         disabled={loadingEditAccount}
         className="p-2 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg"
@@ -648,7 +640,7 @@ const AccountsPage = () => {
         onRefresh={() => queryClient.invalidateQueries(['accounts'])}
       />
     </div>
-  ), [loadingEditAccount, navigate, queryClient])
+  ), [loadingEditAccount, queryClient])
 
   return (
     <div className="space-y-3">
