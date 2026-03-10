@@ -109,16 +109,16 @@ const SendWhatsAppModal = ({ onClose, onSuccess, defaultTo = '', leadId = null, 
               Message Type
             </label>
             <select
-              value={selectedTemplate?.id || ''}
+              value={selectedTemplate?.template_sid || ''}
               onChange={(e) => {
-                const tmpl = templates.find(t => t.id === e.target.value) || null;
+                const tmpl = templates.find(t => t.template_sid === e.target.value) || null;
                 setSelectedTemplate(tmpl);
               }}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:border-transparent"
             >
               <option value="">Custom Message</option>
               {templates.map(t => (
-                <option key={t.id} value={t.id}>{t.display_name}</option>
+                <option key={t.template_sid} value={t.template_sid}>{t.display_name}</option>
               ))}
             </select>
           </div>
