@@ -19,9 +19,10 @@ const sendSMSSchema = Joi.object({
 
 const sendWhatsAppSchema = Joi.object({
   to_number: Joi.string().required(),
-  message: Joi.string().required().max(4096),
+  message: Joi.string().max(4096).optional().allow(null, ''),
   lead_id: Joi.string().uuid().optional().allow(null, ''),
-  contact_id: Joi.string().uuid().optional().allow(null, '')
+  contact_id: Joi.string().uuid().optional().allow(null, ''),
+  use_template: Joi.boolean().optional()
 });
 
 const makeCallSchema = Joi.object({
@@ -232,7 +233,7 @@ router.post('/whatsapp/send', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: error.details[0].message });
     }
 
-    const { to_number, message, lead_id, contact_id } = req.body;
+    const { to_number, message, lead_id, contact_id, use_template } = req.body;
     const organizationId = req.organizationId;
     const userId = req.userId;
 
@@ -242,7 +243,8 @@ router.post('/whatsapp/send', authenticateToken, async (req, res) => {
       body: message,
       leadId: lead_id,
       contactId: contact_id,
-      userId
+      userId,
+      useTemplate: !!use_template
     });
 
     res.json({
