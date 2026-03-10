@@ -67,13 +67,23 @@ class WhatsAppTemplateCache {
       // Filter and map each content item
       for (let i = 0; i < contents.length; i++) {
         const content = contents[i];
-        console.log(`\n📄 [${i + 1}/${contents.length}] Processing: ${content.friendly_name}`);
+        console.log(`\n📄 [${i + 1}/${contents.length}] FULL CONTENT OBJECT STRUCTURE:`);
+        console.log(JSON.stringify(content, null, 2));
+
+        // Log all available keys
+        console.log(`\n   Available Keys: ${Object.keys(content).join(', ')}`);
+
+        // Try common property names
+        const displayName = content.friendly_name || content.name || content.title || content.display_name || 'Unknown';
+        console.log(`\n   Display Name candidates: friendly_name=${content.friendly_name}, name=${content.name}, title=${content.title}`);
         console.log(`   SID: ${content.sid}`);
         console.log(`   Language: ${content.language}`);
-        console.log(`   Full Approval Object: ${JSON.stringify(content.approval)}`);
+        console.log(`   Approval: ${JSON.stringify(content.approval)}`);
 
+        // Since approval is undefined, let's check for alternative structures
         if (!content.approval) {
-          console.log(`   ⏭️  Skipping - no approval object`);
+          console.log(`   ⏭️  No approval object found. Checking for alternative approval structures...`);
+          console.log(`   All properties: ${JSON.stringify(content, null, 2)}`);
           continue;
         }
 
