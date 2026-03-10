@@ -84,26 +84,33 @@ class WhatsAppTemplateCache {
           console.log(`   ⚠️  No body text found in types`);
         }
 
-        // Fetch approval status for this content
-        console.log(`   📋 Fetching approval status...`);
+        // Fetch approval status for this content using direct REST API
+        console.log(`   📋 Fetching approval status via REST API...`);
         let whatsappApprovalStatus = null;
 
         try {
-          // Fetch approval requests for this content using correct SDK path
-          const approvalRequests = await twilioClient.content.v1.contentApprovals.list({
-            contentSid: content.sid
+          // Use the approval endpoint from the content object
+          const approvalUrl = content.links.approval_fetch;
+          console.log(`   Approval URL: ${approvalUrl}`);
+
+          // Make direct HTTP request to get approvals
+          const response = await twilioClient.request({
+            method: 'GET',
+            uri: approvalUrl
           });
 
-          console.log(`   Found ${approvalRequests.length} approval requests`);
+          const approvals = response.approval_requests || [];
+          console.log(`   Found ${approvals.length} approval requests`);
 
-          if (approvalRequests && approvalRequests.length > 0) {
+          if (approvals && approvals.length > 0) {
             // Find WhatsApp approval
-            const whatsappApproval = approvalRequests.find(a => a.channel === 'whatsapp');
+            const whatsappApproval = approvals.find(a => a.channel === 'whatsapp');
             if (whatsappApproval) {
               whatsappApprovalStatus = whatsappApproval.status;
-              console.log(`   WhatsApp Approval Status: ${whatsappApprovalStatus}`);
+              console.log(`   ✅ WhatsApp Approval Status: ${whatsappApprovalStatus}`);
             } else {
               console.log(`   ⏭️  No WhatsApp approval request found`);
+              console.log(`   Available channels: ${approvals.map(a => a.channel).join(', ')}`);
               continue;
             }
           } else {
@@ -112,7 +119,8 @@ class WhatsAppTemplateCache {
           }
         } catch (approvalError) {
           console.log(`   ⚠️  Could not fetch approval status: ${approvalError.message}`);
-          console.log(`   Error details: ${JSON.stringify(approvalError, null, 2)}`);
+          // Don't continue - try to extract approval status from the response error
+          // For now, skip this template if we can't verify approval
           continue;
         }
 
