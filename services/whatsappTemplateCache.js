@@ -89,8 +89,12 @@ class WhatsAppTemplateCache {
         let whatsappApprovalStatus = null;
 
         try {
-          // Fetch all approval requests for this content
-          const approvalRequests = await twilioClient.content.v1.contents(content.sid).approvalRequests.list();
+          // Fetch approval requests for this content using correct SDK path
+          const approvalRequests = await twilioClient.content.v1.contentApprovals.list({
+            contentSid: content.sid
+          });
+
+          console.log(`   Found ${approvalRequests.length} approval requests`);
 
           if (approvalRequests && approvalRequests.length > 0) {
             // Find WhatsApp approval
@@ -108,6 +112,7 @@ class WhatsAppTemplateCache {
           }
         } catch (approvalError) {
           console.log(`   ⚠️  Could not fetch approval status: ${approvalError.message}`);
+          console.log(`   Error details: ${JSON.stringify(approvalError, null, 2)}`);
           continue;
         }
 
