@@ -60,21 +60,31 @@ router.post('/mark-all-read', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: `channel must be one of: ${validChannels.join(', ')}` });
     }
 
-    // Check if table exists
-    let hasTable = false;
-    try {
-      await db.query(`SELECT 1 FROM conversation_read_status LIMIT 0`);
-      hasTable = true;
-    } catch (e) { /* table doesn't exist yet */ }
+    // Check if table exists (safe check via information_schema)
+    const tableCheck = await db.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'conversation_read_status'
+      ) as exists
+    `);
+    const hasTable = tableCheck.rows[0].exists;
 
     if (hasTable) {
       if (channel === 'sms' || channel === 'whatsapp') {
-        const phonesResult = await db.query(`
-          SELECT DISTINCT
-            CASE WHEN direction = 'outbound' THEN to_number ELSE from_number END as phone_number
-          FROM sms_messages
-          WHERE organization_id = $1 AND channel = $2
-        `, [organizationId, channel]);
+        // Check if channel column exists
+        const channelColCheck = await db.query(`
+          SELECT EXISTS (
+            SELECT FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = 'sms_messages' AND column_name = 'channel'
+          ) as exists
+        `);
+        const hasChannelColumn = channelColCheck.rows[0].exists;
+
+        const phonesQuery = hasChannelColumn
+          ? `SELECT DISTINCT CASE WHEN direction = 'outbound' THEN to_number ELSE from_number END as phone_number FROM sms_messages WHERE organization_id = $1 AND channel = $2`
+          : `SELECT DISTINCT CASE WHEN direction = 'outbound' THEN to_number ELSE from_number END as phone_number FROM sms_messages WHERE organization_id = $1`;
+        const phonesParams = hasChannelColumn ? [organizationId, channel] : [organizationId];
+        const phonesResult = await db.query(phonesQuery, phonesParams);
 
         for (const row of phonesResult.rows) {
           await db.query(`
@@ -119,17 +129,22 @@ router.get('/unread-counts', authenticateToken, async (req, res) => {
     const organizationId = req.organizationId;
     const userId = req.userId;
 
-    // Check if required tables/columns exist
-    let hasReadStatusTable = false;
-    let hasCallStatusColumn = false;
-    try {
-      await db.query(`SELECT 1 FROM conversation_read_status LIMIT 0`);
-      hasReadStatusTable = true;
-    } catch (e) { /* table doesn't exist yet */ }
-    try {
-      await db.query(`SELECT call_status FROM phone_calls LIMIT 0`);
-      hasCallStatusColumn = true;
-    } catch (e) { /* column doesn't exist yet */ }
+    // Check if required tables/columns exist (safe check via information_schema)
+    const tableCheck = await db.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'conversation_read_status'
+      ) as exists
+    `);
+    const hasReadStatusTable = tableCheck.rows[0].exists;
+
+    const colCheck = await db.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'phone_calls' AND column_name = 'call_status'
+      ) as exists
+    `);
+    const hasCallStatusColumn = colCheck.rows[0].exists;
 
     if (!hasReadStatusTable) {
       return res.json({ sms: 0, whatsapp: 0, calls: 0, total: 0 });

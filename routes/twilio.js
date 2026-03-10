@@ -346,12 +346,21 @@ router.get('/sms/conversations', authenticateToken, async (req, res) => {
     const userId = req.userId;
     const { channel = 'all' } = req.query;
 
+    // Check if channel column exists on sms_messages (migration 045)
+    const channelColCheck = await db.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'sms_messages' AND column_name = 'channel'
+      ) as exists
+    `);
+    const hasChannelColumn = channelColCheck.rows[0].exists;
+
     // First, check if sms_messages table has any records for this organization
     let countQuery = 'SELECT COUNT(*) FROM sms_messages WHERE organization_id = $1';
     const countParams = [organizationId];
 
-    // Add channel filter if specified
-    if (channel && channel !== 'all') {
+    // Add channel filter only if column exists and channel is specified
+    if (hasChannelColumn && channel && channel !== 'all') {
       countQuery += ` AND channel = $2`;
       countParams.push(channel);
     }
@@ -364,18 +373,25 @@ router.get('/sms/conversations', authenticateToken, async (req, res) => {
     }
 
     // Check if conversation_read_status table exists (migration may not have run yet)
-    let hasReadStatusTable = false;
-    try {
-      await db.query(`SELECT 1 FROM conversation_read_status LIMIT 0`);
-      hasReadStatusTable = true;
-    } catch (e) { /* table doesn't exist yet */ }
+    const tableCheck = await db.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'conversation_read_status'
+      ) as exists
+    `);
+    const hasReadStatusTable = tableCheck.rows[0].exists;
 
-    // Build WHERE clause for channel filtering
-    const channelFilter = channel && channel !== 'all' ? `AND channel = $2` : '';
+    // Build WHERE clause for channel filtering (only if column exists)
+    const channelFilter = hasChannelColumn && channel && channel !== 'all' ? `AND channel = $2` : '';
     const queryParams = [organizationId];
-    if (channel && channel !== 'all') {
+    if (hasChannelColumn && channel && channel !== 'all') {
       queryParams.push(channel);
     }
+
+    // Build channel-aware column expressions (safe when channel column doesn't exist)
+    const smsCountExpr = hasChannelColumn ? "COUNT(*) FILTER (WHERE channel = 'sms')" : "COUNT(*)";
+    const whatsappCountExpr = hasChannelColumn ? "COUNT(*) FILTER (WHERE channel = 'whatsapp')" : "0";
+    const lastChannelExpr = hasChannelColumn ? "channel as last_channel" : "'sms' as last_channel";
 
     let query;
 
@@ -398,8 +414,8 @@ router.get('/sms/conversations', authenticateToken, async (req, res) => {
             COUNT(*) as message_count,
             COUNT(*) FILTER (WHERE direction = 'inbound') as inbound_count,
             COUNT(*) FILTER (WHERE direction = 'outbound') as outbound_count,
-            COUNT(*) FILTER (WHERE channel = 'sms') as sms_count,
-            COUNT(*) FILTER (WHERE channel = 'whatsapp') as whatsapp_count
+            ${smsCountExpr} as sms_count,
+            ${whatsappCountExpr} as whatsapp_count
           FROM sms_messages
           WHERE organization_id = $1 ${channelFilter}
           GROUP BY CASE WHEN direction = 'outbound' THEN to_number ELSE from_number END
@@ -411,7 +427,7 @@ router.get('/sms/conversations', authenticateToken, async (req, res) => {
             CASE WHEN direction = 'outbound' THEN to_number ELSE from_number END as phone_number,
             body as last_message,
             direction as last_direction,
-            channel as last_channel,
+            ${lastChannelExpr},
             lead_id,
             contact_id
           FROM sms_messages
@@ -469,8 +485,8 @@ router.get('/sms/conversations', authenticateToken, async (req, res) => {
             COUNT(*) as message_count,
             COUNT(*) FILTER (WHERE direction = 'inbound') as inbound_count,
             COUNT(*) FILTER (WHERE direction = 'outbound') as outbound_count,
-            COUNT(*) FILTER (WHERE channel = 'sms') as sms_count,
-            COUNT(*) FILTER (WHERE channel = 'whatsapp') as whatsapp_count
+            ${smsCountExpr} as sms_count,
+            ${whatsappCountExpr} as whatsapp_count
           FROM sms_messages
           WHERE organization_id = $1 ${channelFilter}
           GROUP BY CASE WHEN direction = 'outbound' THEN to_number ELSE from_number END
@@ -482,7 +498,7 @@ router.get('/sms/conversations', authenticateToken, async (req, res) => {
             CASE WHEN direction = 'outbound' THEN to_number ELSE from_number END as phone_number,
             body as last_message,
             direction as last_direction,
-            channel as last_channel,
+            ${lastChannelExpr},
             lead_id,
             contact_id
           FROM sms_messages
@@ -557,6 +573,15 @@ router.get('/sms/conversation/:phoneNumber', authenticateToken, async (req, res)
     const { phoneNumber } = req.params;
     const { channel = 'all', limit = 100, offset = 0 } = req.query;
 
+    // Check if channel column exists on sms_messages
+    const channelColCheck = await db.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'sms_messages' AND column_name = 'channel'
+      ) as exists
+    `);
+    const hasChannelColumn = channelColCheck.rows[0].exists;
+
     let query = `
       SELECT
         sm.*,
@@ -576,8 +601,8 @@ router.get('/sms/conversation/:phoneNumber', authenticateToken, async (req, res)
 
     const params = [organizationId, phoneNumber];
 
-    // Add channel filter (default: all)
-    if (channel && channel !== 'all') {
+    // Add channel filter only if column exists (default: all)
+    if (hasChannelColumn && channel && channel !== 'all') {
       query += ` AND sm.channel = $3`;
       params.push(channel);
     }
@@ -607,17 +632,29 @@ router.get('/sms/conversation/:phoneNumber', authenticateToken, async (req, res)
     }
 
     // Calculate channel breakdown for this conversation
-    const statsQuery = `
-      SELECT
-        COUNT(*) as total_count,
-        COUNT(*) FILTER (WHERE channel = 'sms') as sms_count,
-        COUNT(*) FILTER (WHERE channel = 'whatsapp') as whatsapp_count
-      FROM sms_messages
-      WHERE organization_id = $1
-        AND (to_number = $2 OR from_number = $2)
-    `;
-    const statsResult = await db.query(statsQuery, [organizationId, phoneNumber]);
-    const stats = statsResult.rows[0];
+    let stats = { total_count: 0, sms_count: 0, whatsapp_count: 0 };
+    if (hasChannelColumn) {
+      const statsQuery = `
+        SELECT
+          COUNT(*) as total_count,
+          COUNT(*) FILTER (WHERE channel = 'sms') as sms_count,
+          COUNT(*) FILTER (WHERE channel = 'whatsapp') as whatsapp_count
+        FROM sms_messages
+        WHERE organization_id = $1
+          AND (to_number = $2 OR from_number = $2)
+      `;
+      const statsResult = await db.query(statsQuery, [organizationId, phoneNumber]);
+      stats = statsResult.rows[0];
+    } else {
+      const statsQuery = `
+        SELECT COUNT(*) as total_count
+        FROM sms_messages
+        WHERE organization_id = $1
+          AND (to_number = $2 OR from_number = $2)
+      `;
+      const statsResult = await db.query(statsQuery, [organizationId, phoneNumber]);
+      stats = { ...statsResult.rows[0], sms_count: statsResult.rows[0].total_count, whatsapp_count: 0 };
+    }
 
     res.json({
       phoneNumber,
@@ -710,17 +747,22 @@ router.get('/call', authenticateToken, async (req, res) => {
     const userId = req.userId;
     const { leadId, contactId, direction, status, limit = 50, offset = 0 } = req.query;
 
-    // Check if conversation_read_status table exists (migration may not have run yet)
-    let hasReadStatusTable = false;
-    let hasCallStatusColumn = false;
-    try {
-      await db.query(`SELECT 1 FROM conversation_read_status LIMIT 0`);
-      hasReadStatusTable = true;
-    } catch (e) { /* table doesn't exist yet */ }
-    try {
-      await db.query(`SELECT call_status FROM phone_calls LIMIT 0`);
-      hasCallStatusColumn = true;
-    } catch (e) { /* column doesn't exist yet */ }
+    // Check if conversation_read_status table and call_status column exist (migration may not have run yet)
+    const tableCheck = await db.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'conversation_read_status'
+      ) as exists
+    `);
+    const hasReadStatusTable = tableCheck.rows[0].exists;
+
+    const colCheck = await db.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'phone_calls' AND column_name = 'call_status'
+      ) as exists
+    `);
+    const hasCallStatusColumn = colCheck.rows[0].exists;
 
     let query;
     let params;
@@ -1900,12 +1942,31 @@ router.get('/stats', authenticateToken, async (req, res) => {
   try {
     const organizationId = req.organizationId;
 
+    // Check if channel column exists on sms_messages (migration 045)
+    const channelColCheck = await db.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'sms_messages' AND column_name = 'channel'
+      ) as exists
+    `);
+    const hasChannelColumn = channelColCheck.rows[0].exists;
+
     // SMS and WhatsApp stats (combined and channel breakdown)
-    // Note: channel column defaults to 'sms' for backward compatibility
-    const smsQuery = `
+    const smsQuery = hasChannelColumn ? `
       SELECT
         COUNT(*) FILTER (WHERE channel = 'sms') as total_sms,
         COUNT(*) FILTER (WHERE channel = 'whatsapp') as total_whatsapp,
+        COUNT(*) FILTER (WHERE direction = 'outbound') as sent,
+        COUNT(*) FILTER (WHERE direction = 'inbound') as received,
+        COUNT(*) FILTER (WHERE twilio_status = 'delivered') as delivered,
+        COUNT(*) FILTER (WHERE twilio_status = 'failed') as failed,
+        SUM(cost) as total_sms_cost
+      FROM sms_messages
+      WHERE organization_id = $1
+    ` : `
+      SELECT
+        COUNT(*) as total_sms,
+        0 as total_whatsapp,
         COUNT(*) FILTER (WHERE direction = 'outbound') as sent,
         COUNT(*) FILTER (WHERE direction = 'inbound') as received,
         COUNT(*) FILTER (WHERE twilio_status = 'delivered') as delivered,
