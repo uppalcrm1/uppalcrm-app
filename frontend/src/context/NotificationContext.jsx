@@ -36,6 +36,16 @@ export function NotificationProvider({ children }) {
     return 'denied';
   }, []);
 
+  const addToast = useCallback((toast) => {
+    const id = Date.now() + Math.random();
+    setToasts(prev => [...prev, { ...toast, id }]);
+    return id;
+  }, []);
+
+  const dismissToast = useCallback((id) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  }, []);
+
   // Listen for incoming messages via WebSocket to show notifications
   useEffect(() => {
     const handleIncomingSMSNotification = (data) => {
@@ -107,16 +117,6 @@ export function NotificationProvider({ children }) {
       off('incoming-call', handleIncomingCall);
     };
   }, [on, off, queryClient]);
-
-  const addToast = useCallback((toast) => {
-    const id = Date.now() + Math.random();
-    setToasts(prev => [...prev, { ...toast, id }]);
-    return id;
-  }, []);
-
-  const dismissToast = useCallback((id) => {
-    setToasts(prev => prev.filter(t => t.id !== id));
-  }, []);
 
   const value = {
     toasts,
