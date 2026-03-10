@@ -86,7 +86,7 @@ class TwilioService {
   /**
    * Send WhatsApp message
    */
-  async sendWhatsApp({ organizationId, toNumber, body, leadId = null, contactId = null, userId }) {
+  async sendWhatsApp({ organizationId, toNumber, body, leadId = null, contactId = null, userId, useTemplate = false }) {
     try {
       const { client, phoneNumber } = await this.getClient(organizationId);
 
@@ -98,19 +98,54 @@ class TwilioService {
       const configResult = await db.query(configQuery, [organizationId]);
       const whatsappNumber = configResult.rows[0]?.whatsapp_number || '+14155238886'; // Sandbox fallback
 
+      // Normalize toNumber (remove whatsapp: prefix for querying)
+      const normalizedNumber = toNumber.startsWith('whatsapp:') ? toNumber.slice(9) : toNumber;
+
+      // Check for inbound WhatsApp messages in the last 24 hours
+      const inboundCheckQuery = `
+        SELECT COUNT(*) as count FROM sms_messages
+        WHERE organization_id = $1
+          AND from_number = $2
+          AND channel = 'whatsapp'
+          AND direction = 'inbound'
+          AND sent_at > NOW() - INTERVAL '24 hours'
+      `;
+      const inboundCheckResult = await db.query(inboundCheckQuery, [organizationId, normalizedNumber]);
+      const hasRecentInbound = inboundCheckResult.rows[0]?.count > 0;
+
+      // Decide whether to use template
+      // Use template if: explicitly requested OR no recent inbound (24h rule)
+      const shouldUseTemplate = useTemplate || !hasRecentInbound;
+
       // Add whatsapp: prefix to both numbers if not already present
       const fromNumber = whatsappNumber.startsWith('whatsapp:') ? whatsappNumber : `whatsapp:${whatsappNumber}`;
       const toPhoneNumber = toNumber.startsWith('whatsapp:') ? toNumber : `whatsapp:${toNumber}`;
 
-      console.log('📱 Sending WhatsApp message:', { from: fromNumber, to: toPhoneNumber });
+      console.log('📱 Sending WhatsApp message:', { from: fromNumber, to: toPhoneNumber, shouldUseTemplate });
 
-      // Send via Twilio
-      const message = await client.messages.create({
-        body,
-        from: fromNumber,
-        to: toPhoneNumber,
-        statusCallback: `${API_BASE_URL}/api/twilio/webhook/whatsapp-status`
-      });
+      // Send via Twilio - two branches based on message type
+      let message;
+      let messageBody = body;
+
+      if (shouldUseTemplate) {
+        // Use approved renewal template
+        message = await client.messages.create({
+          from: fromNumber,
+          to: toPhoneNumber,
+          contentSid: 'HX8d87e8a5e3ae0d1f9991ad782242c17e',
+          statusCallback: `${API_BASE_URL}/api/twilio/webhook/whatsapp-status`
+        });
+        messageBody = '[Renewal Template]'; // Store meaningful identifier in DB
+      } else {
+        // Free-form message (within 24h window)
+        message = await client.messages.create({
+          body,
+          from: fromNumber,
+          to: toPhoneNumber,
+          statusCallback: `${API_BASE_URL}/api/twilio/webhook/whatsapp-status`
+        });
+        messageBody = body;
+      }
 
       // Save to database with channel='whatsapp'
       const insertQuery = `
@@ -124,11 +159,15 @@ class TwilioService {
 
       const result = await db.query(insertQuery, [
         organizationId, leadId, contactId, userId,
-        'outbound', whatsappNumber, toNumber, body, 'whatsapp',
+        'outbound', whatsappNumber, normalizedNumber, messageBody, 'whatsapp',
         message.sid, message.status
       ]);
 
-      // Create interaction record
+      // Create interaction record with appropriate description
+      const interactionDescription = shouldUseTemplate
+        ? 'Outbound WhatsApp (renewal template)'
+        : `Outbound WhatsApp: ${body}`;
+
       if (leadId) {
         const interactionQuery = `
           INSERT INTO lead_interactions (
@@ -138,7 +177,7 @@ class TwilioService {
         `;
         await db.query(interactionQuery, [
           organizationId, leadId, contactId, userId, 'whatsapp',
-          `Outbound WhatsApp: ${body}`, 'sent'
+          interactionDescription, 'sent'
         ]);
       } else if (contactId) {
         // Create interaction for contact if no lead
@@ -150,7 +189,7 @@ class TwilioService {
         `;
         await db.query(interactionQuery, [
           organizationId, contactId, userId, 'whatsapp',
-          `Outbound WhatsApp: ${body}`, 'sent'
+          interactionDescription, 'sent'
         ]);
       }
 

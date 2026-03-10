@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 
 const SendWhatsAppModal = ({ onClose, onSuccess, defaultTo = '', leadId = null, contactId = null }) => {
   const queryClient = useQueryClient();
+  const [messageType, setMessageType] = useState('freeform'); // 'freeform' | 'template'
   const [formData, setFormData] = useState({
     to_number: defaultTo,
     message: '',
@@ -32,11 +33,19 @@ const SendWhatsAppModal = ({ onClose, onSuccess, defaultTo = '', leadId = null, 
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!formData.to_number || !formData.message) {
-      toast.error('Please fill in all required fields');
+    if (!formData.to_number) {
+      toast.error('Please enter a phone number');
       return;
     }
-    sendMutation.mutate(formData);
+    if (messageType === 'freeform' && !formData.message) {
+      toast.error('Please enter a message');
+      return;
+    }
+    sendMutation.mutate({
+      ...formData,
+      message: messageType === 'freeform' ? formData.message : '',
+      use_template: messageType === 'template'
+    });
   };
 
   // Calculate character count
@@ -87,31 +96,66 @@ const SendWhatsAppModal = ({ onClose, onSuccess, defaultTo = '', leadId = null, 
             </p>
           </div>
 
-          {/* Message Body */}
+          {/* Message Type Toggle */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Message
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Message Type
             </label>
-            <textarea
-              value={formData.message}
-              onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-              placeholder="Type your WhatsApp message here..."
-              rows="6"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent resize-none"
-              style={{ focusRing: '#25D366' }}
-              required
-            />
-
-            {/* Character Count */}
-            <div className="flex items-center justify-between mt-2 text-sm">
-              <p className="text-gray-500">
-                {characterCount} characters
-              </p>
-              <p className={characterCount > 4096 ? 'text-red-600' : 'text-gray-500'}>
-                Max: 4096 characters
-              </p>
+            <div className="flex gap-2 rounded-lg bg-gray-100 p-1">
+              <button
+                type="button"
+                onClick={() => setMessageType('freeform')}
+                className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  messageType === 'freeform' ? 'bg-white shadow text-gray-900' : 'text-gray-500'
+                }`}
+              >
+                Custom Message
+              </button>
+              <button
+                type="button"
+                onClick={() => setMessageType('template')}
+                className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  messageType === 'template' ? 'bg-white shadow text-gray-900' : 'text-gray-500'
+                }`}
+              >
+                Renewal Template
+              </button>
             </div>
           </div>
+
+          {/* Message Body - Conditional based on type */}
+          {messageType === 'freeform' ? (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Message
+              </label>
+              <textarea
+                value={formData.message}
+                onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                placeholder="Type your WhatsApp message here..."
+                rows="6"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent resize-none"
+                style={{ focusRing: '#25D366' }}
+              />
+
+              {/* Character Count */}
+              <div className="flex items-center justify-between mt-2 text-sm">
+                <p className="text-gray-500">
+                  {characterCount} characters
+                </p>
+                <p className={characterCount > 4096 ? 'text-red-600' : 'text-gray-500'}>
+                  Max: 4096 characters
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-gray-700">
+              <p className="font-medium text-green-800 mb-1">Renewal Template</p>
+              <p className="text-gray-600 italic">
+                Sending the approved "renewal_customer" template via WhatsApp.
+              </p>
+            </div>
+          )}
 
           {/* Error Message */}
           {sendMutation.isError && (
@@ -143,7 +187,7 @@ const SendWhatsAppModal = ({ onClose, onSuccess, defaultTo = '', leadId = null, 
             </button>
             <button
               type="submit"
-              disabled={sendMutation.isPending || !formData.to_number || !formData.message}
+              disabled={sendMutation.isPending || !formData.to_number || (messageType === 'freeform' && !formData.message)}
               className="px-6 py-2 text-white rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ backgroundColor: '#25D366' }}
             >
