@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { MessageSquare, MessageCircle, Phone, Send, Settings, PhoneCall, ChevronDown } from 'lucide-react';
+import { MessageSquare, MessageCircle, Phone, Send, Settings, PhoneCall, ChevronDown, CheckCheck } from 'lucide-react';
 import { twilioAPI } from '../services/api';
 import { useTwilioConfig } from '../hooks/useTwilioConfig';
+import { useUnreadCounts } from '../hooks/useUnreadCounts';
 import { useNotifications } from '../context/NotificationContext';
+import { useWebSocket } from '../contexts/WebSocketContext';
 import SendSMSModal from '../components/SendSMSModal';
 import SendWhatsAppModal from '../components/SendWhatsAppModal';
 import ConversationList from '../components/ConversationList';
@@ -26,6 +28,8 @@ const CommunicationsPage = () => {
   const queryClient = useQueryClient();
   const { clearUnread } = useNotifications();
   const { whatsappEnabled } = useTwilioConfig();
+  const { counts: unreadCounts, markAsRead, markAllAsRead } = useUnreadCounts();
+  const { on, off } = useWebSocket();
 
   // Clear unread count when viewing Communications page
   useEffect(() => {
@@ -45,6 +49,22 @@ const CommunicationsPage = () => {
     window.addEventListener('openDialpadWithNumber', handleOpenDialpad);
     return () => window.removeEventListener('openDialpadWithNumber', handleOpenDialpad);
   }, []);
+
+  // Auto-mark-read: if user is viewing a conversation when a new message arrives
+  useEffect(() => {
+    const handleIncomingSMS = (data) => {
+      const incomingPhone = data.from;
+      const channel = data.channel || 'sms';
+
+      // If user has this conversation open, auto-mark as read
+      if (selectedPhone && incomingPhone === selectedPhone && activeTab === channel) {
+        markAsRead(selectedPhone, channel);
+      }
+    };
+
+    on('incoming-sms', handleIncomingSMS);
+    return () => off('incoming-sms', handleIncomingSMS);
+  }, [on, off, selectedPhone, activeTab, markAsRead]);
 
   // Check Twilio configuration
   const { data: config, isLoading: configLoading } = useQuery({
@@ -86,6 +106,26 @@ const CommunicationsPage = () => {
     enabled: !!selectedPhone,
     refetchInterval: 10000 // Refresh every 10 seconds when viewing
   });
+
+  // Handle selecting a conversation — mark as read
+  const handleSelectConversation = useCallback((phoneNumber) => {
+    setSelectedPhone(phoneNumber);
+    const channel = activeTab === 'sms' ? 'sms' : 'whatsapp';
+    markAsRead(phoneNumber, channel);
+  }, [activeTab, markAsRead]);
+
+  // Check if current tab has unread items (for mark-all-as-read button)
+  const currentTabUnreadCount = activeTab === 'sms'
+    ? unreadCounts.sms
+    : activeTab === 'whatsapp'
+      ? unreadCounts.whatsapp
+      : unreadCounts.calls;
+
+  // Handle mark all as read for the active tab
+  const handleMarkAllAsRead = useCallback(() => {
+    const channel = activeTab === 'calls' ? 'call' : activeTab;
+    markAllAsRead(channel);
+  }, [activeTab, markAllAsRead]);
 
   if (configLoading) {
     return <LoadingSpinner />;
@@ -250,50 +290,77 @@ const CommunicationsPage = () => {
       {/* Tabs */}
       <div className="card p-0 overflow-hidden">
         <div className="border-b border-gray-200">
-          <nav className="flex -mb-px">
-            <button
-              onClick={() => {
-                setActiveTab('sms');
-                setSelectedPhone(null);
-              }}
-              className={`px-6 py-4 text-sm font-medium border-b-2 ${
-                activeTab === 'sms'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              <MessageSquare className="w-4 h-4 inline mr-2" />
-              Messages (SMS)
-            </button>
-            {whatsappEnabled && (
+          <div className="flex items-center justify-between">
+            <nav className="flex -mb-px">
               <button
                 onClick={() => {
-                  setActiveTab('whatsapp');
+                  setActiveTab('sms');
                   setSelectedPhone(null);
                 }}
-                className={`px-6 py-4 text-sm font-medium border-b-2 ${
-                  activeTab === 'whatsapp'
-                    ? 'border-b-2 text-white'
+                className={`px-6 py-4 text-sm font-medium border-b-2 flex items-center ${
+                  activeTab === 'sms'
+                    ? 'border-blue-600 text-blue-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
-                style={activeTab === 'whatsapp' ? { borderBottomColor: '#25D366', color: '#25D366' } : {}}
               >
-                <MessageCircle className="w-4 h-4 inline mr-2" />
-                WhatsApp
+                <MessageSquare className="w-4 h-4 mr-2" />
+                Messages (SMS)
+                {unreadCounts.sms > 0 && (
+                  <span className="ml-2 inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold leading-none text-white bg-blue-500 rounded-full">
+                    {unreadCounts.sms > 99 ? '99+' : unreadCounts.sms}
+                  </span>
+                )}
+              </button>
+              {whatsappEnabled && (
+                <button
+                  onClick={() => {
+                    setActiveTab('whatsapp');
+                    setSelectedPhone(null);
+                  }}
+                  className={`px-6 py-4 text-sm font-medium border-b-2 flex items-center ${
+                    activeTab === 'whatsapp'
+                      ? 'border-b-2 text-white'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                  style={activeTab === 'whatsapp' ? { borderBottomColor: '#25D366', color: '#25D366' } : {}}
+                >
+                  <MessageCircle className="w-4 h-4 mr-2" />
+                  WhatsApp
+                  {unreadCounts.whatsapp > 0 && (
+                    <span className="ml-2 inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold leading-none text-white rounded-full" style={{ backgroundColor: '#25D366' }}>
+                      {unreadCounts.whatsapp > 99 ? '99+' : unreadCounts.whatsapp}
+                    </span>
+                  )}
+                </button>
+              )}
+              <button
+                onClick={() => setActiveTab('calls')}
+                className={`px-6 py-4 text-sm font-medium border-b-2 flex items-center ${
+                  activeTab === 'calls'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <Phone className="w-4 h-4 mr-2" />
+                Phone Calls
+                {unreadCounts.calls > 0 && (
+                  <span className="ml-2 inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold leading-none text-white bg-red-500 rounded-full">
+                    {unreadCounts.calls > 99 ? '99+' : unreadCounts.calls}
+                  </span>
+                )}
+              </button>
+            </nav>
+            {/* Mark all as read button */}
+            {currentTabUnreadCount > 0 && (
+              <button
+                onClick={handleMarkAllAsRead}
+                className="mr-4 px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md flex items-center gap-1 transition-colors"
+              >
+                <CheckCheck className="w-3.5 h-3.5" />
+                Mark all as read
               </button>
             )}
-            <button
-              onClick={() => setActiveTab('calls')}
-              className={`px-6 py-4 text-sm font-medium border-b-2 ${
-                activeTab === 'calls'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              <Phone className="w-4 h-4 inline mr-2" />
-              Phone Calls
-            </button>
-          </nav>
+          </div>
         </div>
 
         {/* Tab Content */}
@@ -309,8 +376,9 @@ const CommunicationsPage = () => {
               <ConversationList
                 conversations={conversationsData?.conversations}
                 selectedPhone={selectedPhone}
-                onSelectConversation={setSelectedPhone}
+                onSelectConversation={handleSelectConversation}
                 isLoading={conversationsLoading}
+                channel={activeTab}
               />
             </div>
 
@@ -367,7 +435,7 @@ const CommunicationsPage = () => {
                 Open Dialpad
               </button>
             </div>
-            <CallHistoryList />
+            <CallHistoryList onMarkRead={markAsRead} />
           </div>
         )}
       </div>

@@ -4,6 +4,7 @@ import toast from 'react-hot-toast'
 import { useAuth } from '../contexts/AuthContext'
 import { useNotifications } from '../context/NotificationContext'
 import { useCall } from '../context/CallContext'
+import { useUnreadCounts } from '../hooks/useUnreadCounts'
 import {
   LayoutDashboard,
   Users,
@@ -54,6 +55,7 @@ const DashboardLayout = () => {
   const { user, organization, logout, isLoading } = useAuth()
   const { unreadCount, requestBrowserPermission, browserPermission } = useNotifications()
   const { incomingCall, acceptCall, declineCall } = useCall()
+  const { counts: commUnreadCounts } = useUnreadCounts()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [adminMenuOpen, setAdminMenuOpen] = useState(false)
@@ -364,9 +366,9 @@ const DashboardLayout = () => {
                   >
                     <Icon size={16} className="mr-1.5" />
                     {item.name}
-                    {item.name === 'Communications' && unreadCount > 0 && (
+                    {item.name === 'Communications' && commUnreadCounts.total > 0 && (
                       <span className="ml-2 inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold leading-none text-white bg-red-500 rounded-full">
-                        {unreadCount > 9 ? '9+' : unreadCount}
+                        {commUnreadCounts.total > 9 ? '9+' : commUnreadCounts.total}
                       </span>
                     )}
                   </NavLink>
@@ -428,9 +430,9 @@ const DashboardLayout = () => {
                     >
                       <Icon size={20} className="mr-3" />
                       {item.name}
-                      {item.name === 'Communications' && unreadCount > 0 && (
+                      {item.name === 'Communications' && commUnreadCounts.total > 0 && (
                         <span className="ml-auto inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold leading-none text-white bg-red-500 rounded-full">
-                          {unreadCount > 9 ? '9+' : unreadCount}
+                          {commUnreadCounts.total > 9 ? '9+' : commUnreadCounts.total}
                         </span>
                       )}
                     </NavLink>

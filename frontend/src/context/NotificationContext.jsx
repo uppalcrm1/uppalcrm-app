@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { twilioAPI } from '../services/api';
 import { ToastContainer } from '../components/ToastNotification';
 import { useAuth } from '../contexts/AuthContext';
+import { useWebSocket } from '../contexts/WebSocketContext';
 import { playNotificationSound } from '../utils/audio';
 import { showBrowserNotification, flashTabTitle } from '../utils/notifications';
 
@@ -20,6 +21,7 @@ export function NotificationProvider({ children }) {
   const [browserPermission, setBrowserPermission] = useState('default');
   const lastMessageIdRef = useRef(null);
   const queryClient = useQueryClient();
+  const { on, off } = useWebSocket();
 
   // Request browser notification permission
   useEffect(() => {
@@ -113,6 +115,45 @@ export function NotificationProvider({ children }) {
     setUnreadCount(recentInbound);
 
   }, [conversationsData, queryClient]);
+
+  // WebSocket listener: when incoming SMS/WhatsApp arrives, increment unread counts
+  useEffect(() => {
+    const handleIncomingSMS = (data) => {
+      const channel = data.channel || 'sms';
+
+      // Increment the unread count in React Query cache
+      queryClient.setQueryData(['unreadCounts'], (old) => {
+        if (!old) return { sms: channel === 'sms' ? 1 : 0, whatsapp: channel === 'whatsapp' ? 1 : 0, calls: 0, total: 1 };
+        const updated = { ...old };
+        if (channel === 'sms') updated.sms = (updated.sms || 0) + 1;
+        else if (channel === 'whatsapp') updated.whatsapp = (updated.whatsapp || 0) + 1;
+        updated.total = (updated.sms || 0) + (updated.whatsapp || 0) + (updated.calls || 0);
+        return updated;
+      });
+
+      // Invalidate conversation lists to get updated is_unread flags
+      queryClient.invalidateQueries({ queryKey: ['conversations', channel] });
+    };
+
+    const handleIncomingCall = (data) => {
+      // For missed calls, increment the calls unread count
+      queryClient.setQueryData(['unreadCounts'], (old) => {
+        if (!old) return { sms: 0, whatsapp: 0, calls: 1, total: 1 };
+        const updated = { ...old };
+        updated.calls = (updated.calls || 0) + 1;
+        updated.total = (updated.sms || 0) + (updated.whatsapp || 0) + (updated.calls || 0);
+        return updated;
+      });
+    };
+
+    on('incoming-sms', handleIncomingSMS);
+    on('incoming-call', handleIncomingCall);
+
+    return () => {
+      off('incoming-sms', handleIncomingSMS);
+      off('incoming-call', handleIncomingCall);
+    };
+  }, [on, off, queryClient]);
 
   const addToast = useCallback((toast) => {
     const id = Date.now() + Math.random();

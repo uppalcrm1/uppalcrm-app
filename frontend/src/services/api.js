@@ -1075,6 +1075,24 @@ export const twilioAPI = {
   getStats: async () => {
     const response = await api.get('/twilio/stats')
     return response.data
+  },
+
+  // Mark a conversation as read
+  markRead: async ({ conversation_phone, channel }) => {
+    const response = await api.post('/communications/mark-read', { conversation_phone, channel })
+    return response.data
+  },
+
+  // Mark all conversations in a channel as read
+  markAllRead: async ({ channel }) => {
+    const response = await api.post('/communications/mark-all-read', { channel })
+    return response.data
+  },
+
+  // Get unread counts per channel
+  getUnreadCounts: async () => {
+    const response = await api.get('/communications/unread-counts')
+    return response.data
   }
 }
 

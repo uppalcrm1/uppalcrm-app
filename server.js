@@ -125,6 +125,7 @@ const platformAdminRoutes = require('./routes/platformAdmin');
 const adminFixTrialsRoutes = require('./routes/admin-fix-trials');
 const transactionsRoutes = require('./routes/transactions');
 const twilioRoutes = require('./routes/twilio');
+const communicationsRoutes = require('./routes/communications');
 const reportingRoutes = require('./routes/reporting');
 const reportsRoutes = require('./routes/reports');
 const dashboardsRoutes = require('./routes/dashboards');
@@ -405,6 +406,9 @@ app.use('/api/field-mappings', rateLimiters.general, fieldMappingsRoutes);
 
 // Twilio integration routes
 app.use('/api/twilio', rateLimiters.general, twilioRoutes);
+
+// Communications read tracking routes
+app.use('/api/communications', rateLimiters.general, communicationsRoutes);
 
 // Public routes (no authentication required)
 console.log('🔍 DEBUG: publicLeadRoutes type:', typeof publicLeadRoutes, 'value:', !!publicLeadRoutes);

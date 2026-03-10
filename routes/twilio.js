@@ -343,6 +343,7 @@ router.get('/sms', authenticateToken, async (req, res) => {
 router.get('/sms/conversations', authenticateToken, async (req, res) => {
   try {
     const organizationId = req.organizationId;
+    const userId = req.userId;
     const { channel = 'all' } = req.query;
 
     // First, check if sms_messages table has any records for this organization
@@ -368,6 +369,13 @@ router.get('/sms/conversations', authenticateToken, async (req, res) => {
     if (channel && channel !== 'all') {
       queryParams.push(channel);
     }
+
+    // Determine the channel param index for the read status subquery
+    const readChannel = channel && channel !== 'all' ? channel : 'sms';
+    const userIdParamIndex = queryParams.length + 1;
+    queryParams.push(userId);
+    const readChannelParamIndex = queryParams.length + 1;
+    queryParams.push(readChannel);
 
     const query = `
       WITH conversation_stats AS (
@@ -418,12 +426,25 @@ router.get('/sms/conversations', authenticateToken, async (req, res) => {
         l.first_name as lead_first_name,
         l.last_name as lead_last_name,
         c.first_name as contact_first_name,
-        c.last_name as contact_last_name
+        c.last_name as contact_last_name,
+        crs.last_read_at,
+        CASE
+          WHEN crs.last_read_at IS NULL THEN true
+          WHEN cs.last_message_at > crs.last_read_at THEN true
+          ELSE false
+        END as is_unread
       FROM conversation_stats cs
       JOIN last_messages lm ON cs.phone_number = lm.phone_number
       LEFT JOIN leads l ON lm.lead_id = l.id
       LEFT JOIN contacts c ON lm.contact_id = c.id
-      ORDER BY cs.last_message_at DESC
+      LEFT JOIN conversation_read_status crs
+        ON crs.organization_id = $1
+        AND crs.user_id = $${userIdParamIndex}
+        AND crs.conversation_phone = cs.phone_number
+        AND crs.channel = $${readChannelParamIndex}
+      ORDER BY
+        CASE WHEN crs.last_read_at IS NULL OR cs.last_message_at > crs.last_read_at THEN 0 ELSE 1 END,
+        cs.last_message_at DESC
     `;
 
     const result = await db.query(query, queryParams);
@@ -439,14 +460,15 @@ router.get('/sms/conversations', authenticateToken, async (req, res) => {
         whatsappCount: parseInt(row.whatsapp_count),
         lastMessage: row.last_message,
         lastDirection: row.last_direction,
-        lastChannel: row.last_channel || 'sms', // Default to sms if null (backward compatibility)
+        lastChannel: row.last_channel || 'sms',
         leadId: row.lead_id,
         contactId: row.contact_id,
         contactName: row.contact_first_name
           ? `${row.contact_first_name} ${row.contact_last_name || ''}`.trim()
           : row.lead_first_name
             ? `${row.lead_first_name} ${row.lead_last_name || ''}`.trim()
-            : null
+            : null,
+        isUnread: row.is_unread
       }))
     });
   } catch (error) {
@@ -615,7 +637,8 @@ router.post('/call/make', authenticateToken, async (req, res) => {
 router.get('/call', authenticateToken, async (req, res) => {
   try {
     const organizationId = req.organizationId;
-    const { leadId, contactId, direction, limit = 50, offset = 0 } = req.query;
+    const userId = req.userId;
+    const { leadId, contactId, direction, status, limit = 50, offset = 0 } = req.query;
 
     let query = `
       SELECT
@@ -625,16 +648,30 @@ router.get('/call', authenticateToken, async (req, res) => {
         c.first_name as contact_first_name,
         c.last_name as contact_last_name,
         u.first_name as user_first_name,
-        u.last_name as user_last_name
+        u.last_name as user_last_name,
+        crs.last_read_at,
+        CASE
+          WHEN (pc.call_status IN ('missed', 'no-answer', 'voicemail')
+                OR pc.outcome IN ('no_answer', 'busy', 'voicemail', 'failed'))
+               AND pc.direction = 'inbound'
+               AND (crs.last_read_at IS NULL OR pc.created_at > crs.last_read_at)
+          THEN true
+          ELSE false
+        END as is_unread
       FROM phone_calls pc
       LEFT JOIN leads l ON pc.lead_id = l.id
       LEFT JOIN contacts c ON pc.contact_id = c.id
       LEFT JOIN users u ON pc.user_id = u.id
+      LEFT JOIN conversation_read_status crs
+        ON crs.organization_id = pc.organization_id
+        AND crs.user_id = $2
+        AND crs.conversation_phone = CASE WHEN pc.direction = 'outbound' THEN pc.to_number ELSE pc.from_number END
+        AND crs.channel = 'call'
       WHERE pc.organization_id = $1
     `;
 
-    const params = [organizationId];
-    let paramCount = 1;
+    const params = [organizationId, userId];
+    let paramCount = 2;
 
     if (leadId) {
       paramCount++;
@@ -654,7 +691,22 @@ router.get('/call', authenticateToken, async (req, res) => {
       params.push(direction);
     }
 
-    query += ` ORDER BY pc.created_at DESC LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}`;
+    // Filter by call status (missed, voicemail, etc.)
+    if (status === 'missed') {
+      query += ` AND (pc.call_status IN ('missed', 'no-answer') OR pc.outcome IN ('no_answer', 'busy', 'failed'))`;
+    } else if (status === 'voicemail') {
+      query += ` AND (pc.call_status = 'voicemail' OR pc.outcome = 'voicemail' OR pc.voicemail_url IS NOT NULL)`;
+    }
+
+    // Sort: unread missed calls first, then by recency
+    query += ` ORDER BY
+      CASE WHEN (pc.call_status IN ('missed', 'no-answer', 'voicemail')
+                 OR pc.outcome IN ('no_answer', 'busy', 'voicemail', 'failed'))
+                AND pc.direction = 'inbound'
+                AND (crs.last_read_at IS NULL OR pc.created_at > crs.last_read_at)
+           THEN 0 ELSE 1 END,
+      pc.created_at DESC
+      LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}`;
     params.push(limit, offset);
 
     const result = await db.query(query, params);
@@ -809,6 +861,7 @@ router.post('/webhook/sms', async (req, res) => {
         from: req.body.From,
         to: req.body.To,
         body: req.body.Body,
+        channel: 'sms',
         contactName: result.contactName || null,
         leadId: result.leadId || null,
         contactId: result.contactId || null
