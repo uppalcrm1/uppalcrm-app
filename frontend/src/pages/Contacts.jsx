@@ -108,42 +108,40 @@ const Contacts = () => {
     const columns = []
     const addedFields = new Set()
 
+    // Always add the composite Name column first (combines first_name + last_name)
+    columns.push({
+      key: 'name',
+      sortKey: 'first_name',
+      label: 'Name',
+      type: 'text',
+      isCustom: false,
+      description: 'Contact name',
+      required: true
+    })
+    addedFields.add('name')
+
     // Add system fields - include ALL fields so they're available in column picker
     if (Array.isArray(fieldConfig)) {
       fieldConfig
         .filter(f => f.overall_visibility !== 'hidden')
         .forEach(field => {
-          // Special handling: combine first_name and last_name into a single 'name' column
-          if (field.field_name === 'first_name') {
-            if (!addedFields.has('name')) {
-              columns.push({
-                key: 'name',
-                sortKey: 'first_name',
-                label: 'Name',
-                type: 'text',
-                isCustom: false,
-                description: 'Contact name',
-                required: true
-              })
-              addedFields.add('name')
-            }
-          } else if (field.field_name === 'last_name') {
-            // Skip last_name since we combine it with first_name
+          // Skip first_name and last_name since we already have the composite 'name' column
+          if (field.field_name === 'first_name' || field.field_name === 'last_name') {
             return
-          } else {
-            // Add other fields normally
-            const isSortable = SORTABLE_COLUMNS.has(field.field_name)
-            columns.push({
-              key: field.field_name,
-              label: field.field_label,
-              type: field.field_type,
-              isCustom: false,
-              description: `${field.field_label}`,
-              required: field.is_required,
-              ...(isSortable ? {} : { sortable: false })
-            })
-            addedFields.add(field.field_name)
           }
+
+          // Add other fields normally
+          const isSortable = SORTABLE_COLUMNS.has(field.field_name)
+          columns.push({
+            key: field.field_name,
+            label: field.field_label,
+            type: field.field_type,
+            isCustom: false,
+            description: `${field.field_label}`,
+            required: field.is_required,
+            ...(isSortable ? {} : { sortable: false })
+          })
+          addedFields.add(field.field_name)
         })
     }
 
