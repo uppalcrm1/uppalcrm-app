@@ -1,18 +1,25 @@
 import React, { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { X, MessageCircle, Send } from 'lucide-react';
 import { twilioAPI } from '../services/api';
 import toast from 'react-hot-toast';
 
 const SendWhatsAppModal = ({ onClose, onSuccess, defaultTo = '', leadId = null, contactId = null }) => {
   const queryClient = useQueryClient();
-  const [messageType, setMessageType] = useState('freeform'); // 'freeform' | 'template'
+  const [selectedTemplate, setSelectedTemplate] = useState(null); // null = Custom Message
   const [formData, setFormData] = useState({
     to_number: defaultTo,
     message: '',
     lead_id: leadId,
     contact_id: contactId
   });
+
+  // Fetch templates
+  const { data: templatesData } = useQuery({
+    queryKey: ['whatsappTemplates'],
+    queryFn: twilioAPI.getWhatsAppTemplates
+  });
+  const templates = templatesData?.templates || [];
 
   const sendMutation = useMutation({
     mutationFn: twilioAPI.sendWhatsApp,
@@ -37,14 +44,14 @@ const SendWhatsAppModal = ({ onClose, onSuccess, defaultTo = '', leadId = null, 
       toast.error('Please enter a phone number');
       return;
     }
-    if (messageType === 'freeform' && !formData.message) {
+    if (!selectedTemplate && !formData.message) {
       toast.error('Please enter a message');
       return;
     }
     sendMutation.mutate({
       ...formData,
-      message: messageType === 'freeform' ? formData.message : '',
-      use_template: messageType === 'template'
+      message: selectedTemplate ? '' : formData.message,
+      template_sid: selectedTemplate?.template_sid || null
     });
   };
 
@@ -96,35 +103,28 @@ const SendWhatsAppModal = ({ onClose, onSuccess, defaultTo = '', leadId = null, 
             </p>
           </div>
 
-          {/* Message Type Toggle */}
+          {/* Message Type Dropdown */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               Message Type
             </label>
-            <div className="flex gap-2 rounded-lg bg-gray-100 p-1">
-              <button
-                type="button"
-                onClick={() => setMessageType('freeform')}
-                className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                  messageType === 'freeform' ? 'bg-white shadow text-gray-900' : 'text-gray-500'
-                }`}
-              >
-                Custom Message
-              </button>
-              <button
-                type="button"
-                onClick={() => setMessageType('template')}
-                className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                  messageType === 'template' ? 'bg-white shadow text-gray-900' : 'text-gray-500'
-                }`}
-              >
-                Renewal Template
-              </button>
-            </div>
+            <select
+              value={selectedTemplate?.id || ''}
+              onChange={(e) => {
+                const tmpl = templates.find(t => t.id === e.target.value) || null;
+                setSelectedTemplate(tmpl);
+              }}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:border-transparent"
+            >
+              <option value="">Custom Message</option>
+              {templates.map(t => (
+                <option key={t.id} value={t.id}>{t.display_name}</option>
+              ))}
+            </select>
           </div>
 
-          {/* Message Body - Conditional based on type */}
-          {messageType === 'freeform' ? (
+          {/* Message Body - Conditional based on selected template */}
+          {selectedTemplate === null ? (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Message
@@ -149,11 +149,9 @@ const SendWhatsAppModal = ({ onClose, onSuccess, defaultTo = '', leadId = null, 
               </div>
             </div>
           ) : (
-            <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-gray-700">
-              <p className="font-medium text-green-800 mb-1">Renewal Template</p>
-              <p className="text-gray-600 italic">
-                Sending the approved "renewal_customer" template via WhatsApp.
-              </p>
+            <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm">
+              <p className="font-medium text-green-800 mb-1">{selectedTemplate.display_name}</p>
+              <p className="text-gray-600 italic">{selectedTemplate.body_preview}</p>
             </div>
           )}
 
@@ -187,7 +185,7 @@ const SendWhatsAppModal = ({ onClose, onSuccess, defaultTo = '', leadId = null, 
             </button>
             <button
               type="submit"
-              disabled={sendMutation.isPending || !formData.to_number || (messageType === 'freeform' && !formData.message)}
+              disabled={sendMutation.isPending || !formData.to_number || (!selectedTemplate && !formData.message)}
               className="px-6 py-2 text-white rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ backgroundColor: '#25D366' }}
             >

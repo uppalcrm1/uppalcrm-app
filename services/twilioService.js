@@ -86,7 +86,7 @@ class TwilioService {
   /**
    * Send WhatsApp message
    */
-  async sendWhatsApp({ organizationId, toNumber, body, leadId = null, contactId = null, userId, useTemplate = false }) {
+  async sendWhatsApp({ organizationId, toNumber, body, leadId = null, contactId = null, userId, useTemplate = false, templateSid = null }) {
     try {
       const { client, phoneNumber } = await this.getClient(organizationId);
 
@@ -114,28 +114,33 @@ class TwilioService {
       const hasRecentInbound = inboundCheckResult.rows[0]?.count > 0;
 
       // Decide whether to use template
-      // Use template if: explicitly requested OR no recent inbound (24h rule)
-      const shouldUseTemplate = useTemplate || !hasRecentInbound;
+      // Priority: explicit templateSid > legacy useTemplate flag > 24h auto-detection
+      const resolvedTemplateSid = templateSid || null;
+      const shouldUseTemplate = resolvedTemplateSid !== null || useTemplate || !hasRecentInbound;
+
+      // Fallback SID if auto-detection fires but no explicit templateSid given
+      const LEGACY_RENEWAL_SID = 'HX8d87e8a5e3ae0d1f9991ad782242c17e';
+      const contentSid = resolvedTemplateSid || LEGACY_RENEWAL_SID;
 
       // Add whatsapp: prefix to both numbers if not already present
       const fromNumber = whatsappNumber.startsWith('whatsapp:') ? whatsappNumber : `whatsapp:${whatsappNumber}`;
       const toPhoneNumber = toNumber.startsWith('whatsapp:') ? toNumber : `whatsapp:${toNumber}`;
 
-      console.log('📱 Sending WhatsApp message:', { from: fromNumber, to: toPhoneNumber, shouldUseTemplate });
+      console.log('📱 Sending WhatsApp message:', { from: fromNumber, to: toPhoneNumber, shouldUseTemplate, contentSid });
 
       // Send via Twilio - two branches based on message type
       let message;
       let messageBody = body;
 
       if (shouldUseTemplate) {
-        // Use approved renewal template
+        // Use approved template
         message = await client.messages.create({
           from: fromNumber,
           to: toPhoneNumber,
-          contentSid: 'HX8d87e8a5e3ae0d1f9991ad782242c17e',
+          contentSid: contentSid,
           statusCallback: `${API_BASE_URL}/api/twilio/webhook/whatsapp-status`
         });
-        messageBody = '[Renewal Template]'; // Store meaningful identifier in DB
+        messageBody = '[Template Message]'; // Store meaningful identifier in DB
       } else {
         // Free-form message (within 24h window)
         message = await client.messages.create({

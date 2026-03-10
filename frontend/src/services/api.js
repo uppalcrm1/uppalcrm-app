@@ -1016,6 +1016,12 @@ export const twilioAPI = {
     return response.data
   },
 
+  // Get WhatsApp templates
+  getWhatsAppTemplates: async () => {
+    const response = await api.get('/twilio/whatsapp/templates')
+    return response.data
+  },
+
   // Get SMS history
   getSMSHistory: async (params = {}) => {
     const response = await api.get('/twilio/sms', { params })

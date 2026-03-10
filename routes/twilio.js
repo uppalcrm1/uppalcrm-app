@@ -22,7 +22,8 @@ const sendWhatsAppSchema = Joi.object({
   message: Joi.string().max(4096).optional().allow(null, ''),
   lead_id: Joi.string().uuid().optional().allow(null, ''),
   contact_id: Joi.string().uuid().optional().allow(null, ''),
-  use_template: Joi.boolean().optional()
+  use_template: Joi.boolean().optional(),
+  template_sid: Joi.string().optional().allow(null, '')
 });
 
 const makeCallSchema = Joi.object({
@@ -233,7 +234,7 @@ router.post('/whatsapp/send', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: error.details[0].message });
     }
 
-    const { to_number, message, lead_id, contact_id, use_template } = req.body;
+    const { to_number, message, lead_id, contact_id, use_template, template_sid } = req.body;
     const organizationId = req.organizationId;
     const userId = req.userId;
 
@@ -244,7 +245,8 @@ router.post('/whatsapp/send', authenticateToken, async (req, res) => {
       leadId: lead_id,
       contactId: contact_id,
       userId,
-      useTemplate: !!use_template
+      useTemplate: !!use_template,
+      templateSid: template_sid || null
     });
 
     res.json({
@@ -254,6 +256,35 @@ router.post('/whatsapp/send', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Error sending WhatsApp:', error);
     res.status(500).json({ error: error.message || 'Failed to send WhatsApp message' });
+  }
+});
+
+/**
+ * Get WhatsApp templates for organization
+ */
+router.get('/whatsapp/templates', authenticateToken, async (req, res) => {
+  try {
+    const organizationId = req.organizationId;
+
+    // Check if table exists (pre-migration safety)
+    const tableCheck = await db.query(`
+      SELECT 1 FROM information_schema.tables WHERE table_name = 'whatsapp_templates' LIMIT 1
+    `);
+    if (tableCheck.rows.length === 0) {
+      return res.json({ templates: [] });
+    }
+
+    const result = await db.query(`
+      SELECT id, template_name, template_sid, display_name, body_preview, category, sort_order
+      FROM whatsapp_templates
+      WHERE organization_id = $1 AND is_active = true
+      ORDER BY sort_order ASC, display_name ASC
+    `, [organizationId]);
+
+    res.json({ templates: result.rows });
+  } catch (error) {
+    console.error('Error fetching WhatsApp templates:', error);
+    res.status(500).json({ error: 'Failed to fetch WhatsApp templates' });
   }
 });
 
