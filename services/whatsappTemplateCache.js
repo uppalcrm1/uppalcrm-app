@@ -67,81 +67,64 @@ class WhatsAppTemplateCache {
       // Filter and map each content item
       for (let i = 0; i < contents.length; i++) {
         const content = contents[i];
-        console.log(`\n📄 [${i + 1}/${contents.length}] FULL CONTENT OBJECT STRUCTURE:`);
-        console.log(JSON.stringify(content, null, 2));
-
-        // Log all available keys
-        console.log(`\n   Available Keys: ${Object.keys(content).join(', ')}`);
-
-        // Try common property names
-        const displayName = content.friendly_name || content.name || content.title || content.display_name || 'Unknown';
-        console.log(`\n   Display Name candidates: friendly_name=${content.friendly_name}, name=${content.name}, title=${content.title}`);
+        console.log(`\n📄 [${i + 1}/${contents.length}] Processing: ${content.friendlyName}`);
         console.log(`   SID: ${content.sid}`);
         console.log(`   Language: ${content.language}`);
-        console.log(`   Approval: ${JSON.stringify(content.approval)}`);
 
-        // Since approval is undefined, let's check for alternative structures
-        if (!content.approval) {
-          console.log(`   ⏭️  No approval object found. Checking for alternative approval structures...`);
-          console.log(`   All properties: ${JSON.stringify(content, null, 2)}`);
-          continue;
-        }
+        // Get friendly name (use camelCase property)
+        const displayName = content.friendlyName || 'Unnamed Template';
+        console.log(`   Display Name: ${displayName}`);
 
-        // Check different possible approval status structures
-        let whatsappStatus = null;
-
-        // Try: content.approval.whatsapp
-        if (content.approval.whatsapp) {
-          whatsappStatus = content.approval.whatsapp;
-          console.log(`   WhatsApp Status (from .whatsapp): ${whatsappStatus}`);
-        }
-        // Try: content.approval['whatsapp']
-        else if (content.approval['whatsapp']) {
-          whatsappStatus = content.approval['whatsapp'];
-          console.log(`   WhatsApp Status (from ['whatsapp']): ${whatsappStatus}`);
-        }
-        // Try: content.approval.channels.whatsapp
-        else if (content.approval.channels && content.approval.channels.whatsapp) {
-          whatsappStatus = content.approval.channels.whatsapp;
-          console.log(`   WhatsApp Status (from .channels.whatsapp): ${whatsappStatus}`);
-        }
-        // Fallback - check for any approval property
-        else {
-          console.log(`   ⏭️  No WhatsApp approval found in structure`);
-          continue;
-        }
-
-        if (!whatsappStatus || whatsappStatus !== 'approved') {
-          console.log(`   ⏭️  Skipping - WhatsApp status is '${whatsappStatus}' (not 'approved')`);
-          continue;
-        }
-
-        // Extract body preview from template variables
+        // Extract body from types.twilio/text.body
         let bodyPreview = '';
-        if (content.variables && Array.isArray(content.variables)) {
-          console.log(`   Variables found: ${content.variables.length}`);
-          // Try different variable structures
-          const bodyVar = content.variables.find(v =>
-            v.type === 'body' ||
-            v.key === 'body' ||
-            v.name === 'body'
-          );
-          if (bodyVar) {
-            bodyPreview = bodyVar.value || bodyVar.default || JSON.stringify(bodyVar);
-            console.log(`   Body Preview: ${bodyPreview.substring(0, 80)}...`);
-          }
+        if (content.types && content.types['twilio/text'] && content.types['twilio/text'].body) {
+          bodyPreview = content.types['twilio/text'].body;
+          console.log(`   Body Preview: ${bodyPreview.substring(0, 80)}...`);
         } else {
-          console.log(`   No variables array found`);
+          console.log(`   ⚠️  No body text found in types`);
+        }
+
+        // Fetch approval status for this content
+        console.log(`   📋 Fetching approval status...`);
+        let whatsappApprovalStatus = null;
+
+        try {
+          // Fetch all approval requests for this content
+          const approvalRequests = await twilioClient.content.v1.contents(content.sid).approvalRequests.list();
+
+          if (approvalRequests && approvalRequests.length > 0) {
+            // Find WhatsApp approval
+            const whatsappApproval = approvalRequests.find(a => a.channel === 'whatsapp');
+            if (whatsappApproval) {
+              whatsappApprovalStatus = whatsappApproval.status;
+              console.log(`   WhatsApp Approval Status: ${whatsappApprovalStatus}`);
+            } else {
+              console.log(`   ⏭️  No WhatsApp approval request found`);
+              continue;
+            }
+          } else {
+            console.log(`   ⏭️  No approval requests found for this content`);
+            continue;
+          }
+        } catch (approvalError) {
+          console.log(`   ⚠️  Could not fetch approval status: ${approvalError.message}`);
+          continue;
+        }
+
+        // Only include approved templates
+        if (whatsappApprovalStatus !== 'approved') {
+          console.log(`   ⏭️  Skipping - WhatsApp status is '${whatsappApprovalStatus}' (not 'approved')`);
+          continue;
         }
 
         // Map Twilio template to our format
         const template = {
           template_sid: content.sid, // Content SID (e.g., HX...)
-          display_name: content.friendly_name || 'Unnamed Template',
-          body_preview: bodyPreview || content.friendly_name || '',
+          display_name: displayName,
+          body_preview: bodyPreview,
           category: content.language || 'general',
-          approval_status: whatsappStatus,
-          created_at: content.date_created
+          approval_status: whatsappApprovalStatus,
+          created_at: content.dateCreated
         };
 
         templates.push(template);
