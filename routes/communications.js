@@ -22,12 +22,17 @@ router.post('/mark-read', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: `channel must be one of: ${validChannels.join(', ')}` });
     }
 
-    await db.query(`
-      INSERT INTO conversation_read_status (organization_id, user_id, conversation_phone, channel, last_read_at)
-      VALUES ($1, $2, $3, $4, NOW())
-      ON CONFLICT (organization_id, user_id, conversation_phone, channel)
-      DO UPDATE SET last_read_at = NOW(), updated_at = NOW()
-    `, [organizationId, userId, conversation_phone, channel]);
+    try {
+      await db.query(`
+        INSERT INTO conversation_read_status (organization_id, user_id, conversation_phone, channel, last_read_at)
+        VALUES ($1, $2, $3, $4, NOW())
+        ON CONFLICT (organization_id, user_id, conversation_phone, channel)
+        DO UPDATE SET last_read_at = NOW(), updated_at = NOW()
+      `, [organizationId, userId, conversation_phone, channel]);
+    } catch (tableError) {
+      // Table may not exist yet if migration hasn't run
+      console.warn('conversation_read_status table not available yet:', tableError.message);
+    }
 
     res.json({ success: true });
   } catch (error) {
@@ -55,40 +60,46 @@ router.post('/mark-all-read', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: `channel must be one of: ${validChannels.join(', ')}` });
     }
 
-    if (channel === 'sms' || channel === 'whatsapp') {
-      // Get all unique phone numbers from conversations in this channel
-      const phonesResult = await db.query(`
-        SELECT DISTINCT
-          CASE WHEN direction = 'outbound' THEN to_number ELSE from_number END as phone_number
-        FROM sms_messages
-        WHERE organization_id = $1 AND channel = $2
-      `, [organizationId, channel]);
+    // Check if table exists
+    let hasTable = false;
+    try {
+      await db.query(`SELECT 1 FROM conversation_read_status LIMIT 0`);
+      hasTable = true;
+    } catch (e) { /* table doesn't exist yet */ }
 
-      // UPSERT read status for all phone numbers
-      for (const row of phonesResult.rows) {
-        await db.query(`
-          INSERT INTO conversation_read_status (organization_id, user_id, conversation_phone, channel, last_read_at)
-          VALUES ($1, $2, $3, $4, NOW())
-          ON CONFLICT (organization_id, user_id, conversation_phone, channel)
-          DO UPDATE SET last_read_at = NOW(), updated_at = NOW()
-        `, [organizationId, userId, row.phone_number, channel]);
-      }
-    } else if (channel === 'call') {
-      // Get all unique phone numbers from call logs
-      const phonesResult = await db.query(`
-        SELECT DISTINCT
-          CASE WHEN direction = 'outbound' THEN to_number ELSE from_number END as phone_number
-        FROM phone_calls
-        WHERE organization_id = $1
-      `, [organizationId]);
+    if (hasTable) {
+      if (channel === 'sms' || channel === 'whatsapp') {
+        const phonesResult = await db.query(`
+          SELECT DISTINCT
+            CASE WHEN direction = 'outbound' THEN to_number ELSE from_number END as phone_number
+          FROM sms_messages
+          WHERE organization_id = $1 AND channel = $2
+        `, [organizationId, channel]);
 
-      for (const row of phonesResult.rows) {
-        await db.query(`
-          INSERT INTO conversation_read_status (organization_id, user_id, conversation_phone, channel, last_read_at)
-          VALUES ($1, $2, $3, $4, NOW())
-          ON CONFLICT (organization_id, user_id, conversation_phone, channel)
-          DO UPDATE SET last_read_at = NOW(), updated_at = NOW()
-        `, [organizationId, userId, row.phone_number, 'call']);
+        for (const row of phonesResult.rows) {
+          await db.query(`
+            INSERT INTO conversation_read_status (organization_id, user_id, conversation_phone, channel, last_read_at)
+            VALUES ($1, $2, $3, $4, NOW())
+            ON CONFLICT (organization_id, user_id, conversation_phone, channel)
+            DO UPDATE SET last_read_at = NOW(), updated_at = NOW()
+          `, [organizationId, userId, row.phone_number, channel]);
+        }
+      } else if (channel === 'call') {
+        const phonesResult = await db.query(`
+          SELECT DISTINCT
+            CASE WHEN direction = 'outbound' THEN to_number ELSE from_number END as phone_number
+          FROM phone_calls
+          WHERE organization_id = $1
+        `, [organizationId]);
+
+        for (const row of phonesResult.rows) {
+          await db.query(`
+            INSERT INTO conversation_read_status (organization_id, user_id, conversation_phone, channel, last_read_at)
+            VALUES ($1, $2, $3, $4, NOW())
+            ON CONFLICT (organization_id, user_id, conversation_phone, channel)
+            DO UPDATE SET last_read_at = NOW(), updated_at = NOW()
+          `, [organizationId, userId, row.phone_number, 'call']);
+        }
       }
     }
 
@@ -107,6 +118,22 @@ router.get('/unread-counts', authenticateToken, async (req, res) => {
   try {
     const organizationId = req.organizationId;
     const userId = req.userId;
+
+    // Check if required tables/columns exist
+    let hasReadStatusTable = false;
+    let hasCallStatusColumn = false;
+    try {
+      await db.query(`SELECT 1 FROM conversation_read_status LIMIT 0`);
+      hasReadStatusTable = true;
+    } catch (e) { /* table doesn't exist yet */ }
+    try {
+      await db.query(`SELECT call_status FROM phone_calls LIMIT 0`);
+      hasCallStatusColumn = true;
+    } catch (e) { /* column doesn't exist yet */ }
+
+    if (!hasReadStatusTable) {
+      return res.json({ sms: 0, whatsapp: 0, calls: 0, total: 0 });
+    }
 
     // SMS unread count: conversations with inbound messages newer than user's last_read_at
     const smsResult = await db.query(`
@@ -159,30 +186,57 @@ router.get('/unread-counts', authenticateToken, async (req, res) => {
     `, [organizationId, userId]);
 
     // Calls unread count: missed/no-answer/voicemail calls newer than last_read_at
-    const callsResult = await db.query(`
-      WITH latest_missed AS (
-        SELECT
-          CASE WHEN direction = 'outbound' THEN to_number ELSE from_number END as phone_number,
-          MAX(created_at) as latest_call_at
-        FROM phone_calls
-        WHERE organization_id = $1
-          AND (call_status IN ('missed', 'no-answer', 'voicemail')
-               OR outcome IN ('no_answer', 'busy', 'voicemail', 'failed'))
-          AND direction = 'inbound'
-        GROUP BY CASE WHEN direction = 'outbound' THEN to_number ELSE from_number END
-      )
-      SELECT COUNT(*) as unread_count
-      FROM latest_missed lm
-      WHERE lm.latest_call_at > COALESCE(
-        (SELECT crs.last_read_at
-         FROM conversation_read_status crs
-         WHERE crs.organization_id = $1
-           AND crs.user_id = $2
-           AND crs.conversation_phone = lm.phone_number
-           AND crs.channel = 'call'),
-        '1970-01-01'::timestamptz
-      )
-    `, [organizationId, userId]);
+    let callsResult;
+    if (hasCallStatusColumn) {
+      callsResult = await db.query(`
+        WITH latest_missed AS (
+          SELECT
+            CASE WHEN direction = 'outbound' THEN to_number ELSE from_number END as phone_number,
+            MAX(created_at) as latest_call_at
+          FROM phone_calls
+          WHERE organization_id = $1
+            AND (call_status IN ('missed', 'no-answer', 'voicemail')
+                 OR outcome IN ('no_answer', 'busy', 'voicemail', 'failed'))
+            AND direction = 'inbound'
+          GROUP BY CASE WHEN direction = 'outbound' THEN to_number ELSE from_number END
+        )
+        SELECT COUNT(*) as unread_count
+        FROM latest_missed lm
+        WHERE lm.latest_call_at > COALESCE(
+          (SELECT crs.last_read_at
+           FROM conversation_read_status crs
+           WHERE crs.organization_id = $1
+             AND crs.user_id = $2
+             AND crs.conversation_phone = lm.phone_number
+             AND crs.channel = 'call'),
+          '1970-01-01'::timestamptz
+        )
+      `, [organizationId, userId]);
+    } else {
+      callsResult = await db.query(`
+        WITH latest_missed AS (
+          SELECT
+            CASE WHEN direction = 'outbound' THEN to_number ELSE from_number END as phone_number,
+            MAX(created_at) as latest_call_at
+          FROM phone_calls
+          WHERE organization_id = $1
+            AND outcome IN ('no_answer', 'busy', 'voicemail', 'failed')
+            AND direction = 'inbound'
+          GROUP BY CASE WHEN direction = 'outbound' THEN to_number ELSE from_number END
+        )
+        SELECT COUNT(*) as unread_count
+        FROM latest_missed lm
+        WHERE lm.latest_call_at > COALESCE(
+          (SELECT crs.last_read_at
+           FROM conversation_read_status crs
+           WHERE crs.organization_id = $1
+             AND crs.user_id = $2
+             AND crs.conversation_phone = lm.phone_number
+             AND crs.channel = 'call'),
+          '1970-01-01'::timestamptz
+        )
+      `, [organizationId, userId]);
+    }
 
     const sms = parseInt(smsResult.rows[0].unread_count) || 0;
     const whatsapp = parseInt(whatsappResult.rows[0].unread_count) || 0;

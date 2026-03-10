@@ -363,6 +363,13 @@ router.get('/sms/conversations', authenticateToken, async (req, res) => {
       return res.json({ conversations: [] });
     }
 
+    // Check if conversation_read_status table exists (migration may not have run yet)
+    let hasReadStatusTable = false;
+    try {
+      await db.query(`SELECT 1 FROM conversation_read_status LIMIT 0`);
+      hasReadStatusTable = true;
+    } catch (e) { /* table doesn't exist yet */ }
+
     // Build WHERE clause for channel filtering
     const channelFilter = channel && channel !== 'all' ? `AND channel = $2` : '';
     const queryParams = [organizationId];
@@ -370,82 +377,145 @@ router.get('/sms/conversations', authenticateToken, async (req, res) => {
       queryParams.push(channel);
     }
 
-    // Determine the channel param index for the read status subquery
-    const readChannel = channel && channel !== 'all' ? channel : 'sms';
-    const userIdParamIndex = queryParams.length + 1;
-    queryParams.push(userId);
-    const readChannelParamIndex = queryParams.length + 1;
-    queryParams.push(readChannel);
+    let query;
 
-    const query = `
-      WITH conversation_stats AS (
-        SELECT
-          CASE
-            WHEN direction = 'outbound' THEN to_number
-            ELSE from_number
-          END as phone_number,
-          MAX(created_at) as last_message_at,
-          COUNT(*) as message_count,
-          COUNT(*) FILTER (WHERE direction = 'inbound') as inbound_count,
-          COUNT(*) FILTER (WHERE direction = 'outbound') as outbound_count,
-          COUNT(*) FILTER (WHERE channel = 'sms') as sms_count,
-          COUNT(*) FILTER (WHERE channel = 'whatsapp') as whatsapp_count
-        FROM sms_messages
-        WHERE organization_id = $1 ${channelFilter}
-        GROUP BY CASE WHEN direction = 'outbound' THEN to_number ELSE from_number END
-      ),
-      last_messages AS (
-        SELECT DISTINCT ON (
-          CASE WHEN direction = 'outbound' THEN to_number ELSE from_number END
+    if (hasReadStatusTable) {
+      // Full query with read status tracking
+      const readChannel = channel && channel !== 'all' ? channel : 'sms';
+      const userIdParamIndex = queryParams.length + 1;
+      queryParams.push(userId);
+      const readChannelParamIndex = queryParams.length + 1;
+      queryParams.push(readChannel);
+
+      query = `
+        WITH conversation_stats AS (
+          SELECT
+            CASE
+              WHEN direction = 'outbound' THEN to_number
+              ELSE from_number
+            END as phone_number,
+            MAX(created_at) as last_message_at,
+            COUNT(*) as message_count,
+            COUNT(*) FILTER (WHERE direction = 'inbound') as inbound_count,
+            COUNT(*) FILTER (WHERE direction = 'outbound') as outbound_count,
+            COUNT(*) FILTER (WHERE channel = 'sms') as sms_count,
+            COUNT(*) FILTER (WHERE channel = 'whatsapp') as whatsapp_count
+          FROM sms_messages
+          WHERE organization_id = $1 ${channelFilter}
+          GROUP BY CASE WHEN direction = 'outbound' THEN to_number ELSE from_number END
+        ),
+        last_messages AS (
+          SELECT DISTINCT ON (
+            CASE WHEN direction = 'outbound' THEN to_number ELSE from_number END
+          )
+            CASE WHEN direction = 'outbound' THEN to_number ELSE from_number END as phone_number,
+            body as last_message,
+            direction as last_direction,
+            channel as last_channel,
+            lead_id,
+            contact_id
+          FROM sms_messages
+          WHERE organization_id = $1 ${channelFilter}
+          ORDER BY
+            CASE WHEN direction = 'outbound' THEN to_number ELSE from_number END,
+            created_at DESC
         )
-          CASE WHEN direction = 'outbound' THEN to_number ELSE from_number END as phone_number,
-          body as last_message,
-          direction as last_direction,
-          channel as last_channel,
-          lead_id,
-          contact_id
-        FROM sms_messages
-        WHERE organization_id = $1 ${channelFilter}
+        SELECT
+          cs.phone_number,
+          cs.last_message_at,
+          cs.message_count,
+          cs.inbound_count,
+          cs.outbound_count,
+          cs.sms_count,
+          cs.whatsapp_count,
+          lm.last_message,
+          lm.last_direction,
+          lm.last_channel,
+          lm.lead_id,
+          lm.contact_id,
+          l.first_name as lead_first_name,
+          l.last_name as lead_last_name,
+          c.first_name as contact_first_name,
+          c.last_name as contact_last_name,
+          crs.last_read_at,
+          CASE
+            WHEN crs.last_read_at IS NULL THEN true
+            WHEN cs.last_message_at > crs.last_read_at THEN true
+            ELSE false
+          END as is_unread
+        FROM conversation_stats cs
+        JOIN last_messages lm ON cs.phone_number = lm.phone_number
+        LEFT JOIN leads l ON lm.lead_id = l.id
+        LEFT JOIN contacts c ON lm.contact_id = c.id
+        LEFT JOIN conversation_read_status crs
+          ON crs.organization_id = $1
+          AND crs.user_id = $${userIdParamIndex}
+          AND crs.conversation_phone = cs.phone_number
+          AND crs.channel = $${readChannelParamIndex}
         ORDER BY
-          CASE WHEN direction = 'outbound' THEN to_number ELSE from_number END,
-          created_at DESC
-      )
-      SELECT
-        cs.phone_number,
-        cs.last_message_at,
-        cs.message_count,
-        cs.inbound_count,
-        cs.outbound_count,
-        cs.sms_count,
-        cs.whatsapp_count,
-        lm.last_message,
-        lm.last_direction,
-        lm.last_channel,
-        lm.lead_id,
-        lm.contact_id,
-        l.first_name as lead_first_name,
-        l.last_name as lead_last_name,
-        c.first_name as contact_first_name,
-        c.last_name as contact_last_name,
-        crs.last_read_at,
-        CASE
-          WHEN crs.last_read_at IS NULL THEN true
-          WHEN cs.last_message_at > crs.last_read_at THEN true
-          ELSE false
-        END as is_unread
-      FROM conversation_stats cs
-      JOIN last_messages lm ON cs.phone_number = lm.phone_number
-      LEFT JOIN leads l ON lm.lead_id = l.id
-      LEFT JOIN contacts c ON lm.contact_id = c.id
-      LEFT JOIN conversation_read_status crs
-        ON crs.organization_id = $1
-        AND crs.user_id = $${userIdParamIndex}
-        AND crs.conversation_phone = cs.phone_number
-        AND crs.channel = $${readChannelParamIndex}
-      ORDER BY
-        CASE WHEN crs.last_read_at IS NULL OR cs.last_message_at > crs.last_read_at THEN 0 ELSE 1 END,
-        cs.last_message_at DESC
-    `;
+          CASE WHEN crs.last_read_at IS NULL OR cs.last_message_at > crs.last_read_at THEN 0 ELSE 1 END,
+          cs.last_message_at DESC
+      `;
+    } else {
+      // Fallback query without read status (migration not yet applied)
+      query = `
+        WITH conversation_stats AS (
+          SELECT
+            CASE
+              WHEN direction = 'outbound' THEN to_number
+              ELSE from_number
+            END as phone_number,
+            MAX(created_at) as last_message_at,
+            COUNT(*) as message_count,
+            COUNT(*) FILTER (WHERE direction = 'inbound') as inbound_count,
+            COUNT(*) FILTER (WHERE direction = 'outbound') as outbound_count,
+            COUNT(*) FILTER (WHERE channel = 'sms') as sms_count,
+            COUNT(*) FILTER (WHERE channel = 'whatsapp') as whatsapp_count
+          FROM sms_messages
+          WHERE organization_id = $1 ${channelFilter}
+          GROUP BY CASE WHEN direction = 'outbound' THEN to_number ELSE from_number END
+        ),
+        last_messages AS (
+          SELECT DISTINCT ON (
+            CASE WHEN direction = 'outbound' THEN to_number ELSE from_number END
+          )
+            CASE WHEN direction = 'outbound' THEN to_number ELSE from_number END as phone_number,
+            body as last_message,
+            direction as last_direction,
+            channel as last_channel,
+            lead_id,
+            contact_id
+          FROM sms_messages
+          WHERE organization_id = $1 ${channelFilter}
+          ORDER BY
+            CASE WHEN direction = 'outbound' THEN to_number ELSE from_number END,
+            created_at DESC
+        )
+        SELECT
+          cs.phone_number,
+          cs.last_message_at,
+          cs.message_count,
+          cs.inbound_count,
+          cs.outbound_count,
+          cs.sms_count,
+          cs.whatsapp_count,
+          lm.last_message,
+          lm.last_direction,
+          lm.last_channel,
+          lm.lead_id,
+          lm.contact_id,
+          l.first_name as lead_first_name,
+          l.last_name as lead_last_name,
+          c.first_name as contact_first_name,
+          c.last_name as contact_last_name,
+          false as is_unread
+        FROM conversation_stats cs
+        JOIN last_messages lm ON cs.phone_number = lm.phone_number
+        LEFT JOIN leads l ON lm.lead_id = l.id
+        LEFT JOIN contacts c ON lm.contact_id = c.id
+        ORDER BY cs.last_message_at DESC
+      `;
+    }
 
     const result = await db.query(query, queryParams);
 
@@ -640,38 +710,76 @@ router.get('/call', authenticateToken, async (req, res) => {
     const userId = req.userId;
     const { leadId, contactId, direction, status, limit = 50, offset = 0 } = req.query;
 
-    let query = `
-      SELECT
-        pc.*,
-        l.first_name as lead_first_name,
-        l.last_name as lead_last_name,
-        c.first_name as contact_first_name,
-        c.last_name as contact_last_name,
-        u.first_name as user_first_name,
-        u.last_name as user_last_name,
-        crs.last_read_at,
-        CASE
-          WHEN (pc.call_status IN ('missed', 'no-answer', 'voicemail')
-                OR pc.outcome IN ('no_answer', 'busy', 'voicemail', 'failed'))
-               AND pc.direction = 'inbound'
-               AND (crs.last_read_at IS NULL OR pc.created_at > crs.last_read_at)
-          THEN true
-          ELSE false
-        END as is_unread
-      FROM phone_calls pc
-      LEFT JOIN leads l ON pc.lead_id = l.id
-      LEFT JOIN contacts c ON pc.contact_id = c.id
-      LEFT JOIN users u ON pc.user_id = u.id
-      LEFT JOIN conversation_read_status crs
-        ON crs.organization_id = pc.organization_id
-        AND crs.user_id = $2
-        AND crs.conversation_phone = CASE WHEN pc.direction = 'outbound' THEN pc.to_number ELSE pc.from_number END
-        AND crs.channel = 'call'
-      WHERE pc.organization_id = $1
-    `;
+    // Check if conversation_read_status table exists (migration may not have run yet)
+    let hasReadStatusTable = false;
+    let hasCallStatusColumn = false;
+    try {
+      await db.query(`SELECT 1 FROM conversation_read_status LIMIT 0`);
+      hasReadStatusTable = true;
+    } catch (e) { /* table doesn't exist yet */ }
+    try {
+      await db.query(`SELECT call_status FROM phone_calls LIMIT 0`);
+      hasCallStatusColumn = true;
+    } catch (e) { /* column doesn't exist yet */ }
 
-    const params = [organizationId, userId];
-    let paramCount = 2;
+    let query;
+    let params;
+    let paramCount;
+
+    if (hasReadStatusTable && hasCallStatusColumn) {
+      // Full query with read status tracking
+      query = `
+        SELECT
+          pc.*,
+          l.first_name as lead_first_name,
+          l.last_name as lead_last_name,
+          c.first_name as contact_first_name,
+          c.last_name as contact_last_name,
+          u.first_name as user_first_name,
+          u.last_name as user_last_name,
+          crs.last_read_at,
+          CASE
+            WHEN (pc.call_status IN ('missed', 'no-answer', 'voicemail')
+                  OR pc.outcome IN ('no_answer', 'busy', 'voicemail', 'failed'))
+                 AND pc.direction = 'inbound'
+                 AND (crs.last_read_at IS NULL OR pc.created_at > crs.last_read_at)
+            THEN true
+            ELSE false
+          END as is_unread
+        FROM phone_calls pc
+        LEFT JOIN leads l ON pc.lead_id = l.id
+        LEFT JOIN contacts c ON pc.contact_id = c.id
+        LEFT JOIN users u ON pc.user_id = u.id
+        LEFT JOIN conversation_read_status crs
+          ON crs.organization_id = pc.organization_id
+          AND crs.user_id = $2
+          AND crs.conversation_phone = CASE WHEN pc.direction = 'outbound' THEN pc.to_number ELSE pc.from_number END
+          AND crs.channel = 'call'
+        WHERE pc.organization_id = $1
+      `;
+      params = [organizationId, userId];
+      paramCount = 2;
+    } else {
+      // Fallback query without read status (migration not yet applied)
+      query = `
+        SELECT
+          pc.*,
+          l.first_name as lead_first_name,
+          l.last_name as lead_last_name,
+          c.first_name as contact_first_name,
+          c.last_name as contact_last_name,
+          u.first_name as user_first_name,
+          u.last_name as user_last_name,
+          false as is_unread
+        FROM phone_calls pc
+        LEFT JOIN leads l ON pc.lead_id = l.id
+        LEFT JOIN contacts c ON pc.contact_id = c.id
+        LEFT JOIN users u ON pc.user_id = u.id
+        WHERE pc.organization_id = $1
+      `;
+      params = [organizationId];
+      paramCount = 1;
+    }
 
     if (leadId) {
       paramCount++;
@@ -691,22 +799,34 @@ router.get('/call', authenticateToken, async (req, res) => {
       params.push(direction);
     }
 
-    // Filter by call status (missed, voicemail, etc.)
-    if (status === 'missed') {
-      query += ` AND (pc.call_status IN ('missed', 'no-answer') OR pc.outcome IN ('no_answer', 'busy', 'failed'))`;
-    } else if (status === 'voicemail') {
-      query += ` AND (pc.call_status = 'voicemail' OR pc.outcome = 'voicemail' OR pc.voicemail_url IS NOT NULL)`;
+    // Filter by call status (missed, voicemail, etc.) — only if columns exist
+    if (hasCallStatusColumn) {
+      if (status === 'missed') {
+        query += ` AND (pc.call_status IN ('missed', 'no-answer') OR pc.outcome IN ('no_answer', 'busy', 'failed'))`;
+      } else if (status === 'voicemail') {
+        query += ` AND (pc.call_status = 'voicemail' OR pc.outcome = 'voicemail' OR pc.voicemail_url IS NOT NULL)`;
+      }
+    } else {
+      if (status === 'missed') {
+        query += ` AND pc.outcome IN ('no_answer', 'busy', 'failed')`;
+      } else if (status === 'voicemail') {
+        query += ` AND pc.outcome = 'voicemail'`;
+      }
     }
 
-    // Sort: unread missed calls first, then by recency
-    query += ` ORDER BY
-      CASE WHEN (pc.call_status IN ('missed', 'no-answer', 'voicemail')
-                 OR pc.outcome IN ('no_answer', 'busy', 'voicemail', 'failed'))
-                AND pc.direction = 'inbound'
-                AND (crs.last_read_at IS NULL OR pc.created_at > crs.last_read_at)
-           THEN 0 ELSE 1 END,
-      pc.created_at DESC
-      LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}`;
+    if (hasReadStatusTable && hasCallStatusColumn) {
+      // Sort: unread missed calls first, then by recency
+      query += ` ORDER BY
+        CASE WHEN (pc.call_status IN ('missed', 'no-answer', 'voicemail')
+                   OR pc.outcome IN ('no_answer', 'busy', 'voicemail', 'failed'))
+                  AND pc.direction = 'inbound'
+                  AND (crs.last_read_at IS NULL OR pc.created_at > crs.last_read_at)
+             THEN 0 ELSE 1 END,
+        pc.created_at DESC
+        LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}`;
+    } else {
+      query += ` ORDER BY pc.created_at DESC LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}`;
+    }
     params.push(limit, offset);
 
     const result = await db.query(query, params);
