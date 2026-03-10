@@ -44,28 +44,84 @@ class WhatsAppTemplateCache {
    */
   async fetchFromTwilio(twilioClient) {
     try {
+      console.log('\n🔍 === TWILIO CONTENT API FETCH START ===');
+
+      // Check if content API exists
+      if (!twilioClient.content || !twilioClient.content.v1 || !twilioClient.content.v1.contents) {
+        console.error('❌ Twilio content API not available on this client');
+        return [];
+      }
+
       // Fetch all content items from Twilio
+      console.log('📡 Calling twilioClient.content.v1.contents.list()...');
       const contents = await twilioClient.content.v1.contents.list({ limit: 100 });
+
+      console.log(`✅ Received ${contents.length} total items from Twilio`);
+      if (contents.length === 0) {
+        console.log('⚠️  No content items found in Twilio account');
+        return [];
+      }
 
       const templates = [];
 
       // Filter and map each content item
-      for (const content of contents) {
-        // Check if this content has approved WhatsApp status
-        const whatsappApproval = content.approval?.whatsapp;
+      for (let i = 0; i < contents.length; i++) {
+        const content = contents[i];
+        console.log(`\n📄 [${i + 1}/${contents.length}] Processing: ${content.friendly_name}`);
+        console.log(`   SID: ${content.sid}`);
+        console.log(`   Language: ${content.language}`);
+        console.log(`   Full Approval Object: ${JSON.stringify(content.approval)}`);
 
-        if (!whatsappApproval || whatsappApproval !== 'approved') {
-          continue; // Skip non-approved templates
+        if (!content.approval) {
+          console.log(`   ⏭️  Skipping - no approval object`);
+          continue;
+        }
+
+        // Check different possible approval status structures
+        let whatsappStatus = null;
+
+        // Try: content.approval.whatsapp
+        if (content.approval.whatsapp) {
+          whatsappStatus = content.approval.whatsapp;
+          console.log(`   WhatsApp Status (from .whatsapp): ${whatsappStatus}`);
+        }
+        // Try: content.approval['whatsapp']
+        else if (content.approval['whatsapp']) {
+          whatsappStatus = content.approval['whatsapp'];
+          console.log(`   WhatsApp Status (from ['whatsapp']): ${whatsappStatus}`);
+        }
+        // Try: content.approval.channels.whatsapp
+        else if (content.approval.channels && content.approval.channels.whatsapp) {
+          whatsappStatus = content.approval.channels.whatsapp;
+          console.log(`   WhatsApp Status (from .channels.whatsapp): ${whatsappStatus}`);
+        }
+        // Fallback - check for any approval property
+        else {
+          console.log(`   ⏭️  No WhatsApp approval found in structure`);
+          continue;
+        }
+
+        if (!whatsappStatus || whatsappStatus !== 'approved') {
+          console.log(`   ⏭️  Skipping - WhatsApp status is '${whatsappStatus}' (not 'approved')`);
+          continue;
         }
 
         // Extract body preview from template variables
         let bodyPreview = '';
         if (content.variables && Array.isArray(content.variables)) {
-          // Find body in variables
-          const bodyVar = content.variables.find(v => v.type === 'body');
-          if (bodyVar && bodyVar.value) {
-            bodyPreview = bodyVar.value;
+          console.log(`   Variables found: ${content.variables.length}`);
+          // Try different variable structures
+          const bodyVar = content.variables.find(v =>
+            v.type === 'body' ||
+            v.key === 'body' ||
+            v.name === 'body'
+          );
+          if (bodyVar) {
+            bodyPreview = bodyVar.value || bodyVar.default || JSON.stringify(bodyVar);
+            console.log(`   Body Preview: ${bodyPreview.substring(0, 80)}...`);
           }
+        } else {
+          console.log(`   No variables array found`);
         }
 
         // Map Twilio template to our format
@@ -74,17 +130,22 @@ class WhatsAppTemplateCache {
           display_name: content.friendly_name || 'Unnamed Template',
           body_preview: bodyPreview || content.friendly_name || '',
           category: content.language || 'general',
-          approval_status: whatsappApproval,
+          approval_status: whatsappStatus,
           created_at: content.date_created
         };
 
         templates.push(template);
+        console.log(`   ✅ ADDED to templates`);
       }
 
-      console.log(`📨 Found ${templates.length} approved WhatsApp templates from Twilio`);
+      console.log(`\n🎯 === RESULT: ${templates.length} approved WhatsApp templates ===\n`);
       return templates;
     } catch (error) {
-      console.error('❌ Error fetching templates from Twilio:', error);
+      console.error('\n❌ === TWILIO API ERROR ===');
+      console.error('Error Message:', error.message);
+      console.error('Error Code:', error.code);
+      console.error('Full Error:', JSON.stringify(error, null, 2));
+      console.error('=========================\n');
       // Return empty array on error - graceful degradation
       return [];
     }
