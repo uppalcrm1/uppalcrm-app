@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const twilioService = require('../services/twilioService');
+const whatsappTemplateCache = require('../services/whatsappTemplateCache');
 const { authenticateToken } = require('../middleware/auth');
 const db = require('../database/connection');
 const Joi = require('joi');
@@ -260,31 +261,50 @@ router.post('/whatsapp/send', authenticateToken, async (req, res) => {
 });
 
 /**
- * Get WhatsApp templates for organization
+ * Get WhatsApp templates from Twilio Content API (with 5-min cache)
  */
 router.get('/whatsapp/templates', authenticateToken, async (req, res) => {
   try {
     const organizationId = req.organizationId;
 
-    // Check if table exists (pre-migration safety)
-    const tableCheck = await db.query(`
-      SELECT 1 FROM information_schema.tables WHERE table_name = 'whatsapp_templates' LIMIT 1
-    `);
-    if (tableCheck.rows.length === 0) {
-      return res.json({ templates: [] });
-    }
+    // Get Twilio client
+    const { client } = await twilioService.getClient(organizationId);
 
-    const result = await db.query(`
-      SELECT id, template_name, template_sid, display_name, body_preview, category, sort_order
-      FROM whatsapp_templates
-      WHERE organization_id = $1 AND is_active = true
-      ORDER BY sort_order ASC, display_name ASC
-    `, [organizationId]);
+    // Get templates from cache or Twilio
+    const templates = await whatsappTemplateCache.getTemplates(organizationId, client);
 
-    res.json({ templates: result.rows });
+    res.json({ templates });
   } catch (error) {
     console.error('Error fetching WhatsApp templates:', error);
-    res.status(500).json({ error: 'Failed to fetch WhatsApp templates' });
+    // Graceful degradation: return empty list on error
+    res.json({ templates: [] });
+  }
+});
+
+/**
+ * Cache stats endpoint (for monitoring/debugging)
+ */
+router.get('/whatsapp/templates/cache/stats', authenticateToken, async (req, res) => {
+  try {
+    const stats = whatsappTemplateCache.getStats();
+    res.json(stats);
+  } catch (error) {
+    console.error('Error getting cache stats:', error);
+    res.status(500).json({ error: 'Failed to get cache stats' });
+  }
+});
+
+/**
+ * Invalidate template cache (admin only)
+ */
+router.post('/whatsapp/templates/cache/invalidate', authenticateToken, async (req, res) => {
+  try {
+    const organizationId = req.organizationId;
+    whatsappTemplateCache.invalidate(organizationId);
+    res.json({ message: 'Cache invalidated successfully' });
+  } catch (error) {
+    console.error('Error invalidating cache:', error);
+    res.status(500).json({ error: 'Failed to invalidate cache' });
   }
 });
 
