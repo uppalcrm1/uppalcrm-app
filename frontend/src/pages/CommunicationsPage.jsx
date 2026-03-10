@@ -4,7 +4,6 @@ import { MessageSquare, MessageCircle, Phone, Send, Settings, PhoneCall, Chevron
 import { twilioAPI } from '../services/api';
 import { useTwilioConfig } from '../hooks/useTwilioConfig';
 import { useUnreadCounts } from '../hooks/useUnreadCounts';
-import { useNotifications } from '../context/NotificationContext';
 import { useWebSocket } from '../contexts/WebSocketContext';
 import SendSMSModal from '../components/SendSMSModal';
 import SendWhatsAppModal from '../components/SendWhatsAppModal';
@@ -26,15 +25,9 @@ const CommunicationsPage = () => {
   const [dialpadCallerName, setDialpadCallerName] = useState('');
   const [selectedPhone, setSelectedPhone] = useState(null);
   const queryClient = useQueryClient();
-  const { clearUnread } = useNotifications();
   const { whatsappEnabled } = useTwilioConfig();
   const { counts: unreadCounts, markAsRead, markAllAsRead } = useUnreadCounts();
   const { on, off } = useWebSocket();
-
-  // Clear unread count when viewing Communications page
-  useEffect(() => {
-    clearUnread();
-  }, [clearUnread]);
 
   // Listen for dialpad open event (from incoming call acceptance)
   useEffect(() => {
@@ -83,16 +76,14 @@ const CommunicationsPage = () => {
   const { data: smsConversationsData, isLoading: smsConversationsLoading } = useQuery({
     queryKey: ['conversations', 'sms'],
     queryFn: () => twilioAPI.getConversations({ channel: 'sms' }),
-    enabled: config?.configured && activeTab === 'sms',
-    refetchInterval: 30000 // Refresh every 30 seconds
+    enabled: config?.configured && activeTab === 'sms'
   });
 
   // Get WhatsApp conversations
   const { data: whatsappConversationsData, isLoading: whatsappConversationsLoading } = useQuery({
     queryKey: ['conversations', 'whatsapp'],
     queryFn: () => twilioAPI.getConversations({ channel: 'whatsapp' }),
-    enabled: config?.configured && activeTab === 'whatsapp',
-    refetchInterval: 30000 // Refresh every 30 seconds
+    enabled: config?.configured && activeTab === 'whatsapp'
   });
 
   // Determine which conversations to show based on active tab
@@ -103,8 +94,7 @@ const CommunicationsPage = () => {
   const { data: conversationData, isLoading: conversationLoading } = useQuery({
     queryKey: ['conversation', selectedPhone, activeTab],
     queryFn: () => twilioAPI.getConversation(selectedPhone, { channel: activeTab === 'sms' ? 'sms' : 'whatsapp' }),
-    enabled: !!selectedPhone,
-    refetchInterval: 10000 // Refresh every 10 seconds when viewing
+    enabled: !!selectedPhone
   });
 
   // Handle selecting a conversation — mark as read

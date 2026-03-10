@@ -15,8 +15,7 @@ export function useUnreadCounts() {
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['unreadCounts'],
     queryFn: twilioAPI.getUnreadCounts,
-    refetchInterval: 30000, // Poll every 30 seconds
-    staleTime: 15000,
+    staleTime: Infinity, // Don't auto-refetch; rely on websocket invalidations
     enabled: isAuthenticated,
     placeholderData: { sms: 0, whatsapp: 0, calls: 0, total: 0 }
   });

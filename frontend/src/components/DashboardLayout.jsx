@@ -53,7 +53,7 @@ const navigation = [
 
 const DashboardLayout = () => {
   const { user, organization, logout, isLoading } = useAuth()
-  const { unreadCount, requestBrowserPermission, browserPermission } = useNotifications()
+  const { requestBrowserPermission, browserPermission } = useNotifications()
   const { incomingCall, acceptCall, declineCall } = useCall()
   const { counts: commUnreadCounts } = useUnreadCounts()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
