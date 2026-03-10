@@ -123,6 +123,8 @@ const LeadListTable = ({
 
         // Update system column labels from field config
         const updatedSystemColumns = SYSTEM_COLUMN_DEFINITIONS.map(col => {
+          // Don't override the composite 'name' column label — it combines first_name + last_name
+          if (col.key === 'name') return col
           const fieldKey = col.sortKey || col.key
           return {
             ...col,
