@@ -185,7 +185,9 @@ export default function ConversationView({
                       })()}
 
                       {message.body && (
-                        <p className="text-sm whitespace-pre-wrap break-words">{message.body}</p>
+                        <p className="text-sm whitespace-pre-wrap break-words">
+                          {message.body.replace(/\\n/g, '\n')}
+                        </p>
                       )}
 
                       {/* Show media count indicator if no body */}
@@ -220,13 +222,19 @@ export default function ConversationView({
 
       {/* Input */}
       <form onSubmit={handleSend} className="p-4 border-t border-gray-200 bg-white">
-        <div className="flex items-center space-x-2">
-          <input
-            type="text"
+        <div className="flex items-end space-x-2">
+          <textarea
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
-            placeholder="Type a message..."
-            className="flex-1 rounded-full border border-gray-300 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && e.shiftKey) {
+                e.preventDefault();
+                handleSend(e);
+              }
+            }}
+            placeholder="Type a message... (Shift+Enter to send)"
+            className="flex-1 rounded-2xl border border-gray-300 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+            rows={2}
             disabled={sendMutation.isPending}
           />
           <button
