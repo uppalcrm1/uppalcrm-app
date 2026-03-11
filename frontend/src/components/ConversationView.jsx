@@ -26,7 +26,8 @@ export default function ConversationView({
           to_number: messageData.to,
           message: messageData.body,
           lead_id: messageData.leadId,
-          contact_id: messageData.contactId
+          contact_id: messageData.contactId,
+          force_freeform: true // Agent typed a custom message in the reply box
         });
       } else {
         return twilioAPI.sendSMS(messageData);
