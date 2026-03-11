@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { MessageSquare, ArrowDownLeft, ArrowUpRight, User, UserPlus, UserRoundPlus } from 'lucide-react';
+import { MessageSquare, ArrowDownLeft, ArrowUpRight, User, UserPlus, Users } from 'lucide-react';
 import { formatPhoneNumber } from '../utils/formatPhone';
 
 export default function ConversationList({ conversations, selectedPhone, onSelectConversation, isLoading, channel = 'sms', onCreateContact, onCreateLead }) {
@@ -94,7 +94,7 @@ export default function ConversationList({ conversations, selectedPhone, onSelec
                               }}
                               className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                             >
-                              <UserRoundPlus className="h-3.5 w-3.5 text-green-600" />
+                              <Users className="h-3.5 w-3.5 text-green-600" />
                               Create Lead
                             </button>
                           </div>
