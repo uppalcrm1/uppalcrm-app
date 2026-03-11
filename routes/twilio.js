@@ -24,7 +24,8 @@ const sendWhatsAppSchema = Joi.object({
   lead_id: Joi.string().uuid().optional().allow(null, ''),
   contact_id: Joi.string().uuid().optional().allow(null, ''),
   use_template: Joi.boolean().optional(),
-  template_sid: Joi.string().optional().allow(null, '')
+  template_sid: Joi.string().optional().allow(null, ''),
+  force_freeform: Joi.boolean().optional()
 });
 
 const makeCallSchema = Joi.object({
@@ -235,7 +236,7 @@ router.post('/whatsapp/send', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: error.details[0].message });
     }
 
-    const { to_number, message, lead_id, contact_id, use_template, template_sid } = req.body;
+    const { to_number, message, lead_id, contact_id, use_template, template_sid, force_freeform } = req.body;
     const organizationId = req.organizationId;
     const userId = req.userId;
 
@@ -247,7 +248,8 @@ router.post('/whatsapp/send', authenticateToken, async (req, res) => {
       contactId: contact_id,
       userId,
       useTemplate: !!use_template,
-      templateSid: template_sid || null
+      templateSid: template_sid || null,
+      forceFreeform: !!force_freeform
     });
 
     res.json({

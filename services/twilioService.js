@@ -1,5 +1,6 @@
 const twilio = require('twilio');
 const db = require('../database/connection');
+const whatsappTemplateCache = require('./whatsappTemplateCache');
 
 // Fallback to production URL if API_BASE_URL not set
 const API_BASE_URL = process.env.API_BASE_URL || 'https://uppalcrm-api.onrender.com';
@@ -86,7 +87,7 @@ class TwilioService {
   /**
    * Send WhatsApp message
    */
-  async sendWhatsApp({ organizationId, toNumber, body, leadId = null, contactId = null, userId, useTemplate = false, templateSid = null }) {
+  async sendWhatsApp({ organizationId, toNumber, body, leadId = null, contactId = null, userId, useTemplate = false, templateSid = null, forceFreeform = false }) {
     try {
       const { client, phoneNumber } = await this.getClient(organizationId);
 
@@ -114,9 +115,24 @@ class TwilioService {
       const hasRecentInbound = inboundCheckResult.rows[0]?.count > 0;
 
       // Decide whether to use template
-      // Priority: explicit templateSid > legacy useTemplate flag > 24h auto-detection
+      // Priority: explicit templateSid > forceFreeform (agent chose custom) > legacy useTemplate > 24h auto-detection
+      // If agent explicitly chose "Custom Message" (forceFreeform=true), respect that choice —
+      // send as free-form text and let Twilio reject if outside 24h window.
       const resolvedTemplateSid = templateSid || null;
-      const shouldUseTemplate = resolvedTemplateSid !== null || useTemplate || !hasRecentInbound;
+      let shouldUseTemplate;
+      if (resolvedTemplateSid !== null) {
+        // Agent explicitly selected a template — always use it
+        shouldUseTemplate = true;
+      } else if (forceFreeform) {
+        // Agent explicitly typed a custom message — always send as free-form
+        shouldUseTemplate = false;
+      } else if (useTemplate) {
+        // Legacy flag
+        shouldUseTemplate = true;
+      } else {
+        // Fallback: auto-detect based on 24h window
+        shouldUseTemplate = !hasRecentInbound;
+      }
 
       // Fallback SID if auto-detection fires but no explicit templateSid given
       const LEGACY_RENEWAL_SID = 'HX8d87e8a5e3ae0d1f9991ad782242c17e';
@@ -126,7 +142,7 @@ class TwilioService {
       const fromNumber = whatsappNumber.startsWith('whatsapp:') ? whatsappNumber : `whatsapp:${whatsappNumber}`;
       const toPhoneNumber = toNumber.startsWith('whatsapp:') ? toNumber : `whatsapp:${toNumber}`;
 
-      console.log('📱 Sending WhatsApp message:', { from: fromNumber, to: toPhoneNumber, shouldUseTemplate, contentSid });
+      console.log('📱 Sending WhatsApp message:', { from: fromNumber, to: toPhoneNumber, shouldUseTemplate, contentSid, forceFreeform });
 
       // Send via Twilio - two branches based on message type
       let message;
@@ -140,9 +156,18 @@ class TwilioService {
           contentSid: contentSid,
           statusCallback: `${API_BASE_URL}/api/twilio/webhook/whatsapp-status`
         });
-        messageBody = '[Template Message]'; // Store meaningful identifier in DB
+
+        // Look up the actual template body instead of storing '[Template Message]'
+        try {
+          const templates = await whatsappTemplateCache.getTemplates(organizationId, client);
+          const matchedTemplate = templates.find(t => t.template_sid === contentSid);
+          messageBody = matchedTemplate?.body_preview || body || '[Template Message]';
+        } catch (templateLookupError) {
+          console.error('Failed to look up template body, using fallback:', templateLookupError.message);
+          messageBody = body || '[Template Message]';
+        }
       } else {
-        // Free-form message (within 24h window)
+        // Free-form message — agent chose custom or within 24h window
         message = await client.messages.create({
           body,
           from: fromNumber,
@@ -170,7 +195,7 @@ class TwilioService {
 
       // Create interaction record with appropriate description
       const interactionDescription = shouldUseTemplate
-        ? 'Outbound WhatsApp (renewal template)'
+        ? `Outbound WhatsApp template: ${messageBody.substring(0, 100)}`
         : `Outbound WhatsApp: ${body}`;
 
       if (leadId) {

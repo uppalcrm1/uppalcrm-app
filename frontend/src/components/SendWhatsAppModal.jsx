@@ -51,7 +51,8 @@ const SendWhatsAppModal = ({ onClose, onSuccess, defaultTo = '', leadId = null, 
     sendMutation.mutate({
       ...formData,
       message: selectedTemplate ? '' : formData.message,
-      template_sid: selectedTemplate?.template_sid || null
+      template_sid: selectedTemplate?.template_sid || null,
+      force_freeform: !selectedTemplate // Agent chose "Custom Message" — send as free-form
     });
   };
 
