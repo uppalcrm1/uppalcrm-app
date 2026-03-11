@@ -914,8 +914,8 @@ router.get('/call', authenticateToken, async (req, res) => {
         WITH ${phoneLookupCTE}
         SELECT
           pc.*,
-          COALESCE(l.first_name, cp.first_name) as lead_first_name,
-          COALESCE(l.last_name, cp.last_name) as lead_last_name,
+          COALESCE(l.first_name, lp.first_name) as lead_first_name,
+          COALESCE(l.last_name, lp.last_name) as lead_last_name,
           COALESCE(c.first_name, cp2.first_name) as contact_first_name,
           COALESCE(c.last_name, cp2.last_name) as contact_last_name,
           COALESCE(pc.lead_id, lp.id) as resolved_lead_id,
