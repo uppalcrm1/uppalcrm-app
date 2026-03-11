@@ -4,7 +4,7 @@ import { X } from 'lucide-react'
 import LoadingSpinner from './LoadingSpinner'
 import { customFieldsAPI } from '../services/api'
 
-const ContactForm = ({ contact = null, onClose, onSubmit, users = [], isLoading = false }) => {
+const ContactForm = ({ contact = null, onClose, onSubmit, users = [], isLoading = false, defaultValues: propDefaults = {} }) => {
   const isEditing = !!contact
   const [fieldConfig, setFieldConfig] = useState(null)
   const [loadingConfig, setLoadingConfig] = useState(true)
@@ -60,7 +60,8 @@ const ContactForm = ({ contact = null, onClose, onSubmit, users = [], isLoading 
     } : {
       status: 'active',
       type: 'customer',
-      priority: 'medium'
+      priority: 'medium',
+      ...propDefaults
     }
   })
 

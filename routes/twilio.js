@@ -390,6 +390,17 @@ router.get('/sms', authenticateToken, async (req, res) => {
   }
 });
 
+// Phone normalization SQL helper: strip non-digits, then strip leading '1' if 11 digits
+// Used by conversations and call history endpoints to match phone numbers across formats
+const normalizePhone = (col) => `
+  CASE
+    WHEN LENGTH(REGEXP_REPLACE(COALESCE(${col}, ''), '[^0-9]', '', 'g')) = 11
+      AND LEFT(REGEXP_REPLACE(COALESCE(${col}, ''), '[^0-9]', '', 'g'), 1) = '1'
+    THEN RIGHT(REGEXP_REPLACE(COALESCE(${col}, ''), '[^0-9]', '', 'g'), 10)
+    ELSE REGEXP_REPLACE(COALESCE(${col}, ''), '[^0-9]', '', 'g')
+  END
+`;
+
 /**
  * Get SMS/WhatsApp conversations (grouped by phone number, includes all channels)
  */
@@ -501,12 +512,12 @@ router.get('/sms/conversations', authenticateToken, async (req, res) => {
           lm.last_message,
           lm.last_direction,
           lm.last_channel,
-          lm.lead_id,
-          lm.contact_id,
-          l.first_name as lead_first_name,
-          l.last_name as lead_last_name,
-          c.first_name as contact_first_name,
-          c.last_name as contact_last_name,
+          COALESCE(lm.lead_id, l_phone.id) as lead_id,
+          COALESCE(lm.contact_id, c_phone.id) as contact_id,
+          COALESCE(c.first_name, c_phone.first_name) as contact_first_name,
+          COALESCE(c.last_name, c_phone.last_name) as contact_last_name,
+          COALESCE(l.first_name, l_phone.first_name) as lead_first_name,
+          COALESCE(l.last_name, l_phone.last_name) as lead_last_name,
           crs.last_read_at,
           CASE
             WHEN cs.inbound_count = 0 THEN false
@@ -518,6 +529,22 @@ router.get('/sms/conversations', authenticateToken, async (req, res) => {
         JOIN last_messages lm ON cs.phone_number = lm.phone_number
         LEFT JOIN leads l ON lm.lead_id = l.id
         LEFT JOIN contacts c ON lm.contact_id = c.id
+        LEFT JOIN LATERAL (
+          SELECT id, first_name, last_name FROM contacts
+          WHERE organization_id = $1
+            AND phone IS NOT NULL AND phone != ''
+            AND lm.contact_id IS NULL
+            AND ${normalizePhone('phone')} = ${normalizePhone('cs.phone_number')}
+          LIMIT 1
+        ) c_phone ON true
+        LEFT JOIN LATERAL (
+          SELECT id, first_name, last_name FROM leads
+          WHERE organization_id = $1
+            AND phone IS NOT NULL AND phone != ''
+            AND lm.lead_id IS NULL
+            AND ${normalizePhone('phone')} = ${normalizePhone('cs.phone_number')}
+          LIMIT 1
+        ) l_phone ON true
         LEFT JOIN conversation_read_status crs
           ON crs.organization_id = $1
           AND crs.user_id = $${userIdParamIndex}
@@ -573,17 +600,33 @@ router.get('/sms/conversations', authenticateToken, async (req, res) => {
           lm.last_message,
           lm.last_direction,
           lm.last_channel,
-          lm.lead_id,
-          lm.contact_id,
-          l.first_name as lead_first_name,
-          l.last_name as lead_last_name,
-          c.first_name as contact_first_name,
-          c.last_name as contact_last_name,
+          COALESCE(lm.lead_id, l_phone.id) as lead_id,
+          COALESCE(lm.contact_id, c_phone.id) as contact_id,
+          COALESCE(c.first_name, c_phone.first_name) as contact_first_name,
+          COALESCE(c.last_name, c_phone.last_name) as contact_last_name,
+          COALESCE(l.first_name, l_phone.first_name) as lead_first_name,
+          COALESCE(l.last_name, l_phone.last_name) as lead_last_name,
           false as is_unread
         FROM conversation_stats cs
         JOIN last_messages lm ON cs.phone_number = lm.phone_number
         LEFT JOIN leads l ON lm.lead_id = l.id
         LEFT JOIN contacts c ON lm.contact_id = c.id
+        LEFT JOIN LATERAL (
+          SELECT id, first_name, last_name FROM contacts
+          WHERE organization_id = $1
+            AND phone IS NOT NULL AND phone != ''
+            AND lm.contact_id IS NULL
+            AND ${normalizePhone('phone')} = ${normalizePhone('cs.phone_number')}
+          LIMIT 1
+        ) c_phone ON true
+        LEFT JOIN LATERAL (
+          SELECT id, first_name, last_name FROM leads
+          WHERE organization_id = $1
+            AND phone IS NOT NULL AND phone != ''
+            AND lm.lead_id IS NULL
+            AND ${normalizePhone('phone')} = ${normalizePhone('cs.phone_number')}
+          LIMIT 1
+        ) l_phone ON true
         ORDER BY cs.last_message_at DESC
       `;
     }
@@ -682,6 +725,34 @@ router.get('/sms/conversation/:phoneNumber', authenticateToken, async (req, res)
           type: 'lead',
           id: firstMsg.lead_id,
           name: `${firstMsg.lead_first_name} ${firstMsg.lead_last_name || ''}`.trim()
+        };
+      }
+    }
+
+    // Fallback: look up contact/lead by normalized phone number if not found via message IDs
+    if (!contactInfo) {
+      const phoneMatchQuery = `
+        SELECT type, id, first_name, last_name FROM (
+          SELECT 'contact' as type, id, first_name, last_name, 1 as priority
+          FROM contacts
+          WHERE organization_id = $1
+            AND phone IS NOT NULL AND phone != ''
+            AND ${normalizePhone('phone')} = ${normalizePhone('$2')}
+          UNION ALL
+          SELECT 'lead' as type, id, first_name, last_name, 2 as priority
+          FROM leads
+          WHERE organization_id = $1
+            AND phone IS NOT NULL AND phone != ''
+            AND ${normalizePhone('phone')} = ${normalizePhone('$2')}
+        ) sub ORDER BY priority LIMIT 1
+      `;
+      const phoneMatchResult = await db.query(phoneMatchQuery, [organizationId, phoneNumber]);
+      if (phoneMatchResult.rows.length > 0) {
+        const match = phoneMatchResult.rows[0];
+        contactInfo = {
+          type: match.type,
+          id: match.id,
+          name: `${match.first_name} ${match.last_name || ''}`.trim()
         };
       }
     }
@@ -828,10 +899,12 @@ router.get('/call', authenticateToken, async (req, res) => {
       query = `
         SELECT
           pc.*,
-          l.first_name as lead_first_name,
-          l.last_name as lead_last_name,
-          c.first_name as contact_first_name,
-          c.last_name as contact_last_name,
+          COALESCE(l.first_name, l_phone.first_name) as lead_first_name,
+          COALESCE(l.last_name, l_phone.last_name) as lead_last_name,
+          COALESCE(c.first_name, c_phone.first_name) as contact_first_name,
+          COALESCE(c.last_name, c_phone.last_name) as contact_last_name,
+          COALESCE(pc.lead_id, l_phone.id) as resolved_lead_id,
+          COALESCE(pc.contact_id, c_phone.id) as resolved_contact_id,
           u.first_name as user_first_name,
           u.last_name as user_last_name,
           crs.last_read_at,
@@ -846,6 +919,22 @@ router.get('/call', authenticateToken, async (req, res) => {
         FROM phone_calls pc
         LEFT JOIN leads l ON pc.lead_id = l.id
         LEFT JOIN contacts c ON pc.contact_id = c.id
+        LEFT JOIN LATERAL (
+          SELECT id, first_name, last_name FROM contacts
+          WHERE organization_id = $1
+            AND phone IS NOT NULL AND phone != ''
+            AND pc.contact_id IS NULL
+            AND ${normalizePhone('phone')} = ${normalizePhone('CASE WHEN pc.direction = \'outbound\' THEN pc.to_number ELSE pc.from_number END')}
+          LIMIT 1
+        ) c_phone ON true
+        LEFT JOIN LATERAL (
+          SELECT id, first_name, last_name FROM leads
+          WHERE organization_id = $1
+            AND phone IS NOT NULL AND phone != ''
+            AND pc.lead_id IS NULL
+            AND ${normalizePhone('phone')} = ${normalizePhone('CASE WHEN pc.direction = \'outbound\' THEN pc.to_number ELSE pc.from_number END')}
+          LIMIT 1
+        ) l_phone ON true
         LEFT JOIN users u ON pc.user_id = u.id
         LEFT JOIN conversation_read_status crs
           ON crs.organization_id = pc.organization_id
@@ -861,16 +950,34 @@ router.get('/call', authenticateToken, async (req, res) => {
       query = `
         SELECT
           pc.*,
-          l.first_name as lead_first_name,
-          l.last_name as lead_last_name,
-          c.first_name as contact_first_name,
-          c.last_name as contact_last_name,
+          COALESCE(l.first_name, l_phone.first_name) as lead_first_name,
+          COALESCE(l.last_name, l_phone.last_name) as lead_last_name,
+          COALESCE(c.first_name, c_phone.first_name) as contact_first_name,
+          COALESCE(c.last_name, c_phone.last_name) as contact_last_name,
+          COALESCE(pc.lead_id, l_phone.id) as resolved_lead_id,
+          COALESCE(pc.contact_id, c_phone.id) as resolved_contact_id,
           u.first_name as user_first_name,
           u.last_name as user_last_name,
           false as is_unread
         FROM phone_calls pc
         LEFT JOIN leads l ON pc.lead_id = l.id
         LEFT JOIN contacts c ON pc.contact_id = c.id
+        LEFT JOIN LATERAL (
+          SELECT id, first_name, last_name FROM contacts
+          WHERE organization_id = $1
+            AND phone IS NOT NULL AND phone != ''
+            AND pc.contact_id IS NULL
+            AND ${normalizePhone('phone')} = ${normalizePhone('CASE WHEN pc.direction = \'outbound\' THEN pc.to_number ELSE pc.from_number END')}
+          LIMIT 1
+        ) c_phone ON true
+        LEFT JOIN LATERAL (
+          SELECT id, first_name, last_name FROM leads
+          WHERE organization_id = $1
+            AND phone IS NOT NULL AND phone != ''
+            AND pc.lead_id IS NULL
+            AND ${normalizePhone('phone')} = ${normalizePhone('CASE WHEN pc.direction = \'outbound\' THEN pc.to_number ELSE pc.from_number END')}
+          LIMIT 1
+        ) l_phone ON true
         LEFT JOIN users u ON pc.user_id = u.id
         WHERE pc.organization_id = $1
       `;

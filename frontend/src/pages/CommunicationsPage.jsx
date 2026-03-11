@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { MessageSquare, MessageCircle, Phone, Send, Settings, PhoneCall, ChevronDown, CheckCheck } from 'lucide-react';
-import { twilioAPI } from '../services/api';
+import { twilioAPI, contactsAPI } from '../services/api';
 import { useTwilioConfig } from '../hooks/useTwilioConfig';
 import { useUnreadCounts } from '../hooks/useUnreadCounts';
 import { useWebSocket } from '../contexts/WebSocketContext';
@@ -12,6 +12,8 @@ import ConversationView from '../components/ConversationView';
 import CallHistoryList from '../components/CallHistoryList';
 import TwilioConfigModal from '../components/TwilioConfigModal';
 import Dialpad from '../components/Dialpad';
+import ContactForm from '../components/ContactForm';
+import DynamicLeadForm from '../components/DynamicLeadForm';
 import LoadingSpinner from '../components/LoadingSpinner';
 
 const CommunicationsPage = () => {
@@ -24,6 +26,8 @@ const CommunicationsPage = () => {
   const [dialpadNumber, setDialpadNumber] = useState('');
   const [dialpadCallerName, setDialpadCallerName] = useState('');
   const [selectedPhone, setSelectedPhone] = useState(null);
+  const [createContactPhone, setCreateContactPhone] = useState(null);
+  const [createLeadPhone, setCreateLeadPhone] = useState(null);
   const queryClient = useQueryClient();
   const { whatsappEnabled } = useTwilioConfig();
   const { counts: unreadCounts, markAsRead, markAllAsRead } = useUnreadCounts();
@@ -116,6 +120,25 @@ const CommunicationsPage = () => {
     const channel = activeTab === 'calls' ? 'call' : activeTab;
     markAllAsRead(channel);
   }, [activeTab, markAllAsRead]);
+
+  // Create contact mutation
+  const createContactMutation = useMutation({
+    mutationFn: (data) => contactsAPI.createContact(data),
+    onSuccess: () => {
+      setCreateContactPhone(null);
+      queryClient.invalidateQueries(['conversations']);
+    }
+  });
+
+  // Handler for creating a contact from conversation list
+  const handleCreateContact = useCallback((phoneNumber) => {
+    setCreateContactPhone(phoneNumber);
+  }, []);
+
+  // Handler for creating a lead from conversation list
+  const handleCreateLead = useCallback((phoneNumber) => {
+    setCreateLeadPhone(phoneNumber);
+  }, []);
 
   if (configLoading) {
     return <LoadingSpinner />;
@@ -369,6 +392,8 @@ const CommunicationsPage = () => {
                 onSelectConversation={handleSelectConversation}
                 isLoading={conversationsLoading}
                 channel={activeTab}
+                onCreateContact={handleCreateContact}
+                onCreateLead={handleCreateLead}
               />
             </div>
 
@@ -467,6 +492,28 @@ const CommunicationsPage = () => {
           }}
           prefilledNumber={dialpadNumber}
           contactName={dialpadCallerName}
+        />
+      )}
+
+      {/* Create Contact from conversation */}
+      {createContactPhone && (
+        <ContactForm
+          onClose={() => setCreateContactPhone(null)}
+          onSubmit={(data) => createContactMutation.mutate(data)}
+          isLoading={createContactMutation.isLoading}
+          defaultValues={{ phone: createContactPhone }}
+        />
+      )}
+
+      {/* Create Lead from conversation */}
+      {createLeadPhone && (
+        <DynamicLeadForm
+          onClose={() => setCreateLeadPhone(null)}
+          onSubmit={() => {
+            setCreateLeadPhone(null);
+            queryClient.invalidateQueries(['conversations']);
+          }}
+          initialData={{ phone: createLeadPhone }}
         />
       )}
     </div>
