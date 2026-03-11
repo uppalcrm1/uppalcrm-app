@@ -1,8 +1,11 @@
+import { useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { MessageSquare, ArrowDownLeft, ArrowUpRight, User } from 'lucide-react';
+import { MessageSquare, ArrowDownLeft, ArrowUpRight, User, UserPlus, UserRoundPlus } from 'lucide-react';
 import { formatPhoneNumber } from '../utils/formatPhone';
 
-export default function ConversationList({ conversations, selectedPhone, onSelectConversation, isLoading, channel = 'sms' }) {
+export default function ConversationList({ conversations, selectedPhone, onSelectConversation, isLoading, channel = 'sms', onCreateContact, onCreateLead }) {
+  const [openMenuPhone, setOpenMenuPhone] = useState(null);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -24,11 +27,17 @@ export default function ConversationList({ conversations, selectedPhone, onSelec
   // Unread dot color based on channel
   const dotColor = channel === 'whatsapp' ? 'bg-green-500' : 'bg-blue-500';
 
+  const handleCreateClick = (e, phoneNumber) => {
+    e.stopPropagation();
+    setOpenMenuPhone(openMenuPhone === phoneNumber ? null : phoneNumber);
+  };
+
   return (
     <div className="divide-y divide-gray-200">
       {conversations.map((conversation) => {
         const isUnread = conversation.isUnread;
         const isSelected = selectedPhone === conversation.phoneNumber;
+        const hasName = !!conversation.contactName;
 
         return (
           <div
@@ -50,14 +59,54 @@ export default function ConversationList({ conversations, selectedPhone, onSelec
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between">
-                  <p className={`text-sm truncate ${isUnread ? 'font-semibold text-gray-900' : 'font-medium text-gray-900'}`}>
-                    {conversation.contactName || formatPhoneNumber(conversation.phoneNumber)}
-                  </p>
-                  <p className="text-xs text-gray-500">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <p className={`text-sm truncate ${isUnread ? 'font-semibold text-gray-900' : 'font-medium text-gray-900'}`}>
+                      {hasName ? conversation.contactName : formatPhoneNumber(conversation.phoneNumber)}
+                    </p>
+                    {/* Create Contact/Lead button for unknown numbers */}
+                    {!hasName && (
+                      <div className="relative flex-shrink-0">
+                        <button
+                          onClick={(e) => handleCreateClick(e, conversation.phoneNumber)}
+                          className="p-0.5 rounded hover:bg-gray-200 text-gray-400 hover:text-indigo-600 transition-colors"
+                          title="Create Contact or Lead"
+                        >
+                          <UserPlus className="h-3.5 w-3.5" />
+                        </button>
+                        {openMenuPhone === conversation.phoneNumber && (
+                          <div className="absolute left-0 top-6 z-20 w-40 bg-white rounded-lg shadow-lg border border-gray-200 py-1">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenMenuPhone(null);
+                                onCreateContact?.(conversation.phoneNumber);
+                              }}
+                              className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                            >
+                              <UserPlus className="h-3.5 w-3.5 text-indigo-600" />
+                              Create Contact
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenMenuPhone(null);
+                                onCreateLead?.(conversation.phoneNumber);
+                              }}
+                              className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                            >
+                              <UserRoundPlus className="h-3.5 w-3.5 text-green-600" />
+                              Create Lead
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 flex-shrink-0 ml-2">
                     {formatDistanceToNow(new Date(conversation.lastMessageAt), { addSuffix: true })}
                   </p>
                 </div>
-                {conversation.contactName && (
+                {hasName && (
                   <p className="text-xs text-gray-500">{formatPhoneNumber(conversation.phoneNumber)}</p>
                 )}
                 <div className="mt-1 flex items-center">
