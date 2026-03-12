@@ -122,6 +122,10 @@ const ReportBuilderPage = () => {
     setConfig(prev => ({ ...prev, filters }));
   };
 
+  const handleGroupByChange = (groupBy) => {
+    setConfig(prev => ({ ...prev, groupBy }));
+  };
+
   const handleExecuteReport = () => {
     if (config.fields.length === 0) {
       toast.error('Please select at least one field');
@@ -294,12 +298,63 @@ const ReportBuilderPage = () => {
             </div>
 
             {/* Filter Builder */}
-            <div className="p-4">
+            <div className="p-4 border-b border-gray-200">
               <FilterBuilder
                 filters={config.filters}
                 onChange={handleFiltersChange}
                 fields={fields}
               />
+            </div>
+
+            {/* Group By Selector */}
+            <div className="p-4">
+              <h3 className="text-sm font-semibold text-gray-900 mb-2 flex items-center justify-between">
+                <span>Group By</span>
+                {config.groupBy.length > 0 && (
+                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                    {config.groupBy.length}
+                  </span>
+                )}
+              </h3>
+              <p className="text-xs text-gray-500 mb-3">
+                Group rows for chart aggregation (SUM / COUNT)
+              </p>
+              {fields.filter(f => f.groupable).length > 0 ? (
+                <div className="space-y-1">
+                  {fields.filter(f => f.groupable && config.fields.includes(f.name)).map(field => (
+                    <label
+                      key={field.name}
+                      className="flex items-center space-x-2 px-2 py-1.5 rounded hover:bg-gray-50 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={config.groupBy.includes(field.name)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            handleGroupByChange([...config.groupBy, field.name]);
+                          } else {
+                            handleGroupByChange(config.groupBy.filter(f => f !== field.name));
+                          }
+                        }}
+                        className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-700">{field.label}</span>
+                      <span className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded ml-auto">
+                        {field.type}
+                      </span>
+                    </label>
+                  ))}
+                  {fields.filter(f => f.groupable && config.fields.includes(f.name)).length === 0 && (
+                    <p className="text-xs text-gray-400 italic">
+                      Select groupable fields above first
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-xs text-gray-400 italic">
+                  No groupable fields available
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -382,6 +437,7 @@ const ReportBuilderPage = () => {
                     <DynamicChart
                       data={reportResults}
                       chartType={config.chartType}
+                      fields={fields}
                     />
                   )}
                 </div>
