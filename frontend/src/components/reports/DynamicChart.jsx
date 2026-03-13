@@ -75,29 +75,34 @@ const formatDateLabel = (value) => {
 
 /**
  * Bucket date-keyed data by month, summing numeric fields.
+ * If a category key is provided, preserves the category dimension.
  * Returns the original data if xAxisKey is not a date or bucketing isn't needed.
  */
-const bucketByMonth = (rows, xAxisKey, numericKeys, fieldsMeta) => {
+const bucketByMonth = (rows, xAxisKey, numericKeys, fieldsMeta, categoryKey = null) => {
   if (!rows || rows.length === 0) return rows;
   if (!isDateField(xAxisKey, fieldsMeta)) return rows;
 
   const groups = {};
   rows.forEach(row => {
     const label = toMonthLabel(row[xAxisKey]) || 'Unknown';
-    if (!groups[label]) {
-      groups[label] = { [xAxisKey]: label, _count: 0 };
-      numericKeys.forEach(k => { groups[label][k] = 0; });
+    const catVal = categoryKey ? String(row[categoryKey] ?? 'Unknown') : null;
+    const groupId = categoryKey ? `${label}|||${catVal}` : label;
+
+    if (!groups[groupId]) {
+      groups[groupId] = { [xAxisKey]: label, _count: 0 };
+      if (categoryKey) groups[groupId][categoryKey] = catVal;
+      numericKeys.forEach(k => { groups[groupId][k] = 0; });
     }
-    groups[label]._count += 1;
+    groups[groupId]._count += 1;
     numericKeys.forEach(k => {
-      groups[label][k] += (parseFloat(row[k]) || 0);
+      groups[groupId][k] += (parseFloat(row[k]) || 0);
     });
   });
 
   // Sort chronologically
   return Object.values(groups).sort((a, b) => {
     const parse = (lbl) => {
-      const parts = lbl.split(' ');
+      const parts = String(lbl).split(' ');
       if (parts.length !== 2) return 0;
       const mi = MONTH_NAMES.indexOf(parts[0]);
       const yr = parseInt(parts[1], 10);
@@ -119,6 +124,45 @@ const formatDateLabelsInData = (rows, xAxisKey, fieldsMeta) => {
     ...row,
     [xAxisKey]: formatDateLabel(row[xAxisKey])
   }));
+};
+
+/**
+ * Pivot data by a category field.
+ * Turns rows like:
+ *   { month: "Feb 2026", source: "renewal", amount: 500 }
+ *   { month: "Feb 2026", source: "new_sale", amount: 200 }
+ * Into:
+ *   { month: "Feb 2026", renewal: 500, new_sale: 200 }
+ *
+ * Returns { pivotedData, pivotKeys } where pivotKeys are the new series names.
+ */
+const pivotByCategory = (rows, xAxisKey, categoryKey, numericKey) => {
+  if (!rows || rows.length === 0 || !categoryKey || !numericKey) {
+    return { pivotedData: rows, pivotKeys: [] };
+  }
+
+  const grouped = {};
+  const allCategories = new Set();
+
+  rows.forEach(row => {
+    const xVal = row[xAxisKey];
+    const catVal = String(row[categoryKey] ?? 'Unknown');
+    allCategories.add(catVal);
+
+    if (!grouped[xVal]) {
+      grouped[xVal] = { [xAxisKey]: xVal };
+    }
+    grouped[xVal][catVal] = (grouped[xVal][catVal] || 0) + (parseFloat(row[numericKey]) || 0);
+  });
+
+  const pivotKeys = Array.from(allCategories).sort();
+  // Ensure every row has all category keys (default 0)
+  const pivotedData = Object.values(grouped).map(row => {
+    pivotKeys.forEach(k => { if (row[k] === undefined) row[k] = 0; });
+    return row;
+  });
+
+  return { pivotedData, pivotKeys };
 };
 
 /**
@@ -264,7 +308,11 @@ const DynamicChart = ({ data = [], chartType = 'line', config = {}, fields = [] 
     if (nonNumericKeys.length === 0) return dataKeys[0];
     if (nonNumericKeys.length === 1) return nonNumericKeys[0];
 
-    // Score each candidate by number of unique values in the data
+    // Prefer date fields as x-axis when available (natural timeline)
+    const dateField = nonNumericKeys.find(k => isDateField(k, fields));
+    if (dateField) return dateField;
+
+    // Otherwise score each candidate by number of unique values in the data
     let bestKey = nonNumericKeys[0];
     let bestUniqueCount = 0;
     for (const key of nonNumericKeys) {
@@ -277,26 +325,54 @@ const DynamicChart = ({ data = [], chartType = 'line', config = {}, fields = [] 
     return bestKey;
   }, [data, nonNumericKeys.join(',')]);
 
+  // Category key: the other non-numeric, non-xAxis field used to split series
+  // (e.g. "source" when x-axis is "transaction_date")
+  const categoryKey = useMemo(() => {
+    const candidates = nonNumericKeys.filter(k => k !== xAxisKey);
+    if (candidates.length === 0) return null;
+    // Pick the one with moderate cardinality (good for legend)
+    let best = candidates[0];
+    let bestCount = new Set(data.map(r => r[best])).size;
+    for (const k of candidates.slice(1)) {
+      const count = new Set(data.map(r => r[k])).size;
+      // Prefer fields with 2-20 unique values (good for chart series)
+      if (count >= 2 && count <= 20 && (bestCount < 2 || bestCount > 20 || count < bestCount)) {
+        best = k;
+        bestCount = count;
+      }
+    }
+    // Only use as category if there are multiple distinct values
+    return bestCount >= 2 ? best : null;
+  }, [data, nonNumericKeys.join(','), xAxisKey]);
+
   const yAxisKeys = numericKeys.filter(key => key !== xAxisKey);
 
-  // Auto-aggregate data for chart display, then apply date bucketing
-  const chartData = useMemo(() => {
+  // Auto-aggregate data for chart display, then apply date bucketing and pivoting
+  const { chartData, seriesKeys } = useMemo(() => {
     let processed = aggregateData(data, xAxisKey, yAxisKeys);
 
     // If x-axis is a date field, bucket by month for cleaner charts
     if (isDateField(xAxisKey, fields)) {
-      // If there are many unique date values, bucket by month
       const uniqueDates = new Set(processed.map(r => toMonthLabel(r[xAxisKey])));
       if (processed.length > uniqueDates.size || processed.length > 12) {
-        processed = bucketByMonth(processed, xAxisKey, yAxisKeys, fields);
+        processed = bucketByMonth(processed, xAxisKey, yAxisKeys, fields, categoryKey);
       } else {
-        // Few enough distinct dates — just format them readably
         processed = formatDateLabelsInData(processed, xAxisKey, fields);
       }
     }
 
-    return processed;
-  }, [data, xAxisKey, yAxisKeys.join(','), fields]);
+    // If there's a category field, pivot it into separate series
+    if (categoryKey && yAxisKeys.length > 0) {
+      const { pivotedData, pivotKeys } = pivotByCategory(
+        processed, xAxisKey, categoryKey, yAxisKeys[0]
+      );
+      if (pivotKeys.length >= 2) {
+        return { chartData: pivotedData, seriesKeys: pivotKeys };
+      }
+    }
+
+    return { chartData: processed, seriesKeys: yAxisKeys };
+  }, [data, xAxisKey, yAxisKeys.join(','), categoryKey, fields]);
 
   // Custom tooltip
   const CustomTooltip = ({ active, payload, label }) => {
@@ -362,7 +438,7 @@ const DynamicChart = ({ data = [], chartType = 'line', config = {}, fields = [] 
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                {yAxisKeys.map((key, index) => (
+                {seriesKeys.map((key, index) => (
                   <Line
                     key={key}
                     type="monotone"
@@ -402,7 +478,7 @@ const DynamicChart = ({ data = [], chartType = 'line', config = {}, fields = [] 
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                {yAxisKeys.map((key, index) => (
+                {seriesKeys.map((key, index) => (
                   <Bar
                     key={key}
                     dataKey={key}
@@ -416,9 +492,10 @@ const DynamicChart = ({ data = [], chartType = 'line', config = {}, fields = [] 
       );
 
     case 'pie': {
-      // For pie chart, use first numeric field
-      const pieDataKey = yAxisKeys[0];
-      if (!pieDataKey) {
+      // For pie chart — use seriesKeys if pivoted, else first numeric field
+      const isPivoted = seriesKeys.length > 0 && seriesKeys[0] !== yAxisKeys[0];
+      const pieDataKey = isPivoted ? null : yAxisKeys[0];
+      if (!isPivoted && !pieDataKey) {
         return (
           <div className="flex items-center justify-center h-full">
             <div className="text-center text-gray-500">
@@ -430,12 +507,22 @@ const DynamicChart = ({ data = [], chartType = 'line', config = {}, fields = [] 
       }
 
       // Transform aggregated data for pie chart
-      const rawPieData = chartData.map((item, index) => ({
-        name: String(item[xAxisKey] ?? 'Unknown'),
-        value: parseFloat(item[pieDataKey]) || 0,
-        fill: COLORS[index % COLORS.length]
-      })).filter(item => item.value > 0)
-        .sort((a, b) => b.value - a.value);
+      let rawPieData;
+      if (isPivoted) {
+        // Pivoted: each series key becomes a pie slice, summed across all x-axis groups
+        rawPieData = seriesKeys.map((key, index) => {
+          const total = chartData.reduce((sum, row) => sum + (parseFloat(row[key]) || 0), 0);
+          return { name: key, value: total, fill: COLORS[index % COLORS.length] };
+        }).filter(item => item.value > 0)
+          .sort((a, b) => b.value - a.value);
+      } else {
+        rawPieData = chartData.map((item, index) => ({
+          name: String(item[xAxisKey] ?? 'Unknown'),
+          value: parseFloat(item[pieDataKey]) || 0,
+          fill: COLORS[index % COLORS.length]
+        })).filter(item => item.value > 0)
+          .sort((a, b) => b.value - a.value);
+      }
 
       // Cap slices to avoid rendering chaos
       const pieData = capPieSlices(rawPieData);
@@ -484,7 +571,7 @@ const DynamicChart = ({ data = [], chartType = 'line', config = {}, fields = [] 
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
                 <defs>
-                  {yAxisKeys.map((key, index) => (
+                  {seriesKeys.map((key, index) => (
                     <linearGradient key={key} id={`color${key}`} x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor={COLORS[index % COLORS.length]} stopOpacity={0.8} />
                       <stop offset="95%" stopColor={COLORS[index % COLORS.length]} stopOpacity={0.1} />
@@ -507,7 +594,7 @@ const DynamicChart = ({ data = [], chartType = 'line', config = {}, fields = [] 
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                {yAxisKeys.map((key, index) => (
+                {seriesKeys.map((key, index) => (
                   <Area
                     key={key}
                     type="monotone"
