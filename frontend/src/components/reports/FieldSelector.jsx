@@ -26,34 +26,8 @@ const FieldSelector = ({ fields = [], selectedFields = [], onChange, categorized
     );
   }, [fields, searchTerm]);
 
-  // Group fields by category if categorized data is provided
-  const groupedFields = useMemo(() => {
-    if (!categorized) return { all: filteredFields };
-
-    const groups = {
-      identification: [],
-      demographic: [],
-      activity: [],
-      financial: [],
-      dates: []
-    };
-
-    filteredFields.forEach(field => {
-      if (field.name?.includes('id')) {
-        groups.identification.push(field);
-      } else if (field.type === 'date') {
-        groups.dates.push(field);
-      } else if (field.type === 'number' || field.name?.includes('amount') || field.name?.includes('value')) {
-        groups.financial.push(field);
-      } else if (field.name?.includes('status') || field.name?.includes('priority') || field.name?.includes('source')) {
-        groups.activity.push(field);
-      } else {
-        groups.demographic.push(field);
-      }
-    });
-
-    return groups;
-  }, [filteredFields, categorized]);
+  // No categories: just return all fields in a flat list
+  const groupedFields = useMemo(() => ({ all: filteredFields }), [filteredFields]);
 
   const handleFieldToggle = (fieldName) => {
     if (selectedFields.includes(fieldName)) {
@@ -114,42 +88,12 @@ const FieldSelector = ({ fields = [], selectedFields = [], onChange, categorized
     );
   };
 
-  const renderCategorized = () => {
-    return Object.entries(groupedFields).map(([category, categoryFields]) => {
-      if (categoryFields.length === 0) return null;
-
-      const isExpanded = expandedCategories[category];
-
-      return (
-        <div key={category} className="mb-4">
-          <button
-            onClick={() => toggleCategory(category)}
-            className="flex items-center justify-between w-full p-2 hover:bg-gray-50 rounded"
-          >
-            <div className="flex items-center space-x-2">
-              {isExpanded ? (
-                <ChevronDown className="h-4 w-4 text-gray-500" />
-              ) : (
-                <ChevronRight className="h-4 w-4 text-gray-500" />
-              )}
-              <span className="text-sm font-semibold text-gray-700">
-                {getCategoryLabel(category)}
-              </span>
-              <span className="text-xs text-gray-500">
-                ({categoryFields.length})
-              </span>
-            </div>
-          </button>
-
-          {isExpanded && (
-            <div className="ml-4 mt-2 space-y-1">
-              {categoryFields.map(renderFieldCheckbox)}
-            </div>
-          )}
-        </div>
-      );
-    });
-  };
+  // No categories: just render all fields
+  const renderCategorized = () => (
+    <div className="space-y-1">
+      {groupedFields.all.map(renderFieldCheckbox)}
+    </div>
+  );
 
   const renderUncategorized = () => {
     return (

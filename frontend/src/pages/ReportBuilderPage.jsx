@@ -293,7 +293,7 @@ const ReportBuilderPage = () => {
                   fields={fields}
                   selectedFields={config.fields}
                   onChange={handleFieldsChange}
-                  categorized={!!categorizedFields}
+                  categorized={false}
                 />
               )}
             </div>
