@@ -328,11 +328,6 @@ const buildSelectClause = (fields, dataSource, groupBy = [], aggregation = 'sum'
       }
     }).filter(Boolean);
 
-    // For count aggregation, always include COUNT(*) as record_count
-    if (aggregation === 'count') {
-      selectParts.push('COUNT(*) as record_count');
-    }
-
     return selectParts.join(', ');
   }
 

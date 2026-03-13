@@ -36,12 +36,20 @@ const isDateField = (fieldName, fieldsMeta = []) => {
  * Determine if a field is truly numeric based on field metadata.
  * Falls back to heuristic only when metadata is unavailable.
  */
-const isNumericField = (fieldName, fieldsMeta = []) => {
+const isNumericField = (fieldName, fieldsMeta = [], sampleData = []) => {
   const meta = fieldsMeta.find(f => f.name === fieldName);
   if (meta) {
     return meta.type === 'number';
   }
-  // No metadata — never treat uuid/date-looking values as numeric
+  // For fields without metadata (e.g. synthetic columns like record_count),
+  // fall back to checking actual data values
+  if (sampleData.length > 0) {
+    const samples = sampleData.slice(0, 10);
+    return samples.every(row => {
+      const val = row[fieldName];
+      return val === null || val === undefined || (typeof val === 'number') || (typeof val === 'string' && val !== '' && !isNaN(Number(val)));
+    });
+  }
   return false;
 };
 
@@ -366,8 +374,8 @@ const DynamicChart = ({ data = [], chartType = 'line', config = {}, fields = [] 
   // Get keys for visualization using field metadata for proper type detection
   const dataKeys = Object.keys(data[0] || {});
 
-  // Determine numeric keys using field metadata (not parseFloat heuristic)
-  const numericKeys = dataKeys.filter(key => isNumericField(key, fields));
+  // Determine numeric keys using field metadata (with data fallback for synthetic columns)
+  const numericKeys = dataKeys.filter(key => isNumericField(key, fields, data));
 
   // X-axis: pick the non-numeric field with the most unique values
   // This avoids labelling every bar "renewal" when source is filtered to one value
