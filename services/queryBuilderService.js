@@ -297,7 +297,9 @@ const sanitizeField = (field, dataSource) => {
  * Build SELECT clause
  */
 const buildSelectClause = (fields, dataSource, groupBy = [], aggregation = 'sum') => {
-  const sanitizedFields = fields.map(f => sanitizeField(f, dataSource));
+  // Always include groupBy fields in SELECT, even if not checked
+  const allFields = Array.from(new Set([...fields, ...groupBy]));
+  const sanitizedFields = allFields.map(f => sanitizeField(f, dataSource));
 
   // Supported aggregation functions
   const AGG_FUNCTIONS = { sum: 'SUM', count: 'COUNT', avg: 'AVG', min: 'MIN', max: 'MAX' };
