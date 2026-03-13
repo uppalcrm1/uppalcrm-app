@@ -169,8 +169,26 @@ const DynamicChart = ({ data = [], chartType = 'line', config = {}, fields = [] 
   // Determine numeric keys using field metadata (not parseFloat heuristic)
   const numericKeys = dataKeys.filter(key => isNumericField(key, fields));
 
-  // X-axis: prefer first non-numeric field; fall back to first key
-  const xAxisKey = dataKeys.find(key => !numericKeys.includes(key)) || dataKeys[0];
+  // X-axis: pick the non-numeric field with the most unique values
+  // This avoids labelling every bar "renewal" when source is filtered to one value
+  const nonNumericKeys = dataKeys.filter(key => !numericKeys.includes(key));
+  const xAxisKey = useMemo(() => {
+    if (nonNumericKeys.length === 0) return dataKeys[0];
+    if (nonNumericKeys.length === 1) return nonNumericKeys[0];
+
+    // Score each candidate by number of unique values in the data
+    let bestKey = nonNumericKeys[0];
+    let bestUniqueCount = 0;
+    for (const key of nonNumericKeys) {
+      const uniqueVals = new Set(data.map(row => row[key]));
+      if (uniqueVals.size > bestUniqueCount) {
+        bestUniqueCount = uniqueVals.size;
+        bestKey = key;
+      }
+    }
+    return bestKey;
+  }, [data, nonNumericKeys.join(',')]);
+
   const yAxisKeys = numericKeys.filter(key => key !== xAxisKey);
 
   // Auto-aggregate data for chart display
