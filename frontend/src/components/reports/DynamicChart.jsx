@@ -20,6 +20,17 @@ import {
 // Maximum number of slices for pie chart before grouping remainder into "Other"
 const MAX_PIE_SLICES = 10;
 
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/**
+ * Check if a field is a date field based on metadata.
+ */
+const isDateField = (fieldName, fieldsMeta = []) => {
+  const meta = fieldsMeta.find(f => f.name === fieldName);
+  if (meta) return meta.type === 'date';
+  return false;
+};
+
 /**
  * Determine if a field is truly numeric based on field metadata.
  * Falls back to heuristic only when metadata is unavailable.
@@ -31,6 +42,83 @@ const isNumericField = (fieldName, fieldsMeta = []) => {
   }
   // No metadata — never treat uuid/date-looking values as numeric
   return false;
+};
+
+/**
+ * Format a date value into a short readable month label like "Feb 2026".
+ * Returns null if the value cannot be parsed as a date.
+ */
+const toMonthLabel = (value) => {
+  if (!value) return 'Unknown';
+  try {
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return null;
+    return `${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Format a date value into a short readable label like "Feb 4, 2026".
+ */
+const formatDateLabel = (value) => {
+  if (!value) return 'Unknown';
+  try {
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return String(value);
+    return `${MONTH_NAMES[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+  } catch {
+    return String(value);
+  }
+};
+
+/**
+ * Bucket date-keyed data by month, summing numeric fields.
+ * Returns the original data if xAxisKey is not a date or bucketing isn't needed.
+ */
+const bucketByMonth = (rows, xAxisKey, numericKeys, fieldsMeta) => {
+  if (!rows || rows.length === 0) return rows;
+  if (!isDateField(xAxisKey, fieldsMeta)) return rows;
+
+  const groups = {};
+  rows.forEach(row => {
+    const label = toMonthLabel(row[xAxisKey]) || 'Unknown';
+    if (!groups[label]) {
+      groups[label] = { [xAxisKey]: label, _count: 0 };
+      numericKeys.forEach(k => { groups[label][k] = 0; });
+    }
+    groups[label]._count += 1;
+    numericKeys.forEach(k => {
+      groups[label][k] += (parseFloat(row[k]) || 0);
+    });
+  });
+
+  // Sort chronologically
+  return Object.values(groups).sort((a, b) => {
+    const parse = (lbl) => {
+      const parts = lbl.split(' ');
+      if (parts.length !== 2) return 0;
+      const mi = MONTH_NAMES.indexOf(parts[0]);
+      const yr = parseInt(parts[1], 10);
+      return yr * 100 + mi;
+    };
+    return parse(a[xAxisKey]) - parse(b[xAxisKey]);
+  });
+};
+
+/**
+ * For data where the x-axis is a date but there are few enough rows
+ * that we don't need monthly bucketing, just format the labels nicely.
+ */
+const formatDateLabelsInData = (rows, xAxisKey, fieldsMeta) => {
+  if (!rows || rows.length === 0) return rows;
+  if (!isDateField(xAxisKey, fieldsMeta)) return rows;
+
+  return rows.map(row => ({
+    ...row,
+    [xAxisKey]: formatDateLabel(row[xAxisKey])
+  }));
 };
 
 /**
@@ -191,10 +279,24 @@ const DynamicChart = ({ data = [], chartType = 'line', config = {}, fields = [] 
 
   const yAxisKeys = numericKeys.filter(key => key !== xAxisKey);
 
-  // Auto-aggregate data for chart display
+  // Auto-aggregate data for chart display, then apply date bucketing
   const chartData = useMemo(() => {
-    return aggregateData(data, xAxisKey, yAxisKeys);
-  }, [data, xAxisKey, yAxisKeys.join(',')]);
+    let processed = aggregateData(data, xAxisKey, yAxisKeys);
+
+    // If x-axis is a date field, bucket by month for cleaner charts
+    if (isDateField(xAxisKey, fields)) {
+      // If there are many unique date values, bucket by month
+      const uniqueDates = new Set(processed.map(r => toMonthLabel(r[xAxisKey])));
+      if (processed.length > uniqueDates.size || processed.length > 12) {
+        processed = bucketByMonth(processed, xAxisKey, yAxisKeys, fields);
+      } else {
+        // Few enough distinct dates — just format them readably
+        processed = formatDateLabelsInData(processed, xAxisKey, fields);
+      }
+    }
+
+    return processed;
+  }, [data, xAxisKey, yAxisKeys.join(','), fields]);
 
   // Custom tooltip
   const CustomTooltip = ({ active, payload, label }) => {
