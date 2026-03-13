@@ -94,10 +94,36 @@ const FilterBuilder = ({ filters = [], onChange, fields = [] }) => {
     // Between operator needs two inputs
     if (filter.operator === 'between') {
       const values = Array.isArray(filter.value) ? filter.value : ['', ''];
+      // For date fields, use vertical layout for more space
+      if (field.type === 'date') {
+        return (
+          <div className="flex flex-col space-y-2 w-56">
+            <div className="flex flex-col">
+              <label className="text-xs text-gray-500 mb-1">From</label>
+              <input
+                type="date"
+                value={values[0] || ''}
+                onChange={(e) => updateFilter(index, { value: [e.target.value, values[1]] })}
+                className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+            <div className="flex flex-col">
+              <label className="text-xs text-gray-500 mb-1">To</label>
+              <input
+                type="date"
+                value={values[1] || ''}
+                onChange={(e) => updateFilter(index, { value: [values[0], e.target.value] })}
+                className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+          </div>
+        );
+      }
+      // For number/text, keep horizontal layout
       return (
         <div className="flex items-center space-x-2">
           <input
-            type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : 'text'}
+            type={field.type === 'number' ? 'number' : 'text'}
             value={values[0] || ''}
             onChange={(e) => updateFilter(index, { value: [e.target.value, values[1]] })}
             placeholder="Min"
@@ -105,7 +131,7 @@ const FilterBuilder = ({ filters = [], onChange, fields = [] }) => {
           />
           <span className="text-gray-500 text-sm">to</span>
           <input
-            type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : 'text'}
+            type={field.type === 'number' ? 'number' : 'text'}
             value={values[1] || ''}
             onChange={(e) => updateFilter(index, { value: [values[0], e.target.value] })}
             placeholder="Max"
