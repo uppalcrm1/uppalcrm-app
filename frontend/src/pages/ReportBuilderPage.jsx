@@ -438,6 +438,7 @@ const ReportBuilderPage = () => {
                       data={reportResults}
                       chartType={config.chartType}
                       fields={fields}
+                      config={config}
                     />
                   )}
                 </div>

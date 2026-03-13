@@ -14,7 +14,8 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  Cell
+  Cell,
+  Label
 } from 'recharts';
 
 // Maximum number of slices for pie chart before grouping remainder into "Other"
@@ -263,6 +264,33 @@ const capPieSlices = (pieData) => {
 };
 
 /**
+ * Get human-readable label for a field name.
+ */
+const getFieldLabel = (fieldName, fieldsMeta = []) => {
+  const meta = fieldsMeta.find(f => f.name === fieldName);
+  return meta?.label || fieldName.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+};
+
+/**
+ * Check if a field represents currency/money.
+ */
+const isCurrencyField = (fieldName) => {
+  const lower = fieldName.toLowerCase();
+  return ['amount', 'value', 'price', 'cost', 'revenue', 'total', 'balance', 'payment'].some(w => lower.includes(w));
+};
+
+/**
+ * Format a value for display, with $ prefix for currency fields.
+ */
+const formatValue = (value, fieldName) => {
+  if (typeof value !== 'number') return value;
+  if (isCurrencyField(fieldName)) {
+    return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+  return value.toLocaleString();
+};
+
+/**
  * DynamicChart Component
  * Renders different chart types based on chartType prop.
  * Accepts optional `fields` metadata array to properly identify numeric vs non-numeric fields.
@@ -347,6 +375,17 @@ const DynamicChart = ({ data = [], chartType = 'line', config = {}, fields = [] 
 
   const yAxisKeys = numericKeys.filter(key => key !== xAxisKey);
 
+  // Build human-readable axis labels
+  const xAxisLabel = getFieldLabel(xAxisKey, fields);
+  const yAxisLabel = useMemo(() => {
+    if (yAxisKeys.length === 0) return '';
+    // If data was aggregated (groupBy or auto), label as "Sum of <Field>"
+    const hasGroupBy = config.groupBy && config.groupBy.length > 0;
+    const willAggregate = data.length > 30 || hasGroupBy;
+    const primaryField = getFieldLabel(yAxisKeys[0], fields);
+    return willAggregate ? `Sum of ${primaryField}` : primaryField;
+  }, [yAxisKeys, fields, config, data.length]);
+
   // Auto-aggregate data for chart display, then apply date bucketing and pivoting
   const { chartData, seriesKeys } = useMemo(() => {
     let processed = aggregateData(data, xAxisKey, yAxisKeys);
@@ -374,15 +413,18 @@ const DynamicChart = ({ data = [], chartType = 'line', config = {}, fields = [] 
     return { chartData: processed, seriesKeys: yAxisKeys };
   }, [data, xAxisKey, yAxisKeys.join(','), categoryKey, fields]);
 
-  // Custom tooltip
+  // Custom tooltip — hides zero values, formats currency
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
+      // Filter out zero-value entries
+      const nonZeroPayload = payload.filter(entry => entry.value !== 0);
+      if (nonZeroPayload.length === 0) return null;
       return (
         <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
           <p className="font-semibold text-gray-900 mb-2">{label}</p>
-          {payload.map((entry, index) => (
+          {nonZeroPayload.map((entry, index) => (
             <p key={index} className="text-sm" style={{ color: entry.color }}>
-              {entry.name}: {typeof entry.value === 'number' ? entry.value.toLocaleString() : entry.value}
+              {entry.name}: {formatValue(entry.value, entry.dataKey || entry.name)}
             </p>
           ))}
         </div>
@@ -394,22 +436,22 @@ const DynamicChart = ({ data = [], chartType = 'line', config = {}, fields = [] 
   // Format Y-axis tick
   const formatYAxis = (value) => {
     if (typeof value !== 'number') return value;
-
-    // If value is large, use K/M notation
+    const prefix = isCurrencyField(yAxisKeys[0] || '') ? '$' : '';
     if (value >= 1000000) {
-      return `${(value / 1000000).toFixed(1)}M`;
+      return `${prefix}${(value / 1000000).toFixed(1)}M`;
     }
     if (value >= 1000) {
-      return `${(value / 1000).toFixed(1)}K`;
+      return `${prefix}${(value / 1000).toFixed(1)}K`;
     }
-    return value.toLocaleString();
+    return `${prefix}${value.toLocaleString()}`;
   };
 
-  // Show aggregation notice
-  const isAggregated = chartData !== data;
-  const AggregationNotice = () => isAggregated ? (
+  // Show aggregation notice — only when client auto-grouped (not when user set Group By)
+  const hasExplicitGroupBy = config.groupBy && config.groupBy.length > 0;
+  const isAutoAggregated = chartData !== data && !hasExplicitGroupBy;
+  const AggregationNotice = () => isAutoAggregated ? (
     <div className="text-xs text-gray-500 text-center pb-1">
-      Data auto-grouped by <strong>{xAxisKey}</strong> ({chartData.length} groups from {data.length} rows) — use Group By for custom aggregation
+      Data auto-grouped by <strong>{xAxisLabel}</strong> ({chartData.length} groups from {data.length} rows) — use Group By for custom aggregation
     </div>
   ) : null;
 
@@ -421,7 +463,7 @@ const DynamicChart = ({ data = [], chartType = 'line', config = {}, fields = [] 
           <AggregationNotice />
           <div className="flex-1">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+              <LineChart data={chartData} margin={{ top: 20, right: 30, left: 40, bottom: 30 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis
                   dataKey={xAxisKey}
@@ -430,12 +472,16 @@ const DynamicChart = ({ data = [], chartType = 'line', config = {}, fields = [] 
                   angle={chartData.length > 10 ? -45 : 0}
                   textAnchor={chartData.length > 10 ? 'end' : 'middle'}
                   height={chartData.length > 10 ? 80 : 60}
-                />
+                >
+                  <Label value={xAxisLabel} position="bottom" offset={chartData.length > 10 ? 65 : 5} style={{ fill: '#374151', fontSize: 13, fontWeight: 600 }} />
+                </XAxis>
                 <YAxis
                   stroke="#6b7280"
                   tick={{ fontSize: 12 }}
                   tickFormatter={formatYAxis}
-                />
+                >
+                  <Label value={yAxisLabel} angle={-90} position="insideLeft" offset={-25} style={{ fill: '#374151', fontSize: 13, fontWeight: 600, textAnchor: 'middle' }} />
+                </YAxis>
                 <Tooltip content={<CustomTooltip />} />
                 <Legend wrapperStyle={{ paddingTop: '20px' }} />
                 {seriesKeys.map((key, index) => (
@@ -461,7 +507,7 @@ const DynamicChart = ({ data = [], chartType = 'line', config = {}, fields = [] 
           <AggregationNotice />
           <div className="flex-1">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+              <BarChart data={chartData} margin={{ top: 20, right: 30, left: 40, bottom: 30 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis
                   dataKey={xAxisKey}
@@ -470,12 +516,16 @@ const DynamicChart = ({ data = [], chartType = 'line', config = {}, fields = [] 
                   angle={chartData.length > 10 ? -45 : 0}
                   textAnchor={chartData.length > 10 ? 'end' : 'middle'}
                   height={chartData.length > 10 ? 80 : 60}
-                />
+                >
+                  <Label value={xAxisLabel} position="bottom" offset={chartData.length > 10 ? 65 : 5} style={{ fill: '#374151', fontSize: 13, fontWeight: 600 }} />
+                </XAxis>
                 <YAxis
                   stroke="#6b7280"
                   tick={{ fontSize: 12 }}
                   tickFormatter={formatYAxis}
-                />
+                >
+                  <Label value={yAxisLabel} angle={-90} position="insideLeft" offset={-25} style={{ fill: '#374151', fontSize: 13, fontWeight: 600, textAnchor: 'middle' }} />
+                </YAxis>
                 <Tooltip content={<CustomTooltip />} />
                 <Legend wrapperStyle={{ paddingTop: '20px' }} />
                 {seriesKeys.map((key, index) => (
@@ -540,7 +590,12 @@ const DynamicChart = ({ data = [], chartType = 'line', config = {}, fields = [] 
                   cx="50%"
                   cy="50%"
                   outerRadius={Math.min(200, window.innerHeight * 0.3)}
-                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                  label={({ name, value, percent }) => {
+                    const formatted = isCurrencyField(yAxisKeys[0] || '')
+                      ? `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                      : value.toLocaleString();
+                    return `${name}: ${formatted} (${(percent * 100).toFixed(0)}%)`;
+                  }}
                   labelLine={{ stroke: '#6b7280' }}
                 >
                   {pieData.map((entry, index) => (
@@ -550,7 +605,7 @@ const DynamicChart = ({ data = [], chartType = 'line', config = {}, fields = [] 
                 <Tooltip
                   formatter={(value) => {
                     if (typeof value === 'number') {
-                      return value.toLocaleString();
+                      return formatValue(value, yAxisKeys[0] || '');
                     }
                     return value;
                   }}
@@ -569,7 +624,7 @@ const DynamicChart = ({ data = [], chartType = 'line', config = {}, fields = [] 
           <AggregationNotice />
           <div className="flex-1">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+              <AreaChart data={chartData} margin={{ top: 20, right: 30, left: 40, bottom: 30 }}>
                 <defs>
                   {seriesKeys.map((key, index) => (
                     <linearGradient key={key} id={`color${key}`} x1="0" y1="0" x2="0" y2="1">
@@ -586,12 +641,16 @@ const DynamicChart = ({ data = [], chartType = 'line', config = {}, fields = [] 
                   angle={chartData.length > 10 ? -45 : 0}
                   textAnchor={chartData.length > 10 ? 'end' : 'middle'}
                   height={chartData.length > 10 ? 80 : 60}
-                />
+                >
+                  <Label value={xAxisLabel} position="bottom" offset={chartData.length > 10 ? 65 : 5} style={{ fill: '#374151', fontSize: 13, fontWeight: 600 }} />
+                </XAxis>
                 <YAxis
                   stroke="#6b7280"
                   tick={{ fontSize: 12 }}
                   tickFormatter={formatYAxis}
-                />
+                >
+                  <Label value={yAxisLabel} angle={-90} position="insideLeft" offset={-25} style={{ fill: '#374151', fontSize: 13, fontWeight: 600, textAnchor: 'middle' }} />
+                </YAxis>
                 <Tooltip content={<CustomTooltip />} />
                 <Legend wrapperStyle={{ paddingTop: '20px' }} />
                 {seriesKeys.map((key, index) => (
