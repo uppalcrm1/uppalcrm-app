@@ -171,11 +171,22 @@ const pivotByCategory = (rows, xAxisKey, categoryKey, numericKey) => {
  * Groups by the first text/select/date field (xAxisKey) and SUMs numeric fields.
  * If data is already aggregated (groupBy was used server-side), returns as-is.
  */
-const aggregateData = (rawData, xAxisKey, numericKeys) => {
+const aggregateData = (rawData, xAxisKey, numericKeys, aggregation = 'sum') => {
   if (!rawData || rawData.length === 0) return rawData;
 
   // If there are ≤30 rows, data is likely already aggregated or small enough
   if (rawData.length <= 30) return rawData;
+
+  const applyAgg = (acc, value, count) => {
+    const num = parseFloat(value) || 0;
+    switch (aggregation) {
+      case 'count': return acc + 1;
+      case 'avg': return acc + num; // divide later by _count
+      case 'min': return count === 1 ? num : Math.min(acc, num);
+      case 'max': return count === 1 ? num : Math.max(acc, num);
+      default: return acc + num; // sum
+    }
+  };
 
   const groups = {};
   rawData.forEach(row => {
@@ -186,11 +197,29 @@ const aggregateData = (rawData, xAxisKey, numericKeys) => {
     }
     groups[groupKey]._count += 1;
     numericKeys.forEach(k => {
-      groups[groupKey][k] += (parseFloat(row[k]) || 0);
+      groups[groupKey][k] = applyAgg(groups[groupKey][k], row[k], groups[groupKey]._count);
     });
   });
 
   const result = Object.values(groups);
+
+  // Finalize avg: divide accumulated sums by count
+  if (aggregation === 'avg') {
+    result.forEach(row => {
+      numericKeys.forEach(k => {
+        row[k] = row._count > 0 ? row[k] / row._count : 0;
+      });
+    });
+  }
+
+  // For count mode, replace numeric values with the count
+  if (aggregation === 'count') {
+    result.forEach(row => {
+      numericKeys.forEach(k => {
+        row[k] = row._count;
+      });
+    });
+  }
 
   // If grouping produced only 1 group (e.g. all source=renewal), fall back to
   // a date-based aggregation if a date field exists in the data
@@ -229,13 +258,24 @@ const aggregateData = (rawData, xAxisKey, numericKeys) => {
         }
         dateGroups[monthKey]._count += 1;
         numericKeys.forEach(k => {
-          dateGroups[monthKey][k] += (parseFloat(row[k]) || 0);
+          dateGroups[monthKey][k] = applyAgg(dateGroups[monthKey][k], row[k], dateGroups[monthKey]._count);
         });
       });
 
-      return Object.values(dateGroups).sort((a, b) =>
+      const dateResult = Object.values(dateGroups).sort((a, b) =>
         String(a[dateKey]).localeCompare(String(b[dateKey]))
       );
+      if (aggregation === 'avg') {
+        dateResult.forEach(row => {
+          numericKeys.forEach(k => { row[k] = row._count > 0 ? row[k] / row._count : 0; });
+        });
+      }
+      if (aggregation === 'count') {
+        dateResult.forEach(row => {
+          numericKeys.forEach(k => { row[k] = row._count; });
+        });
+      }
+      return dateResult;
     }
   }
 
@@ -379,16 +419,18 @@ const DynamicChart = ({ data = [], chartType = 'line', config = {}, fields = [] 
   const xAxisLabel = getFieldLabel(xAxisKey, fields);
   const yAxisLabel = useMemo(() => {
     if (yAxisKeys.length === 0) return '';
-    // If data was aggregated (groupBy or auto), label as "Sum of <Field>"
     const hasGroupBy = config.groupBy && config.groupBy.length > 0;
     const willAggregate = data.length > 30 || hasGroupBy;
     const primaryField = getFieldLabel(yAxisKeys[0], fields);
-    return willAggregate ? `Sum of ${primaryField}` : primaryField;
+    if (!willAggregate) return primaryField;
+    const agg = (config.aggregation || 'sum').toLowerCase();
+    const aggLabels = { sum: 'Sum', count: 'Count', avg: 'Avg', min: 'Min', max: 'Max' };
+    return `${aggLabels[agg] || 'Sum'} of ${primaryField}`;
   }, [yAxisKeys, fields, config, data.length]);
 
   // Auto-aggregate data for chart display, then apply date bucketing and pivoting
   const { chartData, seriesKeys } = useMemo(() => {
-    let processed = aggregateData(data, xAxisKey, yAxisKeys);
+    let processed = aggregateData(data, xAxisKey, yAxisKeys, config.aggregation || 'sum');
 
     // If x-axis is a date field, bucket by month for cleaner charts
     if (isDateField(xAxisKey, fields)) {
@@ -414,6 +456,7 @@ const DynamicChart = ({ data = [], chartType = 'line', config = {}, fields = [] 
   }, [data, xAxisKey, yAxisKeys.join(','), categoryKey, fields]);
 
   // Custom tooltip — hides zero values, formats currency
+  const isCountMode = (config.aggregation || 'sum') === 'count';
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       // Filter out zero-value entries
@@ -424,7 +467,7 @@ const DynamicChart = ({ data = [], chartType = 'line', config = {}, fields = [] 
           <p className="font-semibold text-gray-900 mb-2">{label}</p>
           {nonZeroPayload.map((entry, index) => (
             <p key={index} className="text-sm" style={{ color: entry.color }}>
-              {entry.name}: {formatValue(entry.value, entry.dataKey || entry.name)}
+              {entry.name}: {isCountMode ? entry.value.toLocaleString() : formatValue(entry.value, entry.dataKey || entry.name)}
             </p>
           ))}
         </div>
@@ -436,6 +479,11 @@ const DynamicChart = ({ data = [], chartType = 'line', config = {}, fields = [] 
   // Format Y-axis tick
   const formatYAxis = (value) => {
     if (typeof value !== 'number') return value;
+    if (isCountMode) {
+      if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+      if (value >= 1000) return `${(value / 1000).toFixed(1)}K`;
+      return value.toLocaleString();
+    }
     const prefix = isCurrencyField(yAxisKeys[0] || '') ? '$' : '';
     if (value >= 1000000) {
       return `${prefix}${(value / 1000000).toFixed(1)}M`;

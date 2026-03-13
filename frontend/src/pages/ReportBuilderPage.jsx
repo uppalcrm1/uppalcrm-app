@@ -25,6 +25,7 @@ const ReportBuilderPage = () => {
     fields: [],
     filters: [],
     groupBy: [],
+    aggregation: 'sum',
     orderBy: [],
     limit: 1000,
     chartType: 'table'
@@ -307,7 +308,7 @@ const ReportBuilderPage = () => {
             </div>
 
             {/* Group By Selector */}
-            <div className="p-4">
+            <div className="p-4 border-b border-gray-200">
               <h3 className="text-sm font-semibold text-gray-900 mb-2 flex items-center justify-between">
                 <span>Group By</span>
                 {config.groupBy.length > 0 && (
@@ -317,7 +318,7 @@ const ReportBuilderPage = () => {
                 )}
               </h3>
               <p className="text-xs text-gray-500 mb-3">
-                Group rows for chart aggregation (SUM / COUNT)
+                Group rows for chart aggregation
               </p>
               {fields.filter(f => f.groupable).length > 0 ? (
                 <div className="space-y-1">
@@ -356,6 +357,34 @@ const ReportBuilderPage = () => {
                 </p>
               )}
             </div>
+
+            {/* Measure / Aggregation Selector */}
+            {config.groupBy.length > 0 && (
+              <div className="p-4">
+                <h3 className="text-sm font-semibold text-gray-900 mb-2">Measure</h3>
+                <p className="text-xs text-gray-500 mb-3">
+                  How to aggregate numeric fields
+                </p>
+                <select
+                  value={config.aggregation}
+                  onChange={(e) => setConfig(prev => ({ ...prev, aggregation: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="sum">Sum</option>
+                  <option value="count">Record Count</option>
+                  <option value="avg">Average</option>
+                  <option value="min">Minimum</option>
+                  <option value="max">Maximum</option>
+                </select>
+                <p className="mt-2 text-xs text-gray-400">
+                  {config.aggregation === 'sum' && 'Totals the numeric field values per group'}
+                  {config.aggregation === 'count' && 'Counts the number of records per group'}
+                  {config.aggregation === 'avg' && 'Averages the numeric field values per group'}
+                  {config.aggregation === 'min' && 'Shows the minimum value per group'}
+                  {config.aggregation === 'max' && 'Shows the maximum value per group'}
+                </p>
+              </div>
+            )}
           </div>
         </div>
 

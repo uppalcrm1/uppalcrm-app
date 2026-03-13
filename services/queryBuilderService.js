@@ -296,8 +296,12 @@ const sanitizeField = (field, dataSource) => {
 /**
  * Build SELECT clause
  */
-const buildSelectClause = (fields, dataSource, groupBy = []) => {
+const buildSelectClause = (fields, dataSource, groupBy = [], aggregation = 'sum') => {
   const sanitizedFields = fields.map(f => sanitizeField(f, dataSource));
+
+  // Supported aggregation functions
+  const AGG_FUNCTIONS = { sum: 'SUM', count: 'COUNT', avg: 'AVG', min: 'MIN', max: 'MAX' };
+  const aggFn = AGG_FUNCTIONS[aggregation] || 'SUM';
 
   // If grouping, add aggregations for numeric fields not in groupBy
   if (groupBy && groupBy.length > 0) {
@@ -312,16 +316,22 @@ const buildSelectClause = (fields, dataSource, groupBy = []) => {
       }
 
       const fieldMeta = DATA_SOURCES[dataSource].fields[field];
-      if (fieldMeta.aggregatable) {
+      if (fieldMeta.aggregatable || fieldMeta.type === 'number') {
         const expr = fieldMeta.sqlExpression || field;
-        return `SUM(${expr}) as ${field}`;
-      } else if (fieldMeta.type === 'number') {
-        const expr = fieldMeta.sqlExpression || field;
-        return `COUNT(${expr}) as ${field}_count`;
+        if (aggregation === 'count') {
+          // COUNT always uses COUNT(*) aliased to the field name for clarity
+          return `COUNT(${expr}) as ${field}`;
+        }
+        return `${aggFn}(${expr}) as ${field}`;
       } else {
         return null; // Skip non-aggregatable fields not in groupBy
       }
     }).filter(Boolean);
+
+    // For count aggregation, always include COUNT(*) as record_count
+    if (aggregation === 'count') {
+      selectParts.push('COUNT(*) as record_count');
+    }
 
     return selectParts.join(', ');
   }
@@ -447,14 +457,14 @@ const buildQuery = (config, organizationId) => {
     throw new Error(`Invalid configuration: ${validation.errors.join(', ')}`);
   }
 
-  const { dataSource, fields, filters = [], groupBy = [], orderBy = [], limit = 1000 } = config;
+  const { dataSource, fields, filters = [], groupBy = [], orderBy = [], limit = 1000, aggregation = 'sum' } = config;
   const table = DATA_SOURCES[dataSource].table;
 
   // Start with params array - organization_id is always first
   const params = [organizationId];
 
   // Build SELECT clause
-  const selectClause = buildSelectClause(fields, dataSource, groupBy);
+  const selectClause = buildSelectClause(fields, dataSource, groupBy, aggregation);
 
   // Build WHERE clause (include soft delete and organization filter)
   const whereResult = buildWhereClause(filters, dataSource, params);
