@@ -41,36 +41,11 @@ const getFieldsForDataSource = async (req, res) => {
   try {
     const { dataSource } = req.params;
 
-    const fields = queryBuilderService.getFieldsForDataSource(dataSource);
-
-    // Group fields by category for better UX
-    const categorized = {
-      identification: [],
-      demographic: [],
-      activity: [],
-      financial: [],
-      dates: []
-    };
-
-    fields.forEach(field => {
-      if (field.name.includes('id')) {
-        categorized.identification.push(field);
-      } else if (field.type === 'date') {
-        categorized.dates.push(field);
-      } else if (field.type === 'number' || field.name.includes('amount') || field.name.includes('value')) {
-        categorized.financial.push(field);
-      } else if (field.name.includes('status') || field.name.includes('priority') || field.name.includes('source')) {
-        categorized.activity.push(field);
-      } else {
-        categorized.demographic.push(field);
-      }
-    });
-
+    const fields = await queryBuilderService.getFieldsForDataSource(dataSource);
     res.json({
       success: true,
       data: {
-        all: fields,
-        categorized
+        all: fields
       }
     });
   } catch (error) {

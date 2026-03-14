@@ -527,15 +527,39 @@ const getDataSources = () => {
 /**
  * Get fields for a specific data source
  */
-const getFieldsForDataSource = (dataSource) => {
+
+// Returns a promise that resolves to the real columns for the table
+const getFieldsForDataSource = async (dataSource) => {
   if (!DATA_SOURCES[dataSource]) {
     throw new Error(`Invalid data source: ${dataSource}`);
   }
-
-  const fields = DATA_SOURCES[dataSource].fields;
-  return Object.keys(fields).map(fieldName => ({
-    name: fieldName,
-    ...fields[fieldName]
+  const table = DATA_SOURCES[dataSource].table;
+  // Query information_schema for columns
+  const sql = `SELECT column_name, data_type FROM information_schema.columns WHERE table_name = $1 AND table_schema = 'public' ORDER BY ordinal_position`;
+  const result = await db.query(sql, [table]);
+  // Map SQL types to report types
+  const typeMap = {
+    'character varying': 'text',
+    'varchar': 'text',
+    'text': 'text',
+    'uuid': 'uuid',
+    'integer': 'number',
+    'bigint': 'number',
+    'numeric': 'number',
+    'double precision': 'number',
+    'real': 'number',
+    'date': 'date',
+    'timestamp without time zone': 'date',
+    'timestamp with time zone': 'date',
+    'boolean': 'boolean'
+  };
+  return result.rows.map(row => ({
+    name: row.column_name,
+    type: typeMap[row.data_type] || 'text',
+    label: row.column_name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+    filterable: true,
+    groupable: true,
+    sortable: true
   }));
 };
 
