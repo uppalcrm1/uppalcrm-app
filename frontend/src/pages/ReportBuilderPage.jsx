@@ -60,6 +60,7 @@ const ReportBuilderPage = () => {
     enabled: !!id
   });
 
+
   // Load existing report data
   useEffect(() => {
     if (existingReport?.data) {
@@ -70,6 +71,17 @@ const ReportBuilderPage = () => {
       setIsFavorite(report.is_favorite || false);
     }
   }, [existingReport]);
+
+  // Remove any selected fields that are not in the current field list
+  useEffect(() => {
+    if (!fieldsLoading && Array.isArray(fields) && Array.isArray(config.fields)) {
+      const validFieldNames = new Set(fields.map(f => f.name));
+      const filtered = config.fields.filter(f => validFieldNames.has(f));
+      if (filtered.length !== config.fields.length) {
+        setConfig(prev => ({ ...prev, fields: filtered }));
+      }
+    }
+  }, [fields, fieldsLoading]);
 
   // Execute report mutation
   const executeReportMutation = useMutation({
