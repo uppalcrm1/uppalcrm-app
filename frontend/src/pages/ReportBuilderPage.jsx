@@ -208,8 +208,6 @@ const ReportBuilderPage = () => {
     }
   };
 
-  const fields = fieldsData?.data?.all || [];
-  const categorizedFields = fieldsData?.data?.categorized;
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
