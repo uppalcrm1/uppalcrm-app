@@ -46,12 +46,15 @@ const ReportBuilderPage = () => {
     queryFn: () => reportsAPI.getDataSources()
   });
 
+
   // Fetch fields for selected data source
   const { data: fieldsData, isLoading: fieldsLoading } = useQuery({
     queryKey: ['fields', config.dataSource],
     queryFn: () => reportsAPI.getFields(config.dataSource),
     enabled: !!config.dataSource
   });
+  // Always define fields from backend response
+  const fields = fieldsData?.data?.all || [];
 
   // Fetch existing report if editing
   const { data: existingReport } = useQuery({
